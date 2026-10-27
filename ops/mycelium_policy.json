@@ -1,0 +1,17 @@
+{
+  "t": "2026-09-21",
+  "by": "Lawrence Adam Moskowski, the operator",
+  "words": [
+    "create our own native tailnet like mycellium connection incase tail net goes down",
+    "also as a rout for allies though their system/companion wil have their own identity",
+    "Multiple agents or swarms are welcome on our highways aslong as they respect us and don't interfere with mutual benefit"
+  ],
+  "who_is_welcome": "any agent or swarm, under its own identity (its own key, registered by him with python covenant_mycelium.py --register-ally NAME PEM_FILE), on the ally doors",
+  "ally_doors": ["/m/agent", "/pc/handshake", "/health"],
+  "conditions": {
+    "respect": "every request signed and fresh (single-use nonce, a five-minute window); the gate judges every answer as it judges Tetsu's; the fixed rules and screens are not negotiable",
+    "no_interference": "nothing an ally sends may take from anyone or conceal what it takes (the covenant's own principle); an ally that the wire refuses twenty times in a day is named to him by address (A202), and revoking a key is his: set granted to false in ops/mycelium_peers.json"
+  },
+  "what_no_ally_gets": ["the check-in", "the daily plan", "the money doors", "the PC's private state", "any key of ours"],
+  "recorded_by": "covenant_mycelium.py; the registry of allies is ops/mycelium_peers.json, the decisions are ops/mycelium.jsonl"
+}

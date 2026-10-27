@@ -1,0 +1,24 @@
+{
+ "per_file": {
+  "test_a125_trunk_judges_history.py": 2,
+  "test_a127_refine_not_rebuild.py": 5,
+  "test_b6_balance_batching.py": 1,
+  "test_breakout_ledger.py": 2,
+  "test_c3_guard.py": 3,
+  "test_d1_preflight_deps.py": 1,
+  "test_f2_distill_loop.py": 1,
+  "test_f5_reserve.py": 6,
+  "test_f7_caps.py": 8,
+  "test_g12_inflight.py": 4,
+  "test_gate_proxy.py": 1,
+  "test_k3_p9_owner_only_guard.py": 3,
+  "test_m1_mine_equivalence.py": 5,
+  "test_n1_conformance.py": 3,
+  "test_p20_watchdog_self_eval.py": 2,
+  "test_r2_redundancy.py": 6,
+  "test_rule5_ledger.py": 1,
+  "test_sem4_degraded_model.py": 2,
+  "test_sentinel_gate.py": 1
+ },
+ "total": 57
+}

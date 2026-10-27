@@ -1,0 +1,8 @@
+merkle_root ae78c5822f7a2110a0334ec0b2223a7415656758278d7adc9a2ce2f4ba6808e7
+files       675
+depth       10
+utc         2026-08-29T21:05:19Z
+# Proves membership of ONE file with ~10 sibling
+# hashes, revealing nothing about the others. The flat
+# root in SEAL_ROOT.txt is a separate, older claim and is
+# deliberately unchanged.

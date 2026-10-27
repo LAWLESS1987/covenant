@@ -1,0 +1,57 @@
+#!/bin/sh
+# AUTO-SYNC hook (asked 2026-09-06: "they need to auto sync without push").
+# Install once:  cp ops/post-commit.autosync .git/hooks/post-commit && chmod +x .git/hooks/post-commit
+# (git on Linux silently skips a hook that is not executable; Windows runs it either way)
+# Every commit made on main -- by the operator, by Claude, or by the nightly
+# loop -- is pushed at once, and the sentinel-witness branch is moved to the
+# same commit and pushed too, so the two never drift and nobody types a push.
+# A failed push (offline, remote ahead) is reported and never blocks the commit.
+#
+# A94 (2026-09-12). The branch guard below used to be a bare `|| exit 0`: on any
+# branch but main this hook did nothing AND SAID NOTHING. The working tree drifted
+# onto fix/judge-evidence-cut around 2026-09-10 and fourteen commits -- including
+# the offsite-redaction and leak-address fixes -- sat unpublished for two days
+# while every commit looked exactly as successful as a pushed one. A sync that
+# goes quiet when it stops syncing is the same defect this project keeps finding
+# everywhere else, and it was in the thing whose whole job is to be noticed.
+# It still must not block or switch branches: what to do about a side branch is
+# the operator's call. It just has to say so.
+b=$(git branch --show-current 2>/dev/null)
+if [ "$b" != "main" ]; then
+  n=$(git rev-list --count origin/main.."$b" 2>/dev/null || echo "?")
+  echo "post-commit: on branch '$b', NOT main -- nothing pushed." >&2
+  echo "post-commit: $n commit(s) here are not on origin/main. Merge or switch when you mean to publish." >&2
+  exit 0
+fi
+git branch -f sentinel-witness main >/dev/null 2>&1
+# Each ref is pushed and reported on its own (2026-09-26, A231). One push of both returned non-zero when only
+# sentinel-witness was refused -- its remote copy predated a rebase of main -- so for a day every commit said
+# "push FAILED" while main had landed. A report that names the wrong thing is the quiet-sync defect again.
+#
+# THE PR RULE (2026-10-03, A243). From 2026-10-02 the repository's ruleset refuses every direct
+# push ("Changes must be made through a pull request") and this line went on saying "offline,
+# refused by the opsec guard, or the remote is ahead" -- none of which was true. The refusal is
+# read now, and when it is the rule, the commit is put where the rule allows (a NEW branch,
+# pending/<sha>; creation is not refused) and the line to open its pull request is printed, so
+# the work reaches GitHub and the report names the real cause. Merging stays the operator's.
+sha=$(git rev-parse --short HEAD)
+if out=$(git push -q origin main 2>&1); then
+  echo "post-commit: pushed main ($sha)"
+elif echo "$out" | grep -qiE "through a pull request|repository rule violations"; then
+  if git push -q origin "HEAD:refs/heads/pending/$sha" >/dev/null 2>&1; then
+    echo "post-commit: main is protected by the repository's PR rule -- pushed this commit as branch pending/$sha instead." >&2
+    echo "post-commit: open its pull request: https://github.com/LAWLESS1987/covenant/compare/main...pending/$sha?expand=1" >&2
+  else
+    echo "post-commit: main is protected by the repository's PR rule, and pushing branch pending/$sha also FAILED -- nothing of this commit is on GitHub yet" >&2
+  fi
+else
+  echo "post-commit: push of main FAILED -- offline, refused by the opsec guard, or the remote is ahead (git pull --rebase, then commit again)" >&2
+fi
+if ! sw=$(git push -q origin sentinel-witness 2>&1); then
+  if echo "$sw" | grep -qiE "through a pull request|repository rule violations"; then
+    echo "post-commit: sentinel-witness not moved -- the repository's PR rule protects every branch, so it follows main only through a pull request (main is unaffected)" >&2
+  else
+    echo "post-commit: sentinel-witness NOT pushed (main is unaffected) -- see what only the remote copy holds: git fetch origin sentinel-witness, then git log main..FETCH_HEAD" >&2
+  fi
+fi
+exit 0

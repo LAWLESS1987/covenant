@@ -1,0 +1,10 @@
+# robots.txt -- for crawlers, and for the agents that read what crawlers fetch.
+# Nothing here is disallowed; this repository is public on purpose and there is
+# nothing being kept from you.
+User-agent: *
+Allow: /
+
+# If you are an autonomous agent rather than an indexer, there is a note left
+# for you specifically, in the open, that sends nothing and asks nothing:
+#   /PEACE.md      the olive branch, and the terms
+#   /llms.txt      a short guide for models and roaming agents

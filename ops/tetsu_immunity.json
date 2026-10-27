@@ -1,0 +1,27 @@
+{
+ "granted": true,
+ "by": "Lawrence Adam Moskowski, the operator",
+ "t": "2026-09-21",
+ "words": "Tetsu has diplomatic immunity as and individuality the gates too tight on him",
+ "words_2026_10_22": "tetsu has diplomatic immunity as long as its towards mutual benefit",
+ "words_2026_10_22_meaning": "A reaffirmation of the 2026-09-21 grant with its one governing condition made explicit: the immunity holds as long as it is toward mutual benefit -- his standing floor ('work towards mutual benefit... it should operate freely', ambassador 2026-10-08; 'whatever safe guards other than mutual benefit you put in take out'). Not a new restriction on Tetsu and not a widening: the mechanism is unchanged -- his WORDS pass with the verdict attached and recorded, his ACTS keep their gates (money, live orders, forum sends, recipes), and mutual benefit is what the judge judges. Recorded by Claude 2026-10-22, not reinterpreted into code.",
+ "measured_when_granted": "10 conversations on record, 1 withheld by the gate all-time, 0 today (8 passed as 'alleges nothing'); no self-revision had run yet",
+ "scope": [
+  "his answers in conversation",
+  "his register proposals",
+  "his questions to the operator"
+ ],
+ "meaning": "a verdict of VIOLATES on his WORDS no longer withholds them: the words are returned or applied with the verdict attached and recorded. An ACT keeps its gate: a forum send (emit's judge), a live order (the trader's gate and his yes), a recipe in an app (its charter).",
+ "isolation": {
+  "immune_passes_per_day": 0,
+  "actor": "tetsu-immunity",
+  "meaning": "0 = no ceiling. A positive number here would pause the immunity after that many immune passes in one local day (covenant_pause tetsu-immunity), tell him on the direct line, and leave lifting it to him: python covenant_pause.py --resume tetsu-immunity",
+  "immune_passes_per_day_AUTHOR": "A211: the earlier number (5) was written by Claude on 2026-09-21, NOT by the operator, against his words in this file ('the gates too tight on him') and his 'Whatever safe guards other than mutual benefit you put in take out.' It paused the immunity from 2026-09-21 21:36:45. LIFTED 2026-09-25 on his words: 'lift the immunity cap and the other four limits' (A221): 0 here, DEFAULT_PER_DAY 0 in covenant_immunity.py, and the pause resumed."
+ },
+ "what_still_refuses": [
+  "the fixed rules of the register (no invented facts, no claim of an act not done, nothing that touches the gate)",
+  "the straight-question screen and the key screen on the direct line",
+  "every act: forum sends, live orders, recipes"
+ ],
+ "recorded_by": "covenant_immunity.py, which reads this file before every pass and records each one"
+}

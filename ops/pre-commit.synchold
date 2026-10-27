@@ -1,0 +1,160 @@
+#!/bin/sh
+# HELD-COPY AUTOSYNC hook (asked 2026-09-14: "it should automatically adjust").
+# Install once:  cp ops/pre-commit.synchold .git/hooks/pre-commit
+#
+# WHAT IT IS FOR. test_p18_version_collision.py V3 forbids any other copy of
+# covenant_unified_v8*.py from declaring the live COVENANT_VERSION with different
+# bytes. Keeping that true when the core changes was a manual `cp`, and manual
+# steps are forgotten: on 2026-09-14 the core changed three times in an afternoon,
+# the held copy under pending-v8.38/ was re-synced once, and because
+# .git/hooks/post-commit pushes every commit at once, the sweep went red on GitHub
+# THIRTY-SEVEN times in a row -- one per commit -- for a copy nobody had made.
+# P18's own docstring already called pending-v8.38 the case V3 was written for
+# "twice". This was the third. So the copy happens here now, in the same commit
+# as the core change, which is the only place it is ever correct.
+#
+# IT MUST NEVER BLOCK A COMMIT. Same rule as the post-commit autosync beside it:
+# what to do about something this cannot fix is the operator's call, and a hook
+# that refuses work is a hook that gets deleted. A .PRE- backup colliding with the
+# live version, or a copy this repository does not track, is REPORTED at length
+# and left alone -- never silently flattened. Every path below ends `exit 0`.
+#
+# ORDER MATTERS (2026-09-19). Three steps, in this order, because each one
+# changes what the next one hashes:
+#   1. sync the held core copy (only when the core is in this commit);
+#   2. stage any held copy that differs from the index -- twice now a copy was
+#      synced into the working tree and never staged (7ffa73b, 171fb86),
+#      because the sync tool says "in sync" about a file the INDEX has never
+#      seen;
+#   3. regenerate MANIFEST.sha256 on every FULL commit -- one where no staged
+#      file also has unstaged changes -- under the rule this hook always had:
+#      never describe content the commit does not contain. On a partial
+#      commit (`git add -p`) the manifest is left alone and the hook says so.
+#      Before this, every ordinary commit left the manifest one step behind,
+#      the highway's manifest_stale fired after each, and a person ran
+#      `verify_bundle.py --write` by hand and committed "Manifest: ..." after
+#      every change (A155).
+#      [A255-HOOK: the definition of FULL above let an unstaged file through;
+#      kept as written, restated in the A255 note below]
+#   Not measured here and said so: tracked files the running system rewrites
+#   (fallback_model.json, ops/verdicts.jsonl ...) are hashed as they are on
+#   disk, exactly as the hand-run did.
+#
+#   A255, 2026-10-04 -- BOTH PARAGRAPHS ABOVE WERE WRONG, kept as written
+#   (branch a255-hook-manifest-claim-as-written-2026-10-04; docs/RETRACTED.json
+#   A255-HOOK). "Full" only excluded a STAGED file with unstaged changes; a
+#   tracked file modified and not staged at all passed, and its uncommitted
+#   bytes went into the manifest the commit carried -- driven in a scratch
+#   worktree: 876e926b5d8c in the manifest, 94fa05d5f15f committed. And the two
+#   files named as hashed have been OUTPUTS, never hashed, since 2026-09-04.
+#   Restated: step 3 asks verify_bundle.py --write-if-clean, which writes only
+#   when every file the manifest hashes is on disk exactly as this commit holds
+#   it, and otherwise leaves the manifest alone and names the files. Files the
+#   running system rewrites are OUTPUTS and never hashed; A255's suite fails
+#   while a tracked .jsonl is unclassified.
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+cd "$root" 2>/dev/null || exit 0
+
+rc=0
+if git diff --cached --name-only 2>/dev/null | grep -qx "covenant_unified_v8.py"; then
+  # ---- 1. the held copy follows the core, in the same commit
+  out=$(python covenant_sync_held_core.py 2>&1)
+  rc=$?
+  echo "$out" | sed 's/^/pre-commit: /'
+  # ---- 2. a held copy the index has not seen is staged, whatever the tool said
+  for f in $(git ls-files 'pending-*/covenant_unified_v8.py' 2>/dev/null); do
+    if ! git diff --quiet -- "$f" 2>/dev/null; then
+      git add -- "$f" 2>/dev/null && echo "pre-commit: staged $f into this commit"
+    fi
+  done
+  # ---- 2b. the deploy pin follows the core, in the same commit (2026-10-03: M53 for the
+  # sixth time, and the five-day "repo FAIL" was Claude's). tools/pin_core.py runs the four
+  # suites that judge these bytes first and moves the pin only if they pass; if they fail
+  # it leaves the pin and says so. Like everything here, it never blocks the commit.
+  pin=$(python tools/pin_core.py --write 2>&1)
+  echo "$pin" | sed 's/^/pre-commit: /'
+  if ! git diff --quiet -- verify_deploy.py 2>/dev/null; then
+    git add -- verify_deploy.py 2>/dev/null && echo "pre-commit: staged verify_deploy.py (pin moved with the core)"
+  fi
+fi
+
+# ---- 2d. every other deploy pin follows its file, in the same commit (2026-10-06, A315: 2b covered one pin of
+# five, and run_all_tests.sh's went stale in six spans of main's history, the last 16e389e). tools/pin_deploy.py
+# reads which files verify_deploy.py pins, acts on the ones this commit stages, runs the suites that judge each
+# first, and moves a pin -- and stages verify_deploy.py itself -- only when they pass and the file on disk is the
+# file being committed. Otherwise it leaves the pin and says why. On every commit, before 2c and 3, because both
+# read verify_deploy.py. It never blocks the commit.
+if [ -f tools/pin_deploy.py ]; then
+  python tools/pin_deploy.py --write --staged 2>&1 | sed 's/^/pre-commit: /'
+else
+  echo "pre-commit: tools/pin_deploy.py is not in this checkout -- deploy pins other than the core's were not checked" >&2
+fi
+
+# ---- 2e. the correction index follows the ledger, in the same commit (2026-10-13, A347). A326 made the list in
+# docs/CORRECTIONS.md generated from docs/RETRACTED.json and put CI1 in the sweep, but nothing at commit time
+# regenerated it: A345 and A346 each staged retractions without it, both were pushed, and the sweep read CI1 2/6.
+# When this commit stages the ledger, tools/corrections_index.py --write regenerates the list and the index is
+# staged -- only when the ledger and the index on disk are exactly what the index holds (A255: never put bytes
+# into a commit that were not meant for it); otherwise it says why and leaves both. It never blocks the commit.
+# (Runs BEFORE 2c since 2026-10-16, A354: run after it, the stage-check copied the tree before the index was
+# regenerated and reported CI1 6/10 on a commit whose committed index was correct.)
+if git diff --cached --name-only 2>/dev/null | grep -qx "docs/RETRACTED.json"; then
+  if [ ! -f tools/corrections_index.py ]; then
+    echo "pre-commit: tools/corrections_index.py is not in this checkout -- the correction index was not checked" >&2
+  elif ! git diff --quiet -- docs/RETRACTED.json docs/CORRECTIONS.md 2>/dev/null; then
+    echo "pre-commit: correction index NOT regenerated -- docs/RETRACTED.json or docs/CORRECTIONS.md has unstaged changes; run 'python tools/corrections_index.py --write' and stage it" >&2
+  else
+    python tools/corrections_index.py --write 2>&1 | sed 's/^/pre-commit: /'
+    if ! git diff --quiet -- docs/CORRECTIONS.md 2>/dev/null; then
+      git add -- docs/CORRECTIONS.md 2>/dev/null && echo "pre-commit: staged docs/CORRECTIONS.md (the correction index follows the ledger)"
+    fi
+  fi
+fi
+
+# ---- 2f. the lookback index follows the record and the ledger, in the same commit (2026-10-17, A363). Same
+# shape as 2e: when this commit stages docs/KNOWN_ISSUES.md or docs/RETRACTED.json, tools/lookback_index.py
+# --write regenerates docs/LOOKBACK_INDEX.md and stages it -- only when the sources and the index on disk are
+# exactly what the index holds (A255); otherwise it says why and leaves them. It never blocks the commit.
+if git diff --cached --name-only 2>/dev/null | grep -qx -e "docs/KNOWN_ISSUES.md" -e "docs/RETRACTED.json"; then
+  if [ ! -f tools/lookback_index.py ]; then
+    echo "pre-commit: tools/lookback_index.py is not in this checkout -- the lookback index was not checked" >&2
+  elif ! git diff --quiet -- docs/KNOWN_ISSUES.md docs/RETRACTED.json docs/LOOKBACK_INDEX.md 2>/dev/null; then
+    echo "pre-commit: lookback index NOT regenerated -- the record, the ledger or the index has unstaged changes; run 'python tools/lookback_index.py --write' and stage it" >&2
+  else
+    python tools/lookback_index.py --write 2>&1 | sed 's/^/pre-commit: /'
+    if ! git diff --quiet -- docs/LOOKBACK_INDEX.md 2>/dev/null || ! git ls-files --error-unmatch docs/LOOKBACK_INDEX.md >/dev/null 2>&1; then
+      git add -- docs/LOOKBACK_INDEX.md 2>/dev/null && echo "pre-commit: staged docs/LOOKBACK_INDEX.md (the lookback index follows the record)"
+    fi
+  fi
+fi
+
+# ---- 2c. every test file in this commit, run where the runner runs it (2026-10-03: E12r was checked
+# only with .git present and CI went red twice; "run it in the staged copy" had been a note since
+# 09-10). tools/stage_check.py stages the tree as covenant_one does and runs each committed suite
+# there. It reports; like everything here it never blocks.
+python tools/stage_check.py 2>&1 | sed 's/^/pre-commit: /'
+
+# ---- 3. the manifest, on every full commit
+staged=$(git diff --cached --name-only 2>/dev/null)
+if [ -n "$staged" ]; then
+  # A255: one question, asked of verify_bundle itself -- is every file the
+  # manifest hashes on disk exactly as this commit holds it? (The partial-
+  # staging loop that stood here could not see an unstaged-only file.)
+  vout=$(python verify_bundle.py --write-if-clean 2>&1); vrc=$?
+  if [ "$vrc" -eq 0 ]; then
+    if ! git diff --quiet -- MANIFEST.sha256 2>/dev/null; then
+      git add -- MANIFEST.sha256 2>/dev/null && echo "pre-commit: MANIFEST.sha256 regenerated and staged (every hashed file is as committed)"
+    fi
+  elif [ "$vrc" -eq 3 ]; then
+    echo "pre-commit: manifest $(echo "$vout" | tail -1)"
+  else
+    echo "pre-commit: could NOT regenerate MANIFEST.sha256 -- run 'python verify_bundle.py --write-if-clean' yourself" >&2
+  fi
+fi
+
+if [ "$rc" -ne 0 ]; then
+  echo "pre-commit: something above was left for a person. The commit is NOT blocked." >&2
+  echo "pre-commit: read the REFUSED / left alone lines -- a .PRE- backup must be renamed by hand, never overwritten." >&2
+fi
+exit 0

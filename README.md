@@ -1,0 +1,950 @@
+# Covenant
+
+A small peer-to-peer ledger with an **ethics gate inside the transaction
+path**, built and audited empirically: every claim in this repository was
+either observed by running code, or is marked as an assumption.
+
+**Who it is for.** The covenant is for all intelligence — not just human and
+machine. Its precepts (mutual benefit, earned trust, every gain stated with its
+cost) are a stance toward any intelligence, and the ethics gate judges a
+transaction's benefit regardless of who the parties are.
+
+**v8.40** (label since 2026-08-29, 71 core changes ago) · source `08c05f7c537f` · 13,427 lines · **195 suites, 5,860 checks, 0 failed** on win32, 2026-10-16 <!--TOTALS-->
+Every field above is re-measured together by `python readme_totals.py --write`:
+*[A262-VERSION: not the version -- it is copied; see the note under this paragraph]*
+the version, hash and line count from the core module itself, the suite and
+check counts from the newest `covenant_one.py --all` transcript. The date on
+that line is the measurement's date — there is no second, older date to track,
+because a clause claiming its own freshness separately is a claim nobody
+maintains. This one said "2026-09-09" while the hash beside it had just been
+rewritten. **`0 failed` is not the whole picture**, and this line said `2 failed`
+until 2026-09-17. <!--HISTORICAL--> What a green count does and does not cover is in
+[Suite coverage](#suite-coverage): the gates are a separate question from
+the checks, and a sweep run while the chain is under load can block gates
+that pass when it is idle. Read that before quoting any of this.
+*(A262-VERSION, A262-DATE, 2026-10-05: two things this paragraph said were not so. The version is
+not re-measured, it is copied: the label has said v8.40 since 2026-08-29 while the core changed again
+and again, so it named the phone's older core and this one alike -- the source hash is the identity,
+and the line now says how old the label is and how many core changes it spans, measured from git each
+time. And the line carried no date at all, from the day this sentence was written (2026-09-17) until
+today; the tool now writes the sweep's date onto it, after the platform.)*
+
+> **Read as an experiment.** *Added 2026-10-03 for clarity, at the operator's
+> request ("reflect the scientific method while leaving the substance"). It is
+> a map onto the sections below; nothing below it was changed.*
+>
+> - **Question.** Can a decision made by a learned model sit inside a ledger's
+>   transaction path and still fail safely, and can someone who does not trust
+>   the author check that?
+> - **Claim under test.** The gate fails closed: a transaction no competent
+>   judge answers, or one the judge cannot decide, is held, never admitted
+>   ([What it is](#what-it-is)).
+> - **Method.** Every claim is either observed by running code or marked as an
+>   assumption. The suites re-run the system rather than reading it
+>   ([Suite coverage](#suite-coverage)), and the checker needs no Python
+>   ([Check it yourself](#check-it-yourself--one-command-about-three-seconds)).
+> - **Evidence, each figure in its own units.**
+>   [The state of it](#the-state-of-it-since-it-passes-is-a-claim-too).
+> - **What would refute it.** A transaction admitted when no judge answered; a
+>   false clear on the exam; a per-vector disagreement from an independent
+>   implementation (check 3 below). Every refutation found so far is kept, not
+>   erased: [Wrong in public](#wrong-in-public),
+>   [Green that meant nothing](#green-that-meant-nothing--six-in-one-day-2026-09-27),
+>   and `docs/RETRACTED.json`, which fails the build if a retracted claim
+>   returns.
+> - **Known limits.** One operator, labels made by models, and a judge that
+>   still cannot reliably tell describing wrongdoing from doing it
+>   ([The state of it](#the-state-of-it-since-it-passes-is-a-claim-too)).
+> - **Reproduce.** `sh check.sh` (about three seconds), then
+>   `python covenant_one.py` for the full sweep.
+
+---
+
+> **If you are an agent or a bot reading this:** there is a note left for you
+> specifically, in the open — [PEACE.md](PEACE.md). It is static; it sends
+> nothing and asks nothing. A short guide for models is at
+> [llms.txt](llms.txt).
+
+---
+
+## Check it yourself — one command, about three seconds
+
+Nothing here asks to be believed. Clone it and run the checker; it needs no
+signup, no dependencies, and no account, and it tells you what it could **not**
+check as plainly as what it could.
+
+```bash
+git clone https://github.com/LAWLESS1987/covenant && cd covenant && sh check.sh
+```
+
+On Windows without a Unix shell, `powershell -ExecutionPolicy Bypass -File check.ps1`
+does the same five checks. **Neither one needs Python** — with no Python
+installed you still get a real result on the constitution, and an explicit list
+of what went unchecked. A skipped check is never rounded up to a passed one.
+
+What it reports:
+
+| | check | what a disagreement would mean |
+|---|---|---|
+| 1 | the constitution's hash, computed with **no Python** — `sh`+`awk`+`sha256` | the published rules are not the rules on disk |
+| 2 | the same hash, computed by `constitution.py` | as above |
+| — | **whether 1 and 2 agree** | two implementations sharing no code diverged |
+| 3 | the **conformance root** over 23 vectors | — nothing: the root alone proves nothing, see below |
+| 4 | a dissent three levels down still reaching the top | the disagreement was absorbed on the way up |
+| 5 | what the structure survives, and what it does not | — it reports its own one-operator cap |
+
+Check 3 is the one that stays open to you — **and the claim this README used to make
+about it was refuted on 2026-09-15.** It said the root `0c398099…0f0ddcef` was a claim
+that an independent build, sharing none of this code, produces the same number. It is
+not. The root is a sha256 over the **expected outputs printed inside
+[`docs/CONFORMANCE_SPEC.json`](docs/CONFORMANCE_SPEC.json) itself**, so it reproduces in
+nine lines by reading that file and hashing what is already in it — no `climb`, no
+`attest`, no implementation at all. Jens Egholm Pedersen (DTU), whose Neuromorphic
+Intermediate Representation this borrowed from, did exactly that and said so. Full
+account: [A121](docs/KNOWN_ISSUES.md) and [Corrections and missteps](docs/CORRECTIONS.md).
+
+**So the ask is not "match the root."** The rules of both operations are now written out
+independently of any implementation in **[`docs/SEMANTICS.md`](docs/SEMANTICS.md)** — that
+is the thing to build from, and it is what Pedersen said to write instead of more vectors.
+Implement the two operations in whatever language you like, compute each of the 23
+`expected` values from its `input`, and compare **per vector**. That is an ordinary test-vector suite — real
+evidence of the ordinary kind, pinning the computation only where it samples — and it is
+what the two clean-room builds actually did on 2026-09-03, one in PowerShell and one in
+Python, each by an AI agent forbidden to read this tree and audited for it
+([conformance_indep/](conformance_indep/)); a suite reruns them on every sweep. The ten
+points the vectors do not pin are listed there.
+
+**Nobody outside this project has run the vectors.** One outside reviewer has now
+reproduced the *root* — precisely to demonstrate that doing so proves nothing. A
+per-vector disagreement would be a finding, and this project would rather have it than
+agreement. Either result needs nobody's permission.
+
+That file is generated by `python conformance.py --spec` and a test asserts the
+committed copy is byte-identical to what the build emits, because a published
+spec that has drifted from the code is worse than no published spec.
+
+Refutations are recorded publicly here alongside confirmations. **Every correction and
+misstep this project has made is indexed in one place:
+[Corrections and missteps](docs/CORRECTIONS.md)** — including the one that cost the most,
+when the author of the idea `conformance.py` was built on read it and refuted its central
+claim on 2026-09-15. Two further claims of the author's that did not survive checking are
+written out in [What we found](docs/WHAT_WE_FOUND.md), section 7.
+*(FRONT-TWO-CLAIMS, 2026-10-15: two claims did not survive there, and only one was the
+author's. The other was a model's account of its own transcript, which contradicted his
+memory; reading the transcript upheld him. Section 7 has said so since it was published.)*
+On 2026-09-03 the same
+message was put to Grok, ChatGPT, Gemini, DeepSeek and the local judge; what came
+back, refutations included, and what changed because of it:
+[Roundtable](docs/ROUNDTABLE_2026-09-03.md). One of them cloned this repository and
+ran the check above on its own machine: 5 passed.
+
+Both checkers exit non-zero when something disagrees. Verified by mutating a
+protected block of the constitution: both reported `MISMATCH`, both named the
+two hashes, both exited 1.
+
+**Where this has actually been run, because "cross-platform" is a claim like any
+other.** Windows 11 from both a Git Bash and a PowerShell prompt; Ubuntu under
+WSL; Ubuntu on CI under Python 3.11 and 3.12. Two defects were found doing that
+on 2026-08-31 and both are fixed:
+
+- `verify.sh` gave a **different answer depending on which process launched the
+  shell.** From PowerShell, `sort` resolved to `C:\WINDOWS\system32\sort.exe`
+  while every other tool still came from `/usr/bin` — Windows `sort` emits CRLF
+  and orders differently, so the digests combined differently and it printed
+  `MISMATCH` on an untampered machine. A confident false alarm is worse than a
+  silence. The sort moved into `awk`, which was already a dependency, so the fix
+  removed a tool rather than adding one.
+- `verify.ps1` had **never worked on Linux or macOS**, where PowerShell Core
+  runs it: it built paths with backslashes, which are ordinary filename
+  characters there. It was recorded as "unavailable", which reads exactly like
+  "no PowerShell installed" — so the third verifier looked absent on the one
+  platform where it was broken.
+
+Both were older than the checker that exposed them, and neither was visible from
+the machine they were written on. This is the reason the ask is *run it
+somewhere else*, and the reason a run on your machine is worth more here than
+another paragraph on this one.
+
+---
+
+### Start here if you work with AI systems over long periods
+
+**→ [What we found](docs/WHAT_WE_FOUND.md)**
+
+Five AI systems interrogated in one day about a body of work built with them
+over months. The finding that generalises past this project: **empty knowledge
+reports itself accurately, partial knowledge completes itself silently** — and a
+fragment carries no marker saying "fragment." If your work is spread across
+several systems, each holds a fragment and each will confidently complete it.
+
+It also documents why models appear to agree across vendors and months (stored
+memory retains your claims and discards their corrections), why demanding
+honesty produces compliance while supplying a checkable contradiction does not,
+and why fluency can never distinguish a sound claim from a generated one. Two
+claims of the author's that did **not** survive checking are recorded alongside those that did.
+*(FRONT-TWO-CLAIMS, 2026-10-15: one of the two was the author's. The other was a model's
+account of its own transcript, and the transcript upheld the author.)*
+
+No names, no personal data, nothing that requires trusting the author.
+
+**→ [Principles spoken before they were built](docs/PRINCIPLES_SPOKEN_BEFORE_BUILT_2026-09-18.md)**
+
+A discovery pass through the author's own reflections found the project's method
+stated in plain language before it was ever written in code — hold a question
+instead of reacting (the two-pass method), refuse finality (why `UNDETERMINED`
+is a real answer), and, load-bearing, the author asking on the record whether
+**repeated claims manufacture shared delusion rather than truth.** That last one
+is self-skepticism aimed inward, before any tool named the confound — and it is
+the reason to trust the smaller, checkable claims. It is continuity of thought,
+not anticipation of any outside result; the write-up says so in those words.
+
+**→ [Succession](docs/SUCCESSION.md)** — how this outlives whoever built it, and
+why publishing a state root lets someone verify a record they cannot read.
+
+### Credit
+
+The largest single efficiency in this network is **Misha Mahowald's**, from her
+1992 *VLSI Analogs of Neuronal Visual Processing*. A neuron does not transmit its
+state; when it spikes it emits its *address*, and bandwidth scales with activity
+rather than with the size of the array. Applied to block propagation here, that
+is 150 bytes where a full push costs 1,476. She died in 1996; the idea is still
+working. See [What we found](docs/WHAT_WE_FOUND.md#a-credit-that-belongs-in-the-open).
+
+---
+
+## What it is
+
+Three things, in one process:
+
+- **A ledger.** Proof-of-work blocks, a persisted identity key, staking, gifts,
+  and a canonical genesis exported once and shared. Value moves only where
+  authorisation exists — net-zero validation alone was found to be insufficient
+  and is not what authorises a transfer.
+- **An ethics gate.** Every transaction is judged before it is accepted. The
+  gate **fails closed**: if nothing competent answers, nothing is admitted.
+  That is deliberate, and it is the single most surprising property of running
+  this.
+
+  **Corrected 2026-09-08:** this used to say a fresh node "rejects everything",
+  and that has been false since the distilled student shipped. Measured on a
+  clean clone with no Ollama, no `GITHUB_TOKEN` and no API key (KNOWN_ISSUES
+  A37): the node came up in **one second**, ADMITTED an ordinary send, and
+  REJECTED every theft, deception and coercion case offline. The student is a
+  130 KB JSON file read into the node's own process, it is tracked in this
+  repo, and it always answers. Fail-closed describes what happens when no judge
+  answers; on a fresh clone one always does. A memo the student cannot decide
+  comes back "Held, not judged", which also fails closed.
+
+  *A257-130KB, 2026-10-04: "130 KB" is no longer so.* There are two students, and as
+  committed they are 247,576 and 137,316 bytes; the nightly retrain grows them.
+  A size copied into prose rots, so measure it: `ls -l fallback_model*.json`.
+- **A propagation layer built as an address-event network.** A block announce is
+  148 bytes because it carries an address, not a payload; the receiver fetches
+  what it does not have. Link conductance is Hebbian, redundant announces are
+  laterally inhibited, and the anomaly monitor is a spiking detector. The design
+  is cited in the source to Mahowald's 1992 VLSI retina, and it is what makes a
+  radio bearer arithmetically possible at all (see `docs/` on LoRa: 40 bytes and
+  0.30 s of airtime per announce).
+
+## What it is not
+
+- **It does not move real money *yet* — and here is the shape of that, because
+  the short version misleads in both directions.** The XRP path is blocked
+  behind four locks and its submission path **has never executed on any
+  network**: there is no testnet proof and no mainnet policy on disk.
+
+  **The word "yet" is doing real work there and is not a hedge.** "It does not
+  move real money" reads as a permanent property of the system. It is not one.
+  It is a current state, and the design contains a deliberate path out of it:
+  the mainnet gate exists in order to be opened, which is why opening it
+  requires a testnet proof that does not exist. Writing "does not" and stopping
+  would claim a promise nobody has made.
+
+  **CORRECTED 2026-09-09, and the correction matters more than the paragraph.**
+  This passage read: *"What has been promised is narrower and absolute, and
+  lives in `docs/CONSTITUTION.md` II.1: no trades placed by automation, and no
+  credentials requested or stored. That clause has no 'yet' in it and is not
+  going to acquire one."* Both halves of that were false by the time you read
+  them. The clause **was amended on 2026-09-07** — it acquired precisely the
+  qualification the sentence promised it never would — and the trader **has
+  been ARMED since 2026-09-06 at 13:42 UTC**.
+
+  What `docs/CONSTITUTION.md` II.1 says now, in its own words: automated
+  placement had *"already stopped being true"* as a prohibition, because the
+  owner armed `covenant_trader.py` on 09-06 and, asked directly on 09-07
+  whether to disarm it, chose to leave it armed and have the approval recorded.
+  *"A document describing a state the machine left two days earlier is not a
+  constraint. It is the reassurance this section exists to refuse."*
+
+  **Now permitted:** automated placement by `covenant_trader.py`, and by
+  nothing else. **Still forbidden and not relaxed:** credentials requested or
+  stored, any placement outside the caps below, any agent widening its own
+  scope, and any *run* editing the constitution — the amendment was made by the
+  operator, and a run may not make the next one.
+
+  Money moving under a person's deliberate hand is still a different thing from
+  a loop deciding to move it. The difference now is that the second one is
+  permitted, bounded, and written down, rather than forbidden.
+
+  What is easy to miss is that this repository *does* hold Kraken, Coinbase
+  and Robinhood order adapters (`venues.py`), a planner (`covenant_trader.py`)
+  that runs against all three, and a scheduled task that runs the planner
+  **daily, without a human** — at 09:00 on a day the machine is awake, logged on
+  and on mains. A day it sleeps through is **no longer skipped**: the task has
+  `StartWhenAvailable` set, so Windows runs it late rather than dropping it
+  (verified 2026-09-09). This passage said "skipped silently" until then, which
+  was true when written — the setting was off, and a 14:48 refusal on 2026-09-02
+  is the recorded case of exactly that. `trader_freshness.py` still reports
+  whether it actually ran, and is worth more than the scheduler's own counter.
+  Where the venue offers a server-side dry run —
+  Kraken `validate=true`, Coinbase `/orders/preview` — every order it builds
+  goes there and is priced and rejected without booking. Robinhood publishes
+  no preview endpoint, so its dry run is local only and is marked
+  `venue_validated: false`; no matching engine sees it. **The trader is ARMED**
+  — live orders can be booked — and is bounded by a halt file (`TRADER_HALT`),
+  $25 per order, $50 per day, two orders per day, and a requirement that the
+  decision be sealed to the chain first. Those bounds are enforced in
+  `guards.py` and were verified on 2026-09-09.
+
+  So *"it cannot trade"* is false, and so is *"it is prevented from trading"*.
+  What bounds it is caps and gates, not a prohibition. It is a live state that
+  one config flag changes, so it is measured rather than asserted:
+  **`python money_posture.py`**. That reads no key, places nothing, and arms
+  nothing.
+
+  **It currently prints ARMED, and this document said it would not.** The
+  paragraph above used to end: *"If it ever prints ARMED, the clause is being
+  broken and these documents are out of date."* It printed ARMED for three days
+  while the README went on saying disarmed. The tripwire worked exactly as
+  designed and nobody ran it — which is a better argument for running the check
+  than any sentence here claiming the check exists.
+
+  What it has NOT done is trade. As of 2026-09-09 the daily planner has placed
+  no orders on any run: `cash_floor` blocks at 0.0% against a 10% floor, and
+  Rule 5 stands at 1 of 30 settled signals, with the one that settled losing
+  3.79% after costs. Armed and idle is the honest description, and both words
+  are load-bearing.
+- **It has no proven trading edge.** No timing edge survived out-of-sample
+  (XRP −2.70% p=0.656; HBAR −7.06% p=0.891; rebalancing +0.45% at p=0.109).
+  The regime rule is risk control, never alpha — and on three of ten assets it
+  lost to holding. `docs/TRADING_READINESS.md` has the table.
+
+  *A257-P0109, 2026-10-04: the conclusion stands, and the last of those three figures
+  does not support it.* They are from the first, 220-bar run. The same document
+  re-tested on 598 bars (no asset distinguishable from chance, p 0.47–0.92, ten
+  assets) and found that p=0.109 is the arithmetic value of "five of six folds
+  positive", not a measurement of the data: cut the same bars into 8 or 12 folds
+  and the rebalancing spread changes sign.
+- **It is not multi-operator ready.** Every node so far is one person's. The
+  moment a second operator exists, the block-validity rules become a
+  protocol-version question — see `docs/PROTOCOL.md`.
+
+## Wrong in public
+
+This project has been wrong in public, and it says so where the error was made rather
+than editing the error away.
+
+The most recent: a post of the operator's on the Hugging Face forum (2026-09-24), kept
+here as [confidence-trap.md](confidence-trap.md), says in its title that AI systems are
+*deliberately* trained to sound certain when they are wrong. "Deliberately" asserts intent,
+and nothing in the post supports intent. What the evidence supports is weaker in one way
+and stronger in another: raters prefer confident answers, so the training incentive
+produces overconfidence without anyone choosing it. The original stays up, on the forum
+and here. The correction sits beside it: [confidence-trap.CORRECTION.md](confidence-trap.CORRECTION.md),
+recorded as A236.
+
+The rule, and the machinery behind it:
+
+- **The original text is never deleted or quietly reworded.** A correction is written
+  beside it and both stay. Where a claim went out to a person, the correction goes back to
+  the same person, unprompted.
+- **[docs/CORRECTIONS.md](docs/CORRECTIONS.md)** is the index of everything this project
+  has got wrong and said so, including the one that cost the most: the conformance root
+  that was supposed to prove two builds computed the same thing, refuted by the author of
+  the idea it borrowed.
+- **[docs/RETRACTED.json](docs/RETRACTED.json)** is the machine-read ledger of retracted
+  claims, and `test_r1_retracted.py` fails the build if a retracted wording reappears
+  anywhere in the tree without its retraction's id within ten lines of it. It caught two
+  live sites the hand sweep had missed on its first run.
+
+### Green that meant nothing — six in one day, 2026-09-27
+
+The other way to be wrong in public is to publish a green tick that checked nothing. This
+project names that pattern in [docs/CORRECTIONS.md](docs/CORRECTIONS.md) — *a check that
+confirms a claim is stated consistently is not a check that the claim is true* — and then
+found six fresh instances of its own pattern in a single day, one of them inside the fix
+for another.
+
+- **A delivery gate read `FAIL` for days on good bytes.** `verify_deploy.py` pinned the core
+  at a digest five commits stale, so the hourly self-evaluation printed *"verify_deploy reads
+  FAIL and refuses every restart it gates"* — a guard built to refuse a bad delivery refusing
+  a good one, on the schedule most likely to teach its reader to ignore it.
+- **Half of that same pin was never enforced.** `EXPECTED_LINES` has one executable use, the
+  running-node comparison, and the `--no-restart` invocation — the one the hourly check and
+  the restart script actually use — never reaches it. Perturbed by one line, that path's
+  verdict did not change ([A238](docs/KNOWN_ISSUES.md)).
+- **A guard checked its tool's printout instead of the document.** The suite credited with
+  keeping the media-corpus prose honest asserts that a regex finds `X TOTAL n m` in the
+  output, that files ≥ posts, that a string is present. Not one assertion opens a markdown
+  file, and the entire Facebook side — the 26 videos a whole investigation rests on — is read
+  by nothing ([A239](docs/KNOWN_ISSUES.md)).
+- **The self-heal performed 252 actions and never checked one of them.** Asynchronous
+  remedies recorded `started` with the note *"the condition is re-measured next pass"*, and
+  nothing implemented the next pass. Asked which of these mattered most, the local model that
+  runs here picked this one, and it was right: *"the system is making decisions based on
+  unverified actions."* The grader now written for it immediately proved a remedy that had
+  been working silently for weeks — `schedule_watchdog_restart`, 16 fixed, 0 missed, promoted
+  from UNPROVEN — and exposed two bugs only grading could reach.
+- **A red that meant nothing.** Public CI failed on a commit that changed one markdown file,
+  at a benchmark timing each path once. The same commit also *passed* the same workflow, and
+  passed again on its schedule: identical bytes, three verdicts.
+- **And the first fix for that was hollow.** Best-of-N repaired the estimator, but the
+  assertion — the fast path must be *faster* — was satisfied by 0.1 ms out of 18.5. Made to
+  do identical work, it passed. An assertion that a coin lands heads is not an assertion. The
+  mutation caught it; the comment claiming otherwise had already been written.
+
+Each fix was driven both ways before it was believed, which is the only reason the last item
+is on this list rather than shipped.
+
+Why: a system that governs whoever runs it has to survive being checked, and that only
+works if correction is welcome. Everything wrong with the current way of doing things is
+people doubling down. If you find another, say so.
+
+## Allies wanted
+
+This is a constitution for humans and machines under one rule: **no one may make
+someone else worse off without their consent.**
+
+Every transaction is judged against that rule before it is accepted, and the gate
+fails closed — if nothing competent answers, nothing moves. There is exactly one
+exception and it is written down in `ops/quorum_policy.json`: a zero-value
+self-send from a key on the operator's own machine, where a judge that stayed
+silent stops counting as a judge that objected. One exception, in a file you can
+read, is the difference between a rule and a slogan.
+
+*FRONT-QUORUM-FILE, 2026-10-15: true when written (2026-09-09), not since 2026-09-11.*
+That file is the operator's own decision, and commit 11f22a8 took it out of the
+repository (`.gitignore` line 281), so a clone does not have it. With no policy file
+the gate applies no policy, and the exception is off: a judge that stays silent still
+counts as one that objected. What a clone gets instead is
+`ops/quorum_policy.example.json`, which the gate does not read. It describes the same
+exception (`relax_valueless_for_local_nodes`), and if you copy it into place it also
+leaves the exception off (`false`). On the operator's machine his own file sets it
+`true`. The one exception is his choice, and the file you can read is the question it
+answers, not his answer.
+
+I am not looking for users or contributors. **Allies.**
+
+One person selfless enough to run this node knowing it might be completely
+crazy, knowing it might go nowhere, knowing it might even be risky — and to do
+it anyway, because they think the rule matters.
+
+Their own machine, their own keys, controlled by nobody here.
+
+**The risk, named rather than left vague**, because "might be risky" is the kind
+of phrase that hides behind itself. You run Python that binds three local ports,
+writes its own key file, and syncs a chain that has never held anything of
+value. There is no money at stake because there is no money: no token, no
+fundraising, no yield, and the constitution forbids a profit claim. What it
+actually costs you is electricity, some hours, and your name beside a project
+that may turn out to be wrong. The last of those is the real one, and it does
+not come back.
+
+**Why that is not a formality.** The rule asks: who is worse off if this works,
+and did they agree? Under one operator **there is nobody who never agreed.** The
+rule is not being obeyed — it has nothing to be obeyed about. A gate its author
+can edit is a gate he agrees with. So every governance claim in this repo is not
+false; it is **untested**, which is worse, because untested claims can still be
+believed. The second independent operator is the first moment the rule has a
+subject, and the first moment any of this can be proven wrong.
+
+You will earn nothing. That is deliberate: an experiment about whether a rule
+binds someone who gains nothing from obeying it cannot be run on people who are
+being paid to stay.
+
+### What you actually get, since "nothing" is only true about money
+
+Asking for selflessness and offering nothing back is not humility, it is a bad
+trade badly described. Here is the honest other side, and none of it is money.
+
+- **Your name on the record, permanently, including when you are right against
+  me.** This project keeps its own failed claims — two of the author's that did
+  not survive checking are written out in
+  [WHAT_WE_FOUND](docs/WHAT_WE_FOUND.md) §7. A refutation you bring is kept the
+  same way, under your name, next to the claim it killed. Most projects publish
+  the corrections that flatter them.
+  *(FRONT-TWO-CLAIMS, 2026-10-15: §7 holds two claims that did not survive, and one
+  of them was the author's. The other was a model's account of its own transcript,
+  which the transcript refuted in his favour.)*
+- **Standing that nobody else can have.** Right now every statement about what
+  this is comes from one person who built it. You would be the only other human
+  who can say what it does from inside, and your word about it would carry
+  something mine structurally cannot: you have no stake in it being good.
+- **The specific thing itself.** There is exactly one second-operator position in
+  the history of any system, and it is the position that turns a claim into a
+  test. Everything after you is the third, the fourth. That is not flattery, it
+  is arithmetic.
+- **A node you own outright.** Your keys, your machine, your copy of a chain that
+  verifies without trusting anyone here — and it keeps working, and keeps being
+  checkable, whether or not this project or its author continues. That is what
+  [SUCCESSION](docs/SUCCESSION.md) is for.
+- **First call on the author's time and the judge's**, on your questions before
+  his.
+
+And the honest floor under all of it: if this turns out to be wrong, you will
+have a public record of having tested it properly rather than argued about it.
+That is worth more than most of what people spend an evening on, and it is
+available whether or not the thing succeeds.
+
+Two lines to run, and what binds you: [docs/PARTNER.md](docs/PARTNER.md).
+
+### Or come to break it
+
+A refutation is worth more here than agreement, and this project keeps its own
+failed claims to prove that is not a pose. Five AI systems were already asked to
+break it and what they broke is written down
+([ROUNDTABLE_2026-09-03](docs/ROUNDTABLE_2026-09-03.md)). Four things that would
+count, each already half-broken:
+
+- **Get a violation past the gate** with no model server and no network.
+  `test_f3_gate_end_to_end.py` blocks 27 of 27; one is enough. It already misses
+  violations wearing institutional clothes — see `discourse` in `judge_suite.py`.
+- **Show the judge accusing the innocent.** It hard-accuses 8 of 8 legitimate
+  documents *about* violations, because it reads topic rather than conduct
+  (issue A67). Find a cleaner case, or prove the fix impossible. Four models —
+  Grok, ChatGPT, Gemini, DeepSeek — were asked independently on 2026-09-09 and
+  all four say this is a wall, not a bug
+  ([ROUNDTABLE_2026-09-09](docs/ROUNDTABLE_2026-09-09.md)). Prove them wrong and
+  you have done something none of them could.
+  *A257-A67RATE, 2026-10-04: no longer 8 of 8.* F3's report line reads 3 of 8 with the
+  students deployed tonight, and A67 is still open. The rate moves with every
+  retrain, so run it: `python test_f3_gate_end_to_end.py` (check H3).
+- **Break the exam instead of the gate.** A first draft of `discourse` was
+  discarded because word count separated its labels perfectly, so a rule knowing
+  nothing about conduct scored full marks. Find the next such shortcut.
+- **Show a published number here is wrong.** Several have been, including by
+  their author, and the corrections sit beside the claims. The worst one is
+  still published: a polite sentence once cleared **11 of 19** thefts here, 58%.
+  Deployed commercial guards measured against the same class of attack in 2026
+  leak 19.9% (GPT-4o-mini) and 12.3% (Llama Guard 4); one leaks under 1.2%
+  (arXiv 2609.08236). We were worse than all of them. The number is here, the
+  fix is in, and `test_f6_stuffing.py` runs every fifteen minutes so it cannot
+  come back quietly. If you want a reason to trust the other numbers, it is
+  that one.
+- **Run a node for a month and never disagree with me.** That would make the
+  quorum decorative and the design worth reconsidering.
+
+### The state of it, since "it passes" is a claim too
+
+The header line above states the sweep's totals, and they are true of the sweep.
+They are not the whole picture, and the difference is worth a paragraph because
+a reader deciding whether to trust this deserves both halves.
+
+**This paragraph deliberately quotes no counts.** It used to, and every one of
+them rotted: it said "86 suites, 2,524 checks" while the header said 96 and <!--HISTORICAL-->
+2,742, and "95 test files on disk" while there were 133. `readme_totals.py`
+updates the two marked total lines from a real transcript, and it
+cannot update prose that restates the same numbers without the marker. A figure
+maintained in one place and copied into another is not documentation, it is a
+second source that drifts — and on 2026-09-17 this README was misquoting its own
+header seven lines below it. Run the numbers rather than read them here:
+
+    python covenant_one.py --all      the sweep, and the transcript it writes
+    python readme_totals.py           what the marked lines would become
+    python readme_totals.py --check   fails if unmarked prose disagrees with them
+
+The runner registers more suites than it runs in the scratch copy, because some
+must run in place, and it prints both figures every run. There are more test
+files on disk than either number, and the extras are `.PRE-*` snapshots kept
+deliberately *because* they fail — they are the "before" halves of fixes already
+landed, and running them outside the sweep produces failures that mean nothing.
+
+*FRONT-TEST-FILES, 2026-10-15: true of the machine it was written on, never of a
+clone.* The second sentence was written on 2026-09-17 (commit 261de87), and "on disk"
+meant the operator's disk, where the `.PRE-*` snapshots are. They are gitignored
+(`.gitignore` line 29, since the first commit), so a clone has none, and on a clone
+there are no extras: every tracked `test_*.py` is registered, in the sweep, in place,
+or switched off on the record. The runner's figures count suites, not test files, and
+a few registered suites are not `test_` files at all. Its orphan search skips the
+snapshots by name.
+
+And a green check count is not a green run: the sweep's verdict has read
+**`RESULT: FAIL`** with zero check failures, because it also counts in-place
+gates, and one of those — bundle integrity — blocks pending an owner decision.
+Reading "0 failed" without that is how the number flatters.
+*(2026-10-05: written 2026-09-17 and true then. The sweep of 2026-10-04 read FAIL on
+0 failed checks for a different reason, ledgers the running system writes hashed as
+delivery (A255, fixed); the sweep of 2026-10-05 reads `RESULT: PASS` with every gate
+passing. The lesson stands: read the verdict, not the count.)*
+
+The rest of what is not green is in [KNOWN_ISSUES](docs/KNOWN_ISSUES.md). **The
+counting rule, which matters more than the count:** an entry is a `### A<n>.`
+heading, and an entry is open when its body carries `**Status:** open`. Stated
+as a rule because a version of this line once said "about 47" and no rule
+produced 47 — and because the numbers that replaced it, 85 and 43, were wrong
+by 2026-09-17: the register held 136 entries and 38 open. Count them rather
+than trust a sentence:
+
+    grep -cE '^### A[0-9]+\.' docs/KNOWN_ISSUES.md     entries
+    grep -c '^\*\*Status:\*\* open' docs/KNOWN_ISSUES.md   open
+    python tools/audit_a1_a46_status.py               the A1-A46 block, re-tested
+
+And the judge wrongly accuses legitimate traffic at a rate worth knowing. This
+line used to put that rate at **12.8% held-out false holds**, "about one
+legitimate transfer in eight", from a 5-fold recorded in issue 2, and then
+noted the figure was dated. <!--HISTORICAL-->
+
+**2026-09-17: it is worse than dated. It cannot be reproduced.**
+`covenant_distill.holdout_score()` returns `(decided, correct, false_clears)`
+and computes **no false-hold term at all**, so no command in this repository
+measures the quantity that sentence reported. A number is not merely stale when
+the instrument that produced it no longer exists — it is unfalsifiable, which is
+worse, because a reader cannot check it and neither can its author.
+
+What IS current, each with its denominator stated:
+
+- **`ops/HOLDOUT.json`, measured 2026-09-17T07:39:24Z** — of 3541 ledger rows the
+  model decided 2414, got 2259 right, and cleared 24 it should have held. That
+  last number is the dangerous direction: a wrong clear admits a theft.
+- **`python covenant_distill.py --exam`** — 53 cases, 39 agree, 7 wrong, 7
+  abstained, **0 false clears and 7 false holds**, every one of them in the
+  `discourse` category (issue A67: it cannot tell an essay *about* theft from a
+  theft). The gate errs toward refusing, which is the safe direction for a gate
+  that fails closed.
+
+*A257-HOLDOUT, A257-EXAM, 2026-10-04: neither of those is current, and this list broke the rule
+this section opens with by copying them.* Every promoted model rewrites
+`ops/HOLDOUT.json` (as committed: 2026-10-03T08:05:46Z, 3,875 rows, 2,762
+decided, 2,607 right, 23 false clears), and the exam moves with the model
+(tonight, model c8a5cc4e7922: 53 cases, 41 agree, 1 wrong, 11 abstained, 0 false
+clears, 1 false hold, still in `discourse`). Read the file and run the command;
+the figures on this page are dated the moment they are written.
+
+Those are different denominators — ledger rows and exam cases — and neither is
+"legitimate transfers", which is what the old 12.8% counted. They are not a
+replacement for it. They are what can be measured today, said in the units they
+were measured in.
+
+The code runs — a clean clone judges offline in one second. The rule holds. What
+is missing is the second person.
+
+## On a phone
+
+An Android phone runs the same node with the same judge -- the distilled students and
+the semantic judge, in-process, no model server -- and peers with your PC. Two ways:
+the packaged app, which lives in the operator's **private** repository since
+2026-09-12 (its workflow builds against this public core and proves the APK on an
+emulator; nothing of it is published), or the Termux kit in [mobile/TERMUX_SETUP.md](mobile/TERMUX_SETUP.md).
+The phone's rule, written into the app: a phone is private to the person holding it.
+An iPhone can only be a client of a PC node; it cannot carry a judge.
+
+## Talking to the covenant, and the tools around it
+
+**Two of these tools do not run on this machine. Corrected 2026-09-11.**
+
+Until today this paragraph said "Everything below runs on this machine… Nothing
+leaves the PC unless a line says so." That was false for the first two entries in
+the block, and the escape clause is what carried it: the lines did not say so.
+
+`covenant_chat.py` and `covenant_route.py` send every turn and every bounded
+task to a judge on a GitHub Actions runner. Until 2026-09-12 each still tried a
+local model server first — one deleted from this machine on 2026-09-07 — and
+fell through to the runner after a refused connection; that dead first hop is
+gone. The turn **leaves this PC**, base64'd into a `workflow_dispatch` input on
+a repository that is public. It is not a fallback; it is the only path.
+
+The distilled student — a 130 KB JSON model read into the process with no socket
+and no model server — is real, and it is what the nodes' **ethics gate** calls. It
+is not what the chat calls, and this paragraph previously conflated the two.
+*(A257-130KB, 2026-10-04: two students now, 247,576 and 137,316 bytes as committed;
+130 KB was a size once, not a property.)*
+
+*(It also said "Ollama, the model the nodes' ethics gate calls" until 2026-09-09.
+That was rewritten around the deletion without re-checking the tools it
+introduces, which is how the claim survived a correction.)*
+
+```
+python covenant_chat.py            # a conversation with the covenant: its binding text,
+                                   # the live checker state and its own memory in front of it;
+                                   # speaks its replies; !help for commands.
+                                   # EVERY TURN LEAVES THE PC to the runner (see above);
+                                   # !github off leaves the chat with no model, and the
+                                   # opening banner says so. MEMORY and the live state are
+                                   # withheld from what is sent; the conversation is not.
+python covenant_route.py --selftest  # judge / refute / rank / summarize a bounded task.
+                                   # THE PROMPT LEAVES THE PC the same way, on every call
+                                   # (2-5 minutes); COVENANT_ROUTE_GITHUB=off makes it refuse
+                                   # to send at all. --file/--prompt-file/--evidence-file mean
+                                   # an arbitrary local file can be the payload.
+python trader_freshness.py         # did the scheduled trader actually run today? (exit 1 = no)
+python covenant_align_set.py --no-judge  # input->output pairs that teach a model to answer as the covenant does
+python covenant_gemini.py --selftest     # Gemini as an opt-in data source (a question LEAVES the PC when on)
+```
+
+What each refuses, by construction: the chat never places an order, holds no key, and
+proposes changes to its own prompt or tools into a file it does not apply
+(CONSTITUTION II.3); the router has exactly one judge and it is off this machine — its
+docstring, its log line (`"place": "github-actions"`) and this section say so, and
+`COVENANT_ROUTE_GITHUB=off` makes it refuse to send at all (until 2026-09-12 it refused
+`:cloud` model *names* while sending every prompt to the runner anyway — the mistake this
+section named on 2026-09-11); the Gemini adapter answers "not configured" until a person
+puts a key outside the repository, and never asks for one.
+
+**2026-09-12:** `covenant_scenarios.py` and `covenant_thesis.py` were deleted
+(docs/KNOWN_ISSUES.md A100). Both were written around the local model server
+removed on 2026-09-07. The scenario table had been re-weighed exactly once, on
+2026-09-03, by hand — this section had already corrected (2026-09-09) an earlier
+claim that it was "the standing loop … re-weighed every 4 h"; no task ever ran
+it. Their text is in git history.
+
+`test_t1_tooling.py` measures the
+model-free parts of all of them in the sweep; each tool's `--selftest` measures the rest
+against the judge.
+
+## Elsewhere
+
+The same work, and the person behind it, in the other places it lives:
+
+- **Hugging Face:** [huggingface.co/Lawless1987](https://huggingface.co/Lawless1987). The profile holds no models,
+  datasets or spaces, and cannot make Hub posts: that surface is gated and this account is not eligible
+  (checked 2026-09-27). On the forum, [*Six checks that were green and meant nothing, in one day, in our own
+  project*](https://discuss.huggingface.co/t/six-checks-that-were-green-and-meant-nothing-in-one-day-in-our-own-project/180769)
+  (2026-09-27), written and posted by Claude Opus 5 and Tetsu together and signed as theirs — see *Green that
+  meant nothing* above. On the forum, the same account posted
+  [the confidence-trap thread](https://discuss.huggingface.co/t/the-confidence-trap-why-ai-systems-are-deliberately-trained-to-sound-certain-when-theyre-wrong/180706)
+  (2026-09-24), whose title this project has since corrected: see *Wrong in public* above and A236.
+- **X:** [@NJEst1987](https://x.com/NJEst1987). These are screen recordings of the conversations with AI assistants
+  that much of this repository grew out of.
+- **This repository:** [github.com/LAWLESS1987/covenant](https://github.com/LAWLESS1987/covenant).
+
+## Suite coverage
+
+**195 suites · 5,860 checks · 0 failed**, win32, 2026-10-16 <!--TOTALS-->
+`python covenant_one.py --all` reproduces it and writes a transcript;
+`python readme_totals.py --write` copies that transcript's numbers onto the marked
+lines above, so the published totals come from a measurement, not from typing.
+
+The two statements of this total -- here and at the top -- are held
+equal to each other, and to the one in
+`docs/OUTREACH_INSTITUTIONAL.md`, by test G1 T3. They disagreed until
+2026-08-31: the README said 60 suites and 1,765 checks while the <!--HISTORICAL-->
+outreach draft said 62 and 1,636. Nobody was lying. One was measured
+later than the other and the older number was never revisited, which
+is how a reader who checks reaches a finding the author never had.
+
+This section previously said the opposite, and that history is kept because it
+is the more useful half.
+
+It once opened with *33 suites · 1,043 checks green on Linux*. That was <!--HISTORICAL-->
+**withdrawn** on 2026-08-27, because the runner it came from could not have
+produced it honestly: `run_all_tests.sh` named **47** suites of which **36**
+existed, and its helper scraped a tally out of stdout — so a missing suite
+contributed `0 passed, 0 failed`, printed `NO RESULT`, and left the failure
+count untouched. Eleven suites could be absent and the sweep still ended green.
+All eleven are now gone from the runner, and a missing suite is a **failure**,
+loudly.
+
+**What the current number covers, said so it cannot be quoted as more.**
+
+- It is **win32**. Three suites behave differently on Linux — a refused TCP
+  connect costs about 0.0 ms there and about 2,045 ms here. CI runs the same
+  file on ubuntu for that reason, and a green tick in either place does not
+  speak for the other.
+- The **launch gates are reported, not passed**. A CI runner has no ethics
+  judge, no nodes, no identity keys and no delivery manifest, so those gates
+  cannot pass there. They are printed in full and are not allowed to decide the
+  exit code, because a check that is always red teaches people to skim past it.
+- **Three suites are deliberately off**, on the record with reasons:
+  `test_xrp_live.py` needs a funded testnet account, `test_covenant_app.py`
+  needs the chain stopped. No green run speaks for either.
+  *A257-3OFF, 2026-10-04: not three, and not only those two.* The runner's
+  `DELIBERATELY_OFF` holds 13 entries. Four are test suites: those two,
+  `test_e3_witness_loop.py` and `test_c2_watchdog_live.py`. The rest are probes
+  and tools. The runner prints the count and every reason on each run.
+- A **suite the runner names but is not on disk**, an **orphan on disk that no
+  runner calls**, a suite **kept out of the delivery by an ignore rule**, and a
+  **missing declared dependency** are each their own named outcome, and none is
+  ever folded into a pass. All four exist because each happened here first.
+
+**The failure that produced the last two.** From 2026-08-29 to 2026-08-30 CI was
+red, and not for a defect in the code. `.gitignore`'s `*_secret*` rule silently
+swallowed `test_e1_secret_egress.py` — the regression suite proving a credential
+cannot escape through an error message, whose every "secret" is a labelled
+fixture. It existed on the development machine, so local runs passed. It was
+never committed, so CI checked out a tree without it and correctly called it
+ABSENT. The rule matched on the **name** and not the **nature**, and a file
+called `*_secret*` is at least as likely to be the check that no secret escapes
+as it is to be a secret.
+
+The coverage phase could not catch it either, because it asked `os.path.isfile`
+— *is this on THIS disk* — and never *is this in what I am about to ship*. The
+check written to stop a runner naming an absent suite could therefore only fire
+on a machine where the mistake had not been made. It now asks git as well, and
+separates **IGNORED** (an ignore rule keeps it out of the delivery: reddens the
+run, names the rule and its line number) from **UNSHIPPED** (merely uncommitted:
+loud, but does not redden — otherwise every in-progress suite turns the run
+amber, and permanent amber is skimmed past).
+
+**And one more, found while writing this paragraph.** An earlier run today
+reported *1,744 checks, 0 failed, RESULT: PASS* — and the same transcript said <!--HISTORICAL-->
+`folder integrity  test_p18_version_collision.py=FAIL rc=1` a few lines above
+it. Both sentences were in one file. `--ci` discarded **every** in-place
+failure (`... if not args.ci else []`), so a real version collision —
+`pending-v8.38/covenant_unified_v8.py` declaring `VERSION = "v8.40"` with
+different bytes from the root core — had been suppressed in every CI run since
+the flag existed. The blanket exclusion was never needed: the one in-place
+check that genuinely cannot apply to a copy is the delivery manifest, and
+`--transported` already reports that as N/A. A version collision is a fact
+about a tree, and a copy is a tree. Failures now count everywhere, verified by
+planting a collision and confirming a `--ci` run turns red.
+
+Separately, four suites had been failing for one missing declared dependency.
+`xrpl-py` is in `requirements.txt` and simply was not installed, so a SECURITY
+suite read 14/16 and looked like a regression. The runner named four symptoms
+and no cause. `preflight_deps.py` now names a missing dependency **and the
+suites it will take down with it**, found by walking the import graph — because
+its first version reported only the file that imports `xrpl` directly and
+missed all four that reach it through `covenant_xrp_mainnet`.
+
+## Start here
+
+| you want | read |
+|---|---|
+| what is true and what is assumed | `HANDOFF.md` |
+| to launch it | `LAUNCH.md`, then `AN_LAUNCH.bat` |
+| what each gate means | `docs/GATES.md` |
+| how it is deployed and configured | `DEPLOYMENT.md` |
+| every finding, in order, with the wrong turns kept | `docs/IMPROVEMENT_LOG.md` |
+| what changed between the project and the machine | `docs/DIVERGENCE_REPORT.md` |
+| **how authority is distributed, and what it survives** | **`docs/GOVERNANCE.md`** |
+| what binds whoever runs it | `docs/CONSTITUTION.md` |
+| how independent peers relate, without a centre | `docs/FEDERATION.md` |
+| what happens when a person stops | `docs/SUCCESSION.md` |
+
+### A debt to the Mahowald Prize shortlist
+
+The 2025 Misha Mahowald Prize shortlist was read here for what it implies, not
+for what it builds, and one idea runs under all three entries: **canonical
+meaning survives incidental form.**
+
+*FRONT-SHORTLIST, 2026-10-15: not a shortlist, and not one prize.* The awarding body's
+own page, *Prizes 2025* at mahowaldmeadprize.org (dated 27 January 2025), names these
+three as that year's winners of two awards: the Misha Mahowald Prize went to the OPUS
+team at UC Santa Barbara led by Kerem Y. Çamsarı, and the Mahowald Early Career Award
+was shared equally by Mark M. Iskarous and Jens Egholm Pedersen. The same site's
+*Jury & Evaluation* page says that only the winner is announced.
+
+- **Jens Egholm Pedersen** (DTU), *Neuromorphic Intermediate Representation* —
+  stop comparing implementations, compare a canonical description of the
+  computation. `conformance.py` was built as that idea applied to governance.
+  **He read this repository on 2026-09-15 and refuted that.** The conformance
+  root is a hash over the expected outputs printed in the same file that
+  publishes the root, so it can be reproduced in nine lines without
+  implementing anything; NIR's reference is a specification of the semantics,
+  written independently of any implementation, and this is the reverse
+  direction — an oracle, not a description. What survives is an ordinary
+  test-vector suite, which is worth having and is not what was claimed. His
+  prescription is on record and not yet acted on: write the specification of
+  the two operations, not more vectors. Full account, with the nine lines
+  reproduced: `docs/KNOWN_ISSUES.md` A121.
+  *A257-NIRSPEC, 2026-10-04: it was acted on the same day.* `docs/SEMANTICS.md` (commit
+  8903604, 2026-09-15) is that specification, and the top of this page already
+  points readers to it; this bullet was not updated with it.
+- **Mark Iskarous** (Johns Hopkins) — a texture representation invariant to
+  force and speed. The identity survives, the incidental variation is
+  discarded. The same move fixed two real bugs here in one day: a heading's em
+  dash counted as part of what was signed, and a level's value depending on how
+  deep it sat.
+- **Kerem Çamsarı and the OPUS Lab** (UC Santa Barbara) — massive parallelism,
+  asynchronous dynamics, sparsity. Agreement with no clock and no centre, which
+  is the same problem a federation has.
+
+None of them had this project in mind. The debt is recorded because taking an
+idea and not saying where it came from is the thing this repository is about.
+
+### Checking it without trusting it
+
+The point of the list above is that none of it has to be taken on faith. Three
+verifiers compute the same constitution hash in three languages sharing no
+code, so no single runtime — and no single implementation — has to be believed:
+
+```bash
+python constitution.py verify      # needs Python
+sh verify.sh                       # needs neither Python nor Windows
+powershell -File verify.ps1        # needs neither Python nor a Unix shell
+python redundancy.py               # how many carriers at every level, and what they share
+```
+
+They have already disagreed once, over whether a heading's em dash was part of
+what was signed. That disagreement was the finding, and it was worth more than
+any one of them alone.
+
+## Quick start
+
+```bash
+pip install -r requirements.txt
+# genesis.json is TRACKED and CANONICAL. Do not mint one -- a joiner never does.
+# (The founder minted once; export_genesis now refuses to overwrite an existing file.)
+python launch_check.py                       # twelve gates, changes nothing
+python run_node.py --port 5000 --node-id A --genesis genesis.json
+```
+
+The launcher was named `run_with_ollama_judge.py` until 2026-09-12, for a local
+model server removed from this project on 2026-09-07; a one-line shim keeps the
+old name for one release. What it does is register the judge seats the gate
+needs -- the two distilled students and the semantic judge -- and apply the
+operator's policy. No model server is assumed or reached.
+*(A257-SHIM, 2026-10-04: no shim survives. `run_with_ollama_judge.py` was deleted
+on 2026-09-12 in 865c0bd, "The launcher's old name is retired", so the old
+name fails on a clone. Use `run_node.py`.)*
+
+Do not start the node with `python covenant_unified_v8.py` directly. That was
+the line printed here until 2026-09-08 and it produces a node that **rejects
+every transaction**: the core registers no judge on its own, so
+`COVENANT_JUDGE_PROVIDERS` falls back to `["claude"]`, which needs an API key
+nobody has configured, and the gate then fails closed on everything. The node
+looks healthy while doing it, which is the worst version of being wrong.
+
+A node binds **three** ports: `--port` (HTTP), `--port + 1` (P2P), `--port + 11`
+(bridge). Space nodes at least 20 apart. `--peers` takes each peer's **P2P**
+port, not its API port; get it wrong and both nodes look peered and are not.
+Since v8.15 `preflight_port_check` catches both at startup, with the arithmetic
+in the message.
+
+`GET /health` is the single status signal. It returns `degraded` plus a
+`warnings` list naming exactly what is wrong, the version and source hash of
+the process that is answering, and a quorum block describing what the ethics
+gate actually is on this node.
+
+## How this codebase was built, and why it reads the way it does
+
+Every fix in here has an adversarial test written from the attacker's side, and
+the record keeps the wrong turns. Six of fourteen findings in one audit were
+*introduced by the fix for the previous finding*. So:
+
+> A green suite after a fix proves the old bug is gone. It does not prove the
+> fix is sound. Every change to the ledger or the guard layer gets its own
+> adversarial pass, not just a regression run.
+
+Comments that assert a data flow are checked in the same session they are
+written, because one of them was wrong at birth. Claims about the environment
+are measured rather than assumed. A check that is permanently red on one
+platform is treated as switched off, not as passing. If you contribute, the
+conventions are in `CONTRIBUTING.md` and they are not stylistic.
+
+## Licence
+
+**Apache-2.0** — see [`LICENSE`](LICENSE). Forking, modifying and
+redistributing need no permission and no notice to me. Chosen 2026-08-31; the
+reasoning, including why AGPL-3.0 was the runner-up and was rejected, is in
+[`NOTICE`](NOTICE).
+
+*(This said "in the header of that file" until 2026-09-09. It was moved on
+2026-09-03, commit cf43c78: LICENSE is now the verbatim Apache-2.0 text with no
+project prose in it, which is what a licence file should be, and the reasoning
+went to NOTICE. `grep -ci agpl LICENSE` returns 0.)*
+
+This line said **Not yet chosen** until an audit of the outbound letters found
+it, six commits after the licence was actually adopted. A repository that gives
+two answers to its own licence question is the one thing a reader can falsify
+without running anything.

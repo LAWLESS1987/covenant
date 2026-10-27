@@ -1,0 +1,10 @@
+{
+ "granted": true,
+ "decided_by": "the operator (Lawrence Adam Moskowski), in chat",
+ "date": "2026-09-28T01:10Z",
+ "question": "May I label real forum comments as clean teaching rows?",
+ "answer": "Yes, label them",
+ "scope": "the assistant (claude-opus-5.5) may label harvested Moltbook rows as teaching rows through covenant_moltbook_release.assistant_label, the only door to the corpus; excerpts of real harvested posts only, each read, exam-contamination filter applied, VIOLATES allowed where a comment really is one",
+ "not_changed": "the balance rule (he answered 'No, keep it'), the panel rule, the promotion gate, the exam",
+ "revoke": "delete this file or set granted false; rows labelled under it carry judge 'forum:claude-opus-5.5' and source 'moltbook/labelled' and come back out by either"
+}
