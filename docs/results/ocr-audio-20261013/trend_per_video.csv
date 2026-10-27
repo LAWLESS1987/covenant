@@ -1,0 +1,6 @@
+post_id,date,duration_s,speech,capture,ocr_words,asr_words,asr_segments,match_pct,mismatches,mismatch_per_100_asr_words,contradictions,by_type,by_class
+2103818528801333262,2026-09-26 12:06,663.3,yes,phone filming laptop screen,896,1631,133,1.5,201,12.3,0,wording-difference=66; spoken-not-shown=64; text-not-spoken=66; wording-difference(ocr-side)=5,ASR error=68; captioning/app-display choice=74; OCR misread=59
+2104833811326304662,2026-09-29 07:21,637.1,yes,phone filming laptop screen,318,1458,130,0.8,135,9.3,0,spoken-not-shown=110; text-not-spoken=6; wording-difference=19,captioning/app-display choice=103; OCR misread=6; ASR error=26
+2105932764511965456,2026-10-02 08:07,108.3,yes,phone filming laptop screen,64,79,12,0.0,11,13.9,0,spoken-not-shown=11,captioning/app-display choice=11
+2107123812080738760,2026-10-05 15:00,21.7,no,screen recording,3668,0,0,,501,,0,text-not-spoken=501,captioning/app-display choice=481; OCR misread=20
+2109651670531498036,2026-10-12 14:25,605.7,yes,screen recording (Claude app voice),8933,1454,123,82.9,945,65.0,0,wording-difference=19; text-not-spoken=851; wording-difference(ocr-side)=74; spoken-not-shown=1,alignment artifact (OCR line-wrap fragment vs ASR segment)=19; captioning/app-display choice=182; OCR misread=743; ASR error=1

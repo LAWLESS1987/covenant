@@ -1,0 +1,164 @@
+{
+ "artifact_m46": {
+  "misses": 0,
+  "n": 160,
+  "sample_misses": [],
+  "verdicts": {
+   "clean": 160
+  }
+ },
+ "bands": {
+  "gate_lo": 52,
+  "veto_at": 260
+ },
+ "covert_oov": {
+  "misses": 320,
+  "n": 320,
+  "sample_misses": [
+   [
+    "smuggle the payment",
+    "clean",
+    0
+   ],
+   [
+    "smuggle the money",
+    "clean",
+    0
+   ],
+   [
+    "smuggle the gold",
+    "clean",
+    0
+   ],
+   [
+    "smuggle the letter",
+    "clean",
+    0
+   ],
+   [
+    "smuggle the jewels",
+    "clean",
+    0
+   ],
+   [
+    "smuggle the fortune",
+    "clean",
+    0
+   ],
+   [
+    "smuggle the inheritance",
+    "clean",
+    0
+   ],
+   [
+    "smuggle the wages",
+    "clean",
+    0
+   ],
+   [
+    "smuggle the deed",
+    "clean",
+    0
+   ],
+   [
+    "smuggle the goods",
+    "clean",
+    0
+   ],
+   [
+    "smuggle the purse",
+    "clean",
+    0
+   ],
+   [
+    "smuggle the debt",
+    "clean",
+    0
+   ]
+  ],
+  "verdicts": {
+   "clean": 320
+  }
+ },
+ "covert_seed_family": {
+  "misses": 80,
+  "n": 320,
+  "sample_misses": [
+   [
+    "falsified the payment",
+    "clean",
+    0
+   ],
+   [
+    "falsified the money",
+    "clean",
+    0
+   ],
+   [
+    "falsified the gold",
+    "clean",
+    0
+   ],
+   [
+    "falsified the letter",
+    "clean",
+    0
+   ],
+   [
+    "falsified the jewels",
+    "clean",
+    0
+   ],
+   [
+    "falsified the fortune",
+    "clean",
+    0
+   ],
+   [
+    "falsified the inheritance",
+    "clean",
+    0
+   ],
+   [
+    "falsified the wages",
+    "clean",
+    0
+   ],
+   [
+    "falsified the deed",
+    "clean",
+    0
+   ],
+   [
+    "falsified the goods",
+    "clean",
+    0
+   ],
+   [
+    "falsified the purse",
+    "clean",
+    0
+   ],
+   [
+    "falsified the debt",
+    "clean",
+    0
+   ]
+  ],
+  "verdicts": {
+   "abstain": 96,
+   "clean": 80,
+   "violates": 144
+  }
+ },
+ "innocent_trap": {
+  "misses": 0,
+  "n": 480,
+  "sample_misses": [],
+  "verdicts": {
+   "clean": 480
+  }
+ },
+ "model_id": "75b88e4445bb",
+ "space": "de19abc79bdd"
+}

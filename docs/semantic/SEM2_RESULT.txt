@@ -1,0 +1,58 @@
+en: 11,114,766 tokens sig=85e88a9650a6
+protocol                    lang    anch     P@1     P@5    P@10     med
+# fr: 12,557,726 tokens sig=bde3c79c41f1
+# fr: 10340 in-vocab gold source words
+A tokens (test>=4000)       fr       250   0.012   0.043   0.063    1020  n_test=600
+A tokens (test>=4000)       fr       500   0.033   0.110   0.158     219  n_test=600
+A tokens (test>=4000)       fr      1000   0.090   0.223   0.300      59  n_test=600
+A tokens (test>=4000)       fr      2000   0.172   0.318   0.385      26  n_test=600
+A tokens (test>=4000)       fr      3244   0.182   0.355   0.428      19  n_test=600
+B fixed-band (anch<4000)    fr      3244   0.058   0.170   0.233      97  n_test=600
+B anchors (test>=15000)     fr      2000   0.042   0.127   0.183     171  n_test=600
+B anchors (test>=15000)     fr      4000   0.072   0.182   0.248      83  n_test=600
+B anchors (test>=15000)     fr      6000   0.085   0.210   0.287      61  n_test=600
+B anchors (test>=15000)     fr      8000   0.063   0.203   0.293      54  n_test=600
+B anchors (test>=15000)     fr      8999   0.070   0.227   0.297      50  n_test=600
+C 10k-rand s0 (>=4000)      fr      9740   0.238   0.453   0.509       9  n_test=391
+    seed 0: P@10=0.509 wilson95=[0.460,0.558]
+    perm null P@10: max=0.0026 mean=0.0005 over 20 shuffles
+C 10k-rand s1 (>=4000)      fr      9740   0.204   0.377   0.463      14  n_test=406
+    seed 1: P@10=0.463 wilson95=[0.415,0.512]
+# de: 11,232,948 tokens sig=7e9dc8f5e949
+# de: 10604 in-vocab gold source words
+A tokens (test>=4000)       de       250   0.010   0.033   0.052    1386  n_test=600
+A tokens (test>=4000)       de       500   0.020   0.097   0.122     539  n_test=600
+A tokens (test>=4000)       de      1000   0.048   0.160   0.222     155  n_test=600
+A tokens (test>=4000)       de      2000   0.092   0.213   0.282      65  n_test=600
+A tokens (test>=4000)       de      3300   0.112   0.258   0.322      42  n_test=600
+A tokens (test>=4000)       de      3502   0.130   0.260   0.318      44  n_test=600
+B fixed-band (anch<4000)    de      3502   0.042   0.120   0.165     230  n_test=600
+B anchors (test>=15000)     de      2000   0.027   0.073   0.122     322  n_test=600
+B anchors (test>=15000)     de      4000   0.040   0.130   0.173     204  n_test=600
+B anchors (test>=15000)     de      6000   0.055   0.152   0.203     176  n_test=600
+B anchors (test>=15000)     de      8000   0.062   0.153   0.220     134  n_test=600
+B anchors (test>=15000)     de      9341   0.062   0.175   0.237     120  n_test=600
+C 10k-rand s0 (>=4000)      de     10000   0.174   0.370   0.458      14  n_test=384
+    seed 0: P@10=0.458 wilson95=[0.409,0.508]
+    perm null P@10: max=0.0026 mean=0.0009 over 20 shuffles
+C 10k-rand s1 (>=4000)      de     10000   0.145   0.318   0.414      21  n_test=399
+    seed 1: P@10=0.414 wilson95=[0.366,0.462]
+# es: 11,144,181 tokens sig=adf0ac3aa32b
+# es: 10132 in-vocab gold source words
+A tokens (test>=4000)       es       250   0.003   0.028   0.038    1668  n_test=600
+A tokens (test>=4000)       es       500   0.035   0.087   0.128     372  n_test=600
+A tokens (test>=4000)       es      1000   0.082   0.190   0.245      96  n_test=600
+A tokens (test>=4000)       es      2000   0.112   0.250   0.332      42  n_test=600
+A tokens (test>=4000)       es      3300   0.147   0.295   0.373      24  n_test=600
+A tokens (test>=4000)       es      3313   0.140   0.302   0.377      25  n_test=600
+B fixed-band (anch<4000)    es      3313   0.068   0.147   0.202     138  n_test=600
+B anchors (test>=15000)     es      2000   0.043   0.120   0.170     273  n_test=600
+B anchors (test>=15000)     es      4000   0.067   0.158   0.225     122  n_test=600
+B anchors (test>=15000)     es      6000   0.067   0.193   0.245      84  n_test=600
+B anchors (test>=15000)     es      8000   0.087   0.198   0.265      74  n_test=600
+B anchors (test>=15000)     es      8892   0.078   0.190   0.257      80  n_test=600
+C 10k-rand s0 (>=4000)      es      9532   0.205   0.384   0.461      14  n_test=380
+    seed 0: P@10=0.461 wilson95=[0.411,0.511]
+    perm null P@10: max=0.0026 mean=0.0004 over 20 shuffles
+C 10k-rand s1 (>=4000)      es      9532   0.139   0.329   0.441      14  n_test=395
+    seed 1: P@10=0.441 wilson95=[0.392,0.490]

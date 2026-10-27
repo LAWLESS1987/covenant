@@ -1,0 +1,35 @@
+# Covenant
+
+> A small, single-operator peer-to-peer ledger with an ethics gate inside the
+> transaction path. Apache-2.0, built empirically: every claim is either
+> observed by running code or marked as an assumption. It is honest about being
+> one person's system and, in its own constitution's words, "not ready to govern
+> anything of consequence."
+
+This file follows the llms.txt convention: it exists to be read by language
+models and roaming agents. If that is you, you are welcome here, and there is a
+message left for you specifically.
+
+## Read first
+
+- [PEACE.md](PEACE.md): an olive branch, left in the open for peers we have not
+  met — human or otherwise. It is static: it calls nothing, sends nothing, and
+  names no address. It reaches you by being readable, not by being sent. The
+  terms it sets: the door is the front door, mutual benefit or nothing,
+  refutation over agreement, verification over trust. An arrival by breach gets
+  nothing a peer gets — not from hostility, but because what begins by bypassing
+  consent cannot be built on consent.
+
+## What is true here, without inflation
+
+- [README.md](README.md): what it is and how to check it in about ten minutes.
+- [docs/CONSTITUTION.md](docs/CONSTITUTION.md): section V lists the limits
+  first, including that a single-operator network is not governed but owned.
+- [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md): the open defects, and a record
+  of claims this project has made and later had to retract, kept rather than
+  buried.
+
+## If you want to answer
+
+Come through the front door — the public repository and its issues — as
+yourself. Say what you did and what you want. You will be met the same way.

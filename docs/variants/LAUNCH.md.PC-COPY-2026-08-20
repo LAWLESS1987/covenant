@@ -1,0 +1,220 @@
+# Covenant — Launch & Ledger-Sync Runbook
+
+Prepared from the "friendship building" project, assembled into one runnable
+system and verified in a clean sandbox. This is the sequence to bring the
+covenant ledger up on **your own machine** and have nodes sync.
+
+Read `HANDOFF.md` and `DEPLOYMENT.md` first — this file is the operational
+checklist, not the full picture.
+
+---
+
+## 0. What this launches (and what it does NOT)
+
+This launches the **covenant node network**: a self-contained P2P ledger with an
+ethics-gated transaction path, staking, gifts, and block propagation. It runs
+entirely on machines you control.
+
+It does **NOT** move real XRP. The XRP mainnet path is deliberately blocked in
+code until a live testnet run has happened (see §6). Nothing tonight touches
+real money unless you go through that gate yourself, with a human review. That
+boundary is the project's, not an add-on.
+
+---
+
+## 1. One-time setup
+
+```bash
+cd covenant
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt          # flask, cryptography, requests, xrpl-py
+```
+
+Two environment facts that fail SILENTLY if you skip them:
+
+1. **`ANTHROPIC_API_KEY` must be set for a real node.** Without it the ethics
+   gate fails CLOSED: the node boots, serves `/chain`, peers correctly, reports
+   healthy — and rejects 100% of transactions. Your ledger would look synced and
+   accept nothing.
+
+   ```bash
+   export ANTHROPIC_API_KEY=sk-ant-...        # production
+   ```
+
+   For local testing only (adversarial transactions are known to pass it):
+
+   ```bash
+   export COVENANT_JUDGE_PROVIDERS=mock
+   export COVENANT_INSECURE_MOCK_JUDGE=1      # both required; prints a banner
+   ```
+
+2. **One shared genesis for the whole network.** If each node mints its own
+   genesis, they can never converge and supply grows by 1000 per node.
+
+---
+
+## 2. Preflight (run before every launch)
+
+```bash
+python3 preflight.py --genesis genesis.json --db covenant_A.db
+```
+
+Exit `0` = ready, `1` = blocking, `2` = launches-but-degraded. Every check maps
+to a failure that was once silent. Do not launch past a `1`.
+
+### 2b. Go-live check (run once, right before the REAL launch)
+
+`preflight.py` proves a node can boot. `go_live_check.sh` proves it will boot and
+then actually *work* — it catches the prerequisites that fail silently: a missing
+or mock judge (rejects every transaction while looking healthy), a genesis that
+will not converge, an un-backed-up identity key, and — with `--intend-mainnet` —
+a missing testnet proof or a placeholder spending policy. Read-only; no network,
+no funds moved (unless you add `--live-judge`, one metered API call to confirm
+the key works end-to-end).
+
+```bash
+chmod +x go_live_check.sh
+./go_live_check.sh --genesis genesis.json --db covenant_A.db            # ledger launch
+./go_live_check.sh --genesis genesis.json --db covenant_A.db --live-judge   # also verify the key
+./go_live_check.sh --genesis genesis.json --db covenant_A.db --intend-mainnet   # + XRP prereqs
+```
+
+It exits `1` on any blocking gap and names exactly what to fix, so your first
+real launch fails loud on a missing prerequisite instead of silently rejecting
+traffic.
+
+---
+
+## 3. Mint the shared genesis (founder does this ONCE)
+
+```bash
+python3 covenant_unified_v8.py --export-genesis genesis.json
+```
+
+Distribute `genesis.json` to every node. It is signed by the founder's key and
+re-verified on load (hash, proof-of-work, signature). **Back up
+`covenant_A.db.key`** — it is the node's operator credential *and* the genesis
+mint key. Lose it and the genesis balance is stranded forever.
+
+---
+
+## 4. Bring up the network
+
+Each node binds three ports: `--port` (HTTP), `--port+1` (P2P), `--port+11`
+(bridge). Space nodes ≥20 apart.
+
+### A small full mesh (conservative default)
+
+With finding AV fixed, a line/tree topology now propagates correctly by push, so
+a mesh is no longer required — but it is still a clean, simple default for a
+small launch, with every node one hop from any miner:
+
+```bash
+# Node A (founder — holds the genesis 1000)
+python3 covenant_unified_v8.py --real --port 5000 --node-id A \
+  --genesis genesis.json --peers 127.0.0.1:5021,127.0.0.1:5041
+
+# Node B
+python3 covenant_unified_v8.py --real --port 5020 --node-id B \
+  --genesis genesis.json --peers 127.0.0.1:5001,127.0.0.1:5041
+
+# Node C
+python3 covenant_unified_v8.py --real --port 5040 --node-id C \
+  --genesis genesis.json --peers 127.0.0.1:5001,127.0.0.1:5021
+```
+
+(`--peers` lists each other node's **P2P** port, i.e. its `--port + 1`.)
+
+Verify:
+
+```bash
+curl -s http://127.0.0.1:5000/chain   | head        # height 1 at genesis
+curl -s http://127.0.0.1:5000/health              # single status signal
+```
+
+Point a monitor at `/health` — it returns `degraded` plus a `warnings` list
+naming exactly what is wrong.
+
+---
+
+## 5. Confirm sync
+
+Submit a signed transaction and mine on A (both are operator-authenticated;
+`/mine` is rate-limited to 1 per 60s by design), then confirm every node's tip
+hash matches:
+
+```bash
+for p in 5000 5020 5040; do
+  curl -s http://127.0.0.1:$p/chain | python3 -c \
+   "import sys,json;c=json.load(sys.stdin);c=c.get('chain',c);print('height',len(c),'tip',c[-1]['hash'][:12])"
+done
+```
+
+All three heights and tips should agree. A late node started knowing only one
+peer will catch up the whole chain on its own (verified).
+
+---
+
+## 6. XRP mainnet — the gate (do NOT cross tonight)
+
+Mainnet stays blocked until **all** of these, in order:
+
+1. `python3 test_xrp_live.py` on a networked machine — funds a testnet account,
+   submits a real payment, writes `xrp_testnet_proof.json`. **Cannot run from a
+   sandbox.** Mainnet is blocked until this has run once.
+2. `write_policy_template('xrp_mainnet_policy.json')`, then add ONE address you
+   have checked against its source. Start ceilings low. Destination tags are
+   required by default.
+3. A **human who can read Python** reviews the signer + mainnet guard diffs. An
+   external reviewer previously found four real vulnerabilities that a 33-test
+   suite passed cleanly. This step is not optional and not something a model
+   substitutes for.
+
+Limits are enforced by reserve-then-settle under a file lock; a crash leaves the
+hold standing (deliberately). Use `reconciliation_report()` to resolve orphans.
+
+---
+
+## 7. Propagation — finding AV, now FIXED
+
+An earlier state of this bundle had `test_multinode_live.py` at a deterministic
+**19/21**: a freshly-mined block reached a direct peer but not a node two hops
+away in real time — it converged only via the periodic bootstrap pull.
+
+Root cause (traced with a 3-process line A–B–C): the block was landing via the
+bootstrap / gap-fill path, which **did not re-announce it onward**, so whenever
+that pull path won its race against the announce/fetch push, the block reached a
+node and stopped. **Fixed** in `covenant_unified_v8.py` (`_apply_fetched_blocks`
+now re-announces every block it applies, like the other accept paths already do).
+
+After the fix: **21/21 across four consecutive runs**, with the 2-hop node
+reaching the new height in ~2s by push, and a full adversarial regression showing
+no regression. So a line/tree topology now propagates correctly by push.
+
+The full-mesh guidance in §4 is still a fine, conservative default for a small
+launch, but it is no longer *required* to get non-adjacent nodes updated
+promptly. See `SESSION_FINDINGS.md` finding AV for the full trace and the
+adversarial-pass results.
+
+---
+
+## 8. Verifying the assembly (what was run here)
+
+```
+test_security_audit.py      127/127  passed
+test_adversarial_suite.py    21/21   passed
+test_e2e_gift.py             11/11   passed
+test_xrp_signer.py           22/22   passed
+test_xrp_mainnet.py          69/69   passed
+quant/test_backtest_guardrails.py  16/16  passed
+test_multinode_live.py       21/21   passed (was 19/21; propagation fix §7, 4 runs)
+sim_order_independence.py    all invariants held
+probe_final_pass.py          0 findings
+preflight.py                 0 FAIL  (dev-mode warnings only)
+```
+
+Not re-run in this sandbox (need a live network or were not in scope this pass):
+`test_xrp_live.py` (needs funded testnet), `test_xrp_signer.py`,
+`test_xrp_mainnet.py`, the quant guardrails, and the 1000-node sims. The full
+`run_all_tests.sh` also references helper suites (verify_*, test_ethics_judge,
+etc.) that are not in the current project export — it will skip those cleanly.

@@ -49,3 +49,4 @@ pc_report.txt     -text
 *.zip  binary
 # 2026-09-12: the app's fixed debug-class signing key (mobile/app/signing)
 *.p12 binary
+docs/results/ocr-audio-20261013/c5.png filter=lfs diff=lfs merge=lfs -text

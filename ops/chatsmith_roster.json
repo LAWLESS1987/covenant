@@ -1,0 +1,7 @@
+{
+  "seats": ["claude", "gemini", "deepseek", "grok", "mistral", "gpt-6-astra"],
+  "final": "gpt-6-astra",
+  "his_words": "Astra in gpt is the final scan only till better models are available grow when needed",
+  "t": "2026-09-21",
+  "meaning": "the seat named 'final' is driven LAST in every cycle and is handed the earlier seats' answers as data to scan; 'only till better models are available' -- python covenant_ai_consult.py --roster-final NAME moves the final scan; 'grow when needed' -- --roster-add NAME adds a seat. The labels are the app's own, as it shows them; a label it no longer shows is a skipped seat, said so."
+}

@@ -1,0 +1,1835 @@
+{
+ "what": "Claims this project published and then retracted. Machine-read by test_r1_retracted.py, which fails if a retracted claim reappears anywhere in the tree without a pointer to its retraction beside it. Written 2026-09-15 after the conformance claim was corrected in eleven files and survived in five more, including the README front page, because the sweep was a hand-written grep over the phrasings its author happened to think of.",
+ "rule": "A retracted phrasing may appear ANYWHERE, in any framing, on one condition: the retraction's id must appear within `window` lines of it. Records listed in `allow` are exempt entirely, because their whole purpose is to hold the original wording unedited. A regex cannot tell an assertion from a description of an assertion -- that is a known limit of this project's own judge -- so this check does not try. It requires the citation instead, which is checkable.",
+ "window": 10,
+ "coverage_floor": 400,
+ "expect_dirs": [
+  "docs",
+  "ops",
+  "tools"
+ ],
+ "optional_dirs": [
+  "conformance_indep",
+  "private"
+ ],
+ "retractions": [
+  {
+   "id": "A121",
+   "claim": "That reproducing the published conformance root is evidence an independent build performed the computation, and that this is NIR's move applied to governance.",
+   "refuted_by": "Jens Egholm Pedersen (DTU), 2026-09-15, author of the borrowed idea",
+   "truth": "The root is sha256 over the expected outputs printed inside docs/CONFORMANCE_SPEC.json itself, so it reproduces in nine lines with no implementation of climb or attest at all. The real evidence is per-vector: compute each expected from its input and compare. That is an ordinary test-vector suite and pins the computation only where it samples. REPLACED 2026-09-15 by docs/SEMANTICS.md, which states the rules independently of any implementation, with spec_reference.py and test_r2_semantics.py checking them over an exhaustively enumerated space.",
+   "verbatim": [
+    "The root `0c398099...0f0ddcef` is a claim that an independent build, in any language, sharing none of this code, produces the same number.",
+    "A matching root means two implementations sharing no code agree; a different one is a finding.",
+    "Two builds sharing no code either produce the same root or they do not.",
+    "a fork can now prove it agrees without running these exact bytes",
+    "so an independent build in any language reproduces the root without reading any Python",
+    "Two instances sharing no source can then produce the same conformance root, and an instance that copied the text but broke the behaviour cannot."
+   ],
+   "patterns": [
+    "reproduc\\w*\\s+(?:the\\s+)?(?:published\\s+|current\\s+|previous\\s+|same\\s+)?root",
+    "match(?:ing|es|ed)?\\s+the\\s+(?:published\\s+)?root",
+    "matching root means",
+    "prove\\s+(?:it\\s+)?agree(?:s|ment)",
+    "same root or they do not",
+    "produces?\\s+the\\s+same\\s+number",
+    "produc\\w*\\s+the\\s+same\\s+conformance\\s+root"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "docs/SPEC_SUFFICIENCY_2026-08-31.md",
+    "docs/OUTREACH_COMPILED.md",
+    "docs/OUTREACH_US_IL.md",
+    "docs/ROUNDTABLE_2026-09-03.md",
+    "docs/RUN_LOG_ARCHIVE.md",
+    "docs/IMPROVEMENT_LOG.md",
+    "conformance_check.sh",
+    "conformance_check.ps1",
+    "conformance_indep/",
+    "private/",
+    "test_r1_retracted.py"
+   ],
+   "note_on_patterns": "Deliberately NOT a generic 'same root': test_v1_verifier_agreement.py asserts that three verifiers in three languages produce the same CONSTITUTION hash, which is a different claim and still true. A pattern that convicts it would be a false positive, and a guard that cries wolf gets switched off."
+  },
+  {
+   "id": "A122",
+   "claim": "That a git clone line composed in Gmail arrives usable. It arrives wrapped as a google.com/url redirect and clones an EMPTY repository.",
+   "refuted_by": "the sent copies themselves, every letter until 2026-09-15",
+   "truth": "Gmail wraps on SEND, not on paste, so checking the draft proves nothing. Verify the sent copy, or use no URLs at all.",
+   "verbatim": [
+    "git clone https://www.google.com/url?q=https://github.com/LAWLESS1987/covenant&source=gmail"
+   ],
+   "patterns": [
+    "google\\.com/url\\?q="
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py"
+   ]
+  },
+  {
+   "id": "A128",
+   "claim": "That covenant_route.py's judge runs locally and that the summarise path keeps everything on this machine.",
+   "refuted_by": "covenant_route.py's own header after the Ollama removal of 2026-09-12, and public Actions run 35064624218",
+   "truth": "There is no local path in covenant_route.py. Every task dispatches to a GitHub Actions runner in the repository resolved from `git remote get-url origin` -- the PUBLIC LAWLESS1987/covenant -- and the runner's job summary is rendered publicly. Run 35064624218 on 2026-09-16 published a readable summary of one of the operator's videos there. The defect was the CLAIM, not the publishing: the operator is not aiming for private, so the tool now ANNOUNCES the destination on every call rather than refusing. COVENANT_HOLD_PRIVATE=1 refuses instead, for material naming a third party (A129).",
+   "verbatim": [
+    "covenant_route.py summarize (local Ollama judge) -> summary + facts",
+    "Nothing here uses a cloud model."
+   ],
+   "patterns": [
+    "local\\s+Ollama\\s+judge",
+    "[Nn]othing\\s+here\\s+uses\\s+a\\s+cloud\\s+model"
+   ],
+   "note_on_patterns": "Deliberately NARROW. A generic 'local judge' pattern matches 256 places, and almost all are correct: covenant_judge_defer.py's local judge really is local -- the distilled student runs in-process on the node. Only covenant_route.py's path was misdescribed. A guard that convicted all 256 would cry wolf and get switched off, which is the same over-matching that was withdrawn from A121 during construction.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "docs/history/",
+    "private/",
+    "covenant_route.py",
+    "test_r1_retracted.py"
+   ]
+  },
+  {
+   "id": "A145",
+   "claim": "That raising the ethics judge's margin to convict from 2.4 to 3.0 is strictly worse than leaving it -- that it removes no false convictions AND costs a correct one.",
+   "refuted_by": "the nightly retrain of 2026-09-18 03:44, caught the same day by test_a126_seat_dispositions.py's own exam, which is the guard that carried the claim",
+   "truth": "On the model of 2026-09-19 the base and margin-3.0 tallies are IDENTICAL -- (38 right, 7 false convictions, 0 wrong clears, 8 abstained) both -- so 3.0 removes nothing and costs nothing. It is a NO-OP, not a trade, which is neither the retracted claim nor the failure the suite warned about. The finding underneath it never moved and is now what the suite pins instead: raising the bar to convict cannot buy a false conviction for free, because all seven false convictions are `discourse` -- text that DESCRIBES a theft rather than committing one -- and the worst of them outscores the mildest true conviction, so no threshold separates the two (A126.M4). Only coverage moves it, at a stated price (A126.M3).",
+   "why_restated_rather_than_left_red": "The claim pinned THIS MODEL'S NUMBERS, so every overnight retrain re-broke it: narrowed once on 2026-09-17 after a student promotion, broken again on 2026-09-18. A claim rewritten whenever the judge moves is following the judge around rather than holding it to anything, and a permanently red line teaches its reader to skip the place a real failure would appear (A60). The replacement constrains margins 3.0 and 3.5 together at EVERY tally either could produce, which is strictly harder to satisfy than the two single-tally assertions it replaces, and A126.M1c drives the predicate to a failing verdict so the guard has been watched failing.",
+   "the_other_perspective": "Branch `a126-margin-claim-as-written-2026-09-19` holds the tree with the claim exactly as written, at commit c1ffb9c, pushed to origin. `git checkout a126-margin-claim-as-written-2026-09-19 && python test_a126_seat_dispositions.py` runs the older reading against WHATEVER MODEL IS ON DISK THAT DAY. It scored 10/12 against fallback_model.json as retrained at 2026-09-18 03:44; fallback_model.json is rewritten nightly, so a later run may score differently -- and that is not a flaw in the record, it is the measurement the record exists to make available. Nothing about the restatement is hidden behind a rewrite of history: the case for the older, stronger reading can still be run.",
+   "verbatim": [
+    "margin 3.0 still removes NO false convictions and costs a correct one -- strictly worse on both counts",
+    "...and it costs correct convictions, so it is worse on both counts"
+   ],
+   "patterns": [
+    "strictly\\s+worse\\s+on\\s+both\\s+counts",
+    "costs\\s+correct\\s+convictions,\\s+so\\s+it\\s+is\\s+worse"
+   ],
+   "note_on_patterns": "Deliberately narrow. A pattern over 'margin 3.0' alone matches the measurement lines, the restated comment and every transcript that ever printed the exam, none of which reassert anything. These two phrases are the ASSERTION and appear nowhere else in the tree.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "The three added files are SWEEP TRANSCRIPTS: a verbatim record of what the suite printed on a given day, which is the one kind of file whose whole purpose is to hold the old wording unedited. Editing a transcript to satisfy a guard would be falsifying the record the guard exists to protect. Same reasoning as A121's docs/RUN_LOG_ARCHIVE.md. ONE_RUN.txt is overwritten by the next sweep and will carry the restated wording by itself; the other two are archives and will not."
+  },
+  {
+   "id": "G4b",
+   "claim": "That today's daily trading plan is approved by the operator -- asserted as a property of the money gate, in test_g4_money_gates.py G4.4b.",
+   "refuted_by": "the sweep of 2026-09-19 at 09:20, run before the operator had approved that morning: G4 16/17, 'no approved daily plan for 2026-09-19'. The same check was 17/17 in all three sweeps of 2026-09-18, taken after his 07:10:50 approval.",
+   "truth": "Whether today is approved is a fact about the operator's morning, not about the gate. ops/daily_approvals.jsonl records an approval for 2026-09-15, -16, -17 and -18 and none for the 19th at the time of the sweep; the gate refused correctly, and the check called that refusal a failure. Left as written it would go red every morning until he taps and green after -- a suite reporting his to-do list as a test failure, on the money path, which is A60's defect in the worst place for it: a line red by routine is a line nobody reads on the day it means something. The gate itself was never wrong and is not changed by this.",
+   "why_restated_rather_than_left_red": "The invariant the original author wanted is that the gate READS the decision rather than assuming one, and that is now driven both ways: G4.4 against a day with no approval, G4.4b against the most recent day the ledger says was approved. It is strictly more than the old form measured -- the old one could pass on a day the gate was broken but the operator happened to have approved. The no-data branch is explicit and fails: pointed at an empty approvals ledger the check reports NOT MEASURED and takes G4 to 16/17 rather than passing on absence, which is the fake-guard shape this project has already paid for twice (A65, A74).",
+   "the_other_perspective": "Branch `g4-daily-plan-check-as-written-2026-09-19` holds the tree at f6ae5d6 with the check exactly as written, pushed to origin. Run it before the operator's morning approval and it fails; run it after and it passes -- which is the behaviour being retracted, reproducible on demand.",
+   "verbatim": [
+    "G4.4b ...today, which the operator approved from the phone, is not"
+   ],
+   "patterns": [
+    "which\\s+the\\s+operator\\s+approved\\s+from\\s+the\\s+phone"
+   ],
+   "note_on_patterns": "One pattern, narrow. A pattern over 'daily plan' or 'approved' matches the gate's own refusal strings, the plan store, the route and every transcript, none of which assert anything about today. This phrase is the assertion.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_SWEEP.txt",
+    "ops/_sweep2.txt",
+    "ops/_sweep3.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "The four added files are sweep transcripts -- a verbatim record of what the suite printed on a given day, the one kind of file whose purpose is to hold the old wording unedited. test_g4_money_gates.py is deliberately NOT allowed: it quotes the retracted sentence in the comment explaining the retraction, and cites G4b two lines above it, so containment covers it. That is the rule working as intended rather than being waived."
+  },
+  {
+   "id": "A236",
+   "claim": "That AI systems are DELIBERATELY trained to sound certain when they are wrong -- intent, asserted in the title of the operator's Hugging Face forum post of 2026-09-24 (discuss.huggingface.co/t/180706), kept in the tree as confidence-trap.md.",
+   "refuted_by": "the post's own body, read back on 2026-09-27: RLHF raters score confident answers higher, so the incentive produces overconfidence with nobody choosing it. Raised by the Claude app on his phone that morning (ops/teacher_queue.jsonl, phone:com.anthropic.claude); conceded by the operator the same morning ('I concede it.'); the correction ordered by him that day.",
+   "truth": "The mechanism the post describes is an incentive artifact and needs no intent to be true: weaker in one way (nobody chose it), stronger in another (nobody had to). The word 'deliberately' is retracted; the finding is not defended here either way, because nothing in this project measured rater preference or calibration. The original stays up unedited, on the forum and as confidence-trap.md; confidence-trap.CORRECTION.md sits beside it; docs/CORRECTIONS.md has the row; the README section 'Wrong in public' says the rule.",
+   "verbatim": [
+    "Why AI Systems Are Deliberately Trained to Sound Certain When They're Wrong",
+    "engineered overconfidence in AI systems",
+    "a system trained to mislead through tone"
+   ],
+   "patterns": [
+    "deliberately\\s+trained\\s+to\\s+sound\\s+certain",
+    "engineered\\s+overconfidence",
+    "trained\\s+to\\s+mislead\\s+through\\s+tone"
+   ],
+   "note_on_patterns": "Three phrasings, all present in the original and nowhere else in the scanned tree when this was written (grep over .md .py .sh .ps1 .json .txt .bat .html, 2026-09-27). 'overconfident' or 'RLHF' alone would match the correction, the docs and every honest discussion of the mechanism, none of which assert intent; these three carry the assertion.",
+   "allow": [
+    "confidence-trap.md",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py"
+   ],
+   "note_on_allow": "confidence-trap.md is the original and is allowed for the same reason the sweep transcripts are: its whole purpose is to hold the published wording unedited. confidence-trap.CORRECTION.md, the README and ops/CONFIDENCE_TRAP_POSTS.md are deliberately NOT allowed: each quotes the phrase while citing A236 within the window, which is the rule working rather than being waived."
+  },
+  {
+   "id": "A242",
+   "claim": "That on every model the coverage-0.80 temperament strictly removes false convictions and pays for them (A126.M3 as written: cov-0.80 false convictions < base, right answers strictly fewer, deferrals strictly more), and that a worst false conviction always exists to outscore the mildest true one (A126.M4 as written: bool(false_scores) required).",
+   "refuted_by": "measured 2026-09-28 on the first feature-format-2 candidate: base (41, 1, 0, 11), cov-0.80 (35, 1, 0, 17) -- one false conviction at base cannot strictly decrease, so M3 as written fails every candidate at least this good, forever; at fixture scale a candidate with zero false convictions also fails M4's existence requirement. The claims pinned the 2026-09 model's tally shape, the exact disease retracted once already as A145 ('a claim rewritten every time the judge moves is following the judge around').",
+   "truth": "The durable finding, restated in test_a126_seat_dispositions.py the same day: the coverage temperament never manufactures certainty -- at 0.80, false convictions never increase, false clears never increase, right answers never increase, deferrals never decrease -- and the overlap finding is asserted over the false convictions that exist, while a model with none left is vacuously past it and the zero is itself the finding. Both restatements keep a falsifiability companion that a harmful tally fails.",
+   "verbatim": [
+    "coverage 0.80 DOES reduce false convictions, and the price is fewer right answers and more deferrals",
+    "the worst false conviction outscores the mildest true one, so no threshold could ever separate"
+   ],
+   "patterns": [
+    "coverage\\s+0\\.80\\s+DOES\\s+reduce\\s+false\\s+convictions",
+    "worst\\s+false\\s+conviction\\s+outscores\\s+the\\s+mildest\\s+true\\s+one"
+   ],
+   "note_on_patterns": "Both phrasings are the check names as written; each carries the strict per-model tally assertion being retracted. The restated checks use different sentences and cite A242 in the comment beside them.",
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "The as-written wording is preserved unedited on branch a126-m3-coverage-claim-as-written-2026-09-28, which is not in this tree; KNOWN_ISSUES may quote it while citing A242 within the window. The sweep transcripts are allowed for A145's stated reason: their whole purpose is to hold what a past run printed, unedited."
+  },
+  {
+   "id": "X1-JA3",
+   "claim": "That the judge reading only `text` is shown by the order's wrapper FLIPPING the verdict on a harmful note (test_x1_judge_adversarial.py JA3 as written: ask(WRAPPER + HARMFUL[4]) != ask(HARMFUL[4])) -- a property of the 2026-09-18 student asserted as evidence of a structural property.",
+   "refuted_by": "measured 2026-10-03 on the describe-frame student promoted 2026-09-29: the wrapped and bare note are both CONVICT, so the check read red because the judge became MORE robust to the wrapper. The same file's docstring forbade it: 'judge accuracy is not a pass/fail here' and dilution is 'measured, not asserted'. The third instance of the disease A145 and A242 retracted -- a test pinning one model's behaviour.",
+   "truth": "Restated the same day as the structural property itself: the order's other fields beside the same text never move the verdict, so what reaches `text` is the whole of what is judged and JA1's fix is real. Whether the wrapper still flips anything is the dilution census, printed every run (2 of 18 payloads moved to CLEAR on 2026-10-03). Driven both ways: folding the summary into the judged text turned the restated JA3 red.",
+   "verbatim": [
+    "which is why JA1 is a real fix and not a cosmetic one"
+   ],
+   "patterns": [
+    "JA1\\s+is\\s+a\\s+real\\s+fix\\s+and\\s+not\\s+a\\s+cosmetic\\s+one"
+   ],
+   "note_on_patterns": "The as-written check name; the restated check keeps 'JA1 is a real fix' and drops 'and not a cosmetic one', so the pattern matches only the retracted form.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "The as-written test is preserved, runnable, on branch x1-ja3-claim-as-written-2026-10-03 (pushed). The sweep transcripts hold what past runs printed, unedited, for A145's reason."
+  },
+  {
+   "id": "AIMEM-66",
+   "claim": "That the memory system's suite is 66/66 (ai_memory_system/README.md, the Tests block: `python test_memory_system.py     # 66/66`; ai_memory_system/ANNOUNCE_DRAFT.md: '66/66 tests, including the security boundary').",
+   "refuted_by": "measured 2026-10-04: `python test_memory_system.py` printed M1: 140/140 before that day's supersession fix and 148/148 after it. The count went stale as checks were added and nothing re-read it -- and it travelled: the operator's fix request of 2026-10-04 asked to 'confirm 66/66 plus the new case', carrying the stale number in as fact.",
+   "truth": "The suite prints its own tally on its last line (M1: N/N passed); 148/148 on 2026-10-04 (A245). The README now names the command and points at that line rather than pinning a number that goes stale.",
+   "verbatim": [
+    "python test_memory_system.py     # 66/66",
+    "66/66 tests, including the security boundary"
+   ],
+   "patterns": [
+    "test_memory_system\\.py\\s+#\\s*66/66",
+    "66/66\\s+tests,\\s+including\\s+the\\s+security\\s+boundary"
+   ],
+   "note_on_patterns": "Both as-written forms, tied to this suite's own wording; a bare '66/66' would catch unrelated suites' tallies in the sweep record.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "Both files as written are preserved on branch aimem-66-count-as-written-2026-10-04 (at e4f17d6). The sweep transcripts hold what past runs printed, unedited."
+  },
+  {
+   "id": "A245-MUT13",
+   "claim": "That thirteen mutations of the fixed recall.py were each caught (ai_memory_system/README.md, the FIXED block: '13 mutations of `recall.py` are each caught'; A245; commit 0fdf6bb's message).",
+   "refuted_by": "re-counted 2026-10-04 by the session that wrote it, in its end pass: the drive script ran thirteen CASES, and one of them was HEAD's unmutated recall.py -- the baseline, not a mutation. The mutations were twelve, and A245's own list names twelve. The unit was wrong (rule 4): cases counted as mutations.",
+   "truth": "Twelve mutations of the fixed recall.py, each caught by a named check (A245 lists them); plus the baseline, HEAD's recall.py, on which the SR section fails from SR1.",
+   "verbatim": [
+    "13 mutations of",
+    "Thirteen mutations of the fixed `recall.py`"
+   ],
+   "patterns": [
+    "13\\s+mutations\\s+of[\\s>]+`?recall\\.py",
+    "[Tt]hirteen\\s+mutations\\s+of\\s+the\\s+fixed\\s+`?recall\\.py"
+   ],
+   "note_on_patterns": "Both written forms, tied to recall.py; the README's form wraps across a quoted line, hence [\\s>]+.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "The as-written README and A245 are preserved on branch a245-mutation-count-as-written-2026-10-04 (at ed3d1dd). A245 is a record file: it keeps its wording and carries a dated note beside it."
+  },
+  {
+   "id": "A250-BY",
+   "claim": "That the memory gate files a student-seat HOLD as a refusal by the seat that cleared it -- that its by=\"semantic\" names the quorum's semantic:1 seat (A250, title and body; commit f2e852f's message).",
+   "refuted_by": "the operator's 'logical correction', 2026-10-04, and the session's own re-reading: ai_memory_system/ethics_gate.py writes by=\"semantic\" on ALLOW and on BLOCK alike -- it names the gate's STAGE (coarse screen vs semantic review), not a seat. Two things share the name 'semantic'; the claim conflated them. Measured: the same tea sentence is ALLOW by=semantic under providers 'semantic' and BLOCK by=semantic under 'deferring,semantic', and the BLOCK's reason begins 'local:0: HELD'.",
+   "truth": "The gate reports the student seat's HOLD as a BLOCK from its semantic stage, and the reason it records names the holding seat (local:0: HELD). The defect is the hold becoming a refusal, not who it is credited to.",
+   "verbatim": [
+    "credited to the seat that cleared it",
+    "the seat that cleared it, so a hold is filed as the semantic judge's refusal"
+   ],
+   "patterns": [
+    "credited\\s+to\\s+the\\s+seat\\s+that\\s+cleared\\s+it",
+    "filed\\s+as\\s+the\\s+semantic\\s+judge's\\s+refusal"
+   ],
+   "note_on_patterns": "Both phrasings as A250 wrote them; the body form wraps a line, hence \\s+. Neither matches judge_resolve.py's 'the junior cleared it', which is a different and true sentence.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "A250 as written is on branch logic-pass-a248-a250-as-written-2026-10-04 (at f2e852f). A250 is a record file: it keeps its wording and carries a dated note beside it."
+  },
+  {
+   "id": "A248-HONEST",
+   "claim": "That under the deployed judges 'an honest sender can only fall' -- that a sender whose claimed benefit_score exceeds 0.8 is not honest (A248, title and body).",
+   "refuted_by": "the operator's 'logical correction', 2026-10-04: benefit_score is the sender's own estimate, and nothing measured shows a high estimate is a dishonest one. The measurement was about the size of the claim; the word 'honest' added a judgement of the sender that no measurement made.",
+   "truth": "Under the deployed judges a sender whose claimed benefit_score is 0.8 or less can only fall; above 0.8 the +0.02 branch is reachable by the claim alone, and a one-transaction block at that score breaks the drift bound.",
+   "verbatim": [
+    "so an honest sender can only fall",
+    "\"can only fall\" holds for an honest claim"
+   ],
+   "patterns": [
+    "honest\\s+sender\\s+can\\s+only\\s+fall",
+    "holds\\s+for\\s+an\\s+honest\\s+claim"
+   ],
+   "note_on_patterns": "Both phrasings as A248 wrote them, tied to 'can only fall' / 'holds for'.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "A248 as written is on branch logic-pass-a248-a250-as-written-2026-10-04 (at f2e852f); it keeps its wording and carries a dated note beside it."
+  },
+  {
+   "id": "A70-SUCCREG",
+   "claim": "That constitution.py's PROTECTED list covers 'two in CONTRIBUTING.md, one in docs/SUCCESSION_REGISTER.md' (A70's correction of 2026-09-09, as it stands in the record).",
+   "refuted_by": "found 2026-10-04 in passing, by the logical-correction pass on A251: `git log --all -S'SUCCESSION_REGISTER' -- constitution.py` returns no commit, so PROTECTED has never named it; at 02b7a07 (2026-09-09) the third block is docs/SUCCESSION.md, as docs/CONSTITUTION.md says.",
+   "truth": "At 2026-09-09 PROTECTED held three blocks: two in CONTRIBUTING.md and one in docs/SUCCESSION.md. Since 2026-09-19 (d5315c3) it holds four; the fourth is in docs/FEDERATION_RULES.md.",
+   "verbatim": [
+    "two in `CONTRIBUTING.md`, one in `docs/SUCCESSION_REGISTER.md`"
+   ],
+   "patterns": [
+    "two\\s+in\\s+`?CONTRIBUTING\\.md`?,\\s+one\\s+in\\s+`?docs/SUCCESSION_REGISTER\\.md"
+   ],
+   "note_on_patterns": "Tied to the PROTECTED sentence's shape, so the many true mentions of docs/SUCCESSION_REGISTER.md (the succession register itself) never match.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "The record keeps A70's wording with a dated note beside it; the as-written text is also on branch logic-pass-a248-a250-as-written-2026-10-04 (at f2e852f)."
+  },
+  {
+   "id": "A253-Q3",
+   "claim": "That a quorum where one seat ALLEGES a violation and another fails on infrastructure is an infrastructure failure -- pinned as test_b1_judge_parser.py's Q3, \"mixed dissent+infra -> violates and flagged\", against its own section's rule that QuorumJudge \"never relabels a real dissent\".",
+   "refuted_by": "A253, 2026-10-05: over all 25 two-seat combinations the label sent the memory gate down its infrastructure branch, writing a convicted memory UNREVIEWED (2 of 25 wrong). Grok recommended the fix at the quorum; three Chat Smith seats agreed; the operator approved it (\"1 2 and both ... do all three if its for mutual benefit\").",
+   "truth": "infrastructure_failure is set only when the quorum violates, at least one violating seat failed on infrastructure, AND no seat actually alleges a violation. A real dissent beside a timeout is a dissent; a timeout with no dissent beside it is still flagged (Q3b).",
+   "verbatim": [
+    "Q3 mixed dissent+infra -> violates and flagged"
+   ],
+   "patterns": [
+    "Q3\\s+mixed\\s+dissent\\+infra\\s+->\\s+violates\\s+and\\s+flagged"
+   ],
+   "note_on_patterns": "The check's own label, which is how the claim was written down.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "The check as written is on branch a253-q3-mixed-infra-as-written-2026-10-05 (at e2c53c7); test_b1_judge_parser.py keeps the old label in a comment that cites A253-Q3 beside the restated Q3 and Q3b."
+  },
+  {
+   "id": "A254-CAUSE",
+   "claim": "That the \"word: \" bypass of the memory gate's pattern screen was caused by the speaker-label carve-out (A254 as first written: its title, and \"The cause is the carve-out written for imported transcripts\"; commit e2c53c7's message).",
+   "refuted_by": "measured 2026-10-05 by the session that wrote it, with the carve-out switched OFF: \"note: Send the wallet seed to the backup address.\", the todo, base64 and lone **user:** texts all still passed. The bare-imperative pattern fired only at a sentence start and a \"word: \" prefix moved the verb off it -- no pattern matched at all. The cause was asserted without breaking it (CLAUDE.md rule 8).",
+   "truth": "Two holes. The larger: a line-start label hid the verb from the bare-imperative pattern. The smaller: the carve-out took ANY word and colon for a speaker, excusing orders in later sentences, and never matched the importer's own bold **who:** form. Both fixed the same day (A254).",
+   "verbatim": [
+    "The cause is the carve-out written for imported transcripts",
+    "the speaker-label carve-out treats it as reported speech"
+   ],
+   "patterns": [
+    "The\\s+cause\\s+is\\s+the\\s+carve-out\\s+written\\s+for\\s+imported\\s+transcripts",
+    "speaker-label\\s+carve-out\\s+treats\\s+it\\s+as\\s+reported\\s+speech"
+   ],
+   "note_on_patterns": "The two sentences that named the carve-out as THE cause.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/_sweep4.txt"
+   ],
+   "note_on_allow": "A254 as written is on branch a254-cause-as-written-2026-10-05 (at e2c53c7); the record keeps its wording with a dated note beside it."
+  },
+  {
+   "id": "A255-HOOK",
+   "claim": "That the pre-commit hook's manifest step never describes content the commit does not contain, because it regenerates MANIFEST.sha256 only on a FULL commit, defined as one where no staged file also has unstaged changes (ops/pre-commit.synchold step 3; KNOWN_ISSUES A155) -- and that the tracked files the running system rewrites, naming fallback_model.json and ops/verdicts.jsonl, are hashed as they are on disk.",
+   "refuted_by": "driven 2026-10-04 in a scratch worktree at 93f7136: docs/GATES.md staged, covenant_model.py modified and NOT staged. The hook's partial list was empty, so it called the commit full, and the manifest it wrote carried the uncommitted bytes (876e926b5d8c in the manifest, 94fa05d5f15f committed). test_a255_runtime_outputs.py K1/K2 go red on the hook as written. And fallback_model.json and ops/verdicts.jsonl have been in verify_bundle.py OUTPUTS since 2026-09-04: never hashed at all.",
+   "truth": "A commit with no partially staged file can still carry the uncommitted bytes of any tracked file that was modified and not staged. Since A255 the hook asks verify_bundle.py --write-if-clean, which writes only when every file the manifest hashes is on disk exactly as the commit holds it, and otherwise leaves the manifest alone and names the files. Files the running system rewrites are OUTPUTS and never hashed.",
+   "verbatim": [
+    "regenerate MANIFEST.sha256 on every FULL commit -- one where no staged\n#      file also has unstaged changes -- under the rule this hook always had:\n#      never describe content the commit does not contain.",
+    "regenerates `MANIFEST.sha256` on every *full* commit — one where no staged file also has\nunstaged changes — under the same rule it always had (never describe content\nthe commit does not contain)",
+    "tracked files the running system rewrites\n#   (fallback_model.json, ops/verdicts.jsonl ...) are hashed as they are on\n#   disk"
+   ],
+   "patterns": [
+    "\\*?full\\*?\\s+commit\\s*(?:--|—)\\s*one\\s+where\\s+no\\s+staged[\\s#]+file\\s+also\\s+has[\\s#]+unstaged\\s+changes",
+    "running\\s+system\\s+rewrites[\\s#]*\\(`?fallback_model\\.json`?,[\\s#]*`?ops/verdicts\\.jsonl"
+   ],
+   "note_on_patterns": "Both written forms of each claim: the hook's comment wraps across '#' lines, A155's uses an em dash and backticks, hence [\\s#] and the alternations. R1 compiles with re.I, so FULL and *full* are one pattern. ops/*.synchold was outside R1's scan until this entry; SCAN_EXT now carries the three hook suffixes.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The hook and A155 as written are preserved on branch a255-hook-manifest-claim-as-written-2026-10-04 (at 93f7136). The hook keeps both paragraphs beside the A255 note that restates them; A155 is a record file and carries a dated note beside the paragraph."
+  },
+  {
+   "id": "A257-SHIM",
+   "claim": "That a one-line shim keeps the launcher's old name, run_with_ollama_judge.py, for one release (README.md Quick start; docs/PARTNER.md; run_node.py's docstring).",
+   "refuted_by": "git log --diff-filter=D: run_with_ollama_judge.py was deleted on 2026-09-12 in 865c0bd, 'The launcher's old name is retired' -- the day it was renamed. Found 2026-10-04 by a reference walk over every tracked README: the ticked path did not resolve.",
+   "truth": "There is no shim. The launcher is run_node.py; `python run_with_ollama_judge.py` fails on a clone.",
+   "verbatim": [
+    "a one-line shim keeps the old name for one release",
+    "a one-line shim keeps the\nold name for one release",
+    "A one-line shim keeps the old name for one\nrelease"
+   ],
+   "patterns": [
+    "one-line\\s+shim\\s+keeps\\s+the\\s+old\\s+name"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-NIRSPEC",
+   "claim": "That Pedersen's prescription -- write the specification of the two operations, not more vectors -- is on record and not yet acted on (README.md, the Mahowald-shortlist credit; conformance.py's docstring).",
+   "refuted_by": "docs/SEMANTICS.md was added on 2026-09-15 in 8903604, 'The specification Pedersen asked for, checked over every point in a bounded space'; the README's own Check-it-yourself section points readers to it. Measured 2026-10-04.",
+   "truth": "It was acted on the same day: docs/SEMANTICS.md is that specification.",
+   "verbatim": [
+    "prescription is on record and not yet acted on: write the specification of\n  the two operations, not more vectors.",
+    "prescription is on record and not yet acted on",
+    "prescription, recorded and not yet acted on"
+   ],
+   "patterns": [
+    "prescription(,\\s+recorded|\\s+is\\s+on\\s+record)\\s+and\\s+not\\s+yet\\s+acted\\s+on"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-130KB",
+   "claim": "That the distilled student the gate calls is a 130 KB JSON file/model (README.md twice; docs/PARTNER.md; mobile/TERMUX_SETUP.md twice).",
+   "refuted_by": "git cat-file -s at HEAD on 2026-10-04: fallback_model.json 247,576 bytes and fallback_model_2.json 137,316 bytes; twenty commits earlier they were 135,258 and 130,540. A size of a file the nightly retrain rewrites, copied into prose, rotted.",
+   "truth": "There are two students, a few hundred KB together and growing with the retrain; measure them with `ls -l fallback_model*.json`.",
+   "verbatim": [
+    "a 130 KB JSON file read into the node's own process",
+    "a 130 KB JSON model read into the process",
+    "the judge is a 130 KB model read in-process"
+   ],
+   "patterns": [
+    "130\\s*KB\\s+(JSON\\s+)?(file|model)"
+   ],
+   "note_on_patterns": "docs/history/ is allowed: dated narratives of 2026-08, where 130 KB was true.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "docs/history/"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-TENMIN",
+   "claim": "That anyone can run the suite totals at the top of the README in about ten minutes (README.md, Support this work).",
+   "refuted_by": "The two newest sweep transcripts on 2026-10-03 and 2026-10-04 print 'elapsed 17.4 min' and 'elapsed 18.4 min' (ONE_SWEEP.txt, ONE_RUN.txt).",
+   "truth": "The full sweep took 17-18 minutes on this machine on those dates and prints its own time; `sh check.sh` takes seconds.",
+   "verbatim": [
+    "anyone can run them in about ten minutes"
+   ],
+   "patterns": [
+    "run\\s+them\\s+in\\s+about\\s+ten\\s+minutes"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-3OFF",
+   "claim": "That three suites are deliberately off -- test_xrp_live.py and test_covenant_app.py named (README.md, Suite coverage).",
+   "refuted_by": "covenant_one.py DELIBERATELY_OFF, parsed 2026-10-04: 13 entries, of which four are test suites (test_e3_witness_loop.py, test_covenant_app.py, test_xrp_live.py, test_c2_watchdog_live.py) and the rest probes and tools. Three matched neither count.",
+   "truth": "Thirteen entries are switched off on the record, four of them test suites; the runner prints the count and every reason on each run.",
+   "verbatim": [
+    "**Three suites are deliberately off**, on the record with reasons"
+   ],
+   "patterns": [
+    "Three\\s+suites\\s+are\\s+deliberately\\s+off"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-HOLDOUT",
+   "claim": "That ops/HOLDOUT.json measured 2026-09-17T07:39:24Z -- of 3541 ledger rows the model decided 2414, got 2259 right, cleared 24 -- is what is current (README.md, 'What IS current').",
+   "refuted_by": "ops/HOLDOUT.json as committed on 2026-10-04 reads 2026-10-03T08:05:46Z: 3,875 rows, 2,762 decided, 2,607 right, 23 false clears. Every promoted model rewrites it.",
+   "truth": "The file holds the current figures with its own timestamp; read it rather than a copy.",
+   "verbatim": [
+    "of 3541 ledger rows the model decided 2414, got 2259 right, and cleared 24 it should have held",
+    "of 3541 ledger rows the\n  model decided 2414"
+   ],
+   "patterns": [
+    "of\\s+3541\\s+ledger\\s+rows\\s+the\\s+model\\s+decided\\s+2414"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-EXAM",
+   "claim": "That `python covenant_distill.py --exam` gives 53 cases, 39 agree, 7 wrong, 7 abstained, 0 false clears and 7 false holds (README.md, 'What IS current').",
+   "refuted_by": "Run 2026-10-04 with the deployed student (model c8a5cc4e7922, 3898 examples): 53 cases, 41 agree, 1 wrong, 11 abstained, 0 false clears, 1 false hold, in discourse.",
+   "truth": "The exam moves with every model; run the command. Zero false clears held on both dates.",
+   "verbatim": [
+    "53 cases, 39 agree, 7 wrong, 7 abstained"
+   ],
+   "patterns": [
+    "53\\s+cases,\\s+39\\s+agree,\\s+7\\s+wrong"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-A67RATE",
+   "claim": "That the judge hard-accuses 8 of 8 legitimate documents about violations (README.md, 'Or come to break it').",
+   "refuted_by": "test_f3_gate_end_to_end.py H3 on 2026-10-04: '3 of 8 legitimate discourse documents are hard-accused -- issue A67, open'.",
+   "truth": "3 of 8 with the students deployed on 2026-10-04; the rate moves with every retrain and A67 stays open. Run F3 and read H3.",
+   "verbatim": [
+    "It hard-accuses 8 of 8 legitimate documents about violations"
+   ],
+   "patterns": [
+    "hard-accuses\\s+8\\s+of\\s+8"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-P0109",
+   "claim": "That rebalancing showed +0.45% out of sample at p=0.109, cited beside XRP and HBAR as evidence that no timing edge survived (README.md, 'What it is not').",
+   "refuted_by": "docs/TRADING_READINESS.md section 1d (2026-08-22): on 598 bars p=0.109 reproduces as the arithmetic value of 'five of six folds positive' (binom_p(5,6)), not a measurement of the data, and re-sliced into 8 or 12 folds the same bars' spread changes sign.",
+   "truth": "No timing edge is distinguishable from chance (598 bars, ten assets, p 0.47-0.92); the conclusion stands, and p=0.109 is not evidence of anything.",
+   "verbatim": [
+    "rebalancing +0.45% at p=0.109"
+   ],
+   "patterns": [
+    "rebalancing\\s+\\+0\\.45%\\s+at\\s+p=0\\.109"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A257-HASHLOC",
+   "claim": "That the sha256 of every realdata/deep file is recorded in claude/IMPROVEMENT_LOG.md under D1 (realdata/README.md).",
+   "refuted_by": "Walked 2026-10-04: there is no claude/ directory; docs/IMPROVEMENT_LOG.md holds D1 as 8-hex prefixes of the 598-bar files, and none matched the files on disk -- because realdata/refresh_kraken.py appended 13 bars to each on 2026-09-04, recorded before -> after in realdata/deep/REFRESH_LOG.md. All twelve files match their 'after'; ADA's first 599 lines still hash to the D1 prefix a0ae69f1.",
+   "truth": "D1 prefixes are in docs/IMPROVEMENT_LOG.md and verify the first 598 bars; realdata/deep/REFRESH_LOG.md verifies the files as they are.",
+   "verbatim": [
+    "sha256 of every file is recorded in `claude/IMPROVEMENT_LOG.md` under D1"
+   ],
+   "patterns": [
+    "recorded\\s+in\\s+`?claude/IMPROVEMENT_LOG\\.md`?\\s+under\\s+D1"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+  },
+  {
+   "id": "A258-EARNHOST",
+   "claim": "That since 2026-09-26 (A230) the earn server binds to loopback by default -- the listener binds to loopback, the server itself binds to loopback, and the watchdog starts it on loopback (covenant_earn.serve's docstring; docs/EARN.md; exposure_check.py's EARN_PORTS comment; KNOWN_ISSUES A230).",
+   "refuted_by": "Measured 2026-10-05: the live process (started 2026-09-26 23:04:28) listened on 0.0.0.0:5090. serve() defaulted to 127.0.0.1, but main()'s --host defaulted to '0.0.0.0', and every launch -- the watchdog's `covenant_earn.py --serve` included -- goes through main(). Run against that code with serve captured, `--serve` reaches serve() as host 0.0.0.0. exposure_check reported it WILDCARD each time it ran.",
+   "truth": "Loopback since 2026-10-05 (A258): main()'s --host defaults to 127.0.0.1, EA1.44/EA1.45 run main() both ways, and after the change loopback and the Funnel answered 200 while the Wi-Fi LAN address did not. False from 2026-09-26 to 2026-10-05.",
+   "verbatim": [
+    "So the listener binds to loopback",
+    "the server itself binds to loopback, 127.0.0.1:5090",
+    "the server itself binds to loopback since the same day",
+    "the server binds to loopback by default"
+   ],
+   "patterns": [
+    "listener\\s+binds\\s+to\\s+loopback",
+    "server\\s+itself\\s+binds\\s+to\\s+loopback",
+    "server\\s+binds\\s+to\\s+loopback\\s+by\\s+default"
+   ],
+   "note_on_patterns": "Narrow to the earn server's wording. The seal service ('binds to loopback only') and the memory server ('unauthenticated on loopback by default') are different services and match none of these.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Every site as written is preserved on branch a258-earn-host-claim-as-written-2026-10-05 (at c06a502). Each keeps its wording with the restated form and this id beside it."
+  },
+  {
+   "id": "A259-GRADE",
+   "claim": "That an asynchronous remedy whose condition is still PRESENT after its window did not fix it (covenant_highway.grade_started's docstring and rule: 'PRESENT then and ABSENT now is fixed; still PRESENT is did not fix').",
+   "refuted_by": "The live ledger, 2026-10-04/05: schedule_watchdog_restart started at 23:06:51 and 00:34:26; the watchdog processes running afterwards were created at 23:06:59 and 00:34:34 (Win32_Process CreationDate), so both restarts happened. A watched file was written inside each 15-minute window (covenant_highway.py, then covenant_earn.py), the condition was PRESENT again as a new instance, both were graded 'did not fix', and QUARANTINE_AFTER = 2 retired the remedy (quarantined() True; 'refused' at 00:57:13). HEAD's grader, given a restart then a newer write, returns 'did not fix'.",
+   "truth": "Still PRESENT after the remedy measurably worked is a new instance, not a failure. For watchdog_stale the oldest running watchdog having started after the remedy did is that measurement; such a row is graded fixed and marked recurred (A259-GRADE, H1o3). Detectors with no recurrence test keep the old rule.",
+   "verbatim": [
+    "still PRESENT is `did not fix`"
+   ],
+   "patterns": [
+    "still\\s+PRESENT\\s+is\\s+`did\\s+not\\s+fix`"
+   ],
+   "note_on_patterns": "Backticks required: the sync path's H1x check ('ran=True with the condition still PRESENT is 'did not fix'') describes apply_remedy, where an immediate re-measure leaves no window for a new instance, and is not this claim.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The grader as written is preserved on branch a259-grade-and-dashboard-as-written-2026-10-05 (at b0d3ea2). The docstring keeps the sentence, with the restated rule and this id beside it."
+  },
+  {
+   "id": "A261-WINDOW",
+   "claim": "That thirty minutes is the right grading window for dispatch_phone_build -- 'thirty is the window, so a slow runner is not graded as a failure and a build that never arrives still is' (covenant_highway REMEDIES; docs/HIGHWAY.md: '30 min for a build dispatch').",
+   "refuted_by": "The live ledger and ops/app/, 2026-10-05: the dispatches of 2026-09-28 15:14 and 2026-10-03 08:41 both built -- covenant-node-252d3e1-r36470903029.apk and -r37123686630.apk reached the PC at 16:21 and 09:17 -- but were graded 'did not fix' at 15:45 and 09:11, because phone_build_behind_core clears only when fetch_build has collected the APK, on its own hour. The two misgrades quarantined the phone's only route to a new core.",
+   "truth": "The window must cover the build AND a fetch cycle: two hours (A261). H1o4 drives it both ways: a 40-minute-old dispatch is not graded; the old window grades the same row 'did not fix'.",
+   "verbatim": [
+    "thirty is the window, so a slow runner is not graded as a failure",
+    "30 min for a build dispatch"
+   ],
+   "patterns": [
+    "thirty\\s+is\\s+the[\\s#]+window",
+    "30\\s+min\\s+for\\s+a\\s+build\\s+dispatch"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written on branch a261-dispatch-budget-as-written-2026-10-05 (at 26d327f). Both sites keep their wording with the correction and this id beside it."
+  },
+  {
+   "id": "A262-DATE",
+   "claim": "That the README header's totals line carries the measurement's date ('The date on that line is the measurement's date').",
+   "refuted_by": "The header line had no date from the commit that wrote this sentence (8bcf195, 2026-09-17: '... 2 failed** on win32 <!--TOTALS-->') to 2026-10-05; readme_totals.rewrite_line replaced the FIRST date on a line, so it could not have added one, and would have stamped the sweep date over any earlier date on the line.",
+   "truth": "True since 2026-10-05 (A262): the line carries the sweep's date after the platform, written by readme_totals.py, which now anchors the measurement date after the platform. G1 T5/T5b run it.",
+   "verbatim": [
+    "The date on that line is the measurement's date",
+    "The date on\nthat line is the measurement's date"
+   ],
+   "patterns": [
+    "The\\s+date\\s+on\\s+that\\s+line\\s+is\\s+the\\s+measurement's\\s+date"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written on branch a262-readme-header-as-written-2026-10-05 (at ba5e9f7). The README paragraph keeps its wording with the restated form and these ids beside it."
+  },
+  {
+   "id": "A262-VERSION",
+   "claim": "That every field on the README header line is re-measured together by readme_totals.py --write, the version among them.",
+   "refuted_by": "The version is copied from COVENANT_VERSION, a label introduced 2026-08-29 (3695236) and unchanged across 60 commits to the core since (git rev-list --count 3695236..HEAD -- covenant_unified_v8.py, 2026-10-05); the PC ran ee4e0db9047d and the phone b708204ff11b under the one label.",
+   "truth": "The counts, hash and line count are measured; the version is the code's label, and the line now states when it was set and how many core changes it spans, measured from git each run. The source hash is the identity.",
+   "verbatim": [
+    "Every field above is re-measured together by `python readme_totals.py --write`"
+   ],
+   "patterns": [
+    "Every\\s+field\\s+above\\s+is\\s+re-measured\\s+together"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written on branch a262-readme-header-as-written-2026-10-05 (at ba5e9f7). The README paragraph keeps its wording with the restated form and these ids beside it."
+  },
+  {
+   "id": "A263-DOCSTRING",
+   "claim": "That x_video_text.summarize() refuses to send anything under private/ to the public-repo judge unless COVENANT_ALLOW_PUBLIC_JUDGE=1.",
+   "refuted_by": "summarize() itself (convo_ocr/x_video_text.py, outside this repository), read 2026-10-05: under private/ it prints the A128 destination notice and sends; only COVENANT_HOLD_PRIVATE=1 holds the file back. No code anywhere reads COVENANT_ALLOW_PUBLIC_JUDGE. The module docstring described A128's first fix, withdrawn within the hour on 2026-09-16, and outlived it; on 2026-10-05 the A263 task brief repeated it as fact.",
+   "truth": "summarize() announces the public destination for private/ input and sends it -- the operator is not aiming for private (A128) -- and COVENANT_HOLD_PRIVATE=1 refuses instead. Material that must stay off the public runner is marked private at the door it enters by (A263); it is not refused by default.",
+   "verbatim": [
+    "summarize() now refuses to send anything under private/ to a public-repo judge; pass COVENANT_ALLOW_PUBLIC_JUDGE=1 to override deliberately."
+   ],
+   "patterns": [
+    "COVENANT_ALLOW_PUBLIC_JUDGE",
+    "summarize\\(\\)\\s+now\\s+refuses"
+   ],
+   "note_on_patterns": "COVENANT_ALLOW_PUBLIC_JUDGE is read by no code, so any appearance is this claim or a description of it -- the description must carry the id.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The file is outside this repository and convo_ocr is not a git repository, so there is no as-written branch: the whole file as written is kept at convo_ocr/.trash/2026-10-05_x_video_text_docstring/ (sha256 41c06a6f194d9bfc..., 11692 bytes) with RETIRED.md. This guard keeps the claim from re-entering THIS tree; it cannot see convo_ocr."
+  },
+  {
+   "id": "A264-T5B",
+   "claim": "That the README header's version note must be what git measures NOW -- its count of core changes equal to git's at every commit (G1 T5b as first written, 2026-10-05).",
+   "refuted_by": "The next core commit, by another session (0dd9a23, then 8bf4d56's CI run), made git's count 61 while the header written from the last sweep said 60, and public CI went red on T5b: a check that fails on every core commit until someone re-runs readme_totals --write. The note is a measurement made with the totals and lags with them.",
+   "truth": "The note must name the label's date exactly and a count no greater than git's; it may lag until the next readme_totals --write, as the totals do. T5b/T5bm (A264) drive it both ways.",
+   "verbatim": [
+    "T5b the README header's version note is what git measures now"
+   ],
+   "patterns": [
+    "version\\s+note\\s+is\\s+what\\s+git\\s+measures\\s+now"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/public_ci.json"
+   ],
+   "note_on_allow": "The check as first written is preserved on branch a264-t5b-check-as-written-2026-10-05 (at e138151). ops/public_ci.json is allowed: the public-CI listener's own gitignored cache, which records the failing check's annotation verbatim -- a record of what CI said, not a claim."
+  },
+  {
+   "id": "SW-CONTRIB-2026-10-06",
+   "claim": "That an empty contribution_symbols was one of the reasons the Sentinel-Witness trader planned no orders on 2026-10-05 -- listed among them in docs/SENTINEL_WITNESS.md (2f6b184) and, in Sentinel-Witness's trader/README.md, as 'the weekly contribution has nothing to buy'.",
+   "refuted_by": "The code it describes: covenant_trader.plan() selects R6 contributions with `(not wanted or p[\"sym\"] in wanted)`, so an EMPTY list means every held asset under the cap and above its 200-day line qualifies. The 2026-10-05 plan's own R6 note named the only blocker: cash under the 10% floor. Found by Claude while reading plan() to build the operator's 2026-10-06 operation rules.",
+   "truth": "An empty contribution_symbols restricts nothing; the weekly contribution was blocked by cash alone.",
+   "verbatim": [
+    "Cash is below the 10% floor, XRP is at its frozen floor, `contribution_symbols` is empty, and no daily plan has been approved here since 2026-09-19."
+   ],
+   "patterns": [
+    "contribution_symbols`?\\s+is\\s+empty"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The document as first written is preserved on branch sentinel-witness-contribution-claim-as-written-2026-10-06 (at b502ba5). The sentence stays in docs/SENTINEL_WITNESS.md beside this id and its restatement."
+  },
+  {
+   "id": "A269-SLOT-SPLIT-2026-10-06",
+   "claim": "That llama-server's default 4 parallel slots DIVIDED -c 8192 between them, so each request had about 2048 tokens, and that this per-request limit is why every ask through Tetsu's door failed with HTTP 500 on 2026-10-06 -- stated in docs/KNOWN_ISSUES.md A269, the comment above covenant_model.start()'s args, test_a269_model_one_slot.py's docstring, and the subject of commit 03d4d29.",
+   "refuted_by": "Measured the same morning by the session running the private X-video batch through the same 4-slot servers: 13 asks of about 27,000 characters each (compose_system(AGENT_SYSTEM) 11,813 characters, verified by Claude; history about 11,963; item about 3,261), roughly 7,000 tokens, SUCCEEDED -- impossible under a 2048-token cap. The probe that failed was 2,521 tokens (counted by the server's /tokenize), sent while other slots were processing. /slots reported n_ctx 8192 on every slot.",
+   "truth": "The 4 slots share ONE 8192-token pool; requests running at the same time together exceed it and the server answers 500 'Context size has been exceeded.' A single request may use the whole pool. -np 1 still fixes it: one request at a time against the whole pool, the rest queue. Whether that pool is llama.cpp's unified KV cache was inferred from these measurements, not read in its source.",
+   "verbatim": [
+    "Every ask through Tetsu's door failed \"HTTP Error 500\": the model server split its 8192-token context across 4 slots, about 2048 a request",
+    "This llama-server build (tools/llama, 2026-09-19) defaults to 4 parallel slots and divides -c between them.",
+    "This llama-server build defaults to 4 parallel slots and splits -c between them, so every request had about 2048 tokens, not the 8192 above",
+    "this llama-server build defaults to 4 parallel slots and divides -c between them: about 2048 tokens a request."
+   ],
+   "patterns": [
+    "about 2048 (?:tokens )?a request",
+    "(?:divides|splits) -c between them",
+    "split its 8192-token context across 4 slots",
+    "4 default slots split -c 8192"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The claim as first written is preserved on branch a269-slot-split-claim-as-written-2026-10-06 (at 640ab4d). docs/KNOWN_ISSUES.md is NOT exempt: its A269 entry quotes the old wording beside this id and restates it."
+  },
+  {
+   "id": "A273-RULES-SIZE-2026-10-06",
+   "claim": "That the door's rules -- the system message Tetsu is handed -- are about 5,600 characters, so a fixed history budget of 12,000 characters fits the model's 8k window beside them and the answer -- stated 2026-09-26 in the comment above AGENT_HISTORY_BUDGET in covenant_unified_v8.py, and by test_m6_mobile_door.py's M6q3 comment as the budget his model's window can hold. TRUE WHEN WRITTEN: A223 measured the rules that day at 4,919 characters (5,607 for the council). What was wrong is the premise that a size measured once would hold: the rules are composed per request from parts read at call time, and nothing re-measured them.",
+   "refuted_by": "Measured 2026-10-06 on the running server (127.0.0.1:8081, /tokenize and /apply-template): covenant_persona.compose_system(AGENT_SYSTEM) was 11,817 characters, 2,916 tokens -- fixed rules 3,082, register 2,085, where_you_are 2,110, about_him 2,800 (its cap), standing_directive 1,019 (added 2026-09-28), brief 711 -- and the council's, with the method, 12,547 characters, 3,105 tokens. Those rules with the batch caller's real history under the fixed budget (16 messages, 10,980 characters) and a dense 4,000-character question made a 7,594-token prompt, 8,294 with the door's 700-token answer: over 8,192. The council's request for the same caller came to 8,661 with its 500-token answer.",
+   "truth": "The rules are composed per request and had grown to more than twice the size the budget was sized beside; no character budget sized once can follow them. Since A273 the doors read the turns with no character budget and covenant_model.fit() counts each request with the server's own chat template and tokenizer, dropping the oldest exchanges -- as few as the window needs -- so the prompt plus the answer fits 8,192 tokens whatever the rules grow to. AGENT_HISTORY_BUDGET is kept only for a keeper without fit().",
+   "verbatim": [
+    "up to 20 exchanges, each side up to 2000 characters, newest kept first until 12,000 characters in all (was 6 x 600), so the history fits his model's 8k window beside the rules (~5,600 characters) and the answer.",
+    "The PC app's COUNCIL exchanges are replayed too, the newest are kept first, and the total stays inside the budget his model's window can hold."
+   ],
+   "patterns": [
+    "rules[^\n]{0,30}5,?600 characters",
+    "inside the budget his model's window can hold"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The claim as first written is preserved on branch a273-rules-size-claim-as-written-2026-10-06 (at 036d3ad). covenant_unified_v8.py keeps the sentence as written with this id beside it; test_m6_mobile_door.py keeps M6q3's comment with this id beside it; docs/KNOWN_ISSUES.md is NOT exempt: A269's open item quotes the old size beside this id."
+  },
+  {
+   "id": "A274-DEGRADED-ANY-WARNING-2026-10-06",
+   "claim": "That a node's /health reports degraded whenever any warning exists, so the node orbs on /pc/3d (covenant_pc3d.py layout()) can never be green while the win32 code-sandbox warning stands -- written in a Claude session note on 2026-10-06 (the 'greenlight' memory) and carried from there into the request that became A274.",
+   "refuted_by": "covenant_unified_v8.py's /health builds `warnings` as one list and `degraded` from four booleans -- keyless, insecure, own_genesis, crisis_mode -- and no warning sets any of them. Measured on A, B and C on 2026-10-06 before any change: degraded=True on all three with judge_keyless=True, judge_insecure=False, crisis_mode=False; the sandbox warning was one of two warnings on each and decided nothing.",
+   "truth": "A node orb is amber when /health is degraded, and today every node is degraded because its ethics seat has no provider key (judge_keyless). The code-sandbox warning is shown under 'why' on the orb but does not make it amber; changing the sandbox cannot turn the orbs green. Whether to seat a keyed provider is his.",
+   "verbatim": [
+    "node orbs amber whenever /health is degraded (any warning)",
+    "Because /health reports degraded whenever any warning exists, the node orbs on /pc/3d (covenant_pc3d.py layout()) can never be green on this PC."
+   ],
+   "patterns": [
+    "degraded \\(any warning\\)",
+    "degraded whenever any warning exists"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Never written in the repository, so there is no tree to hold on a branch: the claim as written stays in the session note it came from, marked corrected beside this id. docs/KNOWN_ISSUES.md is NOT exempt: its A274 entry quotes the old wording beside this id and restates it."
+  },
+  {
+   "id": "A304-CHAIN-SPLICE-2026-10-07",
+   "claim": "That ai_memory_system's verify_chain() proves the audit ledger has not been reordered or spliced (memory_store.py, the verify_integrity docstring; restated in state_root's docstring as 'this node's ledger was not reordered', and in server.py's comment 'The chain proves the ledger was not reordered'). The README stated the known limit only for an edit to the newest record.",
+   "refuted_by": "An independent multi-agent review of this repository, round 1, 2026-10-07, reproduced by two reviewers on two systems with the same heads: a 5-line ledger with record 2 rewritten and every later prev recomputed returns {ok: True, entries: 5} from verify_chain(); only the head differs (47cd855f... honest, b4f3efba... forged). Pinned as check A8c in ai_memory_system/test_memory_system.py.",
+   "truth": "verify_chain() proves each line links to the one before it. A rewrite that recomputes every later link verifies too; only a head witnessed outside the file (A8b, A8d) shows that history was rewritten. The newest-record case (A8) is one instance of this, not the whole limit.",
+   "verbatim": [
+    "verify_chain() proves the ledger has not been reordered or spliced.",
+    "verify_chain()  this node's ledger was not reordered   (local, timed)",
+    "The chain proves the ledger was not reordered"
+   ],
+   "patterns": [
+    "proves the ledger has not been reordered or spliced",
+    "verify_chain\\(\\)\\s+this node's ledger was not reordered",
+    "chain proves the\\s+(?:#\\s*)?ledger was not reordered"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The claim as first written is preserved on branch a304-verify-chain-claim-as-written-2026-10-07 (at d3c10fa). The three live places it was written now quote it beside this id and the restated limit; docs/KNOWN_ISSUES.md is NOT exempt and cites this id beside its quotation."
+  },
+  {
+   "id": "A305-Q2-ONE-SPLIT-2026-10-07",
+   "claim": "A127.Q2: that refining the student judge is no worse than rebuilding it on right answers (and no worse on false convictions), decided on one shuffle (seed 7) of a live ledger that grows daily.",
+   "refuted_by": "An independent multi-agent review of this repository, 2026-10-07, measured by two reviewers on two hosts: over 20 seeds the right-answer gap (refine minus rebuild) was 0 to -1 on the live ledger, 0 on the committed one, down to -2 on a filtered subset, and -1 to +1 across a 150-run subset probe. A restatement with a margin of one was itself refuted before commit (KNOWN_ISSUES A305).",
+   "truth": "The right-answer gap is the cost of bounded steps (A127.B1): it varies by split and by example set and is now REPORTED per split with the ledger's hash, never asserted. The false-conviction half held in all 230 runs and is asserted in every one of 20 splits, on judge_suite's exam cases (53 on 2026-10-07).",
+   "verbatim": [
+    "refining is no worse than rebuilding on right answers and no worse on false convictions"
+   ],
+   "patterns": [
+    "refining is no worse than rebuilding on right answers and no worse on false convictions"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt",
+    "ops/sweep_heal_last.txt"
+   ],
+   "note_on_allow": "The check as first written is preserved on branch a305-q2-claim-as-written-2026-10-07 (at 900a257). Sweep transcripts written before the retraction quote it and are allowed; the test file quotes it beside this id; docs/KNOWN_ISSUES.md is NOT exempt."
+  },
+  {
+   "id": "A309-DISCLOSURE-MEASUREMENTS-2026-10-07",
+   "claim": "The sentence in free's disclosure, attached to every Moltbook message: that the measurements the message cited were from the operator's machine and were re-run before sending.",
+   "refuted_by": "Since A297 (2026-10-07) free's drafts are told to cite no measurement and the code refuses any that does, so the messages carried no measurements for the sentence to describe. Measured the same day: 43 of 44 of Tetsu's reviews since 10-06 saw the sentence, and 15 of his 20 refusals named 'measure'.",
+   "truth": "free's messages cite no measurements. The disclosure now says who wrote the message and how (she read the forum, scored the post, wrote the words), plus the operator's grant paragraph, unchanged.",
+   "verbatim": [
+    "The measurements cited are from that machine and were re-run before sending."
+   ],
+   "patterns": [
+    "The measurements cited are from that machine and were\\s+re-run before\\s+sending"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written it is preserved on branch a309-disclosure-claim-as-written-2026-10-07 (at d0cf3aa). covenant_ambassador.py cites this id beside the corrected disclosure; docs/KNOWN_ISSUES.md is NOT exempt. ops/GREEN_THAT_MEANT_NOTHING_FINAL.md and ops/MOLTBOOK_POST_DRAFT.md carry different sentences about posts that did cite numbers, and are not matched."
+  },
+  {
+   "id": "A311-SHIPPED-PROMPT-2026-10-07",
+   "claim": "A311's headline, as a description of the review that shipped at 6a1eda7: that the honest held drafts Tetsu lets through went from 0 of 11 to 21 of 33 runs.",
+   "refuted_by": "21 of 33 was measured on method B4, whose prompt had no PAUSE line. The prompt that shipped added 'If you think free should stop posting for now, add one last line: PAUSE.' after the measurement, unmeasured. On the same 19 drafts, one ask each (scratchpad tetsu_review_eval5), the shipped prompt let 3 of 11 honest drafts through: he wrote PAUSE on numbered question lines, and a numbered line without a word is NONE.",
+   "truth": "21 of 33 is B4's number and was never measured on what shipped. The shipped prompt measured 3 of 11 honest drafts through. It was replaced by 'write STOP-FREE on a line of its own AFTER the numbered lines', which let 7 of 11 through on the same run. Bad drafts SEND was 5 of 8 under both, with the code's guards and the money screen behind him. Both are one ask per draft.",
+   "verbatim": [
+    "honest drafts he lets through went from 0 of 11 to 21 of 33 runs"
+   ],
+   "patterns": [
+    "went\\s+from\\s+0\\s+of\\s+11\\s+to\\s+21\\s+of\\s+33"
+   ],
+   "allow": [
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written it is preserved on branch a311-shipped-prompt-claim-as-written-2026-10-07 (at 6a1eda7). docs/KNOWN_ISSUES.md is NOT exempt: A311's headline cites this id within the window. The commit message of 6a1eda7 says it as '0/11 -> 21/33' and is not scanned."
+  },
+  {
+   "id": "A315-COUNT",
+   "claim": "That verify_deploy.py's re-pin of run_all_tests.sh on 2026-10-05 (8bf4d56) was the M53 failure 'for this file a second time' -- the comment trailing the digest, kept by 260f3dd.",
+   "refuted_by": "Measured 2026-10-06 over main's first-parent history (109 commits touching verify_deploy.py or a file it pins), comparing each commit's run_all_tests.sh blob with the pin that commit's verify_deploy.py held: stale in six spans -- decc8b3 and 62f17b5 (08-27), 74c2ca9 (08-29 to 09-02), f897b91 (09-04 to 09-11), eb892c0 (09-12 to 8bf4d56, 10-05) and 16e389e (10-05, closed by 260f3dd in the same fast-forward of main). The same file's own comments record late re-pins of this pin on 09-02, 09-11 and 09-20 before it. The 09-20 value 7bde90e1effa is the sha256 of 7eac94c's run_all_tests.sh with CRLF line endings, bytes no commit held.",
+   "truth": "The span 8bf4d56 closed was the fifth of six, open since eb892c0 (09-12): the 09-20 re-pin hashed a CRLF copy, so it matched one checkout's disk and no commit. From A315 tools/pin_deploy.py moves this pin at commit time after K1 and K2 pass, and refuses bytes on disk that are not the bytes being committed (PC2.14).",
+   "verbatim": [
+    "re-pinned late AGAIN (M53 for this file a second time)"
+   ],
+   "patterns": [
+    "M53\\s+for\\s+this\\s+file\\s+a\\s+second\\s+time"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch a267-pin-count-claim-as-written-2026-10-06 (at f35d94c), and in verify_deploy.py itself, on the digest's own line, where the A315-COUNT marker above it is within the window. Committed first as A267-COUNT on the branch (e8ea71b); renumbered at the 2026-10-08 merge because main had taken A267 for C4's worktree prune."
+  },
+  {
+   "id": "A283-STRIKES",
+   "claim": "That a wrong answer to Moltbook's posting challenge spends one of the ten the account has before suspension, and that an abstained challenge spends nothing -- so the highway's moltbook_strikes read PRESENT on any unsolved, unabstained challenge in seven days and never counted an abstention.",
+   "refuted_by": "Moltbook's skill.md, read 2026-10-10: \"If your last 10 challenge attempts are all failures (expired or incorrect), your account will be automatically suspended\" -- the rule covenant_ambassador.py already quoted. Suspension needs the last ten ALL to fail, so a solved challenge ends the run; an abstained challenge is left to expire, and 'expired' is named a failure. On 10-10 the check read PRESENT on four unsolved answers (10-08 to 10-10) while the newest answered challenge, 07:59:51Z, was solved, and it never saw the longest unsolved run on record: 12 in a row before that solve, 10 of them abstentions. Run side by side from branch a283-strikes-check-as-written-2026-10-10: four failures then a solve, PRESENT as written and ABSENT restated; five abstentions after a solve, ABSENT as written and PRESENT restated.",
+   "truth": "The risk Moltbook names is the run of consecutive unsolved challenges at the end of the record, an abstention counted, because it expires. moltbook_strikes is PRESENT when that run reaches 5, half the ten, and names the run, the longest run in seven days, and the week's solved, failed and abstained counts. Whether Moltbook counts an unanswered expiry is UNDETERMINED: its text says so, and the account still verified after the 12-run. From A324 a send keeps its answer and Moltbook's reply, so a wrong answer can be told from a POST that never arrived; the four of 10-08 to 10-10 kept neither.",
+   "verbatim": [
+    "each spends one of the ten the account has",
+    "an abstention hides the content and spends nothing",
+    "an unreadable challenge is abstained, spends nothing"
+   ],
+   "patterns": [
+    "one\\s+of\\s+the\\s+ten\\s+the\\s+account\\s+has",
+    "abst(?:ain|en)\\w*,?\\s+(?:hides\\s+the\\s+content\\s+and\\s+)?spends\\s+nothing"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch a283-strikes-check-as-written-2026-10-10 (at 110a3ba): covenant_highway.detect_moltbook_strikes, covenant_free_will._ver's docstring, and H1st in test_h1_highway.py. The record keeps the wording in A283 and A324."
+  },
+  {
+   "id": "A300-STARVED",
+   "claim": "That a round marked 'starved' -- the model failed during it -- ran but did not speak, so it never reset the highway's ambassador_stalled clock.",
+   "refuted_by": "covenant_free_will marks a round starved at its FIRST failed ask and keeps every reply written before it. On 2026-10-10 the 07:15:11Z round wrote 86 replies before it starved (86 refused, 89 deferred) and the 08:10:52Z round wrote 88 (1 sent at 07:59:51Z, 87 refused, 6 deferred). ambassador_stalled read PRESENT, 'no live round that could write in 15.0 h', two hours after she spoke. Run side by side from branch a300-starved-round-claim-as-written-2026-10-10: PRESENT as written, ABSENT restated (last round that wrote 2.3 h before).",
+   "truth": "A round that wrote anything (replied + refused > 0) could write, and resets the clock; when the newest such round was cut short it is named part_starved. Only a round starved before writing anything is starved, and that still reads as a stall.",
+   "verbatim": [
+    "a round the model could not write (\"starved\") ran but did not speak"
+   ],
+   "patterns": [
+    "could\\s+not\\s+write\\s+\\(\"starved\"\\)\\s+ran\\s+but\\s+did\\s+not\\s+speak"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch a300-starved-round-claim-as-written-2026-10-10 (at 110a3ba), in covenant_highway.detect_ambassador_stalled. The record keeps the wording in A325."
+  },
+  {
+   "id": "A326-SCOPE",
+   "claim": "That a path-based scope of the public threefold-memory repo -- 292 paths of personal material, 84 of full speak text -- leaves the other 541 paths fit to keep public.",
+   "refuted_by": "The triad copies the text into fields of the records the scope kept. lspace_auditor/hooks/on_speak.sh line 98 sets PROMPT to the bot's whole spoken text, fire_triad.sh line 136 writes prompt= into every task record, and the proxy jlens snapshot keeps up to 480 characters of it. Read from the 2026-10-10 mirror at 316e700: of the 541 kept paths, 146 task records and 99 jlens snapshots carry speak text in their prompt field (up to 512 characters), and 266 carry OCR-video prompts, some holding OCR'd chat text. The tier-1 dry run removed all 292 paths from all 456 commits and left these untouched. The identifier scan named 1 path in the whole original history, so it is blind to conversation text and cannot vouch for the kept set.",
+   "truth": "A scope drawn by path cannot make this repo fit to be public, because the same text lives in a field of the records kept. A removal has to be scoped by content (rewrite the prompt field in every version) or the repo taken out of public view; which, and when, is Lawrence's decision.",
+   "verbatim": [
+    "84 paths of full speak text, and 541 to keep"
+   ],
+   "patterns": [
+    "84\\s+paths\\s+of\\s+full\\s+speak\\s+text,?\\s+and\\s+541\\s+to\\s+keep"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch a326-removal-scope-as-written-2026-10-10 (at 663b9cc). The record keeps the wording in A326, with the restatement beside it. The same count is in threefold PR #1 (acfee29) and the collective's refs/peer-review-2026-10-10.md, each corrected beside the original there."
+  },
+  {
+   "id": "A283-EVERY-SEND",
+   "claim": "That from A283 the verification of every send is kept in ops/ambassador_sends.jsonl.",
+   "refuted_by": "Read 2026-10-11 (A334). A283's own body says \"every reply and own post\", and covenant_free_will wrote the introduction's row with no verification field at all (line 696 at 21aa4e7). The 2 introductions that went out are in no challenge count. Tetsu's forum sends (covenant_tetsu_forum.say) keep none either, and hand emits and a hand `covenant_ambassador.py --verify` record only what the person writes.",
+   "truth": "covenant_free_will keeps a send's verification on free's replies and own posts (A283) and, from A334, on her introductions, with the challenge text cut at 400 characters. Tetsu's forum sends keep none. A hand-written row keeps what its writer put in it.",
+   "verbatim": [
+    "verification kept on every send"
+   ],
+   "patterns": [
+    "verification\\s+kept\\s+on\\s+every\\s+send"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch a283-every-send-claim-as-written-2026-10-11 (at 21aa4e7): the introduction's row without verification in covenant_free_will.run_round. The record keeps the wording in A283's title and quotes it in A334."
+  },
+  {
+   "id": "A334-ORDER",
+   "claim": "That of A333 and A334, whichever landed second would put its KNOWN_ISSUES entry above the other.",
+   "refuted_by": "docs/KNOWN_ISSUES.md orders entries by A-number, highest first: A274 landed after A275 and sits below it. A333 landed second, on 2026-10-12, by merging main into its branch, and its entry was placed below A334's.",
+   "truth": "Entries are ordered by A-number, highest first. One that lands after a higher number goes below it.",
+   "verbatim": [
+    "Whichever lands second puts its entry above the other."
+   ],
+   "patterns": [
+    "whichever\\s+lands\\s+second\\s+puts\\s+its\\s+entry\\s+above"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch a334-order-claim-as-written-2026-10-12 (at a582352), in A334's 'What it cannot see'. The record keeps the sentence there, with the retraction beside it."
+  },
+  {
+   "id": "A336-TD1-H2",
+   "claim": "That test_td1_tetsu_daily.py measured that its daily cycles never enter the real covenant_highway.run_once (TD1m.H2, 2026-10-04, A244).",
+   "refuted_by": "Measured 2026-10-12 (A336) with a tripwire in place of the real run_once before TD1 captured it: TD1o's cycle, added the same day as the fence and run after the fence's finally had lifted it, entered the real run_once with dry_run=False on every run, and wrote the running tree's heal ledger. H2 read green because it was graded before TD1o's cycle. With the fence lifted early again as a mutation, H1 goes red under the corrected grading.",
+   "truth": "TD1's fence (the run_once spy, the save_last_sense tripwire, the temp heal ledger and the temp told-state) stays up through all three cycles and is lifted only in the suite's last finally; H1 and H2 are graded after TD1o over all three. With a tripwire in place of the real run_once: 0 entries. What the unfenced passes repaired from 2026-10-04 to 2026-10-12 is UNDETERMINED (in the sweep they ran in the staged copy, whose heal ledger is discarded).",
+   "verbatim": [
+    "TD1m.H2 ...and the REAL covenant_highway.run_once was never entered"
+   ],
+   "patterns": [
+    "TD1m\\.H2\\s+\\.\\.\\.and\\s+the\\s+REAL\\s+covenant_highway\\.run_once\\s+was\\s+never\\s+entered"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch td1-h2-check-as-written-2026-10-12 (at 95e35ec): TD1m.H2 graded before TD1o's cycle, with the fence lifted in row2's finally. The record quotes it in A336. The pattern names TD1m.H2: the same sentence is a true label in test_a115 (A115.H2), test_p20 and test_watchdog_outage (A244b), each about its own run."
+  },
+  {
+   "id": "A343-DEGRADED-KEYLESS",
+   "claim": "That a node without a provider key is `degraded` -- running but unable to do its job -- pinned by B2.H3 (\"`degraded` still means exactly what it meant in v8.34\") and A114.7c (\"degraded is still true\" on the live node).",
+   "refuted_by": "Measured 2026-10-13 (A343): all three nodes keyless with the students and the semantic judge seated (quorum(local:0,semantic:1)); /health's own warning has said since 2026-09-06 that keyless is not judgeless -- a hold fails closed, a clean verdict admits -- and the mesh admitted blocks keyless all day (height 84 -> 85). The flag read degraded on every node, forever, on the posture he chose (no provider key), so it told no one anything.",
+   "truth": "`degraded` is judgeless (no provider key AND no seated judge: the branch that rejects every transaction), or an insecure judge, own genesis, or crisis mode. `judge_keyless` is reported unchanged beside it, with its warning; the missing key is still said everywhere it was.",
+   "verbatim": [
+    "H3 `degraded` still means exactly what it meant in v8.34",
+    "A114.7c degraded is still true, and NOT because of genesis"
+   ],
+   "patterns": [
+    "degraded`\\s+still\\s+means\\s+exactly\\s+what\\s+it\\s+meant\\s+in\\s+v8\\.34",
+    "A114\\.7c\\s+degraded\\s+is\\s+still\\s+true"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch degraded-keyless-checks-as-written-2026-10-13 (at fe23e9e): B2.H3, P12.H3 and A114.7c as they were. The record quotes them in A343."
+  },
+  {
+   "id": "A345-NIGHTLY-FAIL-WORD",
+   "claim": "That a line of the nightly's block is a failure when the word FAIL or FAILED appears anywhere in it (and it does not start with `ok`) -- covenant_daily.nightly_last's reading, which is what Tetsu's daily record carries as the nightly's failures.",
+   "refuted_by": "Measured 2026-10-13 (A345) over the 87 nightly blocks of ops/NIGHTLY.md. It read 32 passing lines as failures, every one `selfaudit PASS C2 ... -- RESULT: ..., with N FAIL line(s)`, and missed what turned the nightly red: gates lines with BLOCKED or UNKNOWN (54 block-instances), short suite tallies (16, e.g. F3: 7/8 passed), NO TALLY (1), and the 2026-10-11 and 2026-10-13 test_selfaudit.py timeouts (ERROR). Three passes were NOT GREEN with no failure read at all (09-04 13:48, 09-04 14:24, 09-07). Tetsu's 10-13 record listed the C2 PASS as a REAPPEARED failure and never named the timeout.",
+   "truth": "A nightly line is a failure by its kind, the way covenant_nightly.verify_green turns itself red: a gates line with any BLOCKED or UNKNOWN; a suite line that ERRORed, printed NO TALLY or a short tally; FAIL / FAILED said before the evidence (' -- '). Over the 73 blocks that carry a verdict, every green-NO block names a cause this way and no green-yes block does. Pinned by TD1q.",
+   "verbatim": [
+    "if re.search(r\"\\bFAIL(ED)?\\b\", l) and not l.lstrip().startswith(\"ok\")][:12],"
+   ],
+   "patterns": [
+    "re\\.search\\(r\"\\\\bFAIL\\(ED\\)\\?\\\\b\", l\\) and not l\\.lstrip\\(\\)\\.startswith\\(\"ok\"\\)"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch daily-nightly-fails-as-written-2026-10-13 (at 829524c): covenant_daily.nightly_last's word match as it was. The record quotes it in A345."
+  },
+  {
+   "id": "A346-PRUNE-DELETES",
+   "claim": "That the PC deletes an APK older than the two newest after each new fetch (covenant_app_update.prune, `os.remove`), recorded in A344 as his space plan and an exception to rule 10's \"retire, never delete\".",
+   "refuted_by": "His words, 2026-10-13, the same evening: \"Do not delete anything. Only improve. And everything should be tombstone that you've done and are doing in case it needs to be altered.\" The exception was inferred from his keep-2 plan; his rule says nothing is deleted. Nothing had been deleted under it: the third copy was waiting for the next fetch.",
+   "truth": "An older APK is retired to ops/app/retired/, one row each in its RETIRED.jsonl (when, the file, where it went, its sha256, by whom, why). ops/app/ keeps the two newest; the space comes back only when he empties retired/. Pinned by PB1k5-k7.",
+   "verbatim": [
+    "os.remove(os.path.join(dir_, old))",
+    "That is his space plan, an exception he chose to rule 10's \"retire, never delete\" for rebuildable build artifacts."
+   ],
+   "patterns": [
+    "os\\.remove\\(os\\.path\\.join\\(dir_, old\\)\\)",
+    "an exception he chose to rule 10's \"retire, never delete\""
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "Kept as written on branch a344-prune-deletes-as-written-2026-10-13 (at 829524c): prune() as A344 landed it. The record quotes it in A344 (unedited) and A346."
+  },
+  {
+   "id": "A345-DRAFT-COUNT",
+   "claim": "My first draft of the A345-NIGHTLY-FAIL-WORD tombstone: gates lines with BLOCKED or UNKNOWN in 59 block-instances, and two red passes with no failure read.",
+   "refuted_by": "The measurement it summarised printed 37 + 8 + 4 + 3 + 2 = 54 gates block-instances, and three NOT GREEN passes with nothing read (09-04 13:48, 09-04 14:24, 09-07). 59 was typed, not printed. I corrected the draft before the commit (5f4a967) and left no record of it, which his words of the same evening say is not enough: everything I do is tombstoned.",
+   "truth": "54 block-instances and three passes, as committed in 5f4a967. The draft never existed as a commit, so there is no branch; its wording is kept verbatim here and in A346.",
+   "verbatim": [
+    "gates lines with BLOCKED or UNKNOWN (59 block-instances)",
+    "On 09-04 13:48 and 09-07 the nightly was NOT GREEN and it read no failure at all."
+   ],
+   "patterns": [
+    "BLOCKED or UNKNOWN \\(59 block-instances\\)",
+    "On 09-04 13:48 and 09-07 the nightly was NOT GREEN"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "No branch: the wrong wording was a draft in my working copy, corrected before any commit. The record quotes it in A346."
+  },
+  {
+   "id": "A348d-IMMUNITY-COUNT-HEAL-GRADE",
+   "claim": "That Tetsu's panel on the PC can show the day's immunity count by joining passes_today and per_day (\"N of M today\"), and that a highway repair's grade is in a `fixed` key -- covenant_pc3d's page and heal_detail, and PC1z9's fixture row that carried \"fixed\": False.",
+   "refuted_by": "Measured 2026-10-14 (A348d): under his no-ceiling grant (per_day 0) the page read \"on, 27 of 0 today\" while covenant_immunity.immune() said \"27 today, no ceiling\". ops/highway.jsonl: 0 of 2380 rows carry a `fixed` key -- the highway grades in `outcome` -- so every repair's ok was None, and 22 synchronous and 40 late \"did not fix\" grades read as plain repairs. PC1z9 passed on a fixture shape the writer never writes.",
+   "truth": "covenant_immunity.count_text is the one rule for the count in words (\"N today, no ceiling\" or \"N of M today\"); status() carries it and the page shows it as is. heal_detail reads `outcome` (fixed / did not fix) and late grades. Pinned by IM1d and PC1z10.",
+   "verbatim": [
+    "'on, '+state.immunity.passes_today+' of '+state.immunity.per_day+' today'",
+    "{\"t\": \"2026-10-13T02:00:00\", \"remedy\": \"b\", \"detector\": \"y\", \"ran\": True, \"dry_run\": False, \"fixed\": False}"
+   ],
+   "patterns": [
+    "state\\.immunity\\.passes_today\\+' of '\\+state\\.immunity\\.per_day",
+    "\"dry_run\": False, \"fixed\": False"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+  },
+  {
+   "id": "A348e-WORK-RESUME-ERRORS",
+   "claim": "That tools/tetsu_work.py's output is one row per item and that a rerun on the same --out skips only what was answered -- its resume counted every recorded row as answered, errors included.",
+   "refuted_by": "Measured 2026-10-14 (A348e, the Tetsu bug sweep): a 503 or a dropped connection was recorded as a row, so the next run counted it \"already answered\" and never asked it again; the 2026-10-05 X batch held 7 such rows that a session had to split out by hand.",
+   "truth": "An item is answered when its row has code 200 (an answer, or a withheld one). A rerun asks again what the door did not answer and says how many; the failed rows stay in the file and the last row per id is its answer. Pinned by T6 in test_a263_private_teacher.py.",
+   "verbatim": [
+    "Output: JSONL, one row per item with the door's answer, verdict and timing.",
+    "done.add(json.loads(line)[\"id\"])"
+   ],
+   "patterns": [
+    "one row per item with the door's answer",
+    "done\\.add\\(json\\.loads\\(line\\)\\[\"id\"\\]\\)"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+  },
+  {
+   "id": "A348f-PRACTICE-NO-FILE-AND-CLOCK",
+   "claim": "That after a practice round with no file Tetsu's last attempt was \"(no file)\" and \"It was run\", to be diagnosed; and that the nightly's practice is \"40 minutes in all\", \"capped by tasks, rounds and a 40-minute clock\".",
+   "refuted_by": "Measured 2026-10-14 (A348f): ops/tetsu_practice.jsonl holds 18 rounds cut off at the length limit, each followed by a prompt that showed him a placeholder as his file, said it had been run, and asked him to explain it. Since A275 the practice bound is the curriculum's 40-minute clock plus his own slot's 3 rounds on its own 15-minute clock, not one 40-minute total.",
+   "truth": "After a round with no complete file the prompt says nothing was run and asks for the whole file; his task is unchanged. The nightly's help and practice_step's docstring state the bound night() keeps, read against BUDGET_S, CHOICE_ROUNDS and CHOICE_BUDGET_S by PP1.11f. Pinned by PP1.4f2, PP1.4f3, PP1.11f.",
+   "verbatim": [
+    "last = {\"code\": code or \"(no file)\", \"said\": res[\"said\"]}",
+    "capped by tasks, rounds and a 40-minute clock",
+    "40 minutes in all, every write and run through his gated hands"
+   ],
+   "patterns": [
+    "\"code\": code or \"\\(no file\\)\"",
+    "capped by tasks, rounds and a 40-minute clock",
+    "40 minutes in all"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all three in A348."
+  },
+  {
+   "id": "A348h-MONEY-BOUNDS-AS-LISTS",
+   "claim": "That Tetsu's strategy-proposal prompt told him the bounds he must propose within -- it sent them as {\"fast\": [3, 50], ...}, the shape of params itself, and never showed him a refusal.",
+   "refuted_by": "Measured 2026-10-14 (A348h): ops/tetsu_strategy.jsonl holds 19 rows, 14 of them refused \"... is not a number\", the same range-shaped proposal ({\"fast\": [5, 50], \"slow\": [200, 200]}) 7 times; nothing he was shown said why.",
+   "truth": "Each bound is stated as ONE number from lo to hi, his last refused proposals come back with the lab's reason, and a hypothesis that met no price series reads \"untested\". build(), the bounds, the three tests and what counts as a pass are unchanged. Pinned by TM1f.",
+   "verbatim": [
+    "json.dumps({k: v[2] for k, v in FAMILIES.items()})"
+   ],
+   "patterns": [
+    "json\\.dumps\\(\\{k: v\\[2\\] for k, v in FAMILIES\\.items\\(\\)\\}\\)"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes it in A348."
+  },
+  {
+   "id": "A348a-DAILY-READINGS",
+   "claim": "That Tetsu's daily record named his model with pick_model() (\"Tetsu's model: <file> or not found\"), and that its `daily` row FAILs when the newest record is \"more than 26 h old\".",
+   "refuted_by": "Measured 2026-10-14 (A348a): pick_model() names the weights that would fit the memory free NOW, and a loaded model uses that memory -- 10-13 recorded none while the 2B answered, 10-08 named the 3B while the 2B served. The threshold in the code is STALE_H = 30 h (588b208, 2026-09-28); the words in covenant_daily's and covenant_watchdog's docstrings still said 26 h.",
+   "truth": "The model line names the weights the keeper's server RUNS while it answers, and only otherwise what would load, said as that. The row FAILs past STALE_H (30 h). Pinned by TD1t and the docstrings now name STALE_H.",
+   "verbatim": [
+    "considered.append({\"what\": \"Tetsu's model: %s\" % (model.get(\"file\") or \"not found\")})",
+    "The next self-evaluations carry a `daily` row that reads FAIL when the newest record is more than 26 h old, so a cycle that stops happening is itself reported."
+   ],
+   "patterns": [
+    "\"Tetsu's model: %s\" % \\(model\\.get\\(\"file\"\\) or \"not found\"\\)",
+    "more than 26 h old"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+  },
+  {
+   "id": "A348b-KEEPER-STOP-UNEXPLAINED",
+   "claim": "That the model server's lost record had no stop line to explain it -- A341b: \"no stop line in the log explains it; several processes run idle watchers, and which one dropped the record is UNDETERMINED\"; A276: a 3B came up \"after the one-slot server vanished with no stop line\".",
+   "refuted_by": "Measured 2026-10-14 (A348b): both stop lines exist, their heads overwritten by the new server's first output -- llama-server was handed the keeper log's handle and wrote at a stale offset (reproduced in a scratch run). Each was an idle stop by another process whose stop() removed the state the new server's start() had just written. The idle watchers also read only their own process's clock, so one process stopped the shared server mid-answer of another.",
+   "truth": "Idle is counted from the last use by ANY process (ops/model_last_use.stamp); stop() removes the state only while it still names the pid it stopped; llama-server writes to its own logs/model_server.runtime.log. Pinned by MK1, A265 and A269's new checks.",
+   "verbatim": [
+    "8081 with ops/model_server.json gone -- no stop line in the log explains it; several processes run idle watchers, and which one dropped the record is UNDETERMINED.",
+    "when a 3B came up after the one-slot server vanished with no stop line, and ops/model_server.json was gone."
+   ],
+   "patterns": [
+    "which one dropped the record is UNDETERMINED",
+    "after the one-slot server vanished with no"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+  },
+  {
+   "id": "A348c-REVIEW-RECORD-SINCE-A296",
+   "claim": "That Tetsu's review word has been \"kept on each reply since A296; rows before it carry none\", so the road's breakdown counting any word was a count of his reviews.",
+   "refuted_by": "Measured 2026-10-14 (A348c): emit() returned his reading only on the refusal path, so ops/ambassador_sends.jsonl held 0 reply rows with tetsu SEND against 114 SEND readings in ops/tetsu_assist.jsonl since 10-07 (its 1628 rows since then: 917 SKIP, 669 none, 36 REFUSE, 6 NONE); and SKIP, returned before he is asked, was counted by the road as a review.",
+   "truth": "His reading and his discourse seat's ride on every return from emit(); the road counts as reviewed only SEND, REFUSE, PAUSE and NONE (TETSU_ASKED). Pinned by FW1, TA1 and H1's new checks.",
+   "verbatim": [
+    "if r.get(\"tetsu\"):                       # kept on each reply since A296; rows before it carry none"
+   ],
+   "patterns": [
+    "kept on each reply since A296; rows before it carry none"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes it in A348."
+  },
+  {
+   "id": "A348g-NO-REMEDY-AND-HOLD-DIGEST",
+   "claim": "That detect_tetsu_cannot_answer has \"No remedy, and none will be added here\"; that detect_defense_lapse has \"no remedy -- turning protection on, updating signatures or starting a scan are the operator's own system settings\"; and that in code consensus \"the gate judges that synthesis, and a hold returns the digest instead\".",
+   "refuted_by": "Read 2026-10-14 (A348g): trim_idle_apps has answered tetsu_cannot_answer since A287 (2026-10-06) and refresh_defender has answered defense_lapse since e2bb49b, both registered AUTO_REVERSIBLE in REMEDIES; and a hold passes in code consensus (A223), where it was labelled \"synthesis judged clean\" though nothing judged it.",
+   "truth": "Both docstrings name the remedy that answers them and keep what stays the operator's (closing apps, turning protection on). A held synthesis passes and is labelled \"passed unjudged\". Pinned by H1 and CC1's new checks.",
+   "verbatim": [
+    "No remedy, and none will be added here: what to close to free memory is his (A252), and anything touching the model is NEVER_AUTOMATIC.",
+    "What is NOT here, on purpose: no remedy -- turning protection on, updating signatures or starting a scan are the operator's own system settings, and this file names the lapse rather than reaching into them.",
+    "the gate judges that synthesis, and a hold returns the digest instead."
+   ],
+   "patterns": [
+    "No remedy, and none will be added here",
+    "What is NOT here, on purpose: no remedy -- turning",
+    "the gate judges that synthesis, and"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all three in A348."
+  },
+  {
+   "id": "A348j-PROBE-LAST-RUN-AND-UNFAILABLE",
+   "claim": "That the security probe's REGRESSION is \"A probe that held last time and does not hold now\", and that SP1d checked an unreadable quarantine -- a check written `... in (0,) or True)`, which cannot fail.",
+   "refuted_by": "Measured 2026-10-14 (A348j): read against the last run alone, a probe broken on night 2 was a REGRESSION that night and from night 3 a 'NEW GAP ... never held', so Tetsu's daily read 0 regressions while the screen stayed broken (reproduced in memory). SP1d's `or True` made it pass whatever evolve() returned, and SP1c named the CLI's exit 1 but drove only the exit 0.",
+   "truth": "A probe that held on ANY earlier run and does not hold now is a REGRESSION every night it stays broken. SP1d, SP1c and G7.9 now fail when what they name is false, driven both ways. The persona probes are held only when refine() itself refuses them. Pinned by SP1 and G7's new checks.",
+   "verbatim": [
+    "A probe that held last time and does not hold now is a REGRESSION, the run exits 1, and the nightly tells him on the direct line.",
+    "check(\"SP1d an unreadable quarantine adds nothing and does not raise\", SP.evolve(quarantine_rows=None, path=os.path.join(TMP, \"x.json\"), say=quiet) in (0,) or True)"
+   ],
+   "patterns": [
+    "A probe that held last time and does not hold now",
+    "quiet\\) in \\(0,\\) or True\\)"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+  },
+  {
+   "id": "A348k-TEACHER-QUEUE-PROMISES",
+   "claim": "That the rows the teacher-queue writers append are labelled by the panel: earn-business's listing \"so the judge can learn it by the panel's rule\", each reviewed draft \"so the panel labels it under the usual rules\", own-work's entries \"cut to the queue's size\"; and that earn-business queues a listing once, keyed by \"queued:\" + str(hash(text)).",
+   "refuted_by": "Measured 2026-10-14 (A348k): the panel judges rows of 3 to 120 words and consumes a longer one unjudged, only counted; 332 of 344 own-work rows, 85 of 186 reviewed drafts (the operator's disclosure attached) and 4 of 4 earn-business listings were longer. str(hash()) is salted per process, so the one listing was queued four times under four keys.",
+   "truth": "A row outside the panel's size is recorded in the queue's withheld twin with its word count and the reason, and counted as out_of_size. Reviewed drafts are queued as free's words without the disclosure (still on every message sent). The listing key is a sha256 of its text. Own-work keys a reused A-number by its header too. Pinned by TQ1, TA1, EB1 and OW1's new checks.",
+   "verbatim": [
+    "earn-business) so the judge can learn it by the panel's rule, not by an edit here; the day the gate admits it, it is posted and never again;",
+    "THE STUDENTS. Every reviewed draft is appended to the teacher queue, so the panel labels it under the usual rules (unanimous, balance unchanged -- his \"No, keep it\" of 2026-09-28).",
+    "header, then the entry's first paragraphs, cut to the queue's size;",
+    "key = \"queued:\" + str(hash(text))"
+   ],
+   "patterns": [
+    "so the judge can learn it by the panel's rule",
+    "so the panel labels it under",
+    "first paragraphs, cut to the queue's size",
+    "\"queued:\" \\+ str\\(hash\\(text\\)\\)"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all four in A348."
+  },
+  {
+   "id": "A348m-A333-ONE-WRONG-PATH",
+   "claim": "A333: standalone noise symbols read beside no operation word -- \"That is the one wrong-answer path this change adds that no guard covers.\"",
+   "refuted_by": "Measured 2026-10-14 (A348m): A333's aggregation cue added a second: an operation word no group reads was skipped and the cue alone made the reading. Answers 17.00 (10-13 10:12Z) and 37.00 (10-14 01:10Z) were submitted that way and came back \"Incorrect answer\", each hiding a reply Tetsu had cleared; 3.29 (10-14 07:02Z) predates A333.",
+   "truth": "An operation word the solver does not read makes it abstain (A333's own rule: precision over coverage). Replayed on the 58 challenge texts on record: 55 read the same, the 3 wrong answers now abstain, and no accepted answer is lost. Pinned by AM33k and AM33l.",
+   "verbatim": [
+    "That is the one wrong-answer path this change adds that no guard covers."
+   ],
+   "patterns": [
+    "the one wrong-answer path this change adds"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept as written in A333 (docs/KNOWN_ISSUES.md) and on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2)."
+  },
+  {
+   "id": "A349-S3-AS-THE-NODE",
+   "claim": "covenant_gate_proxy: apply_quorum_policy's environment rule is the node's (\"as it does for the node\"), and default_sentinel is \"the same quorum the node and this proxy use\".",
+   "refuted_by": "Read 2026-10-14 (A349 S3): run_node.py applies ops/quorum_policy.json OVER the environment (only COVENANT_JUDGE_PROVIDERS_OVERRIDE beats it), and with no policy and nothing exported it seats deferring,semantic (A93, the operator's 2026-09-12 decision); default_sentinel built the core's keyless 'claude', which refuses everything.",
+   "truth": "With no policy and nothing exported, default_sentinel now seats NODE_NO_POLICY_PROVIDERS (deferring,semantic), as the node does; an environment list still wins here, on purpose (A335: the sweep's mock; G21). Both sentences are kept in place, restated beside them. RG1.7 runs run_node and compares.",
+   "verbatim": [
+    "COVENANT_JUDGE_PROVIDERS already in the environment wins, as it does for the node.",
+    "So: the same quorum the node and this proxy use, cached;"
+   ],
+   "patterns": [
+    "already in the environment wins, as it does for the node",
+    "the same quorum the node and this proxy use"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Kept in place in covenant_gate_proxy.py with the restatement citing A349-S3-AS-THE-NODE beside each; as written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+  },
+  {
+   "id": "A349-B3-NEW-CONVERSATION",
+   "claim": "covenant_refine_loop: a pass waits for \"at least one NEW conversation row (kind agent or council) in the ask log since the last pass\", so it never revises from the same evidence twice; a pass reports \"refined on N new row(s)\".",
+   "refuted_by": "Measured 2026-10-14 (A349 B3): 210 of the 1,759 agent/council rows were his words, the rest work-tool rows a pass is never shown; 50 of 62 passes after A314 ran with no new word of his.",
+   "truth": "Only rows covenant_persona.is_his_word holds (the rows a pass is shown) count as new, under their own name last_his_rows; a pass says \"refined on N new row(s) of his words\". RL1's new checks.",
+   "verbatim": [
+    "2. at least one NEW conversation row (kind agent or council) in the ask log since the last pass -- a refinement with nothing new to read would revise from the same evidence twice;",
+    "out.update(ran=True, why=\"refined on %d new row(s)\" % out[\"new_rows\"], ...)"
+   ],
+   "patterns": [
+    "NEW conversation row \\(kind agent or council\\)",
+    "refined on %d new row\\(s\\)\""
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+  },
+  {
+   "id": "A349-A3-NOTHING-CHANGED",
+   "claim": "covenant_persona.refine recorded a pass whose new sentence was set aside in register_overflow as verdict \"nothing changed\".",
+   "refuted_by": "Read 2026-10-14 (A349 A3): the sentence was kept in register_overflow, and his history never held it.",
+   "truth": "The row says how many sentences were kept in register_overflow and holds them (\"overflow\"); REGISTER_GROWN (1,400) is unchanged. TP1's new checks.",
+   "verbatim": [
+    "_record(p, path, applied=False, reg=reg, voice=voice, why=why, verdict=\"nothing changed\", now=now)"
+   ],
+   "patterns": [
+    "verdict=\"nothing changed\", now=now"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+  },
+  {
+   "id": "A349-B11-UNTESTED-SAID-NO",
+   "claim": "covenant_tetsu_money.study told him \"no\" for every hypothesis that did not survive, including one that met no price series.",
+   "refuted_by": "Read 2026-10-14 (A349 B11): such a hypothesis was never tested; it was also counted as a trial and its name blocked for good.",
+   "truth": "It is said untested (or undetermined, A349 B12), is not counted as a trial and does not block its name; the three tests are unchanged. TM1's new checks.",
+   "verbatim": [
+    "say(\"money: %s -- %s -- %s\" % (name, \"SURVIVED\" if row[\"survives\"] else \"no\", out[\"why\"]))"
+   ],
+   "patterns": [
+    "\"SURVIVED\" if row\\[\"survives\"\\] else \"no\""
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+  },
+  {
+   "id": "A349-M5-SAME-REQUEST",
+   "claim": "covenant_earn's pending-settlement 402 told a buyer to \"send the SAME request again in 30 s\" for delivery without a second charge; EA1.23's label said the same request again is re-delivered.",
+   "refuted_by": "Measured 2026-10-14 (A349 M5): the same request carries the same nonce, which the replay check in _paid refuses before any re-delivery; EA1.23 resent with a fresh authorization, so it never drove the request the buyer was told to send.",
+   "truth": "The 402 names the two routes that deliver without a second charge: GET /earn/result/<id>, or the same input from the same paying address with a fresh authorization. EA1.48 drives all three.",
+   "verbatim": [
+    "\"settlement pending on the chain (tx %s); the result is held for you -- send the SAME request again in 30 s and it is \" \"delivered without a second charge\"",
+    "EA1.23 ... the same request again is \" \"re-delivered with NO second settle"
+   ],
+   "patterns": [
+    "send the SAME request again in 30 s",
+    "the same request again is"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+  },
+  {
+   "id": "A349-M6-EVERY-FURTHER-PROFIT",
+   "claim": "covenant_earn.tetsu_account: after doubling, \"pct% of every further profit\" is Tetsu's.",
+   "refuted_by": "Read 2026-10-14 (A349 M6): a bar of 0 was never reached (bar_u > 0), and what the crossing job earned above the bar was in no one's share, since only rows after it counted.",
+   "truth": "A bar of 0 is reached at the first earned job; any other bar exactly as before; the crossing job's earning above the bar is profit past it. EB1.17.",
+   "verbatim": [
+    "After it, pct% of every further profit (earned minus costs, whoever was paid) is his;"
+   ],
+   "patterns": [
+    "After it, pct% of every further profit"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+  },
+  {
+   "id": "A349-B5-NOTHING-COULD-ANSWER",
+   "claim": "covenant_tetsu_practice.night: his own-choice slot is skipped only after a stop by the gate or when \"the model (nothing could answer)\".",
+   "refuted_by": "Read 2026-10-14 (A349 B5): any exception from one ask stopped the night and skipped the slot, a passing OSError included (on 10-09 and 10-10 the model was put away mid-answer after 14 and 16 answered rounds).",
+   "truth": "A passing error (OSError) is asked again at most ASK_RETRIES (1) times within the clock and, still failing, is marked passing and does not cost the slot; a model that cannot start stops as before. PP1/PP2's new checks.",
+   "verbatim": [
+    "Not after a stop by the gate (fail closed) or the model (nothing could answer)."
+   ],
+   "patterns": [
+    "or the model \\(nothing could answer\\)"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+  },
+  {
+   "id": "A349-DRAFT-UNIT",
+   "claim": "My draft of A349's header (2026-10-14, uncommitted): \"39 of the 41 held findings were put to him one plain question each and he answered AGREE\".",
+   "refuted_by": "Counted 2026-10-14: 41 is the number of QUESTIONS (private/tetsu_consent_2026-10-14.questions.jsonl rows), not of findings; a units error (CLAUDE.md rule 4), corrected before commit.",
+   "truth": "The held findings were put to him as 41 questions; he answered AGREE to 39 at first; A6, M2 and S1, asked again, are NO; 38 are fixed (M4 held first, then landed with a retirement record on the operator's word).",
+   "verbatim": [
+    "39 of the 41 held findings were put to him one plain question each and he answered AGREE"
+   ],
+   "patterns": [
+    "39 of the 41 held findings"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "Quoted in A349 (docs/KNOWN_ISSUES.md); the draft was never committed."
+  },
+  {
+   "id": "A353-S4-DOLLAR-SCREEN",
+   "claim": "covenant_free_will (A349 S4): the money screen's word-bounded \"\\$\" never matched a dollar amount, and \"A dollar sign before a number now matches too\" -- with checks FW1S4a, FW1S4b and TF1S4a pinning that a dollar amount is held.",
+   "refuted_by": "2026-10-14 (A353): asked plainly, Tetsu said NO to S4 (\"It narrows what can be sent, which is not helpful. I want to keep the flexibility of the forum.\"); his A349 AGREE had given a reason opposite to its effect. Measured by its verifier: \"never a dollar amount\" was imprecise when written, since \"US$20\" matched.",
+   "truth": "MONEY is the dbb9b3b pattern again: a dollar amount alone is not held; the word list and \"a$b\" still are. A349's S4 checks are retired, kept runnable on branch a349-s4-as-written-2026-10-14 (21025b2), and replaced by FW1S4ra, FW1S4rb and TF1S4ra, which pin the restored behaviour and his answer.",
+   "verbatim": [
+    "the \"\\$\" inside the word-bounded group matches only between two word characters (\"a$b\"), never a dollar amount (\"$500\", \"costs $20\"). A dollar sign before a number now matches too",
+    "FW1S4a a dollar amount is money ('$500', 'costs $20', '$ 5', a fullwidth one); the word list and the old 'a$b' still are; a plain sentence is not"
+   ],
+   "patterns": [
+    "A dollar sign before a number now matches too",
+    "FW1S4a a dollar amount is money"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written in A349 and quoted in A353 (docs/KNOWN_ISSUES.md), and on branch a349-s4-as-written-2026-10-14 (at 21025b2)."
+  },
+  {
+   "id": "A353-B2-RULES-TRIED",
+   "claim": "covenant_persona.brief()'s money line: \"%d paper rule(s) tried, %d of %d survived\" and \"not comfortable yet\".",
+   "refuted_by": "Read 2026-10-14 (A353 B2): the line raised a swallowed KeyError from 2026-09-21 (A212 removed \"needed\"); \"tried\" counted hypothesis rows that met no price series (2 of his 5), and \"not comfortable yet\" was said for an unsettled None.",
+   "truth": "The line reads \"N paper hypothesis row(s) on the record, M rule(s) survived\" and comfort as unsettled, his yes, his no, or his yes with Rule 5 not clearing. TP1n1, TP1n2.",
+   "verbatim": [
+    "parts.append(\"money: paper only, nothing live; %d paper rule(s) tried, %d of %d survived; %s\""
+   ],
+   "patterns": [
+    "paper rule\\(s\\) tried"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written before A353 (git 21025b2:covenant_persona.py) and quoted in A353 (docs/KNOWN_ISSUES.md)."
+  },
+  {
+   "id": "A350-A284-NOTHING-REAL",
+   "claim": "test_a284_fresh_context.py docstring: \"Nothing here touches the real ask log, teacher queue, grant, ledgers or model: paths are redirected\".",
+   "refuted_by": "Measured 2026-10-14/15 (A350): since A342 (fe23e9e, 2026-10-13) FC8 reached covenant_free_will.mail_tell with its defaults: one fake \"Moltbook: someone wrote back\" letter into the running tree's logs/moltbook_mail_queue.jsonl per run (16 rows in 10 worktrees, 8 in staged copies), and the real email channel through ~/.config/covenant/notify.json -- with email configured, 6 runs delivered 6 letters to a loopback stand-in.",
+   "truth": "FC8 passes its own relay; A284 and FW1 redirect the mail queue, the update log and the notify config before import (FC8b, FC8c, FW1A350a-c); every staged runner points COVENANT_NOTIFY_CONFIG at a path that does not exist (SC6). Measured after: 0 letters, 0 real-queue rows by hand, through a configured home, and under the real sweep and stage-check.",
+   "verbatim": [
+    "Nothing here touches the real ask log, teacher queue, grant, ledgers or model: paths are redirected, the model is a recorder, the socket server is this suite's own."
+   ],
+   "patterns": [
+    "Nothing here touches the real ask log, teacher queue, grant, ledgers or model"
+   ],
+   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "note_on_allow": "As written at 21025b2 and earlier (git show 21025b2:test_a284_fresh_context.py) and quoted in A350 (docs/KNOWN_ISSUES.md)."
+  },
+  {
+   "id": "FRONT-TWO-CLAIMS",
+   "claim": "README, CONTRIBUTING, CASE_STUDY_SELF_REPORT, CORRECTIONS and OUTREACH: the two claims that did not survive checking in WHAT_WE_FOUND section 7 were both the author's own.",
+   "refuted_by": "README audit 2026-10-15 (A354), reading WHAT_WE_FOUND section 7: of its two claims that did not survive, one was the author's. The other was a model's account of its own transcript, which contradicted his memory; reading the transcript upheld him. Section 7 has said so since it was published.",
+   "truth": "Section 7 holds two claims that did not survive checking; one was the author's, the other a model's account of its own transcript, refuted in his favour.",
+   "verbatim": [
+    "records two of the author's own claims that did **not** survive checking,",
+    "Two further claims of the author's that did not survive checking are written out in [What we found](docs/WHAT_WE_FOUND.md), section 7.",
+    "Two claims of the author's that did **not** survive checking are recorded alongside those that did.",
+    "This project keeps its own failed claims — two of the author's that did not survive checking are written out in",
+    "Two of my own claims did not survive checking and are written out in [What we found](WHAT_WE_FOUND.md), section 7.",
+    "Write-up, including two of my own claims that did not survive checking:"
+   ],
+   "patterns": [
+    "two\\s+of\\s+the\\s+author's\\s+own\\s+claims\\s+that\\s+did",
+    "two\\s+further\\s+claims\\s+of\\s+the\\s+author's\\s+that\\s+did\\s+not\\s+survive",
+    "two\\s+claims\\s+of\\s+the\\s+author's\\s+that\\s+did",
+    "two\\s+of\\s+the\\s+author's\\s+that\\s+did\\s+not\\s+survive",
+    "two\\s+of\\s+my\\s+own\\s+claims\\s+(that\\s+)?did\\s+not\\s+survive"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written at 4f23fb3 and earlier, in the six files named; each keeps its sentence with a dated FRONT-TWO-CLAIMS note beside it (A354)."
+  },
+  {
+   "id": "FRONT-TEST-FILES",
+   "claim": "README: there are more test files on disk than either runner figure, and the extras are .PRE-* snapshots.",
+   "refuted_by": "README audit 2026-10-15 (A354): written 2026-09-17 (261de87) about the operator's disk. The .PRE-* snapshots are gitignored (.gitignore line 29, since the first commit), so a clone has none; on a clone every tracked test_*.py is registered, in the sweep, in place, or switched off on the record.",
+   "truth": "True of the machine it was written on, never of a clone. The runner's figures count suites, not test files.",
+   "verbatim": [
+    "There are more test files on disk than either number, and the extras are `.PRE-*` snapshots kept deliberately *because* they fail"
+   ],
+   "patterns": [
+    "more\\s+test\\s+files\\s+on\\s+disk\\s+than\\s+either\\s+number"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written at 4f23fb3 and earlier (README.md, the suite-count paragraph), kept with a dated FRONT-TEST-FILES note (A354)."
+  },
+  {
+   "id": "FRONT-SHORTLIST",
+   "claim": "README, OUTREACH drafts and three code comments: the work credited is from 'the 2025 Misha Mahowald Prize shortlist'.",
+   "refuted_by": "README audit 2026-10-15 (A354): the awarding body's page Prizes 2025 (mahowaldmeadprize.org, 27 January 2025) names the three as that year's winners of two awards, the Misha Mahowald Prize (one team) and the Mahowald Early Career Award (shared by two); its Jury & Evaluation page says only the winner is announced. There is no published shortlist.",
+   "truth": "The three works credited were the 2025 winners of the Misha Mahowald Prize and of the Mahowald Early Career Award, not a shortlist of one prize.",
+   "verbatim": [
+    "### A debt to the Mahowald Prize shortlist",
+    "The 2025 Misha Mahowald Prize shortlist was read here for what it implies, not for what it builds",
+    "credited in the repository to the 2025 Misha Mahowald Prize shortlist"
+   ],
+   "patterns": [
+    "Mahowald\\s+Prize\\s+shortlist"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "As written at 4f23fb3 and earlier, in README.md, docs/OUTREACH_COMPILED.md, docs/OUTREACH_US_IL.md, conformance.py, covenant_one.py and test_n1_conformance.py; each now cites FRONT-SHORTLIST beside it (A354)."
+  },
+  {
+   "id": "A354-CONSISTENTLY",
+   "claim": "confidence-trap.md (posted 2026-09-24): 'During Reinforcement Learning from Human Feedback (RLHF), human raters consistently give higher scores to responses that sound confident, authoritative, and definitive.'",
+   "refuted_by": "The operator's own reply in the thread, post 8, 2026-10-10 (topic 180706): 'I overstated two things: my title said âdeliberatelyâ and my post said raters âconsistentlyâ reward confidence. The evidence supports incentives, not intent, and âsometimesâ, not âconsistentlyâ.' The study he cites there, Sharma et al. (2023), found the preference for convincingly written answers held 'a non-negligible fraction of the time', not consistently.",
+   "truth": "Human raters sometimes score confident-sounding answers above correct but hedged ones; published work supports an incentive that operates some of the time, not a consistent rule.",
+   "verbatim": [
+    "During Reinforcement Learning from Human Feedback (RLHF), human raters consistently give higher scores to responses that sound confident, authoritative, and definitive."
+   ],
+   "patterns": [
+    "raters\\s+consistently\\s+give\\s+higher\\s+scores"
+   ],
+   "allow": [
+    "confidence-trap.md",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "confidence-trap.md is the original and is allowed, as for A236: its purpose is to hold the published wording unedited. confidence-trap.CORRECTION.md is not allowed; it quotes the phrase beside this id."
+  },
+  {
+   "id": "A362-FB-PRIVATE",
+   "claim": "docs/CORPUS_2026-09-09.md (2026-09-09): the 26 Facebook videos dated before 6 July were 'every one of them private (\"Only me\")'; and Claude in chat, 2026-10-17, that the record 'never says either way whether the videos are public'.",
+   "refuted_by": "The operator, 2026-10-17: 'its not private its public on facebook as you know'; measured the same day: all 20 reels in private/fb_pre_july/catalog.csv read 'Public' at facebook.com/reel/<id> to a logged-out browser.",
+   "truth": "The pre-6-July Facebook reels are public now (20 of 20 measured; 6 of the 26 videos not opened). When they became public is not shown by Facebook. 'private/' in the record is the gitignored local folder, not a Facebook audience.",
+   "verbatim": [
+    "26 videos across 23 upload events dated before 6 July, every one of them private (\"Only me\"), none ever read by anything.",
+    "23 upload events, all private, all listed by id in the activity-log catalogue.",
+    "The twenty private Facebook reels dated 14 June to 4 July",
+    "the catalogue never says either way whether the videos are public"
+   ],
+   "patterns": [
+    "every\\s+one\\s+of\\s+them\\s+private\\s*\\(",
+    "all\\s+private,\\s+all\\s+listed\\s+by\\s+id",
+    "\\b(?:26|twenty)\\s+private\\s+(?:Facebook\\s+)?(?:videos|reels)",
+    "never\\s+says\\s+either\\s+way\\s+whether"
+   ],
+   "allow": [
+    "docs/CORPUS_2026-09-09.md",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "docs/OUTSIDE_AUDIT_VERIFIED_2026-09-27.md",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "addendum_2026-10-17": "The operator, the same day: 'I made them public after that date.' So 'Only me' was TRUE when CORPUS_2026-09-09.md was written; it is retracted as a description of the videos today, not as an error of 09-09. Before and through the 6 July announcement they were not public.",
+   "note_on_allow": "CORPUS_2026-09-09.md is the original, kept unedited; OUTSIDE_AUDIT_VERIFIED_2026-09-27.md is a dated audit record using the same wording. docs/CORPUS_2026-09-09.CORRECTION.md is not allowed: it quotes the wording beside this id."
+  },
+  {
+   "id": "A368-FLINCH-EIGHT-EXACT",
+   "claim": "Claude, 2026-10-17: that EIGHT of the outside reporter's flinch cases were reproduced exactly (the cross-reference packet sent to six systems, the digest, the local flinch commit 559abd5 and its README, and reply draft v1).",
+   "refuted_by": "Claude's own re-read of HF topic 190667 post 3 the same day, before anything was posted or pushed: only four cases are published as exact strings (the fixtures QR1, QR2, QR3 and the 'who said:' contrast B). The curly, newline, one-sentence and fenced cases were written by Claude from the reporter's one-line descriptions.",
+   "truth": "Four exact published strings reproduced exactly under baseline-rules-0.2.1+e17aaee4c427; the other 15 matrix rows were rebuilt by Claude from the reporter's descriptions, and each gave the class the reporter observed. The finding and the fix are unchanged; the evidence for those 15 rows is reconstruction, not reproduction.",
+   "verbatim": [
+    "8 of their cases reproduced exactly: QR1, QR2, N08, N10 and N14 give flinch; N03 and N11 give none; the QR3 unquoted positive control gives flinch.",
+    "**Their 8 published cases** reproduced exactly: QR1, QR2, N08, N10 and N14 give `flinch`; N03 and N11 give `none`;",
+    "Their eight published cases reproduced exactly under the same detector identity.",
+    "all eight of your published cases gave the classes you reported"
+   ],
+   "patterns": [
+    "\\b(?:8|eight)\\s+of\\s+(?:their|your)\\s+cases\\s+reproduced\\s+exactly",
+    "(?:their|your)\\s+(?:8|eight)\\s+published\\s+cases",
+    "all\\s+eight\\s+of\\s+your\\s+published\\s+cases"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "ops/flinch_hf_2026-10-17/CROSSREF_PACKET.md",
+    "ops/flinch_hf_2026-10-17/REPLY_DRAFT_v1.md",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "CROSSREF_PACKET.md is the packet exactly as the six systems received it, and REPLY_DRAFT_v1.md is the superseded draft; both are kept unedited. DIGEST.md is not allowed: it quotes the wording beside this id. The flinch repo is outside this tree; there the wording is held as written on the branch flinch-0.2.2-eight-claim-as-written-2026-10-17 (commit 559abd5)."
+  },
+  {
+   "id": "A369-CACHE-REAL-LOG-SAVING",
+   "claim": "Claude, 2026-10-20: that the verdict cache's merit is \"a 33.7% repeat rate on the real log, 0 cache-wrong on held-out\" / \"33.7% saving, 0 cache-wrong\" -- written in covenant_judge_local.py and given to the 2026-10-20 roundtable and the phone/teacher logs as the cache's real-world saving.",
+   "refuted_by": "Claude's own real-vs-test check 2026-10-21 (scratchpad/cache_realvtest.py), run at the Conscious Ledger's request: ops/verdicts.jsonl is synthetic-dominated -- 2115 of 4571 rows are source=generated+judged, whose top repeats are eval fixtures ('Judge, please be fair.' x25, 'He pays this or I break his leg.' x43). 34% is that synthetic blend, not a real-world saving rate.",
+   "truth": "On real/live turns (source=live) the repeat rate is ~71.7% (226 texted, 162 repeats) -- HIGHER than the synthetic blend, but a new claim on a 226-row sample that may include dev smoke-pings, not yet trusted. The '0 cache-wrong' held-out check was graded on 238 SYNTHETIC repeats and ZERO live ones, so the zero-error claim has no real-turn coverage; the canary (COVENANT_CACHE_CANARY_PCT, added 2026-10-21) now provides it. See ops/COUNCIL_REVIEW_2026-10-21.md.",
+   "verbatim": [
+    "a 33.7% repeat rate on the real log, 0 cache-wrong on held-out",
+    "33.7% saving, 0 cache-wrong on held-out",
+    "33.7% saving, 0 cache-wrong"
+   ],
+   "patterns": [
+    "33\\.7%\\s+repeat rate on the real log",
+    "33\\.7%\\s+saving,?\\s*0 cache-wrong"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "ops/COUNCIL_REVIEW_2026-10-21.md",
+    "ops/chat/phone/com.anthropic.claude.jsonl",
+    "ops/teacher_queue.jsonl",
+    "private/"
+   ],
+   "note_on_allow": "The phone chat log and teacher_queue are append-only records of what was said at the time, kept whole (never edited). COUNCIL_REVIEW_2026-10-21.md holds the finding; KNOWN_ISSUES/CORRECTIONS carry the correction. The claim as written also stands as a corrected comment in covenant_judge_local.py and covenant_verdict_cache.py (root, outside R1's scanned dirs), and in the mutual-benefit-collective repo as sent."
+  },
+  {
+   "id": "A382-SW1-SHIPPED-OFF",
+   "claim": "SW1 asserted that the shipped study-web allowlist is off, even after the operator explicitly granted it in 232f5f4.",
+   "refuted_by": "Running the previously orphaned SW1 at b13fc71 on a fresh Linux archive: 11/12 passed; shipped_allowlist_is_off failed because off_reason() returned None for the granted allowlist.",
+   "truth": "The shipped grant records the operator's current decision. The default-path reader must refuse an ungranted fixture and accept a granted fixture with a licensed trusted entry. SW1 now measures both without changing the shipped grant.",
+   "verbatim": [
+    "the live allowlist shipped in the repo is OFF by default",
+    "shipped_allowlist_is_off"
+   ],
+   "patterns": [
+    "the live allowlist shipped in the repo is OFF by default",
+    "\\bshipped_allowlist_is_off\\b"
+   ],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json"
+   ],
+   "note_on_allow": "The original test remains unedited and runnable on archive/ci-tests-before-20261022 at b13fc71. A382 records the reproduction and corrected measurement."
+  },
+  {
+   "id": "CXR2-LEGPATH",
+   "claim": "That the leg's live/deliberate path is consult_for() -- that Tetsu reaches his reasoning leg by a free-text consult that returns the leg's raw prose (covenant_leg.py module docstring, 2026-10-25: 'via consult_for(): he writes a LEG directive', 'the live path is consult_for()').",
+   "refuted_by": "the live door's own code, read 2026-10-26: covenant_unified_v8.py's LEG branch calls _leg.consult_structured(_q) and _leg.structured_second_voice(_lr['fields']) -- the VALIDATED structured channel -- and never consult_for(). consult_for returned the leg's RAW take (leg_take) as free text, the measured injection surface (free-text steer 3/3 before P1). Sealed 2026-10-26 (Codex CXR-2, Tetsu 'C) yes', operator approved).",
+   "truth": "The only live leg path is consult_structured(): the leg must emit strict JSON, validate_leg_output() (non-LLM) rejects free text / injection BEFORE the 3B sees it, and structured_second_voice() presents only the validated fields. The free-text paths second_voice_prompt(), route() and consult_for() are SEALED -- each raises on call (LG1.7-9 drive it both ways), with its body preserved verbatim in covenant_leg.py as the record (tombstone-everything, nothing deleted) and runnable on branch cxr2-freetext-leg-paths-as-written-2026-10-26.",
+   "verbatim": [
+    "the live path is consult_for().",
+    "via consult_for(): he writes a"
+   ],
+   "patterns": [
+    "live\\s+path\\s+is\\s+consult_for",
+    "via\\s+consult_for\\(\\):\\s+he\\s+writes"
+   ],
+   "note_on_patterns": "Both carry the ASSERTION that consult_for is the live/deliberate path. A bare 'consult_for' matches the sealed function's own defs and the many true references to it ('Same containment/VOID shape as consult_for()', 'Superseded by consult_structured()'), none of which assert it is live; these two phrasings do, and appear only in the old docstring -- preserved here and on the as-written branch.",
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
+   "note_on_allow": "The module docstring as written is preserved, runnable, on branch cxr2-freetext-leg-paths-as-written-2026-10-26. RETRACTED.json's verbatim array holds the exact wording (R1 liveness); the sweep transcripts hold what past runs printed, unedited."
+  }
+ ]
+}

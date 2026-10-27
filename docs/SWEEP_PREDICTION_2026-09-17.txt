@@ -1,0 +1,40 @@
+PRE-REGISTERED 2026-09-17, before running covenant_one.py --all
+
+HYPOTHESIS
+  The marked README totals (96 suites, 2,742 checks, dated 2026-09-12) are
+  STALE, because four suites were registered after that date:
+  test_p21_self_eval_persist, test_p22_watchdog_restart_verifies,
+  test_p23_second_operator_security, test_p24_corpus_counts.
+
+PREDICTION
+  suites  > 96      (expected 100 if all four run in the scratch copy)
+  checks  > 2,742   (expected ~2,808: P21=14, P22=15, P23=27, P24=~10)
+  failed  = 0
+
+FALSIFIED BY
+  suites <= 96      -> the new suites are not being run; registration is not
+                       the same as execution, and I would have assumed it was.
+  checks <= 2,742   -> same, or a suite silently reports no tally.
+  failed  > 0       -> something I landed today breaks under the full battery,
+                       which four green suites run individually would not show.
+
+WHAT I MUST NOT DO
+  Adjust this prediction after reading the result. If it is wrong, the gap is
+  the finding.
+
+---
+ON WHAT THIS FILE PROVES, AND WHAT IT DOES NOT
+  Git records when this was COMMITTED, which is after the sweep ran. It cannot
+  prove the text predates the measurement. Two things do, and neither is git:
+
+  1. The prediction is WRONG. It says failed = 0; the sweep reported 12, eleven
+     of them caused by the author. Nobody retro-fits a prediction that convicts
+     them. A fabricated one would have been right.
+  2. It names the falsifier that would have been most instructive --
+     "registration is not the same as execution, and I would have assumed it
+     was" -- which is not a sentence written by someone who already had the
+     answer.
+
+  Stated here rather than left for a reader to notice, because the whole point
+  of pre-registering is that the record is checkable, and a claim about the
+  record needs the same treatment as any other claim.

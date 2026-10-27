@@ -1,0 +1,10 @@
+post_id,date,duration_s,own_or_reshare,video_type,lang,ocr_words,asr_words,ocr_segments,ocr_matched_pct,mismatch_count,main_types,chat_ui_terms_on_screen
+2109690871016988733,2026-10-12,150.4,reshare,TikTok link,en,1822,40,125,1.6,125,onscreen_no_audio=113; wording_difference=10; audio_no_onscreen=2,
+2109663384295686239,2026-10-12,54.5,reshare,TikTok link,en,345,182,39,5.1,43,wording_difference=22; onscreen_no_audio=15; audio_no_onscreen=6,gpt
+2109651670531498036,2026-10-12,605.7,own,X native video,en,10014,1781,103,52.4,67,onscreen_no_audio=28; wording_difference=21; audio_no_onscreen=18,anthropic|claude|reply to claude
+2109394971975430381,2026-10-11,12.4,own,X native video,en,982,0,12,0.0,12,onscreen_no_audio=12,claude|reply to claude
+2109296047176458703,2026-10-11,154.5,reshare,TikTok link,de,1487,51,122,0.0,124,onscreen_no_audio=121; audio_no_onscreen=2; wording_difference=1,
+2109295060533567947,2026-10-11,97.4,reshare,TikTok link,en,1219,83,79,0.0,85,onscreen_no_audio=78; audio_no_onscreen=6; wording_difference=1,
+2107491305077055657,2026-10-06,1159.1,own,X native video,mk,18863,0,215,0.0,215,onscreen_no_audio=215,anthropic|chatgpt|claude|gpt|grok
+2107398791275958761,2026-10-06,173.7,own,"TikTok link (own, 'Me again')",pt,1994,63,59,0.0,66,onscreen_no_audio=59; audio_no_onscreen=7,
+2107123812080738760,2026-10-05,21.7,own,X native video,en,1646,0,21,0.0,21,onscreen_no_audio=21,claude|gemini|reply to claude

@@ -1,0 +1,40 @@
+# Pairs relative value: a third hypothesis, the same bar
+
+12 series, 611 dates 2025-01-01 -> 2026-09-03; 66 pairs x 18 settings = 1188 variants; costs 50 bps one way
+
+## The five best of 990 variants, beta fitted on the first 40% and scored on the rest
+
+| variant | total | Sharpe | max DD |
+|---|---|---|---|
+| ADA/SOL lb60 e2.00 x0.50 | +35.2% | 1.33 | -11.5% |
+| NEAR/ONDO lb40 e2.00 x0.25 | +77.9% | 1.22 | -39.3% |
+| NEAR/XLM lb40 e2.00 x0.50 | +82.0% | 1.22 | -45.4% |
+| NEAR/XRP lb20 e2.00 x0.50 | +56.2% | 1.21 | -22.7% |
+| NEAR/XLM lb40 e1.50 x0.50 | +67.2% | 1.06 | -42.4% |
+
+## Test 1 -- deflation
+
+Best: `ADA/SOL lb60 e2.00 x0.50`, Sharpe 1.33 over 366 bars. Expected best from 1188 NO-EDGE trials: 3.30. Deflated Sharpe **0.0000** (needs >= 0.95): FAIL
+
+## Test 2 -- walk-forward, the search inside each fold
+
+| fold | chosen on train | train Sharpe | test return | test Sharpe | bars |
+|---|---|---|---|---|---|
+| 1 | ATOM/PEPE lb20 e2.00 x0.25 | 4.24 | -8.50% | -0.30 | 100 |
+| 2 | NEAR/ONDO lb40 e2.00 x0.50 | 5.97 | -23.47% | -1.39 | 100 |
+| 3 | CRO/XLM lb20 e2.00 x0.50 | 3.08 | +1.77% | 0.36 | 100 |
+| 4 | AVAX/XLM lb40 e2.00 x0.25 | 1.95 | -0.51% | -0.43 | 100 |
+| 5 | ADA/SOL lb60 e2.00 x0.50 | 1.61 | +0.00% | 0.00 | 93 |
+
+1 of 5 folds positive, binomial p = 0.969 (needs majority AND p <= 0.05): FAIL
+mean out-of-sample return -6.14%
+
+## Test 3 -- PBO by CSCV
+
+PBO = 0.386 (needs < 0.5): PASS
+
+## Verdict
+
+**Nothing survived** -- all three tests are required, and at least one failed.
+
+Third hypothesis class, same answer. The trader stays disarmed for a measured reason.

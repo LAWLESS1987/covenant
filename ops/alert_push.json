@@ -1,0 +1,6 @@
+{
+  "direct_line": true,
+  "his_words": "yes turn alert push on",
+  "set": "2026-10-17",
+  "what": "The watchdog tells him when a condition starts (present 3 rounds) and when it clears (absent 3 rounds), on the direct line to the Covenant app. The phone peer's heartbeat backoff is left out. Set direct_line to false to turn it off. See A367."
+}

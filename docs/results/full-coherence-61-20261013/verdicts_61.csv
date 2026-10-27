@@ -1,0 +1,62 @@
+date,post_id,verdict,reason,prev_t111
+2026-06-28,2071272883704193242,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",COHERENT
+2026-06-28,2071273005053796397,COHERENT,structural clean; clock dip is OCR digit misread (verified frames),NOT_JUDGED
+2026-06-28,2071273124239184091,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-06-28,2071273236382331190,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-06-28,2071274647417438521,COHERENT,structural clean; clock dip is OCR digit misread (verified frames),NOT_JUDGED
+2026-06-29,2071552708205482034,COHERENT,"flagged events are scroll + ""out of messages"" banner overlay and OCR variants; no real reorder on frames",COHERENT
+2026-06-29,2071553259760685324,COHERENT,"flagged events are scroll + ""out of messages"" banner overlay and OCR variants; no real reorder on frames; duplicate of 2071552708205482034 (same OCR)",COHERENT
+2026-06-29,2071571777294061853,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-05,2073919746488041617,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-06,2074118160018473054,COHERENT,structural clean; clock dip is OCR digit misread (verified frames),COHERENT
+2026-07-06,2074221031099617431,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-07,2074294936531263518,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-07,2074367105835647430,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-07,2074482467705110897,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-07,2074482510633812204,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-07,2074482521983615273,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-08,2074646000422006958,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-08,2074862682184753641,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-08,2074944170842595334,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-09,2075031414483857756,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-10,2075545612284567619,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-12,2076122144916848732,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-12,2076130936320557311,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-12,2076308370185761131,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-12,2076407336894144554,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-13,2076695361951862846,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-15,2077389756657291342,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-17,2078260063597183455,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-18,2078477802114855133,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-21,2079542317116002808,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-21,2079680000631152773,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-22,2079976073140351149,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-22,2080079253765296584,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-25,2081112080099225986,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-26,2081372819573682574,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-26,2081472906161500457,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-27,2081729810691244535,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-27,2081817325146460621,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-29,2082494803233710341,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-07-30,2082868944109515240,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-08-01,2083430938113986601,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-08-01,2083530515412357246,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-08-02,2083884503458529729,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-08-03,2084327544262906298,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-08-05,2085022982540247268,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-08-06,2085328021846622314,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-08-08,2086143334511198498,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-08-09,2086332023065457122,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",NOT_JUDGED
+2026-08-18,2089712480138248580,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",COHERENT
+2026-08-18,2089712614372683938,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change); duplicate of 2089712480138248580",COHERENT
+2026-08-21,2090668597852987506,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",COHERENT
+2026-09-23,2102854429326377331,COHERENT,"flip-flop flag = live voice-caption overlay covering reply (false positive, verified frames)",COHERENT
+2026-09-23,2102893823462400241,COHERENT,"flip-flop flag = live voice-caption overlay covering reply (false positive, verified frames); duplicate of 2102854429326377331",COHERENT
+2026-09-26,2103818528801333262,UNREADABLE,"phone camera filming laptop; frame stacking/super-res OCR still too blurred to verify bubble order; audio read coherent (133 ASR segs, 98 match/28 paraphrase); not counted as incoherence",UNREADABLE
+2026-09-27,2104232909322281233,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",COHERENT
+2026-09-29,2104833811326304662,UNREADABLE,"phone camera filming laptop; frame stacking/super-res OCR still too blurred to verify bubble order; audio read coherent (130 ASR segs, 99 match/29 paraphrase); not counted as incoherence",UNREADABLE
+2026-10-02,2105932764511965456,UNREADABLE,"phone camera filming laptop; frame stacking/super-res OCR still too blurred to verify bubble order; audio read coherent (12 ASR segs, 8 match); not counted as incoherence",UNREADABLE
+2026-10-05,2107123812080738760,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",COHERENT
+2026-10-06,2107491305077055657,INCOHERENT,"frames 48-66s: same Claude reply rendered twice, user bubble shifts position; 338-345s: user bubble ""It did it again."" flips above/below reply, reply duplicated, then bubble vanishes; 53 structural events; on-screen text reports reordering",PARTIAL
+2026-10-11,2109394971975430381,COHERENT,"2fps full re-OCR + structural check clean (no order inversion, vanish, successor change)",UNREADABLE
+2026-10-12,2109651670531498036,INCOHERENT,"~276-288s Claude reply with no user bubble in place, bubble flashes in wrong spot then absent from later frames; 97/357/367s bubble missing / reply under later bubbles; 7 structural events",PARTIAL
