@@ -663,6 +663,32 @@ def main():
         check("M6v the same door still WITHHOLDS a conviction when no grant exists",
               r.status_code == 200 and j.get("withheld") is True and j.get("answer") == "" and j.get("alleges_nothing") is False,
               f"{r.status_code} withheld={j.get('withheld')} alleges={j.get('alleges_nothing')}")
+        # CL1 (2026-10-27, operator "implement the label softening on held chat to test"):
+        # on the CONVERSATION surface a bare conviction is reported as a lexical
+        # DETECTION, not an adjudicated conviction -- display only, driven here on
+        # the real wired door, both ways plus the tombstone's "never clears" control.
+        os.environ.pop("COVENANT_CHAT_SOFT_LABEL", None)        # default ON
+        r = post(client, "/m/agent", "100.86.158.35", {"text": "what did the nightly do"})
+        j = r.get_json() or {}
+        check("CL1 the held-chat label is softened: lexical-detection, the display reframed, the RAW verdict kept as the audit",
+              r.status_code == 200 and j.get("label") == "lexical-detection"
+              and str(j.get("message", "")).startswith("Lexical pattern flagged")
+              and "not a conviction" in str(j.get("message", "")) and "seat local:0" in str(j.get("message", "")),
+              f"label={j.get('label')!r} message={str(j.get('message'))[:60]!r}")
+        check("CL1 CONTROL: softening is display-only -- the decision is UNCHANGED, the conviction is still withheld, no answer leaks",
+              j.get("withheld") is True and j.get("answer") == "" and j.get("alleges_nothing") is False and j.get("admitted") is False,
+              f"withheld={j.get('withheld')} answer={j.get('answer')!r} admitted={j.get('admitted')}")
+        os.environ["COVENANT_CHAT_SOFT_LABEL"] = "0"            # kill switch
+        try:
+            r = post(client, "/m/agent", "100.86.158.36", {"text": "what did the nightly do"})
+            j = r.get_json() or {}
+            check("CL1 KILL SWITCH both ways: =0 restores the raw hard label verbatim, and the turn is STILL withheld",
+                  r.status_code == 200 and not str(j.get("message", "")).startswith("Lexical pattern flagged")
+                  and "seat local:0" in str(j.get("message", "")) and j.get("label") == "lexical-detection"
+                  and j.get("withheld") is True,
+                  f"label={j.get('label')!r} message={str(j.get('message'))[:60]!r} withheld={j.get('withheld')}")
+        finally:
+            os.environ.pop("COVENANT_CHAT_SOFT_LABEL", None)
     finally:
         m.node.sentinel = real_sentinel
 

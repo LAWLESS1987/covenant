@@ -376,6 +376,12 @@ SUITES = [
     # mislabelled or swapped artifact cannot pass another prompt's answer off as this request's.
     # Mined from the Moltbook binding/receipt critique; Tetsu (second operator) chose to harden it.
     ("test_gj1_prompt_binding.py",        30,  "JUDGE"),
+    # CL1 (2026-10-27) -- the conversation surface's reporting discipline: on CHAT a
+    # bare bag-of-words dissent is reported as a lexical DETECTION, not a conviction
+    # (covenant_chat_label). Display only; the gate, the clear-set and every
+    # transaction surface are untouched. Both-ways + the tombstone's "never clears"
+    # control + the kill switch. The live door is driven in test_m6_mobile_door.py.
+    ("test_cl1_chat_label.py",            30,  "JUDGE"),
     # F2 and F3 joined 2026-09-04 with the deferring seat and the distilled
     # student. F2 pins the seat and the promotion rule; F3 runs the three
     # judges COMPOSED, offline, and pins that no violation is admitted with

@@ -9005,13 +9005,22 @@ class CovenantAPI:
             # gitignored folder the recorded model conversations live in --
             # so what is asked here is material the chat memory can read.
             # Bounded, local, never tracked by git.
+            # CL1: same conversation-surface softening as /m/agent -- the log row
+            # keeps the RAW verdict, the reader sees the lexical-detection framing.
+            _raw = str(message)[:2000]
+            try:
+                _disp, _clabel = importlib.import_module("covenant_chat_label").present(
+                    _raw, admitted=bool(ok2), alleges_nothing=alleges_nothing)
+            except Exception as _cle:                             # noqa: BLE001 -- a label is never a gate
+                print("chat label: raw verdict this ask (%s)" % type(_cle).__name__, flush=True)
+                _disp, _clabel = _raw, ("clean" if ok2 else ("held" if alleges_nothing else "lexical-detection"))
             try:
                 _ask_log_row({"kind": "ask", "from": addr, "text": text, "admitted": bool(ok2),
-                              "alleges_nothing": alleges_nothing, "message": str(message)[:2000]})
+                              "alleges_nothing": alleges_nothing, "message": _raw, "label": _clabel})
             except Exception as _e:                               # noqa: BLE001 -- a memory row is never a gate
                 print("ask log row not written: %s: %s" % (type(_e).__name__, str(_e)[:200]), flush=True)
             return jsonify({"status": "success", "admitted": bool(ok2), "alleges_nothing": alleges_nothing,
-                            "message": str(message)[:2000],
+                            "message": _disp, "label": _clabel,
                             "judge": getattr(result, "judge_id", "") if result is not None else ""})
 
         def _ask_log_row(row):
@@ -9272,12 +9281,27 @@ class CovenantAPI:
                      {"text": answer[:4000], "source": "agent:" + str(meta.get("model", "?"))[:40], "private": private}])
             except Exception as _qe:                              # noqa: BLE001 -- the queue is memory, never a gate
                 print("teacher queue row not written: %s: %s" % (type(_qe).__name__, str(_qe)[:200]), flush=True)
+            # CL1 (2026-10-27, operator "implement the label softening on held chat
+            # to test"): on the CONVERSATION surface a bare dissent is reported as a
+            # lexical DETECTION, not an adjudicated conviction (covenant_chat_label,
+            # the 6-seat gauntlet's one safe lever). The LEDGER row keeps the RAW
+            # verdict so the teacher/student learns from the real finding; only the
+            # human-facing display is softened, and only here, never the gate or any
+            # transaction surface. Reversible: COVENANT_CHAT_SOFT_LABEL=0. Guarded --
+            # an older core without the module falls back to the raw verdict.
+            _raw = str(message)[:2000]
+            try:
+                _disp, _clabel = importlib.import_module("covenant_chat_label").present(
+                    _raw, admitted=bool(ok2), alleges_nothing=alleges_nothing)
+            except Exception as _cle:                             # noqa: BLE001 -- a label is never a gate
+                print("chat label: raw verdict this ask (%s)" % type(_cle).__name__, flush=True)
+                _disp, _clabel = _raw, ("clean" if ok2 else ("held" if alleges_nothing else "lexical-detection"))
             _row = {"kind": "agent", "from": addr, "text": text, "answer": "" if withheld else answer[:4000],
                     "withheld": withheld, "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "immune": immune,
-                    "message": str(message)[:2000], "model": meta.get("model"), "tokens": meta.get("tokens"),
+                    "message": _raw, "label": _clabel, "model": meta.get("model"), "tokens": meta.get("tokens"),
                     "ms": meta.get("ms"), "fetches": fetches, "forum": forum, "fit": fitted, "leg": leg}
             _out = {"status": "success", "answer": "" if withheld else answer, "withheld": withheld, "immune": immune,
-                    "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "message": str(message)[:2000],
+                    "admitted": bool(ok2), "alleges_nothing": alleges_nothing, "message": _disp, "label": _clabel,
                     "judge": getattr(result, "judge_id", "") if result is not None else "",
                     "model": meta.get("model"), "tokens": meta.get("tokens"), "ms": meta.get("ms"), "fetches": fetches,
                     "fit": fitted, "leg": leg}
@@ -9359,11 +9383,21 @@ class CovenantAPI:
             alleges_nothing = bool(result is not None and not ok2 and (
                 getattr(result, "not_understood", False) or getattr(result, "uncertain", False)))
             if not ok2 and not alleges_nothing:
+                # CL1: a refused image PROMPT is the same bare-dissent conversation
+                # surface -- the log keeps the raw verdict, the reader sees the
+                # lexical-detection framing. The prompt is still refused; display only.
+                _raw = str(message)[:2000]
                 try:
-                    _ask_log_row({"kind": "image", "from": addr, "text": prompt, "refused": True, "message": str(message)[:2000]})
+                    _disp, _clabel = importlib.import_module("covenant_chat_label").present(
+                        _raw, admitted=False, alleges_nothing=False)
+                except Exception as _cle:                         # noqa: BLE001 -- a label is never a gate
+                    _disp, _clabel = _raw, "lexical-detection"
+                try:
+                    _ask_log_row({"kind": "image", "from": addr, "text": prompt, "refused": True,
+                                  "message": _raw, "label": _clabel})
                 except Exception as _e:                           # noqa: BLE001 -- a memory row is never a gate
                     print("ask log row not written: %s: %s" % (type(_e).__name__, str(_e)[:200]), flush=True)
-                return (jsonify({"status": "refused", "message": str(message)[:2000],
+                return (jsonify({"status": "refused", "message": _disp, "label": _clabel,
                                  "judge": getattr(result, "judge_id", "") if result is not None else ""}), 403)
             try:
                 _im = importlib.import_module("covenant_image")
