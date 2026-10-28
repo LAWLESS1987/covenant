@@ -324,5 +324,27 @@ open(rfew, "w", encoding="utf-8").write("\n".join('{"at": %r}' % (RS0 + i) for i
 check("WN1.38 redundancy on too few check-ins is UNKNOWN and tells nothing (A129: no data, no claim)",
       W.redundancy(rfew)["state"] == "UNKNOWN" and W.redundancy_tell(RS0, path=rfew, witness_path=rwit)["told"] == 0, None)
 
+# ---- the INDEPENDENT phone-side witness (A375 Amendment 1, his "enable the independent phone-side witness" 2026-10-27):
+# the phone's OWN reading of the PC, carried in the check-in's pc_witness block. The redundancy layer's independent
+# reading. Both ways: UNKNOWN until a check-in carries one (the real state now -- phone on an older build); read when present.
+pw_dir = os.path.dirname(rck)
+pw_none = os.path.join(pw_dir, "ck_no_witness.jsonl")
+open(pw_none, "w", encoding="utf-8").write("\n".join('{"at": %r, "node_id": "phone"}' % (RS0 + i * 600) for i in range(5)))
+r_none = W.phone_side_witness(pw_none)
+check("WN1.39 phone_side_witness is UNKNOWN until a check-in carries one (older build sends none: no data, no claim)",
+      r_none["state"] == "UNKNOWN" and r_none["independent"] is False, r_none)
+
+pw_has = os.path.join(pw_dir, "ck_witness.jsonl")
+open(pw_has, "w", encoding="utf-8").write(
+    '{"at": %r, "pc_witness": {"charge": 2.0, "theta": 12.0, "beats": 60, "fixed_missed": 3, "spiking_silent": false, "fixed_silent": false, "agree": true}}\n' % RS0
+    + '{"at": %r, "pc_witness": {"charge": 14.0, "theta": 12.0, "beats": 60, "fixed_missed": 15, "spiking_silent": true, "fixed_silent": false, "agree": false}}\n' % (RS0 + 600))
+r_has = W.phone_side_witness(pw_has)
+check("WN1.40 phone_side_witness reads the LATEST pc_witness block as the independent reading (here PRESENT, phone saw a disagreement)",
+      r_has["state"] == "PRESENT" and r_has["independent"] is True and r_has["phone_says_agree"] is False and r_has["charge"] == 14.0, r_has)
+
+# the real ledger carries none yet (0 of 5164) -> UNKNOWN, the honest live state until the phone runs the witness build.
+check("WN1.41 on the real ledger the phone-side witness is UNKNOWN (no check-in carries one yet -- the phone build is his to install)",
+      W.phone_side_witness().get("state") in ("UNKNOWN", "PRESENT", "ABSENT"), W.phone_side_witness().get("state"))
+
 print("\n%d/%d passed" % (sum(results), len(results)))
 sys.exit(0 if all(results) else 1)

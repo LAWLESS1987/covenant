@@ -635,9 +635,54 @@ def redundancy_tell(now, path=None, witness_path=None, fire_gaps=6.0):
             "agree": rep["agree"], "twin_only": rep["twin_only"], "base_only": rep["base_only"]}
 
 
+def phone_side_witness(path=None):
+    """The INDEPENDENT reading the redundancy layer was built to want: the phone's OWN witness of the PC, carried in a
+    check-in's `pc_witness` block (covenant_daily_plan.record_checkin keeps it). The phone computes it from the
+    OUTSIDE -- the one observation path neither the highway nor this module can make on the PC, because both read the
+    PC's own ledgers. This reads the latest check-in that carried one and reports the phone's reading beside the PC's.
+
+    UNKNOWN until the phone sends one (the sender ships in the app build 447e4f9+; a phone on an older build sends
+    nothing -- no data, no claim). When present, agreement with the PC's own view is the healthy state; a disagreement
+    (the phone sees the PC as silent while the PC thinks it is answering, or the reverse) is the independent finding
+    that one side is blind. Reads only; acts on nothing."""
+    latest = None
+    try:
+        with open(path or CHECKINS, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                w = r.get("pc_witness")
+                if isinstance(w, dict):
+                    latest = (r.get("at"), w)
+    except OSError:
+        return {"state": "UNKNOWN", "why": "no check-in ledger", "independent": False}
+    if latest is None:
+        return {"state": "UNKNOWN", "independent": False,
+                "why": "no check-in has carried a phone-side witness yet -- the phone is on an older build, or has "
+                       "not run the witness build (0 of the ledger's rows carry one)"}
+    at, w = latest
+    spiking_silent = bool(w.get("spiking_silent", False))
+    return {
+        "state": "PRESENT" if spiking_silent else "ABSENT", "independent": True, "at": at,
+        "charge": w.get("charge"), "theta": w.get("theta"), "beats": w.get("beats"),
+        "fixed_missed": w.get("fixed_missed"), "phone_says_agree": w.get("agree"),
+        "note": ("the phone's OUTSIDE reading of the PC -- the independent path; a disagreement with the PC's own view "
+                 "(a gap in phone_checkins the phone did NOT see as silence, or the reverse) is the finding one side "
+                 "is blind. This is independent-sensing redundancy, not the same-ledger algorithmic kind."),
+    }
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     import time
+    if argv and argv[0] == "phone":
+        print(json.dumps(phone_side_witness(), indent=1, default=str))
+        return 0
     if argv and argv[0] == "redundancy":
         print(json.dumps(redundancy(), indent=1, default=str))
         return 0
