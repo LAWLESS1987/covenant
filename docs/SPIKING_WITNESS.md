@@ -209,8 +209,11 @@ run on the PC and read the PC's own ledgers. A neuron on THE PHONE over the PC's
   answer resets).
 - `entry.pc_witness` returns the spiking reading beside the fixed count and whether they agree; a disagreement is
   the finding. It raises nothing and acts on nothing; NodeService keeps the authoritative reconnect notice.
-- M5.80a-f, M5 312/312, five mutations each red. Commits db903f8 + 078d055 on brain/witness. Not pushed (phone main
-  reaches his phone only on his yes).
+- M5.80a-f, five mutations each red. Originally commits db903f8 + 078d055 on brain/witness. **ENABLED 2026-10-27
+  (Amendment 4): ported onto covenant-phone main (447e4f9), Android CI #138 green.** brain/witness was never pushed
+  and had diverged from main, so it was ported, not merged; a latent bug was fixed (`pc_witness` computed
+  `spiking_silent` but did not return it, so the PC never received the one field its receiver lists). It reaches his
+  phone only when he builds and installs; until then the PC-side reading is UNKNOWN (no data, no claim).
 - **Surfaced in the /pc display (PC side on main, dd48e47).** The phone sends its witness reading in the check-in
   (`entry.pc_witness_summary` + NodeService); `record_checkin` keeps a bounded, type-safe `pc_witness` block;
   `covenant_pc3d._last_checkin_witness` reads the newest one and hides a reading older than 6 h; the /pc Phone orb
@@ -315,3 +318,61 @@ Node-height progress (the reviewers' pick: clear monotonic velocity, a baseline-
 next twin, under the Amendment 2 bar; a held-out negative set for each stream; and a dense polling loop for a real
 efficiency cut. Tailscale's own view beside the check-in ledger and a per-ledger writer pacemaker remain. None wired
 to act until each clears the Amendment 2 bar.
+
+## Amendment 4 (2026-10-27): the negatives pipeline, a first verdict, redundancy, the phone-side path, two declines
+
+His words over this day: "next snn improvement? both", then "theres other ways it can help", "build it for
+redundancy", "enable the independent phone-side witness". Four pieces, each built honestly as what it is, and two
+candidates checked and declined on the record before any code.
+
+**1. The negatives PIPELINE (the "still to build" piece above, now built).** Amendment 3 set the keep bar but the
+held-out negative set it judges against did not exist -- it has to ACCRUE from normal operation, never be
+manufactured. `covenant_witness.seal_negatives`/`accrue_once` seal incident-free spans read-only and idempotently,
+always withholding the most recent `CONFIRM_LAG_S` (2 d) so still-unfolding time is never called clean (rule 9);
+`shadow_alarms` logs every detector fire in a sealed span (the specificity record); `prove_or_retire` runs
+`beats_baseline` against the accrued set and stays UNDETERMINED until `PROVE_MIN_NEGATIVE_DAYS` (30). CLI
+`python covenant_witness.py accrue|prove`. WN1 32/32 (8 new, both ways).
+
+**2. The first real verdict: the phone pacemaker is RETIRED as a twin, on evidence.** On 38.7 accrued negative-days it
+catches exactly what CUSUM catches -- both catch both known silences, both raise 9 false alarms, identical fa_rate
+0.233/day: "catches nothing the baseline misses." Amendment 3's prediction (CUSUM is the sufficient statistic on
+these streams) is now PROVEN on real accrued data rather than asserted, with the specificity number that was
+previously unmeasured (~1 false alarm per 4.3 days). The phone-silence DETECTION still works (CUSUM); what is retired
+is the claim the spiking twin adds independent redundancy here.
+
+**3. The REDUNDANCY layer (his "build it for redundancy").** A different goal from the keep test, built as such: the
+keep test asks "does the twin add DETECTION?" (no); redundancy runs both readings in PARALLEL so a DISAGREEMENT shows
+one has gone blind (the "disagreement is the output" of Amendment 1). `redundancy`/`agree_disagree`/`redundancy_tell`
+(CLI `redundancy`/`tell`) compare the pacemaker and CUSUM; agreement is the healthy state, every divergence is
+surfaced to `ops/spiking_witness.jsonl` once. Live: the two AGREE on all 11 flagged silences (agreement 1.0, quiet).
+HONEST LIMIT: same-ledger twins give ALGORITHMIC redundancy (catches a detector bug/drift), not INDEPENDENT-sensing
+redundancy -- which is piece 4. WN1 38/38.
+
+**4. The INDEPENDENT phone-side witness, ENABLED.** The phone's own reading of the PC, the one outside path (see the
+phone-side section above): ported onto covenant-phone main (447e4f9), Android CI #138 green, bug fixed. PC side reads
+it: `covenant_witness.phone_side_witness` (CLI `phone`), beside the `/pc` display that already surfaces it
+(`covenant_pc3d`, dd48e47). WN1 41/41. LIVE STATE UNKNOWN until he builds and installs the app -- then the
+independent reading goes live and a disagreement (the phone sees the PC silent while the PC thinks it is answering, or
+the reverse) is the finding neither PC-side reader can make alone.
+
+**Two candidates checked and DECLINED on the record (look-first, build-only-if-it-beats-the-baseline).**
+- *Cross-stream coincidence* (a neuron firing on correlated outages across streams): the highway ledger's 71
+  independent-subsystem red episodes co-occur with ANOTHER independent subsystem exactly once (node_down +
+  tetsu_cannot_answer, 10-14); every other co-occurrence is one common cause -- build/deploy churn. A coincidence
+  neuron would restate the deploy state, not catch an independent compound. Not built.
+- *Flaky-clustering on tetsu* (the leaky-burst on an intermittent-failure stream): model_asks has 1 failure in 2730
+  (asks are not made when Tetsu is down), the highway detector logs no interleaved ok/fail, and practice.retention has
+  no labelled incident at a ~30% base rate. No stream has interleaved ok/fail + a labelled incident + a sub-base-rate
+  signal, so `beats_baseline` cannot run. Not built.
+
+**And the efficiency question, answered in the lab (ED-sKWS vs a VAD gate, `C:\Users\Lawre\spiking` Amendment 11).**
+The one place the review said spiking could provably pay. On the public 6 h stream: both an energy VAD gate and the
+spiking LIF gate pass ~everything on noisy audio (the gate buys nothing there); the saving is in the event-driven
+NETWORK -- 78% fewer operations than the dense GRU on the neuromorphic op-count model (clears the 30% bar), but ~1% on
+measured CPU wall time (a simulated spiking net is no cheaper). Honest: energy yes (projected, needs neuromorphic
+hardware), latency no, gate no -- the same lesson this witness reached on its own streams.
+
+**The through-line.** On the system's current streams the plain baselines (CUSUM, consecutive-count) are sufficient;
+a spiking twin's provable win needs either a signal that is genuinely in the TIMING with labelled incidents to prove
+specificity, or neuromorphic HARDWARE where cost follows spikes. Three twin ideas this day each returned to that
+boundary. That is not spiking failing -- it is the keep test telling us, with evidence, where the investment pays.
