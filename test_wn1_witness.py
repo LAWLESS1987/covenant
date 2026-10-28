@@ -280,5 +280,49 @@ check("WN1.32 prove_or_retire RUNS the keep test once >=30 negative-days have ac
       pr["verdict"] in ("KEEP", "RETIRE") and pr["accrued_negative_days"] >= 30.0 and "twin" in pr and "base" in pr,
       {"verdict": pr.get("verdict"), "neg_days": pr.get("accrued_negative_days"), "why": pr.get("why")})
 
+# ---- the REDUNDANCY layer (A375 Amendment 1, his "build it for redundancy" 2026-10-27): two readings in parallel, the
+# DISAGREEMENT is the output. Not a claim the twin beats the baseline (the keep test RETIRED that) -- a resilience /
+# divergence signal. Driven both ways: agreement is quiet, a divergence in EITHER direction is surfaced and told once.
+
+# agree_disagree: both ways -- a key both read is agreement; a key only one read is that one's disagreement.
+ad = W.agree_disagree([1, 2, 3], [2, 3, 4])
+check("WN1.33 agree_disagree splits into agree / twin_only / base_only (the disagreement is the output)",
+      ad["agree"] == [2, 3] and ad["twin_only"] == [1] and ad["base_only"] == [4], ad)
+ad_same = W.agree_disagree([5, 6], [5, 6])
+check("WN1.34 two readings that fully agree surface NO disagreement (agreement is the healthy state, not a fault)",
+      ad_same["twin_only"] == [] and ad_same["base_only"] == [], ad_same)
+
+# redundancy on a stream: a MORE-SENSITIVE spiking reading (fires earlier) flags a borderline silence the CUSUM
+# baseline passes -> a twin_only disagreement is surfaced (the second reading diverging, which is the whole point).
+RS0 = time.mktime((2026, 3, 1, 0, 0, 0, 0, 0, -1))
+rt = [RS0 + i * 600 for i in range(400)]                 # 10-min cadence
+rt += [rt[-1] + 5 * 600]                                 # a ~50-min gap: 5 median gaps -- below CUSUM's 6, above pace(4)
+rt += [rt[-1] + 600 * i for i in range(1, 200)]
+import tempfile as _tf  # noqa: E402
+rck = os.path.join(_tf.mkdtemp(), "r.jsonl")
+open(rck, "w", encoding="utf-8").write("\n".join('{"at": %r}' % t for t in rt))
+rep_sens = W.redundancy(rck, fire_gaps=4.0)              # pace fires at 4 gaps, cusum at 6 -> they must disagree on the 5-gap hole
+check("WN1.35 a more-sensitive spiking reading surfaces a borderline silence the baseline passes (a twin_only disagreement)",
+      rep_sens["state"] == "OK" and rep_sens["twin_only"] >= 1 and any(d["flagged_by"] == "spiking_twin_only" for d in rep_sens["disagreements"]),
+      {"twin_only": rep_sens.get("twin_only"), "base_only": rep_sens.get("base_only")})
+
+# on the matched readings (pace 6 gaps == cusum's 6-gap bound) the layer is quiet -- honest: same threshold, no divergence.
+rep_match = W.redundancy(rck, fire_gaps=6.0)
+check("WN1.36 at matched thresholds the two readings agree and the layer is quiet (a consistency guard, not noise)",
+      rep_match["state"] == "OK" and rep_match["twin_only"] == 0 and rep_match["base_only"] == 0, rep_match)
+
+# redundancy_tell: told once. First call writes the new disagreements; a second call at the same data tells nothing.
+rwit = os.path.join(os.path.dirname(rck), "spiking_witness.jsonl")
+t1 = W.redundancy_tell(RS0, path=rck, witness_path=rwit, fire_gaps=4.0)
+t2 = W.redundancy_tell(RS0, path=rck, witness_path=rwit, fire_gaps=4.0)
+check("WN1.37 redundancy_tell tells each disagreement ONCE: the first call writes them, a repeat tells nothing",
+      t1["told"] >= 1 and t2["told"] == 0, (t1.get("told"), t2.get("told")))
+
+# too few check-ins: UNKNOWN, nothing told (no data, no claim).
+rfew = os.path.join(os.path.dirname(rck), "few2.jsonl")
+open(rfew, "w", encoding="utf-8").write("\n".join('{"at": %r}' % (RS0 + i) for i in range(4)))
+check("WN1.38 redundancy on too few check-ins is UNKNOWN and tells nothing (A129: no data, no claim)",
+      W.redundancy(rfew)["state"] == "UNKNOWN" and W.redundancy_tell(RS0, path=rfew, witness_path=rwit)["told"] == 0, None)
+
 print("\n%d/%d passed" % (sum(results), len(results)))
 sys.exit(0 if all(results) else 1)

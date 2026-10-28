@@ -410,6 +410,7 @@ def beats_baseline(twin_fires, base_fires, incidents, negatives):
 
 WITNESS_STATE = os.path.join(HERE, "ops", "witness_state.json")
 NEGATIVES_LEDGER = os.path.join(HERE, "ops", "witness_negatives.jsonl")
+SPIKING_WITNESS = os.path.join(HERE, "ops", "spiking_witness.jsonl")   # the redundancy layer's disagreements, told once
 CONFIRM_LAG_S = 2 * 86400          # time younger than two days is not yet sealed as a verified negative
 PROVE_MIN_NEGATIVE_DAYS = 30.0     # below this the keep test is UNDETERMINED -- a thin negative set cannot measure specificity
 
@@ -546,9 +547,103 @@ def prove_or_retire(now, checkins_path=None, ledger_path=None, fire_gaps=6.0,
             "accrued_negative_days": round(neg_days, 2), "incidents": len(incidents), **detail}
 
 
+# ----------------------------------------------------------------- the REDUNDANCY layer (A375 Amendment 1, his 2026-10-27)
+#
+# His original ask, 2026-10-19: "a redundant layer of everything we've developed and grew", and 2026-10-27, after the
+# keep test RETIRED the pacemaker as a twin: "build it for redundancy." These are two different goals, and this is the
+# second one, built honestly as what it is:
+#   - the KEEP TEST (Amendment 3, prove_or_retire) asks "does the spiking twin add DETECTION the baseline misses?"
+#     On the phone stream the answer is no -- pacemaker and CUSUM agree (RETIRE). That verdict stands; nothing here
+#     overturns it or claims the twin is superior.
+#   - REDUNDANCY asks a different question: run both readings in PARALLEL so that a DISAGREEMENT shows one of them has
+#     gone blind (Amendment 1: "Disagreement is the output ... told once"). Two readings that AGREE is the healthy,
+#     expected state; the signal is where they DIFFER.
+# So agreement is not a failure here, it is the baseline condition. The value is resilience (if one detector breaks or
+# drifts, the other still reads) and the disagreement alarm (a bug or drift in one shows as divergence from the other).
+# HONEST LIMIT: the pacemaker and CUSUM read the SAME ledger, so this is ALGORITHMIC redundancy -- it catches a fault in
+# one detector's arithmetic, not a fault in the shared observation path. INDEPENDENT-sensing redundancy (the phone's own
+# view of the PC) is the path the review called for and waits on his yes for the phone branch. Reads only; acts on nothing.
+
+def agree_disagree(spiking_keys, baseline_keys):
+    """PURE. Given the two readings' fire KEYS on the same stream (e.g. rounded gap-starts), split them into: both
+    fired (agree), only the spiking twin fired (twin_only), only the baseline fired (base_only). The disagreements --
+    twin_only and base_only -- are redundancy's whole output: where the readings differ, one is blind."""
+    sp, bs = set(spiking_keys), set(baseline_keys)
+    return {"agree": sorted(sp & bs), "twin_only": sorted(sp - bs), "base_only": sorted(bs - sp)}
+
+
+def redundancy(path=None, fire_gaps=6.0):
+    """Read the phone stream TWICE -- the spiking pacemaker and the plain CUSUM -- and report their agreement and every
+    disagreement. It does NOT claim the twin beats the baseline (the keep test settled that: they agree on real
+    incidents, so the twin was RETIRED as a detector). This is the redundant LAYER his A375 asked for: a second reading
+    whose job is to DIVERGE when one of the two goes blind. Returns a dict with each disagreement's time and which
+    reading flagged it; acts on nothing."""
+    import time
+    times = checkin_times(path)
+    if len(times) < 10:
+        return {"state": "UNKNOWN", "why": "too few check-ins to set a cadence (%d)" % len(times)}
+    gap = median_gap(split_tune_score(times)[0]) or median_gap(times)
+    pace, cus = Pacemaker(gap, fire_gaps), Cusum(gap)
+    p_sil, c_sil = silences(times, pace.silent), silences(times, cus.alarm)
+    hours_of = {round(a): round(h, 1) for a, _b, h in p_sil}
+    hours_of.update({round(a): round(h, 1) for a, _b, h in c_sil})
+    ad = agree_disagree([round(a) for a, _b, _h in p_sil], [round(a) for a, _b, _h in c_sil])
+
+    def ev(keys, who):
+        return [{"stream": "phone_checkins", "at_gap_start": k, "flagged_by": who, "hours": hours_of.get(k),
+                 "when": time.strftime("%Y-%m-%d %H:%M", time.localtime(k))} for k in keys]
+
+    n = len(ad["agree"]) + len(ad["twin_only"]) + len(ad["base_only"])
+    return {
+        "state": "OK", "stream": "phone_checkins",
+        "readings": {"spiking": "pacemaker(%.1f gaps)" % fire_gaps, "baseline": "cusum"},
+        "agree": len(ad["agree"]), "twin_only": len(ad["twin_only"]), "base_only": len(ad["base_only"]),
+        "agreement_rate": round(len(ad["agree"]) / n, 3) if n else 1.0,
+        "disagreements": ev(ad["twin_only"], "spiking_twin_only") + ev(ad["base_only"], "baseline_only"),
+        "note": ("the two readings agree -- the expected healthy state; redundancy's value is resilience and the "
+                 "disagreement alarm, not added detection (the keep test RETIRED the twin as a detector)."),
+    }
+
+
+def redundancy_tell(now, path=None, witness_path=None, fire_gaps=6.0):
+    """Append only the NEW disagreements to the spiking-witness ledger -- told once (Amendment 1). Idempotent: a
+    disagreement already on record is not told again. Writes only; acts on nothing."""
+    witness_path = witness_path or SPIKING_WITNESS
+    rep = redundancy(path, fire_gaps)
+    if rep.get("state") != "OK":
+        return {"told": 0, "why": rep.get("why", rep.get("state"))}
+    told = set()
+    try:
+        with open(witness_path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                told.add((r.get("stream"), r.get("at_gap_start"), r.get("flagged_by")))
+    except OSError:
+        pass
+    new = [d for d in rep["disagreements"] if (d["stream"], d["at_gap_start"], d["flagged_by"]) not in told]
+    if new:
+        with open(witness_path, "a", encoding="utf-8") as fh:
+            for d in new:
+                fh.write(json.dumps(dict(d, told_at=float(now))) + "\n")
+    return {"told": len(new), "agreement_rate": rep["agreement_rate"],
+            "agree": rep["agree"], "twin_only": rep["twin_only"], "base_only": rep["base_only"]}
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     import time
+    if argv and argv[0] == "redundancy":
+        print(json.dumps(redundancy(), indent=1, default=str))
+        return 0
+    if argv and argv[0] == "tell":
+        print(json.dumps(redundancy_tell(time.time()), indent=1, default=str))
+        return 0
     if argv and argv[0] == "accrue":
         print(json.dumps(accrue_once(time.time()), indent=1, default=str))
         return 0
