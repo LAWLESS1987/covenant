@@ -2,6 +2,7 @@
 """WN1 -- the spiking witness, first piece (A375 Amendment 1, covenant_witness.py). Pure functions over synthetic
 and real check-in streams; nothing acts. His words, 2026-10-19: "improve the spiking system ... a redundant layer".
 Run: .venv\\Scripts\\python.exe -I -B test_wn1_witness.py"""
+import json
 import os
 import sys
 import time
@@ -198,6 +199,86 @@ check("WN1.24 beats_baseline KEEPS a twin that catches a baseline-missed inciden
       "rate; RETIRES one that restates the baseline; RETIRES one that catches the miss but at a worse FP rate",
       k1 is True and "kept" in w1 and k2 is False and "second mechanism" in w2 and k3 is False and "WORSE false-alarm" in w3,
       (k1, w1, k2, w2, k3, w3))
+
+# ---- the negatives PIPELINE (Amendment 3, still-to-build piece): accrue verified negatives read-only over time, then
+# prove-or-retire against them. Driven both ways, with the honesty margin (recent time is not sealed) and idempotency.
+import tempfile  # noqa: E402
+
+PS0 = time.mktime((2026, 1, 1, 0, 0, 0, 0, 0, -1))
+pstream = [PS0 + i * 600 for i in range(0, 20000)]      # ~139 days of 10-min check-ins, no incident
+now_far = pstream[-1] + 3 * 86400                        # "now" well after the last check-in
+LAG = 2 * 86400
+
+# seal_negatives, forward: old incident-free time IS sealed; with no incident the whole aged stream is one span.
+sp_far = W.seal_negatives(pstream, [], now_far, confirm_lag_s=LAG, sealed_until=0.0)
+check("WN1.25 seal_negatives seals the aged incident-free stream as one negative span",
+      len(sp_far) == 1 and abs(sp_far[0][0] - pstream[0]) < 1 and abs(sp_far[0][1] - pstream[-1]) < 1, sp_far)
+
+# seal_negatives, the honesty margin: with now at the last check-in, the most recent confirm_lag is NOT sealed (rule 9).
+sp_recent = W.seal_negatives(pstream, [], pstream[-1], confirm_lag_s=LAG, sealed_until=0.0)
+withheld_h = (pstream[-1] - sp_recent[-1][1]) / 3600.0 if sp_recent else 0.0
+check("WN1.26 seal_negatives withholds the most recent confirm_lag (never calls still-unfolding time clean)",
+      sp_recent and abs(withheld_h - 48.0) < 0.2, withheld_h)
+
+# idempotency: once sealed_until has advanced past the stream, there is nothing left to seal.
+sealed_to = sp_far[-1][1]
+check("WN1.27 seal_negatives is idempotent: re-sealing past the high-water mark yields nothing",
+      W.seal_negatives(pstream, [], now_far, LAG, sealed_to) == [], None)
+
+# shadow_alarms: a fire inside a sealed span is a false alarm; a fire outside every span (e.g. in an incident) is not.
+sa = W.shadow_alarms([150.0, 250.0, 350.0], [(100.0, 200.0), (300.0, 400.0)])
+check("WN1.28 shadow_alarms counts only fires that land inside a sealed negative span (the specificity record)",
+      sa == [150.0, 350.0], sa)
+
+# accrue_once end-to-end on temp paths: first run seals + writes the ledger and the mark; a second run at the same
+# clock seals nothing (the mark makes it idempotent -- no double counting).
+d = tempfile.mkdtemp()
+ck = os.path.join(d, "ck.jsonl")
+open(ck, "w", encoding="utf-8").write("\n".join('{"at": %r}' % t for t in pstream))
+st, lg = os.path.join(d, "state.json"), os.path.join(d, "neg.jsonl")
+r1 = W.accrue_once(now_far, checkins_path=ck, state_path=st, ledger_path=lg)
+lines1 = sum(1 for _ in open(lg, encoding="utf-8")) if os.path.exists(lg) else 0
+r2 = W.accrue_once(now_far, checkins_path=ck, state_path=st, ledger_path=lg)
+lines2 = sum(1 for _ in open(lg, encoding="utf-8")) if os.path.exists(lg) else 0
+check("WN1.29 accrue_once seals on the first run and NOTHING on a repeat run at the same clock (idempotent, no double count)",
+      r1["spans"] and r1["neg_seconds"] > 0 and lines1 == 1 and r2["spans"] == [] and lines2 == 1, (r1.get("neg_seconds"), lines1, lines2))
+
+# too few check-ins: accrue seals nothing and writes no files (no data, no claim).
+ck_few = os.path.join(d, "few.jsonl")
+open(ck_few, "w", encoding="utf-8").write("\n".join('{"at": %r}' % (PS0 + i) for i in range(5)))
+st_few, lg_few = os.path.join(d, "s2.json"), os.path.join(d, "n2.jsonl")
+r_few = W.accrue_once(now_far, checkins_path=ck_few, state_path=st_few, ledger_path=lg_few)
+check("WN1.30 accrue_once on too few check-ins seals nothing and writes no ledger (A129: no data, no claim)",
+      r_few.get("sealed_spans") == 0 and not os.path.exists(lg_few), (r_few, os.path.exists(lg_few)))
+
+# prove_or_retire, below threshold: a thin negative set is UNDETERMINED, never a verdict (rule 9).
+pr_thin = W.prove_or_retire(now_far, checkins_path=ck, ledger_path=os.path.join(d, "empty.jsonl"))
+check("WN1.31 prove_or_retire is UNDETERMINED on a thin negative set (specificity on too few negatives is not specificity)",
+      pr_thin["verdict"] == "UNDETERMINED" and pr_thin["accrued_negative_days"] == 0.0, pr_thin)
+
+# prove_or_retire, above threshold: a stream carrying the two known silences, with >=30 accrued negative-days, actually
+# runs the keep test and returns a KEEP or RETIRE verdict with the twin/baseline scores beside it.
+H0 = time.mktime((2026, 10, 1, 0, 0, 0, 0, 0, -1))
+hstream, t = [], H0
+while t < H0 + 20 * 86400:
+    lt = time.localtime(t)
+    if (lt.tm_mon, lt.tm_mday, lt.tm_hour) == (10, 8, 0):
+        t += 53 * 3600
+        continue
+    if (lt.tm_mon, lt.tm_mday, lt.tm_hour) == (10, 12, 6):
+        t += 22 * 3600
+        continue
+    hstream.append(t)
+    t += 600
+ck_h = os.path.join(d, "ckh.jsonl")
+open(ck_h, "w", encoding="utf-8").write("\n".join('{"at": %r}' % t for t in hstream))
+lg_h = os.path.join(d, "negh.jsonl")
+# a 40-day accrued negative span placed before the stream (non-overlapping with the incidents)
+open(lg_h, "w", encoding="utf-8").write(json.dumps({"spans": [[H0 - 50 * 86400, H0 - 10 * 86400]]}) + "\n")
+pr = W.prove_or_retire(H0 + 30 * 86400, checkins_path=ck_h, ledger_path=lg_h)
+check("WN1.32 prove_or_retire RUNS the keep test once >=30 negative-days have accrued (verdict + twin/baseline scores)",
+      pr["verdict"] in ("KEEP", "RETIRE") and pr["accrued_negative_days"] >= 30.0 and "twin" in pr and "base" in pr,
+      {"verdict": pr.get("verdict"), "neg_days": pr.get("accrued_negative_days"), "why": pr.get("why")})
 
 print("\n%d/%d passed" % (sum(results), len(results)))
 sys.exit(0 if all(results) else 1)

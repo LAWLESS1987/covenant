@@ -24,6 +24,7 @@ import json
 import math
 import os
 import statistics
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CHECKINS = os.path.join(HERE, "ops", "phone_checkins.jsonl")
@@ -392,7 +393,168 @@ def beats_baseline(twin_fires, base_fires, incidents, negatives):
     return kept, why, {"twin": tw, "base": bs}
 
 
+# ----------------------------------------------------------------- the negatives PIPELINE (Amendment 3, the still-to-build piece)
+#
+# Amendment 3's unanimous verdict (six models + Tetsu, 2026-10-19): a spiking twin can be KEPT only when it is measured
+# to beat CUSUM at an equal-or-better false-alarm rate on a held-out set of REAL negatives, and "normal operation IS the
+# negative set -- never manufacture an incident". That negative set does not exist until it has ACCRUED: the detectors
+# run read-only over weeks, every alarm logged-but-ignored, and only time that has safely passed is sealed as a trusted
+# negative. This is that accrual -- read-only, idempotent, acting on nothing. It writes one internal ledger and a
+# high-water mark; it never touches the highway, the gate, the ledger of record, or any outward surface. The keep test
+# (beats_baseline) above is the judge; this is the evidence it needs, accumulated honestly over time.
+#
+# The honesty margin (rule 9): a span is sealed only once it is OLDER than CONFIRM_LAG_S. Recent time is not yet
+# trustworthy -- an incident could still be unfolding in it, and calling a span clean before it is over is exactly the
+# false-negative the whole witness exists to avoid. And prove_or_retire returns UNDETERMINED until enough negative-days
+# have accrued: specificity measured on a thin negative set is not specificity (the A376-strike lesson, in code).
+
+WITNESS_STATE = os.path.join(HERE, "ops", "witness_state.json")
+NEGATIVES_LEDGER = os.path.join(HERE, "ops", "witness_negatives.jsonl")
+CONFIRM_LAG_S = 2 * 86400          # time younger than two days is not yet sealed as a verified negative
+PROVE_MIN_NEGATIVE_DAYS = 30.0     # below this the keep test is UNDETERMINED -- a thin negative set cannot measure specificity
+
+
+def known_incident_windows(times):
+    """The (start, end) epoch window of each KNOWN_SILENCE, read off the real stream: the gap that SPANS the silence's
+    date (the same test as covers()) and lasts at least its min_hours. A known silence not yet present in the stream is
+    simply absent -- never invented (the review's rule: do not manufacture an incident)."""
+    import time
+    out = []
+    for s in KNOWN_SILENCES:
+        for a, b in zip(times, times[1:]):
+            if (b - a) / 3600.0 < s["min_hours"]:
+                continue
+            if time.strftime("%Y-%m-%d", time.localtime(a)) <= s["from"] <= time.strftime("%Y-%m-%d", time.localtime(b)):
+                out.append((a, b))
+                break
+    return out
+
+
+def seal_negatives(event_times, incidents, now, confirm_lag_s=CONFIRM_LAG_S, sealed_until=0.0):
+    """PURE. The incident-free spans safe to trust as negatives this run: each extract_negatives span, clamped to start
+    at sealed_until (never re-seal already-sealed time) and to END before the horizon now-confirm_lag_s (never seal time
+    an unfolding incident could still be hiding in). Returns [(a, b)] with b > a."""
+    horizon = float(now) - float(confirm_lag_s)
+    out = []
+    for a, b in extract_negatives(event_times, incidents):
+        a2, b2 = max(float(a), float(sealed_until)), min(float(b), horizon)
+        if b2 > a2:
+            out.append((a2, b2))
+    return out
+
+
+def shadow_alarms(fire_times, spans):
+    """PURE. The fires that land inside sealed negative spans -- logged, never acted on. This is the specificity
+    (false-alarm) record a twin is later judged on. A fire inside a real incident is a detection, and is not counted
+    here."""
+    return [t for t in fire_times if _in_any(t, spans)]
+
+
+def _phone_fires(times, fire_gaps=6.0):
+    """The pacemaker and CUSUM alarm INSTANTS over the stream (last check-in + the detector's own latency), so each
+    fire can be attributed to the span it lands in. Cadence frozen from the tuning half (Amendment 1)."""
+    gap = median_gap(split_tune_score(times)[0]) or median_gap(times)
+    pace, cus = Pacemaker(gap, fire_gaps), Cusum(gap)
+    pace_fires = [a + pace.fires_after_s() for a, _b, _h in silences(times, pace.silent)]
+    cus_fires = [a + (cus.k + cus.h) for a, _b, _h in silences(times, cus.alarm)]
+    return gap, pace_fires, cus_fires
+
+
+def _read_json(path, default):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return default
+
+
+def accrued_spans(ledger_path=None):
+    """Every sealed negative span across the accrual ledger, as (a, b) epoch pairs -- the verified negative set that has
+    accumulated so far. Absent ledger -> empty (no data, no claim)."""
+    out = []
+    try:
+        with open(ledger_path or NEGATIVES_LEDGER, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                for a, b in r.get("spans", []):
+                    out.append((float(a), float(b)))
+    except OSError:
+        return []
+    return out
+
+
+def accrue_once(now, checkins_path=None, state_path=None, ledger_path=None,
+                confirm_lag_s=CONFIRM_LAG_S, fire_gaps=6.0):
+    """Read-only accrual, idempotent. Seal the phone stream's newly-trustworthy incident-free spans, record the
+    pacemaker/CUSUM false alarms inside them, and advance the high-water mark. Writes WITNESS_STATE and appends to
+    NEGATIVES_LEDGER only when there is something new to seal; acts on nothing else. Re-running with no new elapsed
+    time seals nothing (the mark makes it idempotent). Returns the record (or the reason it sealed nothing)."""
+    state_path = state_path or WITNESS_STATE
+    ledger_path = ledger_path or NEGATIVES_LEDGER
+    times = checkin_times(checkins_path)
+    if len(times) < 10:
+        return {"sealed_spans": 0, "why": "too few check-ins to set a cadence (%d)" % len(times)}
+    state = _read_json(state_path, {})
+    sealed_until = float(state.get("phone_sealed_until", 0.0))
+    incidents = known_incident_windows(times)
+    spans = seal_negatives(times, incidents, now, confirm_lag_s, sealed_until)
+    gap, pace_fires, cus_fires = _phone_fires(times, fire_gaps)
+    rec = {
+        "at": float(now), "stream": "phone_checkins",
+        "spans": [[round(a), round(b)] for a, b in spans],
+        "neg_seconds": round(sum(b - a for a, b in spans)),
+        "shadow_fa": {"pacemaker": len(shadow_alarms(pace_fires, spans)),
+                      "cusum": len(shadow_alarms(cus_fires, spans))},
+        "median_gap_min": round(gap / 60.0, 1), "confirm_lag_h": round(confirm_lag_s / 3600.0, 1),
+        "incidents_known": len(incidents),
+    }
+    if spans:
+        with open(ledger_path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec) + "\n")
+        state["phone_sealed_until"] = max(sealed_until, float(now) - float(confirm_lag_s))
+        with open(state_path, "w", encoding="utf-8") as fh:
+            json.dump(state, fh)
+    return rec
+
+
+def prove_or_retire(now, checkins_path=None, ledger_path=None, fire_gaps=6.0,
+                    min_negative_days=PROVE_MIN_NEGATIVE_DAYS):
+    """Amendment 3's keep test for the phone pacemaker, run against the ACCRUED negative set (not the naive whole-stream
+    one). Until at least min_negative_days of verified negatives have accrued, the honest verdict is UNDETERMINED (rule
+    9): the test is not run, because specificity measured on a thin negative set is not specificity. Reads only; it
+    decides nothing on its own -- it reports KEEP/RETIRE for a person to act on."""
+    spans = accrued_spans(ledger_path)
+    neg_days = sum(b - a for a, b in spans) / 86400.0
+    times = checkin_times(checkins_path)
+    if len(times) < 10:
+        return {"verdict": "UNDETERMINED", "why": "too few check-ins (%d)" % len(times),
+                "accrued_negative_days": round(neg_days, 2)}
+    if neg_days < min_negative_days:
+        return {"verdict": "UNDETERMINED", "accrued_negative_days": round(neg_days, 2),
+                "need_days": min_negative_days,
+                "why": "not enough verified negatives yet to measure specificity -- keep accruing"}
+    incidents = known_incident_windows(times)
+    _gap, pace_fires, cus_fires = _phone_fires(times, fire_gaps)
+    kept, why, detail = beats_baseline(pace_fires, cus_fires, incidents, spans)
+    return {"verdict": "KEEP" if kept else "RETIRE", "why": why,
+            "accrued_negative_days": round(neg_days, 2), "incidents": len(incidents), **detail}
+
+
 def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    import time
+    if argv and argv[0] == "accrue":
+        print(json.dumps(accrue_once(time.time()), indent=1, default=str))
+        return 0
+    if argv and argv[0] == "prove":
+        print(json.dumps(prove_or_retire(time.time()), indent=1, default=str))
+        return 0
     print(json.dumps({"phone_silence": report(), "ask_bursts": ask_burst_report(),
                       "moltbook_strikes": strike_report()}, indent=1, default=str))
     return 0

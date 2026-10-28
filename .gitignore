@@ -412,6 +412,9 @@ ops/model_asks.jsonl
 ops/model_asks.jsonl.prev
 # A294 (2026-10-07): the threefold witness's readings and its first-seen gaps
 ops/threefold_witness.json
+# A375 (2026-10-27): the spiking witness's negatives-accrual pipeline -- runtime state, accrues over months
+ops/witness_state.json
+ops/witness_negatives.jsonl
 ops/public_identity.json
 coinbase_balance.prev.json
 
