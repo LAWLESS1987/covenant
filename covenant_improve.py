@@ -66,18 +66,24 @@ def _keywords(c, k=4):
 
 def _grep_repo(terms, root=HERE):
     """Crude dedup: does any keyword already appear in a top-level .py source? Errs toward 'have' (a false
-    match rejects a duplicate, the safe direction). Bounded to top-level sources so a nightly run stays cheap."""
+    match rejects a duplicate, the safe direction). Bounded to top-level sources so a nightly run stays cheap.
+
+    Returns the FIRST "term @ basename" it matched (a truthy string), or "" when nothing matched. The string
+    is so a 'have' verdict can name WHICH keyword tripped the dedup: the blind spot is a single GENERIC word
+    (e.g. 'joins', 'promote') matching everywhere, and a 'have' that cannot say which word is unmeasurable --
+    run-check-adjust needs that evidence before the threshold is ever changed (2026-10-28, A375 side-finding)."""
     if not terms:
-        return False
-    pats = [re.compile(re.escape(t), re.I) for t in terms]
+        return ""
+    pats = [(t, re.compile(re.escape(t), re.I)) for t in terms]
     for path in glob.glob(os.path.join(root, "*.py")):
         try:
             src = open(path, encoding="utf-8", errors="ignore").read()
         except Exception:                                      # noqa: BLE001
             continue
-        if any(p.search(src) for p in pats):
-            return True
-    return False
+        for t, p in pats:
+            if p.search(src):
+                return "%s @ %s" % (t, os.path.basename(path))
+    return ""
 
 
 def _tombstoned(text, paths=TOMBSTONES):
@@ -109,8 +115,12 @@ def vet(c, grep=None, tomb=None):
     hit = tomb(c.get("idea", ""))
     if hit:
         return {"status": "recurrence", "why": hit}
-    if grep(_keywords(c)):
-        return {"status": "have", "why": "a capability keyword already appears in source (dedup)"}
+    g = grep(_keywords(c))
+    if g:
+        why = "a capability keyword already appears in source (dedup)"
+        if g is not True:                                      # real _grep_repo names the term; a True stub does not
+            why += ": %s" % g
+        return {"status": "have", "why": why}
     return {"status": "backlog", "why": "survived cheap vet -- needs a human/strong-seat call"}
 
 

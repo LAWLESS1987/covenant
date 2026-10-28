@@ -56,6 +56,14 @@ def main():
                 fails.append("vet: keyword-in-source should be have")
             if CI.vet(cases["backlog"], no_grep, no_tomb)["status"] != "backlog":
                 fails.append("vet: a genuine gap with a test should reach backlog")
+            # a 'have' must NAME the keyword that tripped the dedup, so a single-generic-word
+            # false-match is measurable (2026-10-28, A375 side-finding). Both ways:
+            named = CI.vet(cases["have"], lambda terms: "joins @ covenant_mycelium.py", no_tomb)
+            if named["status"] != "have" or "joins @ covenant_mycelium.py" not in named["why"]:
+                fails.append("vet: a have from a real dedup match must name the term in why, got %r" % named)
+            plain = CI.vet(cases["have"], lambda terms: True, no_tomb)
+            if ":" in plain["why"]:
+                fails.append("vet: a bare-True grep (stub) must leave why generic, got %r" % plain)
 
             # ---- flow: COLD START seeds, no digest ----
             _write(IM.CANDIDATES, [_row("a", "A " + long, "a1"), _row("b", "B " + long, "b2")])
