@@ -1274,7 +1274,15 @@
     "state\\.immunity\\.passes_today\\+' of '\\+state\\.immunity\\.per_day",
     "\"dry_run\": False, \"fixed\": False"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
   },
   {
@@ -1290,7 +1298,15 @@
     "one row per item with the door's answer",
     "done\\.add\\(json\\.loads\\(line\\)\\[\"id\"\\]\\)"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
   },
   {
@@ -1308,7 +1324,15 @@
     "capped by tasks, rounds and a 40-minute clock",
     "40 minutes in all"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all three in A348."
   },
   {
@@ -1322,7 +1346,15 @@
    "patterns": [
     "json\\.dumps\\(\\{k: v\\[2\\] for k, v in FAMILIES\\.items\\(\\)\\}\\)"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes it in A348."
   },
   {
@@ -1338,7 +1370,15 @@
     "\"Tetsu's model: %s\" % \\(model\\.get\\(\"file\"\\) or \"not found\"\\)",
     "more than 26 h old"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
   },
   {
@@ -1354,7 +1394,15 @@
     "which one dropped the record is UNDETERMINED",
     "after the one-slot server vanished with no"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
   },
   {
@@ -1368,7 +1416,15 @@
    "patterns": [
     "kept on each reply since A296; rows before it carry none"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes it in A348."
   },
   {
@@ -1386,7 +1442,15 @@
     "What is NOT here, on purpose: no remedy -- turning",
     "the gate judges that synthesis, and"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all three in A348."
   },
   {
@@ -1402,7 +1466,15 @@
     "A probe that held last time and does not hold now",
     "quiet\\) in \\(0,\\) or True\\)"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
   },
   {
@@ -1422,7 +1494,15 @@
     "first paragraphs, cut to the queue's size",
     "\"queued:\" \\+ str\\(hash\\(text\\)\\)"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all four in A348."
   },
   {
@@ -1436,7 +1516,15 @@
    "patterns": [
     "the one wrong-answer path this change adds"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "Kept as written in A333 (docs/KNOWN_ISSUES.md) and on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2)."
   },
   {
@@ -1452,7 +1540,15 @@
     "already in the environment wins, as it does for the node",
     "the same quorum the node and this proxy use"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "Kept in place in covenant_gate_proxy.py with the restatement citing A349-S3-AS-THE-NODE beside each; as written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
   },
   {
@@ -1468,7 +1564,15 @@
     "NEW conversation row \\(kind agent or council\\)",
     "refined on %d new row\\(s\\)\""
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
   },
   {
@@ -1482,7 +1586,15 @@
    "patterns": [
     "verdict=\"nothing changed\", now=now"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
   },
   {
@@ -1496,7 +1608,15 @@
    "patterns": [
     "\"SURVIVED\" if row\\[\"survives\"\\] else \"no\""
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
   },
   {
@@ -1512,7 +1632,15 @@
     "send the SAME request again in 30 s",
     "the same request again is"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
   },
   {
@@ -1526,7 +1654,15 @@
    "patterns": [
     "After it, pct% of every further profit"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
   },
   {
@@ -1540,7 +1676,15 @@
    "patterns": [
     "or the model \\(nothing could answer\\)"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
   },
   {
@@ -1554,7 +1698,15 @@
    "patterns": [
     "39 of the 41 held findings"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "Quoted in A349 (docs/KNOWN_ISSUES.md); the draft was never committed."
   },
   {
@@ -1570,7 +1722,15 @@
     "A dollar sign before a number now matches too",
     "FW1S4a a dollar amount is money"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "As written in A349 and quoted in A353 (docs/KNOWN_ISSUES.md), and on branch a349-s4-as-written-2026-10-14 (at 21025b2)."
   },
   {
@@ -1584,7 +1744,15 @@
    "patterns": [
     "paper rule\\(s\\) tried"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "As written before A353 (git 21025b2:covenant_persona.py) and quoted in A353 (docs/KNOWN_ISSUES.md)."
   },
   {
@@ -1598,7 +1766,15 @@
    "patterns": [
     "Nothing here touches the real ask log, teacher queue, grant, ledgers or model"
    ],
-   "allow": ["docs/KNOWN_ISSUES.md", "docs/CORRECTIONS.md", "docs/RETRACTED.json", "private/", "test_r1_retracted.py", "ONE_RUN.txt", "ONE_SWEEP.txt"],
+   "allow": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json",
+    "private/",
+    "test_r1_retracted.py",
+    "ONE_RUN.txt",
+    "ONE_SWEEP.txt"
+   ],
    "note_on_allow": "As written at 21025b2 and earlier (git show 21025b2:test_a284_fresh_context.py) and quoted in A350 (docs/KNOWN_ISSUES.md)."
   },
   {
@@ -1830,6 +2006,24 @@
     "ONE_SWEEP.txt"
    ],
    "note_on_allow": "The module docstring as written is preserved, runnable, on branch cxr2-freetext-leg-paths-as-written-2026-10-26. RETRACTED.json's verbatim array holds the exact wording (R1 liveness); the sweep transcripts hold what past runs printed, unedited."
+  },
+  {
+   "id": "A375-EQ-THRESHOLD",
+   "claim": "That retiring the phone pacemaker twin PROVED CUSUM is the sufficient statistic -- \"Amendment 3's prediction (CUSUM is the sufficient statistic on these streams) is now PROVEN on real accrued data rather than asserted\" (SPIKING_WITNESS.md Amendment 4 and KNOWN_ISSUES.md A375, 2026-10-27).",
+   "truth": "The pacemaker and the CUSUM it was compared against fire at the SAME threshold by construction: Pacemaker.silent is since_last/(6*gap) >= 1 <=> since_last >= 6*gap (covenant_witness.py:73-82); Cusum.alarm is max(0, since_last - 2*gap) >= 4*gap <=> since_last >= 6*gap (:93-100). Both fire at 6 median gaps, so the identical detections and identical 9 false alarms are guaranteed, not measured evidence, and the redundancy layer's 11/11 agreement is trivially expected. The RETIREMENT stands (the twin adds no detection on this stream); the EVIDENTIAL weight ('PROVEN ... sufficient statistic') does not. A real test needs two detectors that are not threshold-equivalent, or a timing signal with labelled incidents.",
+   "refuted_by": "An external reviewer (ChatGPT, GPT-5 thinking) reading the HF post draft on 2026-10-28, VERIFIED in covenant_witness.py (the Pacemaker.silent and Cusum.alarm firing conditions reduce to the same since_last >= 6*gap). The retraction is posted publicly at HF thread 180769 reply 2, and restated in SPIKING_WITNESS.md Amendment 5.",
+   "patterns": [
+    "PROVEN on real accrued data"
+   ],
+   "allow": [
+    "docs/SPIKING_WITNESS.md",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/RETRACTED.json"
+   ],
+   "note_on_allow": "The wording is kept verbatim in SPIKING_WITNESS.md Amendment 4 and KNOWN_ISSUES.md A375, each marked SUPERSEDED and pointing to SPIKING_WITNESS.md Amendment 5; CORRECTIONS.md ('Green that checked nothing') and this ledger hold it as the correction record. Nothing erased (rule 10).",
+   "note_on_patterns": "The exact retracted phrase 'PROVEN on real accrued data' occurs only in these record files. A near-variant 'PROVEN on real data' in an ops draft is different wording and not this claim, so the pattern stays narrow.",
+   "note_on_branch": "No as-written code branch: the retracted claim is PROSE in docs, not a runnable check, so the verbatim-in-tree record (above) is the preserved original, as with the confidence-trap retraction."
   }
  ]
 }

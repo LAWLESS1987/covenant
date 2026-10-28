@@ -339,6 +339,9 @@ catches exactly what CUSUM catches -- both catch both known silences, both raise
 these streams) is now PROVEN on real accrued data rather than asserted, with the specificity number that was
 previously unmeasured (~1 false alarm per 4.3 days). The phone-silence DETECTION still works (CUSUM); what is retired
 is the claim the spiking twin adds independent redundancy here.
+  **[SUPERSEDED 2026-10-28 -- see Amendment 5.** The word PROVEN here is an overclaim: the pacemaker and this CUSUM
+  are the SAME threshold by construction (both fire at 6 median gaps), so their identical results are guaranteed, not
+  evidence. The retirement stands; "PROVEN on real accrued data" does not. Wording kept verbatim above per rule 10.]
 
 **3. The REDUNDANCY layer (his "build it for redundancy").** A different goal from the keep test, built as such: the
 keep test asks "does the twin add DETECTION?" (no); redundancy runs both readings in PARALLEL so a DISAGREEMENT shows
@@ -376,3 +379,33 @@ hardware), latency no, gate no -- the same lesson this witness reached on its ow
 a spiking twin's provable win needs either a signal that is genuinely in the TIMING with labelled incidents to prove
 specificity, or neuromorphic HARDWARE where cost follows spikes. Three twin ideas this day each returned to that
 boundary. That is not spiking failing -- it is the keep test telling us, with evidence, where the investment pays.
+
+## Amendment 5 (2026-10-28): the equal-threshold retraction -- the comparison that could not fail
+
+Caught by an external reviewer (ChatGPT, GPT-5 thinking) reading the draft of the HF post, and VERIFIED in our own
+code. Amendment 4's phrase "**Amendment 3's prediction (CUSUM is the sufficient statistic on these streams) is now
+PROVEN on real accrued data**" is RETRACTED (the wording is kept verbatim in Amendment 4 above, marked SUPERSEDED, per
+rule 10).
+
+**Why it is wrong.** The pacemaker and the CUSUM we compared it against fire at the SAME threshold by construction:
+- `Pacemaker.silent`: `since_last / (6*gap) >= 1`  <=>  `since_last >= 6*gap`   (`covenant_witness.py:73-82`)
+- `Cusum.alarm`: `max(0, since_last - 2*gap) >= 4*gap`  <=>  `since_last >= 6*gap`   (`covenant_witness.py:93-100`)
+
+Both fire at 6 median gaps. On the one-dimensional silence signal the one-sided CUSUM reduces to the current gap, so
+the two are one test wearing two names. Their identical detections and identical 9 false alarms are GUARANTEED, not
+measured evidence of anything; the redundancy layer's 11/11 agreement (Amendment 4 piece 3) is trivially expected for
+the same reason. Presenting that agreement as a meaningful comparison between distinct methods would be exactly the
+failure the six-checks post is about -- a check that cannot fail.
+
+**What still stands.** Retiring the pacemaker as a twin is still correct -- it adds no detection on this stream. What
+is retracted is the EVIDENTIAL weight: we did not prove CUSUM is the sufficient statistic in general, and we did not
+measure that a spiking formulation adds nothing in general. We showed these two configurations are the same detector.
+
+**Restated honestly:** *On 38.7 accrued negative-days the pacemaker and its CUSUM baseline were threshold-equivalent
+by construction (both fire at 6 median gaps), so their identical results carry no evidential weight about spiking vs
+CUSUM. The pacemaker is retired as a twin because it adds no detection here; the general sufficiency question is
+untested on these streams.* A real test needs two detectors that are NOT threshold-equivalent, or a signal genuinely
+in the timing with labelled incidents.
+
+This retraction is posted publicly too (HF thread 180769, reply 2, 2026-10-28), because the near-miss -- an overclaim
+caught by an outside reader before it shipped as a finding -- is the useful part.
