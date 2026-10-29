@@ -157,6 +157,11 @@ INPUT_LEDGERS = {
     # disposition was edited, which is exactly what should be caught.
     "ops/have_dispositions.jsonl":
         "improve-miner 'have' dispositions; hashed on purpose, appended only at a committed disposition",
+    # 2026-10-28: the dedup benchmark -- a labelled set of candidate ideas (real_have / real_gap) the vet is
+    # scored against (covenant_improve.benchmark). A hand-authored fixture/record, read not written; hashed on
+    # purpose so a changed label is caught.
+    "ops/dedup_benchmark.jsonl":
+        "improve-miner dedup benchmark; a hand-authored labelled fixture, read not written",
 }
 
 

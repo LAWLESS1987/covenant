@@ -437,6 +437,10 @@ SUITES = [
     # substrings, so a keyword in a comment no longer false-kills a candidate. Both offline, both-ways.
     ("test_im4_circle_back.py",           60,  "SECURITY"),
     ("test_im5_dedup_precision.py",       60,  "SECURITY"),
+    # IM6 (2026-10-28): the dedup benchmark -- scores the vet over an author-labelled real_have/real_gap set and
+    # measures false-have and missed-duplicate rates (ChatGPT: measure before adding more precision). Harness
+    # pinned both ways; the live seed rate is a LIMIT measurement, not a pass/fail.
+    ("test_im6_dedup_benchmark.py",       60,  "SECURITY"),
     # A115 (2026-09-14), registered in the change that created it. Sits beside
     # the outage suite above because it guards the opposite mistake: that one
     # pins the watchdog NOTICING an outage, this one pins it not INVENTING one.

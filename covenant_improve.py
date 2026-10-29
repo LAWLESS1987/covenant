@@ -297,6 +297,46 @@ def circle_back(rows=None, dispositions=None, n_runs=CIRCLE_BACK_RUNS, backlog=B
             "ok": not escalate and not miner_defect}
 
 
+# ---- dedup benchmark (operator "build the benchmark"; ChatGPT asked to MEASURE before more precision) --------
+# A labelled set of candidate ideas, each adjudicated real_have (a capability we DO have -> the dedup should
+# flag it) or real_gap (we LACK it -> the dedup must NOT flag it). Running the vet over them MEASURES the two
+# error rates ChatGPT named: a false_have (a real_gap the dedup killed) and a missed_duplicate (a real_have the
+# dedup let through). "covered" = the vet treated it as already-present (status have OR recurrence). The seed
+# labels are AUTHOR-written, not blind independent adjudication (ops/dedup_benchmark.jsonl) -- so the live
+# numbers are INDICATIVE scaffolding, not a validated benchmark; the harness + metrics are the durable part.
+BENCHMARK = os.path.join(HERE, "ops", "dedup_benchmark.jsonl")
+_COVERED = ("have", "recurrence")
+
+
+def benchmark(rows=None, path=BENCHMARK, grep=None, tomb=None):
+    """Score the vet over a labelled set. Returns the two error rates + the per-row outcomes. refs/tomb inject
+    for the test; the default runs the real matcher over the live tree."""
+    rows = _load_backlog(path) if rows is None else rows
+    out = []
+    for r in rows:
+        v = vet({"kind": "gap", "maps": r.get("maps", ""), "idea": r.get("idea", ""),
+                 "test": r.get("test") or "present=green / removed=red"}, grep=grep, tomb=tomb)
+        covered = v["status"] in _COVERED
+        if r.get("label") == "real_have":
+            outcome = "caught" if covered else "missed_duplicate"
+        else:                                                  # real_gap
+            outcome = "false_have" if covered else "correct_pass"
+        out.append({"id": r.get("id"), "idea": r.get("idea"), "label": r.get("label"),
+                    "vet": v["status"], "outcome": outcome, "why": v["why"]})
+    nh = sum(1 for r in out if r["label"] == "real_have")
+    ng = sum(1 for r in out if r["label"] == "real_gap")
+    missed = [r for r in out if r["outcome"] == "missed_duplicate"]
+    false_have = [r for r in out if r["outcome"] == "false_have"]
+    by_status = {}
+    for r in out:
+        by_status[r["vet"]] = by_status.get(r["vet"], 0) + 1
+    return {"n": len(out), "n_real_have": nh, "n_real_gap": ng,
+            "missed_duplicates": [r["id"] for r in missed], "false_haves": [r["id"] for r in false_have],
+            "missed_dup_rate": (len(missed) / nh) if nh else None,
+            "false_have_rate": (len(false_have) / ng) if ng else None,
+            "by_status": by_status, "rows": out}
+
+
 def _default_digest(top, say):
     lines = ["Weekly improvement digest -- %d candidate(s) survived the cheap vet (a human/strong-seat makes "
              "the call; nothing is adopted automatically):" % len(top)]
