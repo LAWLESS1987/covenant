@@ -46,3 +46,26 @@ NOT matched; all concepts collected; unparseable file contributes nothing; the l
   "unresolved" match shows this is the next refinement; the circle-back holds it in the meantime.
 - **Full POSSIBLE_HAVE tri-state + triage** of escalations by evidence quality: a larger downstream change;
   the circle-back's disposition model already prevents silent discard.
+
+## Follow-up: concept COVERAGE (the specificity lever, chosen after measuring)
+Continuing "find flaws and consult", I went to add an idf/specificity filter but MEASURED first (df across 460
+top-level .py): the candidate's content terms are promote (df=0), joins (df=0), first-class (df=0), unresolved
+(df=1). So the false 'have' rested on 'unresolved' matching in ONE file -- it is RARE, not generic, so idf would
+NOT flag it. The real weaknesses: low concept COVERAGE (1 of 4 content terms matched) and semantics ('unresolved'
+is an unrelated variable). I put three levers to ChatGPT (GPT-5): (a) concept-coverage downgrade, (b) an LLM
+semantic judge, (c) neither.
+
+GPT-5 chose **(a), as a confidence DOWNGRADE, not evidence of absence.** Coverage is cheap, reproducible, and
+adds no unvalidated judge. Rejected (b) here: an LLM can mistake plausible code for an implemented capability,
+hallucinate equivalence, miss distributed implementations, and -- worst -- lend false semantic authority to
+another wrong dismissal. Failure modes of (a) it named: a genuine implementation may use only one term (synonyms,
+abstraction, naming); keyword counts treat correlated terms as independent; verbose descriptions lower coverage;
+top-level-only misses subdirs; and even 4/4 would not prove semantic equivalence. Its rule: keep the lexical
+evidence, compute coverage over distinct content concepts, route a single-term match on a multi-concept candidate
+to backlog/needs-human with the identifier+location attached; do NOT conclude 'not implemented'; keep the
+circle-back for the rest; then measure false-have / review-load / missed-duplicate rates before adding more.
+
+Implemented in `vet()`: a 'have' resting on a single matched term when the candidate has >=2 content concepts is
+downgraded to 'backlog' (the evidence is kept in `why`). The live 'promote unresolved joins' candidate is now
+`backlog` (needs a human), not a false 'have'. test_im5 12/12. The semantic-judge lever and a labelled
+false-have/review-load benchmark are the noted, un-built next steps.

@@ -155,9 +155,20 @@ def vet(c, grep=None, tomb=None):
         return {"status": "recurrence", "why": hit}
     g = grep(_keywords(c))
     if g:
-        why = "a capability keyword already appears in source (dedup)"
-        if g is not True:                                      # real _grep_repo names the term; a True stub does not
-            why += ": %s" % g
+        if g is not True:                                      # a real matcher names the matched term(s)
+            matched = {seg.split("@", 1)[0].strip() for seg in str(g).split(";") if "@" in seg}
+            content = _keywords(c)
+            if len(matched) == 1 and len(content) >= 2:
+                # Coverage downgrade (ChatGPT review, 2026-10-28): a single lone lexical match on a candidate
+                # with several distinct content concepts is too weak to call a 'have' -- it touches one concept
+                # and does not show the capability (the measured case: 'unresolved' df=1 matched, promote/joins/
+                # first-class df=0). Keep the lexical evidence and route to a human; do NOT conclude 'not
+                # implemented' (coverage measures how much of a claim the evidence touches, not whether it is true).
+                return {"status": "backlog", "why": "survived cheap vet -- only a single lexical match (%s), %d "
+                        "of %d content terms; needs a human/strong-seat call" % (g, len(matched), len(content))}
+            why = "a capability keyword already appears in source (dedup): %s" % g
+        else:
+            why = "a capability keyword already appears in source (dedup)"
         return {"status": "have", "why": why}
     return {"status": "backlog", "why": "survived cheap vet -- needs a human/strong-seat call"}
 
