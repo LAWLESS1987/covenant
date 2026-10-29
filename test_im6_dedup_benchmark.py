@@ -68,10 +68,12 @@ def main():
           % (live["missed_dup_rate"], live["missed_duplicates"] or "none"))
     fh_rec = [r["id"] for r in live["rows"] if r["outcome"] == "false_have" and r["vet"] == "recurrence"]
     fh_have = [r["id"] for r in live["rows"] if r["outcome"] == "false_have" and r["vet"] == "have"]
-    print("  LIMIT of the false positives, %d are from the loose RECURRENCE check (%s) and %d from the DEDUP (%s)"
+    print("  LIMIT of the false positives, %d are from the RECURRENCE check (%s) and %d from the DEDUP (%s)"
           % (len(fh_rec), fh_rec or "-", len(fh_have), fh_have or "-"))
-    print("  LIMIT recurrence is NOT covered by the circle-back guard -- a false recurrence silently discards a "
-          "real gap. Tightening _tombstoned and extending the circle-back to recurrence are the measured next steps.")
+    print("  LIMIT recurrence FIXED (A391): it now rides RETRACTED.json's narrow patterns, so it fires 0 here "
+          "(was 6 of 10, all false, shadowing the dedup); and the circle-back now re-verifies every recurrence, "
+          "so a false one is surfaced, never a silent drop. The remaining false-haves are all DEDUP (coverage>=2 "
+          "on coincidental generic identifiers) -- the next measured lever, and each is held by the circle-back.")
 
     ok = sum(R)
     print("\nIM6: %d/%d passed" % (ok, len(R)))

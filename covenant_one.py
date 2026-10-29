@@ -441,6 +441,11 @@ SUITES = [
     # measures false-have and missed-duplicate rates (ChatGPT: measure before adding more precision). Harness
     # pinned both ways; the live seed rate is a LIMIT measurement, not a pass/fail.
     ("test_im6_dedup_benchmark.py",       60,  "SECURITY"),
+    # IM7 (A391, 2026-10-29): recurrence rides docs/RETRACTED.json's narrow patterns (what R1 runs), not a 2-word
+    # prose scan over 18k lines that the benchmark showed fired on 6/10 and ALL false (shadowing the dedup, and
+    # silently discarding a real gap). The circle-back now re-verifies every recurrence: still-matching ->
+    # reconfirmed, no longer matching (legacy prose / restated) -> surfaced, so no silent drop. Both-ways, offline.
+    ("test_im7_recurrence_precision.py",  60,  "SECURITY"),
     # A115 (2026-09-14), registered in the change that created it. Sits beside
     # the outage suite above because it guards the opposite mistake: that one
     # pins the watchdog NOTICING an outage, this one pins it not INVENTING one.

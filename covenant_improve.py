@@ -14,7 +14,7 @@ Codex's rule). It does NOT claim a candidate is a real improvement; it filters o
 and leaves a human or a stronger seat the final call:
   - kind != gap            -> skip (have / stance / none / unparsed)
   - no both-ways test       -> needs-test (cannot earn a ring without one)
-  - matches a tombstone     -> recurrence (RETRACTED / KNOWN_ISSUES already covers it)
+  - re-states a RETRACTED claim -> recurrence (matches that retraction's narrow pattern -- what R1 enforces)
   - keyword already in src   -> have (dedup against the capability, not the idea)
   - else                     -> backlog (survived; needs a human/strong-seat call)
 
@@ -32,9 +32,7 @@ import covenant_improve_mine as IM
 import covenant_improve_extract as EX
 
 BACKLOG = os.path.join(HERE, "ops", "improve_backlog.jsonl")
-TOMBSTONES = (os.path.join(HERE, "docs", "RETRACTED.json"),
-              os.path.join(HERE, "docs", "KNOWN_ISSUES.md"),
-              os.path.join(HERE, "docs", "LOOKBACK_INDEX.md"))
+RETRACTED = os.path.join(HERE, "docs", "RETRACTED.json")   # the DESIGNED recurrence instrument (R1's ledger)
 DIGEST_CAP = 5
 DIGEST_WEEKDAY = 0          # Monday (time.gmtime().tm_wday); the weekly roll-up, not per-round
 _STOP = {"the", "that", "with", "from", "this", "into", "when", "which", "their", "about", "every",
@@ -124,21 +122,54 @@ def _grep_repo(terms, root=HERE):
     return "; ".join(matches)
 
 
-def _tombstoned(text, paths=TOMBSTONES):
-    """Return the first tombstone/known-issue line whose distinctive keyword appears in `text`, else None."""
-    terms = [w for w in re.findall(r"[a-zA-Z][a-zA-Z_-]{5,}", (text or "").lower()) if w not in _STOP]
-    if not terms:
-        return None
-    for path in paths:
-        if not os.path.exists(path):
-            continue
-        try:
-            for line in open(path, encoding="utf-8", errors="ignore"):
-                low = line.lower()
-                if sum(1 for t in terms if t in low) >= 2:     # two distinctive terms co-occurring = a real match
-                    return "%s: %s" % (os.path.basename(path), line.strip()[:120])
-        except Exception:                                      # noqa: BLE001
-            continue
+_RETRACTION_CACHE = {}
+
+
+def _retraction_patterns(path=RETRACTED):
+    """The narrow per-claim regexes from docs/RETRACTED.json -- the DESIGNED recurrence instrument, the very
+    patterns test_r1_retracted.py enforces (rule 10: 'a narrow pattern', one set per refuted claim). Returns
+    [(id, claim, compiled), ...]; cached by (path, mtime) so a nightly compiles them once."""
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return []
+    hit = _RETRACTION_CACHE.get(path)
+    if hit and hit[0] == mtime:
+        return hit[1]
+    out = []
+    try:
+        data = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    for r in data.get("retractions", []):
+        claim = (r.get("claim") or "").strip()
+        for p in r.get("patterns", []):
+            try:
+                out.append((r.get("id"), claim, re.compile(p, re.I)))
+            except re.error:
+                continue                                       # a malformed pattern is R1's problem to flag, not ours
+    _RETRACTION_CACHE[path] = (mtime, out)
+    return out
+
+
+def _tombstoned(text, path=RETRACTED):
+    """Return 'RETRACTED <id>: <claim>' if `text` RE-STATES a retracted claim (matches one of that retraction's
+    narrow patterns), else None.
+
+    REDESIGNED 2026-10-29 (A391). The old check flagged a 'recurrence' when any TWO >=6-char non-stopword terms
+    co-occurred on ONE line of RETRACTED.json + KNOWN_ISSUES.md + LOOKBACK_INDEX.md (18,858 lines of prose).
+    MEASURED on the dedup benchmark it fired on 6 of 10 candidates and ALL SIX were FALSE: function words slip
+    the length filter ('reserve'+'before' hit a line about preserving a check on a branch; 'retraction'+'beside'
+    hit the file HEADER; the real gap 'mobile push on a verdict flip' hit a line about re-judging blocks and was
+    SILENTLY DISCARDED). Same shape as the dedup substring bug -- a lexical co-occurrence in prose read as a
+    semantic match (rule 7 / A30). The designed instrument is RETRACTED.json's narrow patterns (what R1 runs); a
+    recurrence = re-stating a REFUTED claim. KNOWN_ISSUES/LOOKBACK carry no patterns and are OPEN defects, not
+    refuted claims -- a candidate matching one may be PROPOSING the fix, so they no longer force a 'recurrence'
+    (they fall through to the dedup/backlog -> a human). The hit names the retraction id so the circle-back can
+    re-verify it mechanically (the instrument is re-runnable, unlike a 'have's justification)."""
+    for rid, claim, rx in _retraction_patterns(path):
+        if rx.search(text or ""):
+            return "RETRACTED %s: %s" % (rid, claim[:110])
     return None
 
 
@@ -203,6 +234,7 @@ FALSE_MATCH_STOPWORD_K = 3                             # this many false_match h
 TERM_NAMING_FIX_ISO = "2026-10-28T13:29:21Z"           # f08ce10: 'have' verdicts name the term from here on
 _OUTCOMES = ("verified_have", "false_match", "unresolved")
 _HAVE_TERM = re.compile(r"dedup\)\s*:\s*(?P<term>[^@;]+?)\s*@\s*(?P<file>[^\s();]+)")   # first "term @ file"
+_RECURRENCE_ID = re.compile(r"RETRACTED\s+(?P<id>[^\s:]+)\s*:")                         # "RETRACTED A121: ..."
 
 
 def have_killing_term(why):
@@ -210,6 +242,23 @@ def have_killing_term(why):
     have did not name which keyword tripped the dedup."""
     m = _HAVE_TERM.search(why or "")
     return (m.group("term").strip(), m.group("file").strip()) if m else (None, None)
+
+
+def recurrence_retraction_id(why):
+    """Parse a 'recurrence' verdict's named retraction id from its `why` ('RETRACTED A121: ...'), or None for a
+    legacy verdict written by the old prose scan (which named a file, never a retraction id)."""
+    m = _RECURRENCE_ID.search(why or "")
+    return m.group("id").strip() if m else None
+
+
+def _recurrence_still_matches(idea, rid, path=RETRACTED):
+    """Does `idea` STILL match the named retraction's narrow patterns? The recurrence instrument is re-runnable
+    (unlike a have's justification), so the circle-back can MECHANICALLY reconfirm a recurrence. One that no
+    longer matches -- a crude legacy verdict, or a retraction later restated/removed -- is surfaced for re-vet,
+    so a false recurrence can no longer silently discard a real gap."""
+    if not rid:
+        return False
+    return any(r_rid == rid and rx.search(idea or "") for r_rid, _claim, rx in _retraction_patterns(path))
 
 
 def _load_backlog(path=BACKLOG):
@@ -265,15 +314,20 @@ def disposition_clears(d, today, root=HERE):
 
 
 def circle_back(rows=None, dispositions=None, n_runs=CIRCLE_BACK_RUNS, backlog=BACKLOG,
-                fix_iso=TERM_NAMING_FIX_ISO, sunset_runs=SUNSET_RUNS, disp_path=DISPOSITIONS, today=None):
-    """Read the have-Y claims back. Returns {'escalate','miner_defect','cleared','demote_terms','ok'}.
-    A 'have' is CLEARED only by a well-formed disposition keyed to its candidate id. Otherwise it is held to
-    an escalation window (n_runs; sunset_runs for grandfathered pre-fix rows) and, past it, ESCALATED. A
-    term-less have (not grandfathered) is a miner_defect. ok == nothing to escalate and no miner defect."""
+                fix_iso=TERM_NAMING_FIX_ISO, sunset_runs=SUNSET_RUNS, disp_path=DISPOSITIONS, today=None,
+                retracted=RETRACTED):
+    """Read the discard verdicts back -- BOTH the have-Y claims and the recurrence claims. Returns
+    {'escalate','miner_defect','stale_recurrence','cleared','reconfirmed','demote_terms','ok'}.
+    A 'have' is CLEARED only by a well-formed disposition keyed to its candidate id; otherwise it is held to an
+    escalation window (n_runs; sunset_runs for grandfathered pre-fix rows) and, past it, ESCALATED; a term-less
+    non-grandfathered have is a miner_defect. A 'recurrence' is re-verified MECHANICALLY against the named
+    retraction's patterns: one that still matches is reconfirmed (no human needed); one that no longer matches --
+    a crude legacy prose verdict, or a retraction since restated/removed -- is stale_recurrence (surfaced for
+    re-vet), unless a disposition clears it. ok == nothing escalated, no miner defect, no stale recurrence."""
     rows = _load_backlog(backlog) if rows is None else rows
     disp = load_dispositions(disp_path) if dispositions is None else dispositions
     today = today or time.strftime("%Y-%m-%d", time.gmtime())
-    escalate, miner_defect, cleared = [], [], []
+    escalate, miner_defect, cleared, stale_recurrence, reconfirmed = [], [], [], [], []
     fm = {}
     for d in disp.values():
         if d.get("outcome") == "false_match" and (d.get("term") or "").strip():
@@ -292,9 +346,23 @@ def circle_back(rows=None, dispositions=None, n_runs=CIRCLE_BACK_RUNS, backlog=B
         if _runs_after(r, rows) >= (sunset_runs if grandfathered else n_runs):
             escalate.append({"id": cid, "term": term, "file": file, "idea": r.get("idea"), "t": r.get("t"),
                              "grandfathered": grandfathered, "needs": "a disposition keyed to this candidate id"})
+    for r in (x for x in rows if x.get("vet") == "recurrence"):
+        cid = r.get("id")
+        d = disp.get(cid)
+        if d and disposition_clears(d, today):
+            cleared.append({"id": cid, "outcome": d.get("outcome")})
+            continue
+        rid = recurrence_retraction_id(r.get("why"))
+        if _recurrence_still_matches(r.get("idea"), rid, retracted):
+            reconfirmed.append({"id": cid, "rid": rid})       # a precise recurrence that still holds -- no human
+            continue
+        stale_recurrence.append({"id": cid, "rid": rid, "idea": r.get("idea"), "t": r.get("t"),
+                                 "needs": "re-vet: this 'recurrence' no longer matches a RETRACTED pattern "
+                                          "(a legacy prose verdict, or the retraction was restated)"})
     demote = sorted(t for t, c in fm.items() if c >= FALSE_MATCH_STOPWORD_K)
-    return {"escalate": escalate, "miner_defect": miner_defect, "cleared": cleared, "demote_terms": demote,
-            "ok": not escalate and not miner_defect}
+    return {"escalate": escalate, "miner_defect": miner_defect, "stale_recurrence": stale_recurrence,
+            "cleared": cleared, "reconfirmed": reconfirmed, "demote_terms": demote,
+            "ok": not escalate and not miner_defect and not stale_recurrence}
 
 
 # ---- dedup benchmark (operator "build the benchmark"; ChatGPT asked to MEASURE before more precision) --------
@@ -389,12 +457,17 @@ def nightly(say=print, ask=None, weekday=None, digest=None, backlog=BACKLOG, gre
         for u in cb["miner_defect"]:
             say("improve: CIRCLE-BACK miner-defect -- have '%s' named no killing term (re-vet; not a real gap)"
                 % ((u.get("idea") or "?")[:70]))
+        for s in cb["stale_recurrence"]:
+            say("improve: CIRCLE-BACK stale-recurrence -- '%s' was discarded as a recurrence but no longer "
+                "matches RETRACTED %s; re-vet (a real gap may have been silently dropped)"
+                % ((s.get("idea") or "?")[:70], s.get("rid") or "(no id -- legacy prose verdict)"))
     for t in cb["demote_terms"]:
         say("improve: CIRCLE-BACK vocabulary -- '%s' false-matched >=%d times; demote it to a dedup stopword"
             % (t, FALSE_MATCH_STOPWORD_K))
     return {"new": len(new), "counts": counts, "ready": len(ready), "digest_emitted": emitted,
             "circle_back_ok": cb["ok"], "escalate": len(cb["escalate"]), "miner_defect": len(cb["miner_defect"]),
-            "cleared": len(cb["cleared"]), "demote_terms": cb["demote_terms"]}
+            "stale_recurrence": len(cb["stale_recurrence"]), "cleared": len(cb["cleared"]),
+            "reconfirmed": len(cb["reconfirmed"]), "demote_terms": cb["demote_terms"]}
 
 
 def main(argv=None):
@@ -410,10 +483,14 @@ def main(argv=None):
                      ", grandfathered" if o.get("grandfathered") else ""))
         for u in cb["miner_defect"]:
             print("MINER-DEFECT  have '%s' named no killing term -- re-vet (%s)" % ((u.get("idea") or "?")[:70], u["t"]))
+        for s in cb["stale_recurrence"]:
+            print("STALE-RECURRENCE  '%s' no longer matches RETRACTED %s -- re-vet, a real gap may have been "
+                  "dropped (%s)" % ((s.get("idea") or "?")[:70], s.get("rid") or "(no id)", s["t"]))
         for t in cb["demote_terms"]:
             print("DEMOTE  '%s' false-matched >=%d times -- make it a dedup stopword" % (t, FALSE_MATCH_STOPWORD_K))
-        print("circle-back: %d cleared, %d escalate, %d miner-defect -> %s"
-              % (len(cb["cleared"]), len(cb["escalate"]), len(cb["miner_defect"]), "ok" if cb["ok"] else "FAILED"))
+        print("circle-back: %d cleared, %d reconfirmed, %d escalate, %d miner-defect, %d stale-recurrence -> %s"
+              % (len(cb["cleared"]), len(cb["reconfirmed"]), len(cb["escalate"]), len(cb["miner_defect"]),
+                 len(cb["stale_recurrence"]), "ok" if cb["ok"] else "FAILED"))
         return 0 if cb["ok"] else 1
     print(nightly())
     return 0
