@@ -150,6 +150,13 @@ INPUT_LEDGERS = {
     # was edited, which is exactly what this should catch.
     "ops/tetsu_consent.jsonl":
         "Tetsu's role-consent record; hashed on purpose, appended only at a committed consent decision",
+    # 2026-10-28: the improve-miner circle-back dispositions (covenant_improve.circle_back). A governance
+    # record: a human marks a 'have' verified_have / false_match / unresolved and commits it in the same
+    # breath; the circle-back guard only READS it, never writes it, so it does not dirty the tree the way an
+    # OUTPUT ledger does. Hashed on purpose: a changed hash on an existing row would mean a recorded
+    # disposition was edited, which is exactly what should be caught.
+    "ops/have_dispositions.jsonl":
+        "improve-miner 'have' dispositions; hashed on purpose, appended only at a committed disposition",
 }
 
 
