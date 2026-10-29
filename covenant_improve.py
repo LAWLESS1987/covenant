@@ -64,26 +64,64 @@ def _keywords(c, k=4):
     return out
 
 
-def _grep_repo(terms, root=HERE):
-    """Crude dedup: does any keyword already appear in a top-level .py source? Errs toward 'have' (a false
-    match rejects a duplicate, the safe direction). Bounded to top-level sources so a nightly run stays cheap.
+_CAMEL = re.compile(r"[A-Z]+(?![a-z])|[A-Z][a-z]+|[a-z]+|[0-9]+")
 
-    Returns the FIRST "term @ basename" it matched (a truthy string), or "" when nothing matched. The string
-    is so a 'have' verdict can name WHICH keyword tripped the dedup: the blind spot is a single GENERIC word
-    (e.g. 'joins', 'promote') matching everywhere, and a 'have' that cannot say which word is unmeasurable --
-    run-check-adjust needs that evidence before the threshold is ever changed (2026-10-28, A375 side-finding)."""
+
+def _code_identifiers(src):
+    """The identifier (NAME) tokens of a Python source -- CODE ONLY. tokenize drops comments and string/
+    docstring tokens, so prose never counts as a capability; Python keywords (def, class, ...) are dropped
+    too. A file that will not tokenize contributes nothing (conservative: fewer, not more, false 'have's)."""
+    import io
+    import keyword
+    import tokenize as _tok
+    out = set()
+    try:
+        for t in _tok.generate_tokens(io.StringIO(src).readline):
+            if t.type == _tok.NAME and not keyword.iskeyword(t.string):
+                out.add(t.string)
+    except (_tok.TokenError, IndentationError, SyntaxError, ValueError):
+        pass
+    return out
+
+
+def _components(identifier):
+    """An identifier split into its lowercase word parts (snake_case and camelCase) plus the whole thing, so a
+    keyword matches `resolve_joins` on 'joins' but a comment containing the English word 'joins' never does."""
+    parts = {identifier.lower()}
+    for chunk in identifier.split("_"):
+        for m in _CAMEL.finditer(chunk):
+            parts.add(m.group(0).lower())
+    return parts
+
+
+def _grep_repo(terms, root=HERE):
+    """Dedup against the CODE, not the prose. For each top-level .py, match each candidate keyword against the
+    file's identifier tokens at WORD level (snake/camel components), never as a raw-text substring. Returns
+    every distinct "term @ basename (code `identifier`)" it matched, joined by '; ' (a truthy string), or "".
+
+    Redesigned 2026-10-28 (ops/consult_dedup_precision_external_2026-10-28.md) after a 'have' false-killed a
+    real candidate: 'joins' had matched an English verb in a COMMENT via a case-insensitive SUBSTRING on the
+    first keyword only. ChatGPT + DeepSeek: match code identifiers not raw text (tokenize; snake/camel, not \\b),
+    collect ALL matched concepts, and a lexical match is evidence to INVESTIGATE -- never, on its own, proof. So
+    a 'have' from this is held by the circle-back guard for a disposition, not silently discarded. Still bounded
+    to top-level .py for a cheap nightly run; a no-match stays 'backlog' (needs a human call), never a confident
+    'new' -- absence of evidence in a partial scan is not evidence of absence (DeepSeek)."""
     if not terms:
         return ""
-    pats = [(t, re.compile(re.escape(t), re.I)) for t in terms]
-    for path in glob.glob(os.path.join(root, "*.py")):
+    termset = {t.lower() for t in terms}
+    matches, seen = [], set()
+    for path in sorted(glob.glob(os.path.join(root, "*.py"))):
         try:
             src = open(path, encoding="utf-8", errors="ignore").read()
         except Exception:                                      # noqa: BLE001
             continue
-        for t, p in pats:
-            if p.search(src):
-                return "%s @ %s" % (t, os.path.basename(path))
-    return ""
+        base = os.path.basename(path)
+        for ident in sorted(_code_identifiers(src)):
+            for t in sorted(termset & _components(ident)):
+                if (t, base) not in seen:
+                    seen.add((t, base))
+                    matches.append("%s @ %s (code `%s`)" % (t, base, ident))
+    return "; ".join(matches)
 
 
 def _tombstoned(text, paths=TOMBSTONES):
@@ -153,7 +191,7 @@ SUNSET_RUNS = 30                                       # grandfathered pre-fix h
 FALSE_MATCH_STOPWORD_K = 3                             # this many false_match hits on a term = a vocabulary bug
 TERM_NAMING_FIX_ISO = "2026-10-28T13:29:21Z"           # f08ce10: 'have' verdicts name the term from here on
 _OUTCOMES = ("verified_have", "false_match", "unresolved")
-_HAVE_TERM = re.compile(r"dedup\)\s*:\s*(?P<term>[^@]+?)\s*@\s*(?P<file>\S+)\s*$")
+_HAVE_TERM = re.compile(r"dedup\)\s*:\s*(?P<term>[^@;]+?)\s*@\s*(?P<file>[^\s();]+)")   # first "term @ file"
 
 
 def have_killing_term(why):

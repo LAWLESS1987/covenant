@@ -431,6 +431,12 @@ SUITES = [
     # flood), the vet downgrades every non-starter (no-test, tombstoned, keyword-in-source), and the weekly
     # digest fires CAPPED on its day and holds off-day. Door, grep and tombstone lookups stubbed; offline.
     ("test_im3_improve_nightly.py",       60,  "SECURITY"),
+    # IM4 (2026-10-28): the circle-back guard -- a 'have' verdict's killing term is read back and a 'have'
+    # with no disposition keyed to its candidate id is escalated, never auto-cleared on a coincidental commit
+    # (two outside reviews). IM5: the dedup matches CODE identifiers (tokenize, snake/camel), not prose or
+    # substrings, so a keyword in a comment no longer false-kills a candidate. Both offline, both-ways.
+    ("test_im4_circle_back.py",           60,  "SECURITY"),
+    ("test_im5_dedup_precision.py",       60,  "SECURITY"),
     # A115 (2026-09-14), registered in the change that created it. Sits beside
     # the outage suite above because it guards the opposite mistake: that one
     # pins the watchdog NOTICING an outage, this one pins it not INVENTING one.
