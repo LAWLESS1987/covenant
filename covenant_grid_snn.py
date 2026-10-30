@@ -193,9 +193,21 @@ def ewma_baseline_score(rows, now=None, window_s=WINDOW_S):
         b4 = float(np.nanmax(cc[np.triu_indices(cc.shape[0], k=1)])) if cc.size > 1 else 0.0
     else:
         b4 = 0.0
+    # B5: slope of the RAW setpoint value over time (family C monotone walk -> high |slope|;
+    # mean-reverting -> ~0). The |delta| encoding cannot see this, so read the rows directly.
+    spv = sorted((r.get("issued_utc", 0), float((r.get("magnitude") or {}).get("value", 0)))
+                 for r in rows if r.get("action") == "setpoint")
+    b5 = abs(float(np.polyfit(np.arange(len(spv)), [v for _, v in spv], 1)[0])) if len(spv) > 2 else 0.0
+    # B6: breaker alternation (family B oscillation -> adjacent ops almost always differ;
+    # a random benign mix -> ~0.5). Read the raw open/close sequence in time order.
+    bseq = [1 if r.get("action") == "breaker_open" else 0
+            for r in sorted(rows, key=lambda r: r.get("issued_utc", 0))
+            if r.get("action") in ("breaker_open", "breaker_close")]
+    b6 = float(np.mean([bseq[i] != bseq[i - 1] for i in range(1, len(bseq))])) if len(bseq) > 2 else 0.0
     return {"B1_ewma_shed": ewma(shed), "B2_cusum_shed": cusum,
             "B2_sustained_breaker": float(breaker.mean()),
-            "B3_setpoint_slope": b3, "B3b_shed_slope": b3b, "B4_crosszone_corr": b4}
+            "B3_setpoint_slope": b3, "B3b_shed_slope": b3b, "B4_crosszone_corr": b4,
+            "B5_setpoint_value_slope": b5, "B6_breaker_alternation": b6}
 
 
 # --------------------------------------------------------------- the witness

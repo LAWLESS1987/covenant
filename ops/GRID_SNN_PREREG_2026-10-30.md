@@ -100,3 +100,34 @@ guards against. **Conclusion unchanged and strengthened: NO-GO leading** — no 
 has been shown to need a different mechanism. Remaining before sealing: complete the
 B/C trivial detectors (expected to catch them) or run the trained net. Witness stays
 UNKNOWN. Recorded, not deleted.
+
+## VERDICT — sealed 2026-10-30: **NO-GO for the SNN witness**
+
+With the trivial baselines completed (B5 raw-setpoint-value slope, B6 breaker
+alternation added tick 7), **every synthetic attack family is caught by a one-line
+trivial detector** on the ≥5-seed held-out protocol:
+
+| family | best trivial baseline | test detection | test FA |
+|---|---|---|---|
+| A | B3b shed-slope | 0.97 ± 0.04 | ~0.047 |
+| B | B6 breaker-alternation | 1.00 ± 0.00 | ~0.047 |
+| C | B5 setpoint-value-slope | 1.00 ± 0.00 | ~0.020 |
+| D | B4 cross-zone-correlation | 1.00 ± 0.00 | ~0.013 |
+
+The best baseline is at or near the ceiling on every family, so the SNN **cannot
+clear the pre-registered ship bar** (beat the best baseline by >2σ AND ≥0.10 absolute)
+on any family — there is no headroom. The trained-net run is therefore **moot for a
+GO** and is not needed to seal this.
+
+**Fallback taken (prereg option b):** the SNN stays PARKED; `grid_pattern_anomaly`
+returns UNKNOWN (never a silent ABSENT). We do NOT ship the net as a witness — a
+redundant layer earns its place only as a *different* mechanism, and here a trivial
+detector already does the job ([[spiking-witness-a375]], [[snn-not-a-judge-feature]]).
+
+**Caveats recorded (not deleted):** (1) test FA is ~2–5% at n=60 — a small-sample
+threshold artifact; a larger-n run would tighten the baselines' FA toward ≤1%, it
+would not create SNN headroom. (2) This is **synthetic separability at matched
+marginals, NOT a field claim** — real within-bounds attacks are unseen (theater-risk
+#1). The trivial-baseline ensemble is the right witness *shape* if real telemetry
+ever validates it; until then no pattern witness ships live, and the gate's sole
+authority stays the deterministic C1–C7.
