@@ -228,3 +228,23 @@ do not fit in free memory) and `model_unmanaged` (a model server answers that th
 record of starting). Both are reads. Neither has a remedy: anything touching the model is
 `NEVER_AUTOMATIC`, and what to close to free memory is his. They make the road say what the daily
 cycle used to say once a day. The phone stays off this road until he and I go over it, as he asked.
+
+## Self-hosted mesh resilience (2026-10-30)
+
+The mesh now runs on our own infrastructure, so its coordinator and its git host are things
+that can fail — and the highway should notice. Two detectors read them every pass, each with
+an AUTO_REVERSIBLE remedy, because relaunching our own daemon is safe and reversible and
+touches nothing `NEVER_AUTOMATIC` (the same class as `restart_watchdog`):
+
+- `headscale_down` → `restart_headscale`: our own Tailscale control plane (headscale, in WSL).
+  `/health` answering is ABSENT; the launcher present but not answering is PRESENT.
+- `git_host_down` → `restart_git_host`: our own smart-HTTP git host (`git_http_server.py`, in
+  WSL). ANY HTTP response — even a 404 for an unknown repo path — means the process is alive
+  (ABSENT); only no response at all (a transport failure) is PRESENT, the restart-worthy state.
+  A restart cannot fix a misconfig and must never be triggered by one.
+
+Both are marked "deployed here" by their Startup launcher, so a clone or a CI machine that is
+not the host reads UNKNOWN, never a false alarm. The device wire between machines still waits
+for the operator; this only keeps our own services breathing. Driven both ways in
+`test_h1_highway.py` (H1hs, H1gh). As of 2026-10-30 the engine carries **34 detectors and 17
+remedies**, counted by discovery (`sorted(covenant_highway.DETECTORS)` / `.REMEDIES`).
