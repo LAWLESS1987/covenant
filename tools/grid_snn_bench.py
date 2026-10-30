@@ -167,9 +167,10 @@ def main():
         bl = max(set(names), key=names.count)
         print("family %s: in-bounds=%s  best baseline=%s  test detection=%.2f+/-%.2f  test FA=%.3f"
               % (fam, valid, bl, det.mean(), det.std(), fa.mean()))
-    print("\nRead: a family where a TRIVIAL baseline already hits ~1.0 detection at <=1% FA")
-    print("leaves the SNN nothing to beat (NO-GO there). The SNN's only candidate niche is a")
-    print("family still UNSOLVED by B1-B4; the trained-SNN comparison is the next step.")
+    print("\nVERDICT (sealed 2026-10-30, ops/GRID_SNN_PREREG_2026-10-30.md): a trivial baseline")
+    print("catches EVERY family, so the SNN clears no family's pre-registered bar -- NO-GO. The")
+    print("witness stays parked (grid_pattern_anomaly -> UNKNOWN). Synthetic separability only,")
+    print("NOT a field claim; a trained-net run is moot for a GO above a ceiling baseline.")
     return 0
 
 
