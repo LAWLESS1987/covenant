@@ -887,6 +887,26 @@ def main():
           "never PRESENT, and nothing left pending",
           len(_told) == _k and _seen_states == [H.ABSENT, H.ABSENT, H.ABSENT]
           and not json.load(open(_s)).get("pending"), (_seen_states, _told[_k:]))
+    # 2026-10-30: a run concludes 'failure' on an INCOMPLETE sweep (covenant_one exit 2), not only on a FAIL.
+    # On a fresh CI clone the node-dependent suites cannot run, so INCOMPLETE is the expected ceiling, nothing
+    # failed, and it must NOT read as "red on main" nor nag the direct line.
+    _k = len(_told)
+    _inc = ["RESULT: INCOMPLETE. Nothing failed; something was not measured.",
+            "test_a124_chain_syncable.py  needs a node database -- a NO-OP here"]
+    r_inc = H.detect_public_ci_red(get=_api([_run(40, "failure", 0.3), _run(39, "success", 2.0)], _inc, []),
+                                   now=_t0, cache=os.path.join(_cdir, "incomplete.json"), tell=_tell)
+    check("H1ci an INCOMPLETE run (failure conclusion, no FAIL line) is ABSENT, named INCOMPLETE, and not a red nag",
+          r_inc["state"] == H.ABSENT and r_inc["measured"].get("incomplete") is True and len(_told) == _k,
+          (r_inc["state"], r_inc["measured"].get("incomplete"), _told[_k:]))
+    _incfail = ["RESULT: INCOMPLETE. Nothing failed.", "suites not clean   1  -> test_x.py",
+                "      | FAIL  X1 a real failure sits alongside the unmeasured items"]
+    for _dt in (0, _R):
+        r_if = H.detect_public_ci_red(get=_api([_run(42, "failure", 0.2), _run(41, "success", 1.0)], _incfail, []),
+                                      now=_t0 + _dt, cache=os.path.join(_cdir, "incfail.json"), tell=_tell)
+    check("H1ci broken the other way: a real FAIL line alongside INCOMPLETE still fires PRESENT, not hidden",
+          r_if["state"] == H.PRESENT and any("FAIL  X1" in x for x in r_if["measured"]["failing"]),
+          r_if["measured"])
+
     check("H1ci public_ci_red has no remedy: the fix is a change to the code, and PRESENT reaches him as an alert",
           not [n for n, rr in H.REMEDIES.items() if "public_ci_red" in (rr.get("for") or [])])
 

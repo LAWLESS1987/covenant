@@ -1498,12 +1498,27 @@ def detect_public_ci_red(health=None, get=None, now=None, cache=None, tell=None)
                         red_since_sha=(streak[-1].get("sha") if streak else None),
                         red_since_is=("at least" if len(streak) == len(done) else "exact"))
         named = [x for x in measured["failing"] if x.startswith(("FAIL", "suites not clean"))][:4]
-        episode = "red:%s" % measured["red_since_sha"]
-        text = ("The public CI is red on main: %s%d finished run(s) since %s%s, the newest %s. %s"
-                % ("at least " if measured["red_since_is"] == "at least" else "", len(streak),
-                   measured["red_since_sha"], " or earlier" if measured["red_since_is"] == "at least" else "",
-                   newest.get("sha"), "; ".join(named) or "The annotation named no check."))
-        state = PRESENT
+        # 2026-10-30: a run concludes 'failure' when covenant_one exits 2 INCOMPLETE just as when it exits 1
+        # FAILED. On a fresh CI clone the node-dependent suites (test_xrp_live, test_a124_chain_syncable,
+        # test_covenant_app) cannot run, so INCOMPLETE is their expected steady state and NOTHING failed.
+        # Calling that "red on main" was false and nagged the direct line on every red streak for a non-failure.
+        # So when the annotation WAS read, names no FAIL/unclean line, and says INCOMPLETE: name it, do not alarm.
+        incomplete_only = (bool(measured["failing"]) and not named
+                           and "annotation_error" not in measured
+                           and any("INCOMPLETE" in x for x in measured["failing"]))
+        if incomplete_only:
+            measured.update(incomplete=True,
+                            why="newest finished CI run is INCOMPLETE -- node-dependent suites cannot run on a "
+                                "fresh clone; nothing failed, so this is the expected ceiling on CI, not a red")
+            episode, text, state = None, ("The public CI's newest main run is INCOMPLETE -- node-dependent "
+                                          "suites can't run on CI; nothing failed."), ABSENT
+        else:
+            episode = "red:%s" % measured["red_since_sha"]
+            text = ("The public CI is red on main: %s%d finished run(s) since %s%s, the newest %s. %s"
+                    % ("at least " if measured["red_since_is"] == "at least" else "", len(streak),
+                       measured["red_since_sha"], " or earlier" if measured["red_since_is"] == "at least" else "",
+                       newest.get("sha"), "; ".join(named) or "The annotation named no check."))
+            state = PRESENT
     elif age_h is not None and age_h > CI_SILENT_H:
         measured["why"] = ("nothing on main has finished for %.1f h, and the schedule runs every 2 h -- "
                            "a missing run is not a passing run" % age_h)
