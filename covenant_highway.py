@@ -2288,6 +2288,48 @@ def detect_model_drift(health=None, pin=None, repo=None, **kwargs):
     return {"state": ABSENT, "measured": {"pinned": len(pinned)}}
 
 
+HEADSCALE_HEALTH = "http://127.0.0.1:8080/health"
+
+
+def _headscale_launcher():
+    """The Startup launcher is both the always-on mechanism AND the deployed-here marker:
+    a machine without it (a clone, CI, a node that is not the control host) is not running
+    our control plane and is not meant to."""
+    appdata = os.environ.get("APPDATA") or ""
+    if not appdata:
+        return ""
+    return os.path.join(appdata, "Microsoft", "Windows", "Start Menu", "Programs",
+                        "Startup", "CovenantHeadscale.vbs")
+
+
+def detect_headscale_down(health=None, url=None, marker=None, **kwargs):
+    """Our own Tailscale control plane (headscale in WSL, 2026-10-30) is deployed on this
+    machine but not serving. Deployed-here is marked by the Startup launcher; a machine
+    without it is UNKNOWN, never PRESENT, so a clone or a non-control node never alarms.
+
+    Resilience for the self-hosted mesh. UNLIKE the takeover guards, this has an
+    AUTO_REVERSIBLE remedy (restart_headscale): relaunching our own daemon touches nothing
+    in NEVER_AUTOMATIC -- same class as restart_watchdog. /health passing is ABSENT; the
+    launcher present but /health not answering is PRESENT."""
+    url = url or HEADSCALE_HEALTH
+    marker = _headscale_launcher() if marker is None else marker
+    if not marker or not os.path.exists(marker):
+        return {"state": UNKNOWN, "measured": {"why": "headscale is not deployed on this machine "
+                                               "(no Startup launcher)"}}
+    try:
+        with urllib.request.urlopen(url, timeout=5) as r:
+            body = r.read(200).decode("utf-8", "replace")
+            code = getattr(r, "status", 200)
+        if code == 200 and "pass" in body:
+            return {"state": ABSENT, "measured": {"serving": True, "url": url}}
+        return {"state": PRESENT, "measured": {"why": "headscale answered but not healthy",
+                                              "code": code, "body": body[:80]}}
+    except Exception as e:                                   # noqa: BLE001
+        return {"state": PRESENT, "measured": {
+            "why": "headscale control plane is not answering -- the self-hosted mesh has no coordinator",
+            "url": url, "error": "%s: %s" % (type(e).__name__, str(e)[:120])}}
+
+
 DETECTORS = {
     "node_down": detect_node_down,
     "tetsu_cannot_answer": detect_tetsu_cannot_answer,
@@ -2299,6 +2341,9 @@ DETECTORS = {
     "head_commitment_broken": detect_head_commitment_broken,
     "consent_chain_broken": detect_consent_chain_broken,
     "model_drift": detect_model_drift,
+    # Our own Tailscale control plane (headscale) -- AUTO-repairable: restarting our own
+    # daemon is safe and reversible (restart_headscale), unlike the takeover guards above.
+    "headscale_down": detect_headscale_down,
     "stale_test_mesh": detect_stale_test_mesh,
     "defender_threat": detect_defender_threat,
     "defense_lapse": detect_defense_lapse,
@@ -2477,6 +2522,32 @@ def remedy_restart_watchdog(measured, dry_run=True):
     p = subprocess.run(["powershell", "-NoProfile", "-Command", ps], creationflags=_NOWIN,
                        cwd=HERE, capture_output=True, text=True, timeout=300)
     return p.returncode == 0, ((p.stdout or "") + (p.stderr or "")).strip()[-200:]
+
+
+def remedy_restart_headscale(measured, dry_run=True):
+    """STATELESS: relaunch our own Tailscale control plane via the SAME hidden Startup
+    launcher that logon uses, so the running headscale is the one on disk. Reversible;
+    touches nothing in NEVER_AUTOMATIC. (2026-10-30, the self-hosted mesh's resilience.)"""
+    import subprocess
+    vbs = _headscale_launcher()
+    if not vbs or not os.path.exists(vbs):
+        return False, "no headscale launcher on this machine to restart"
+    if dry_run:
+        return True, "would relaunch headscale via the Startup launcher (wscript, hidden)"
+    # end a stuck instance first -- exact name, never -f, so this process is never the target
+    subprocess.run(["wsl.exe", "-d", "Ubuntu", "--", "pkill", "-x", "headscale"],
+                   creationflags=_NOWIN, capture_output=True, timeout=30)
+    time.sleep(1)
+    subprocess.run(["wscript.exe", vbs], creationflags=_NOWIN, capture_output=True, timeout=30)
+    for _ in range(6):                                       # ~12 s for it to come up and answer /health
+        time.sleep(2)
+        try:
+            with urllib.request.urlopen(HEADSCALE_HEALTH, timeout=4) as r:
+                if getattr(r, "status", 200) == 200:
+                    return True, "headscale restarted and serving"
+        except Exception:                                    # noqa: BLE001
+            continue
+    return False, "relaunched but headscale did not answer /health within ~12 s"
 
 
 def remedy_dispatch_phone_build(measured, dry_run=True):
@@ -2987,6 +3058,12 @@ REMEDIES = {
                          "benefit": {"gains": ["the checks that are deployed are the checks running (P14)"],
                                      "cost": ["a gap of a few seconds with nothing watching the nodes"],
                                      "irreversible": []}},
+    "restart_headscale": {"fn": remedy_restart_headscale, "klass": AUTO_REVERSIBLE,
+                          "for": ["headscale_down"], "kind": "stateless",
+                          "touches": ["the headscale control-plane process (in WSL)"],
+                          "benefit": {"gains": ["our own Tailscale control plane keeps coordinating the mesh"],
+                                      "cost": ["a few seconds with the coordinator down; existing tunnels keep flowing"],
+                                      "irreversible": []}},
     "dispatch_phone_build": {"fn": remedy_dispatch_phone_build, "klass": AUTO_REVERSIBLE,
                              "for": ["phone_build_behind_core"], "kind": "stateless",
                              # The build takes about ten minutes; thirty is the

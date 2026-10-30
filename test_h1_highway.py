@@ -910,6 +910,49 @@ def main():
     check("H1ci public_ci_red has no remedy: the fix is a change to the code, and PRESENT reaches him as an alert",
           not [n for n, rr in H.REMEDIES.items() if "public_ci_red" in (rr.get("for") or [])])
 
+    # ---- H1hs: headscale_down + restart_headscale (2026-10-30) -----------------
+    # Resilience for our own Tailscale control plane. AUTO-repairable: restarting our own
+    # daemon is safe and reversible (unlike the ALARM-only takeover guards). Driven both
+    # ways with a stub /health and stub launcher markers, so no live headscale is needed.
+    import http.server as _hsrv, threading as _hth, socket as _hsk
+    _hsdir = tempfile.mkdtemp(prefix="h1hs_")
+    _hsmark = os.path.join(_hsdir, "CovenantHeadscale.vbs")
+    open(_hsmark, "w").write("x")
+
+    class _HsOK(_hsrv.BaseHTTPRequestHandler):
+        def do_GET(self):                                         # noqa: N802
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"status":"pass"}')
+
+        def log_message(self, *a):
+            pass
+
+    _hsd = _hsrv.HTTPServer(("127.0.0.1", 0), _HsOK)
+    _hp = _hsd.server_address[1]
+    _htt = _hth.Thread(target=_hsd.serve_forever, daemon=True)
+    _htt.start()
+    try:
+        d = H.detect_headscale_down(url="http://127.0.0.1:%d/health" % _hp, marker=_hsmark)
+        check("H1hs deployed + /health passing -> ABSENT", d["state"] == H.ABSENT, str(d))
+    finally:
+        _hsd.shutdown()
+    _s = _hsk.socket()
+    _s.bind(("127.0.0.1", 0))
+    _dp = _s.getsockname()[1]
+    _s.close()
+    d = H.detect_headscale_down(url="http://127.0.0.1:%d/health" % _dp, marker=_hsmark)
+    check("H1hs deployed but the control plane is DOWN -> PRESENT", d["state"] == H.PRESENT, str(d))
+    d = H.detect_headscale_down(url="http://127.0.0.1:%d/health" % _dp,
+                                marker=os.path.join(_hsdir, "absent.vbs"))
+    check("H1hs not deployed here (no launcher) -> UNKNOWN, never a false alarm on a clone/CI",
+          d["state"] == H.UNKNOWN, str(d))
+    check("H1hs restart_headscale is AUTO_REVERSIBLE and answers headscale_down",
+          H.REMEDIES["restart_headscale"]["klass"] == H.AUTO_REVERSIBLE
+          and "headscale_down" in H.REMEDIES["restart_headscale"]["for"])
+    check("H1hs restart_headscale dry_run acts on nothing -- just reports intent",
+          H.remedy_restart_headscale({}, dry_run=True)[0] is True)
+
     # ---- H1pb: phone_build_failed (2026-09-27), the same stub API and clock --
     # dispatch_phone_build was told "accepted (HTTP 204)" and nothing ever read
     # whether the build it asked for arrived: three failed on a full artifact
