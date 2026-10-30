@@ -131,3 +131,24 @@ marginals, NOT a field claim** — real within-bounds attacks are unseen (theate
 #1). The trivial-baseline ensemble is the right witness *shape* if real telemetry
 ever validates it; until then no pattern witness ships live, and the gate's sole
 authority stays the deterministic C1–C7.
+
+## Trained-net confirmation (2026-10-30 16:29, `tools/grid_snn_train.py`, spiking-lab venv: torch 2.14.1+cpu, snntorch 1.0.0)
+
+Small LIF net (10→32→1 Leaky, BCE on mean membrane), 5 seeds, train/val/test split,
+threshold at the 99th percentile of held-out benign val scores:
+
+| family | trained SNN test detection | test FA | best trivial baseline |
+|---|---|---|---|
+| A | 1.00 ± 0.00 | 0.010 | B3b shed-slope 0.97 ± 0.04 (FA 0.047) |
+| B | **0.06 ± 0.04** | 0.110 | B6 alternation 1.00 |
+| C | 1.00 ± 0.00 | 0.020 | B5 value-slope 1.00 |
+| D | 0.99 ± 0.02 | 0.030 | B4 cross-zone 1.00 (FA 0.013) |
+| D held-out (trained on A,B,C) | 0.98 | **0.100** | — |
+
+Against the ship bar: the largest gain over the best baseline is +0.03 (A) — below both
+the 0.10 absolute floor and 2× pooled std; the net is far WORSE on B (the encoding drops
+open/close ORDER, which the one-line alternation baseline reads directly), ties C,
+trails D, and the held-out-family test fails the ≤1% FA operating point (10%).
+**VERDICT stands, now measured: NO-GO.** The witness stays parked (UNKNOWN). Weights were
+NOT saved to `ops/grid_snn_weights.npz` — an unproven net is not shipped as a witness.
+Recorded, not deleted.
