@@ -186,3 +186,13 @@ protocol driver that puts the signature check inside itself.
 - `python verify_grid_ledger.py` (standalone; a stranger can run it beside a clone)
 - `python test_gg1_grid_guard.py` — every guard driven **both ways** (attack →
   red, remove → green), 37/37.
+- `python test_gs1_grid_snn.py` — the optional ALARM-only SNN witness
+  (`covenant_grid_snn.py`, detector `grid_pattern_anomaly`), 11/11: boundary
+  purity (`authorize()` byte-identical with the witness present or absent),
+  never-authorize (a screaming witness changes no decision), source-invariant
+  (`authorize()` never references the witness), UNKNOWN-never-pass. The witness
+  is a *different-mechanism* second eye on the stream of already-honored commands
+  — the one surface C1–C7 can't see (in-bounds attack *patterns*). It returns
+  **UNKNOWN until a sealed training run** (`ops/GRID_SNN_PREREG_2026-10-30.md`)
+  earns weights that beat trivial baselines; an unproven net is never shipped as
+  a witness, and it can only recommend a HOLD a person must see — never actuate.

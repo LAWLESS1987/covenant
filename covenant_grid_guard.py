@@ -546,6 +546,24 @@ def detect_grid_authz_channel_lost(now=None, path=HEARTBEAT, **kw):
                note="authorization heartbeat stale -> gateway should be latched to safe-state hold")
 
 
+def detect_grid_pattern_anomaly(envelope=None, now=None, ledger=None, **kw):
+    """ALARM-only, OPTIONAL redundant SNN witness (covenant_grid_snn) over the
+    stream of ALREADY-honored commands -- a different-mechanism eye on the one
+    thing C1..C7 cannot see: an attack made of individually in-bounds commands.
+    Deferred import so the guard never hard-depends on it or on numpy/torch;
+    absent or erroring -> UNKNOWN (never ABSENT: an absent witness is not 'all
+    clear', covenant_highway P20). It can recommend a HOLD a person must SEE; it
+    is NEVER called by authorize() (a tested invariant, test_gs1)."""
+    try:
+        from covenant_grid_snn import pattern_anomaly_state
+    except Exception:  # noqa: BLE001
+        return _st(UNKNOWN, note="snn witness unavailable (optional module/deps absent)")
+    try:
+        return pattern_anomaly_state(envelope=envelope, now=now, ledger=ledger)
+    except Exception as e:  # noqa: BLE001
+        return _st(UNKNOWN, note="snn witness error: %s" % type(e).__name__)
+
+
 GRID_DETECTORS = {
     "grid_command_unauthenticated": detect_grid_command_unauthenticated,
     "grid_command_replay": detect_grid_command_replay,
@@ -553,6 +571,7 @@ GRID_DETECTORS = {
     "grid_interlock_breach": detect_grid_interlock_breach,
     "grid_ledger_broken": detect_grid_ledger_broken,
     "grid_authz_channel_lost": detect_grid_authz_channel_lost,
+    "grid_pattern_anomaly": detect_grid_pattern_anomaly,   # ALARM-only SNN witness
 }
 
 # The grid words that must join covenant_highway.NEVER_AUTOMATIC at commit time so

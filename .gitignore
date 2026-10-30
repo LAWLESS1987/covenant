@@ -278,6 +278,7 @@ ops/own_work_state.json
 ops/grid_commands.jsonl
 ops/grid_commands.chain.jsonl
 ops/grid_authz_heartbeat.jsonl
+ops/grid_snn_weights.npz
 ops/pause/
 # Node A's off-box peers (the phone's tailnet address), read by covenant_watchdog.py
 # and covenant_prod.bat alike, so neither public file carries the address.
