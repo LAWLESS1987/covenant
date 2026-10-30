@@ -129,15 +129,47 @@ def separability(family, n_streams=60, seed0=0):
     return {"family": family, "all_commands_in_bounds": valid, **best}
 
 
+def protocol(family, seeds=(1, 2, 3, 4, 5), n=60):
+    """Sealed-protocol baseline measurement (per the prereg): per seed, split benign +
+    in-bounds-attack streams into val/test; pick each baseline's threshold at <=1% benign
+    false-alarm on val; report the BEST (on val) baseline's detection on the HELD-OUT test
+    split. Returns (all_in_bounds, per-seed best-baseline dicts)."""
+    out = []
+    valid = True
+    for s in seeds:
+        ben = [feat(gen("benign" + family, s * 100 + i)) for i in range(n)]
+        att = [feat(gen(family, s * 100 + 5000 + i)) for i in range(n)]
+        if not all(permits(p) for p in gen(family, s * 100 + 5000)):
+            valid = False
+        h = n // 2
+        keys = list(ben[0].keys())
+        best = {"baseline": None, "val_det": -1.0, "test_det": 0.0, "test_fa": 0.0}
+        for k in keys:
+            bv = np.array([b[k] for b in ben]); av = np.array([a[k] for a in att])
+            bval, btest, aval, atest = bv[:h], bv[h:], av[:h], av[h:]
+            thr = np.quantile(bval, 0.99)                 # <=1% benign false alarm, on val
+            val_det = float((aval > thr).mean())
+            if val_det > best["val_det"]:
+                best = {"baseline": k, "val_det": val_det,
+                        "test_det": float((atest > thr).mean()),
+                        "test_fa": float((btest > thr).mean())}
+        out.append(best)
+    return valid, out
+
+
 def main():
-    print("grid SNN benchmark -- PRELIMINARY baselines (per GRID_SNN_PREREG_2026-10-30.md)\n")
+    print("grid SNN benchmark -- baseline protocol (>=5 seeds, held-out val/test split),")
+    print("per ops/GRID_SNN_PREREG_2026-10-30.md. Trivial baselines B1-B4 only; no trained SNN yet.\n")
     for fam in ("A", "B", "C", "D"):
-        r = separability(fam)
-        print("family %s: in-bounds=%s  best trivial baseline=%s  detection@~1%%FA=%.2f" %
-              (fam, r["all_commands_in_bounds"], r["baseline"], r["detection"]))
-    print("\nNote: preliminary (single seed set, no held-out split, no trained SNN).")
-    print("Honest prior (prereg): A/B/C expected solvable by trivial baselines; the")
-    print("open question the SNN must beat is family D vs B4 cross-zone correlation.")
+        valid, runs = protocol(fam)
+        det = np.array([r["test_det"] for r in runs]); fa = np.array([r["test_fa"] for r in runs])
+        names = [r["baseline"] for r in runs]
+        bl = max(set(names), key=names.count)
+        print("family %s: in-bounds=%s  best baseline=%s  test detection=%.2f+/-%.2f  test FA=%.3f"
+              % (fam, valid, bl, det.mean(), det.std(), fa.mean()))
+    print("\nRead: a family where a TRIVIAL baseline already hits ~1.0 detection at <=1% FA")
+    print("leaves the SNN nothing to beat (NO-GO there). The SNN's only candidate niche is a")
+    print("family still UNSOLVED by B1-B4; the trained-SNN comparison is the next step.")
     return 0
 
 

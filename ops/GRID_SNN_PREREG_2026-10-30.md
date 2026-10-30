@@ -74,3 +74,15 @@ saturated by a trivial detector, which *strengthens the NO-GO prior*. A/B/C scor
 0.00 under the current crude features (feature/generator refinement is a later
 tick). This is a signal, not the verdict; the full ≥5-seed held-out protocol and
 the trained-SNN comparison remain. Recorded, not deleted (tombstone-everything).
+
+**5-seed held-out protocol (2026-10-30, `tools/grid_snn_bench.py` `protocol()`):**
+over seeds 1–5, with a val/test split and each baseline's threshold set at ≤1%
+benign false-alarm on val, the trivial **B4 cross-zone-correlation baseline detects
+family D at 1.00 ± 0.00 on the held-out test split (test FA ≈ 0.013)** — this
+forecloses the SNN's one pre-registered candidate niche. Families A/B/C score
+0.00 ± 0.00 for the best trivial baseline (feature/generator tuning, or genuinely
+low matched-marginal signal — open, a later tick). **Leading conclusion: NO-GO for
+the SNN as framed** — a trivial detector already ceilings family D, and A/B/C were
+pre-registered as baseline territory, not SNN territory. To be confirmed by the
+trained-net comparison (spiking-lab venv) before the verdict is sealed; the witness
+stays UNKNOWN until then. Recorded, not deleted.
