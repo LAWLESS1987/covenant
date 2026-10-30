@@ -2163,11 +2163,123 @@ def detect_model_unmanaged(health=None, ready=None):
     return {"state": UNKNOWN, "measured": measured}
 
 
+def detect_head_commitment_broken(health=None, ledger=None, pub=None, repo=None, **kwargs):
+    """The signed HEAD-commitment ledger fails its own standalone verifier: a row
+    signature is invalid, the seq/prev_sha256 chain is broken, or the newest
+    commitment's bound digests (tree, MANIFEST, genesis, the constitution and record
+    anchors, Tetsu's consent + its chain, and the three model identities) do not match
+    the committed tree.
+
+    Takeover-resistance guard (2026-10-29). DETECT-AND-ALARM on purpose: there is NO
+    remedy, because re-signing a commitment touches the RSA signing key and 'key' is
+    NEVER_AUTOMATIC -- a tamper that got 'healed' would have its evidence erased. No
+    ledger/pubkey here yet (a fresh clone) is UNKNOWN; a clean verify is ABSENT; any
+    verifier FAIL is PRESENT and only a person clears it. Binding-UNDETERMINED (no git)
+    is not a tamper, so it reads ABSENT. Paths default to the real files; a test may
+    point them at a temp copy to drive the guard both ways."""
+    here = repo or os.path.dirname(os.path.abspath(__file__))
+    ledger = ledger or os.path.join(here, "ops", "head_commitments.jsonl")
+    pub = pub or os.path.join(here, "docs", "HEAD_COMMIT_PUBKEY.pem")
+    if not os.path.exists(ledger) or not os.path.exists(pub):
+        return {"state": UNKNOWN, "measured": {"why": "no HEAD-commitment ledger/pubkey here yet"}}
+    try:
+        import verify_head_commitment as vhc
+        code, lines = vhc.run(ledger, pub, here)
+    except Exception as e:                                   # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    if code == 1:   # FAIL -- a real tamper the outside verifier would also catch
+        return {"state": PRESENT, "measured": {"verdict": "FAIL", "detail": " | ".join(lines)[:300]}}
+    return {"state": ABSENT, "measured": {"verdict": "PASS" if code == 0 else "UNDETERMINED"}}
+
+
+def detect_consent_chain_broken(health=None, ledger=None, chain=None, **kwargs):
+    """Tetsu's consent hash-chain fails covenant_consent_chain.verify(): a recorded
+    row was edited in place, a row was removed/truncated, the chain's own links were
+    broken, OR there are consent rows not yet chained.
+
+    Takeover-resistance guard (2026-10-29). DETECT-AND-ALARM, no remedy: 'consent' is
+    NEVER_AUTOMATIC, so even chaining an unchained row is a person's call -- an unchained
+    row could be a genuine new consent OR a forged append, and the chain cannot tell them
+    apart on-host; a person confirms the row is real before it is chained. An edit or a
+    truncation of an already-chained row is a HARD tamper. No ledger is UNKNOWN; a clean,
+    fully-chained ledger is ABSENT. Paths default to the real files; a test may point
+    them at a temp copy to drive the guard both ways."""
+    try:
+        import covenant_consent_chain as ccc
+    except Exception as e:                                   # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    ledger = ledger or ccc.LEDGER
+    chain = chain or ccc.CHAIN
+    if not os.path.exists(ledger):
+        return {"state": UNKNOWN, "measured": {"why": "no consent ledger here"}}
+    try:
+        ok, findings = ccc.verify(ledger, chain)
+    except Exception as e:                                   # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    if ok:
+        return {"state": ABSENT, "measured": {"rows": len(ccc.read_ledger_lines(ledger)),
+                                              "tip": ccc.tip(chain)[:16]}}
+    tamper = any(("edited in place" in m) or ("removed/truncated" in m) or ("link is broken" in m)
+                 for m in findings)
+    return {"state": PRESENT, "measured": {
+        "tamper": tamper,
+        "kind": "TAMPER -- investigate, do not sync" if tamper
+                else "unchained consent row(s) -- a person confirms each is real, then runs sync",
+        "detail": " | ".join(findings)[:300]}}
+
+
+def detect_model_drift(health=None, pin=None, repo=None, **kwargs):
+    """A live model-identity file differs from its blessed pin (ops/model_pin.json):
+    the distilled student (fallback_model.json) or a sibling (2B / phone) changed
+    without the pin being updated, or a pinned file is missing.
+
+    Takeover-resistance guard (2026-10-29). DETECT-AND-ALARM, no remedy: 'model' is
+    NEVER_AUTOMATIC, so a changed model is a person's call -- they either BLESS it by
+    re-pinning, or investigate a swap. This catches a WORKING-TREE / runtime swap that
+    the HEAD-commitment binding cannot, because that binding sees only the COMMITTED
+    file (git HEAD) while this reads the live file on disk. No pin / no files is UNKNOWN;
+    all live digests matching the pin is ABSENT; any mismatch or missing file is PRESENT.
+    The base .gguf weights are not pinned here (gitignored, multi-GB). Paths default to
+    the real files; a test may override them."""
+    import hashlib
+    here = repo or os.path.dirname(os.path.abspath(__file__))
+    pin = pin or os.path.join(here, "ops", "model_pin.json")
+    if not os.path.exists(pin):
+        return {"state": UNKNOWN, "measured": {"why": "no model pin (ops/model_pin.json) to compare against"}}
+    try:
+        pinned = (json.load(open(pin, encoding="utf-8")) or {}).get("models") or {}
+    except Exception as e:                                   # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    if not pinned:
+        return {"state": UNKNOWN, "measured": {"why": "model pin lists no models"}}
+    drifted, missing = [], []
+    for name, want in pinned.items():
+        p = os.path.join(here, name)
+        if not os.path.exists(p):
+            missing.append(name)
+            continue
+        with open(p, "rb") as fh:
+            if hashlib.sha256(fh.read()).hexdigest() != want:
+                drifted.append(name)
+    if drifted or missing:
+        return {"state": PRESENT, "measured": {
+            "drifted": drifted, "missing": missing,
+            "kind": "a live model differs from its blessed pin (or is missing) -- "
+                    "bless it by re-pinning ops/model_pin.json, or investigate a swap"}}
+    return {"state": ABSENT, "measured": {"pinned": len(pinned)}}
+
+
 DETECTORS = {
     "node_down": detect_node_down,
     "tetsu_cannot_answer": detect_tetsu_cannot_answer,
     "model_unmanaged": detect_model_unmanaged,
     "tetsu_asks_failing": detect_tetsu_asks_failing,
+    # Takeover-resistance guards (2026-10-29): both ALARM-only, no remedy, because
+    # re-signing (key) and consent are NEVER_AUTOMATIC. A tamper must be SEEN by a
+    # person, never auto-"healed" -- auto-remediation would erase the evidence.
+    "head_commitment_broken": detect_head_commitment_broken,
+    "consent_chain_broken": detect_consent_chain_broken,
+    "model_drift": detect_model_drift,
     "stale_test_mesh": detect_stale_test_mesh,
     "defender_threat": detect_defender_threat,
     "defense_lapse": detect_defense_lapse,

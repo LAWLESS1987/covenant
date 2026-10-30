@@ -150,6 +150,12 @@ INPUT_LEDGERS = {
     # was edited, which is exactly what this should catch.
     "ops/tetsu_consent.jsonl":
         "Tetsu's role-consent record; hashed on purpose, appended only at a committed consent decision",
+    # 2026-10-29: the tamper-evident hash-chain OVER the consent ledger (covenant_consent_chain). A sidecar
+    # that commits each consent row's bytes in order and links the entries; appended only when sync() is run
+    # at a committed consent decision, the same discipline as the ledger it protects. Hashed on purpose: a
+    # changed hash on an existing chain entry would mean the integrity record itself was edited.
+    "ops/tetsu_consent.chain.jsonl":
+        "Tetsu's consent hash-chain; hashed on purpose, appended only at a committed consent decision",
     # 2026-10-28: the improve-miner circle-back dispositions (covenant_improve.circle_back). A governance
     # record: a human marks a 'have' verified_have / false_match / unresolved and commits it in the same
     # breath; the circle-back guard only READS it, never writes it, so it does not dirty the tree the way an

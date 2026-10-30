@@ -1237,6 +1237,25 @@ def main():
           any("mesh_source_split" in a and "phone:5001" in a for a in a_ms),
           str([a[:120] for a in a_ms if "mesh_source_split" in a]))
 
+    # head_commitment_broken and consent_chain_broken arrived 2026-10-29 (takeover
+    # resistance) and H1v caught them with no coverage here, which is exactly what
+    # H1v is for. Both are ALARM-only on purpose: a tamper of the signed HEAD-
+    # commitment ledger or of Tetsu's consent hash-chain must be SEEN by a person,
+    # never auto-"healed" (that would erase the evidence), and each touches a
+    # NEVER_AUTOMATIC word ('key' for re-signing, 'consent'). Their both-ways
+    # behaviour is pinned in test_hw1_takeover_detectors.py; what is driven HERE is
+    # the one property this file is about -- the class boundary: no remedy, of any
+    # class, may point at either, or a tamper could be graded as auto-fixable.
+    for _g in ("head_commitment_broken", "consent_chain_broken", "model_drift"):
+        check("H1tk %s is a registered detector" % _g, _g in H.DETECTORS)
+        check("H1tk %s has NO remedy pointed at it -- a tamper must never auto-heal" % _g,
+              [n for n, r in H.REMEDIES.items()
+               if _g in (r.get("for") or []) or _g in (r.get("async_for") or [])] == [],
+              str({n: r.get("for") for n, r in H.REMEDIES.items()}))
+        _st_g = H.DETECTORS[_g]().get("state")
+        check("H1tk %s runs and returns a valid state against the real tree" % _g,
+              _st_g in (H.PRESENT, H.ABSENT, H.UNKNOWN), str(_st_g))
+
     # app_install_futile arrived 2026-09-18 (A147) and H1v caught it with no
     # coverage here, third in a row, which is the whole argument for that
     # guard. Its behaviour is pinned in test_h2_update_witness.py (F1-F12,

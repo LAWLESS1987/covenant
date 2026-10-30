@@ -8,7 +8,9 @@ issues that arise" -- "Give me a one click self heal button on the pc and phone
 apps that can fix eachother".
 
 WHAT THIS IS, AND WHAT IT IS NOT. It is not a new repair engine. Everything it
-runs is `covenant_highway` (A100 onward): nineteen detectors and the remedies
+runs is `covenant_highway` (A100 onward): its detectors (31 as of 2026-10-29,
+including the two ALARM-only takeover guards -- head_commitment_broken and
+consent_chain_broken -- which have NO remedy by design) and the remedies
 already classed AUTO_REVERSIBLE, each one already bounded, already recorded in
 ops/highway.jsonl, already refusing to act while the highway is paused. What
 was missing was a HANDLE -- the repairs ran only on the watchdog's own schedule,

@@ -84,6 +84,10 @@ _to_delete/
 # rules that already covered *.key and *.db. An ignore file nobody has watched
 # refuse anything has not been tested (M31).
 *.pem
+# ...but the HEAD-commitment PUBLIC key is meant to be published: a stranger
+# needs it to run verify_head_commitment.py. The matching PRIVATE key lives in
+# .covenant-keys/*.key (ignored below) and never leaves this machine.
+!docs/HEAD_COMMIT_PUBKEY.pem
 *.p12
 *.pfx
 *.env
@@ -216,6 +220,12 @@ ops/judge_route.log
 # covenant_chat.py transcripts and the covenant's own memory: private conversations
 ops/chat/
 ops/gemini.log
+
+# detect_model_drift's blessed model-digest baseline: operator-LOCAL trust state
+# (what THIS operator has blessed), not a repo-wide constant. A clone without it
+# reads model_drift as UNKNOWN (no false alarm); this machine reads ABSENT. The
+# matching model files and the HEAD-commitment that binds them are tracked.
+ops/model_pin.json
 
 # 2026-09-03: covenant_distill.py keeps a REFUSED candidate here for inspection; the model in use is fallback_model.json
 fallback_model.candidate.json
