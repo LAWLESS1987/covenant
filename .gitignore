@@ -274,6 +274,10 @@ ops/distill_rejected_live.jsonl
 ops/heal.jsonl
 ops/immune.jsonl
 ops/own_work_state.json
+# grid guard runtime state (config files grid_signers/interlocks/policy ARE tracked)
+ops/grid_commands.jsonl
+ops/grid_commands.chain.jsonl
+ops/grid_authz_heartbeat.jsonl
 ops/pause/
 # Node A's off-box peers (the phone's tailnet address), read by covenant_watchdog.py
 # and covenant_prod.bat alike, so neither public file carries the address.

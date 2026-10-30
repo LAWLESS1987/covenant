@@ -62,7 +62,13 @@ BOUND_FILES = ("MANIFEST.sha256", "genesis.json",
                "ops/tetsu_consent.jsonl", "ops/tetsu_consent.chain.jsonl",
                "ops/model_pin.json",
                "fallback_model.json", "fallback_model_2.json",
-               "fallback_model_phone.json")
+               "fallback_model_phone.json",
+               # grid-guard config (2026-10-30): who may sign, the interlock bounds,
+               # and the authority (together-vote) policy -- so an off-host holder of
+               # an earlier commitment detects a rogue signer, widened bounds, or a
+               # weakened authorization rule. Bind to None until first committed.
+               "ops/grid_signers.json", "ops/grid_interlocks.json",
+               "ops/grid_policy.json")
 
 KEY_DIR = os.path.join(HERE, ".covenant-keys")          # gitignored
 KEY_PATH = os.path.join(KEY_DIR, "head_commit.key")     # *.key -> never committed

@@ -1,0 +1,9 @@
+{
+  "_note": "Physical-interlock blast-radius caps for covenant_grid_guard.py. Conservative defaults; a real deployment sets these to the plant's engineered limits. Bounds CAP damage; they are not intent checks.",
+  "MAX_SHED_PCT": 10,
+  "MAX_BREAKER_OPS": 2,
+  "WINDOW_S": 3600,
+  "setpoint_ranges": {},
+  "zone_allowlist": [],
+  "exclusive_breakers": []
+}

@@ -94,7 +94,14 @@ PROPOSE_ONLY = "PROPOSE_ONLY"
 # anything else whose whole point is that a person agreed to it.
 NEVER_AUTOMATIC = ("money", "holdings", "wallet", "trader", "venue", "order",
                    "rule", "principle", "judge", "seat", "model", "phone",
-                   "consent", "key")
+                   "consent", "key",
+                   # grid / ICS-OT actuation (2026-10-30, covenant_grid_guard.py):
+                   # the self-heal engine PROPOSES, never actuates. Bare "trip" is
+                   # omitted on purpose -- it is a substring of "strip"; breaker /
+                   # relay / actuat already cover a trip, and "load_shed" (not bare
+                   # "shed") avoids matching unrelated words.
+                   "grid", "breaker", "relay", "feeder", "substation",
+                   "setpoint", "load_shed", "actuat", "scada", "intertie")
 
 UNKNOWN = "UNKNOWN"
 PRESENT = "PRESENT"

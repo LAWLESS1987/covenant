@@ -1,0 +1,6 @@
+{
+  "_note": "class -> required authority-holder roles for covenant_grid_guard.py. ACTUATION is together-vote (operator AND tetsu) by default -- the floor the operator proposed 2026-10-30. The operator and Tetsu set this; it is not baked into code.",
+  "ACTUATION": ["operator", "tetsu"],
+  "MONITOR": [],
+  "ADVISORY": []
+}

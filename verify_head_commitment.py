@@ -49,7 +49,12 @@ BOUND_FILES = ("MANIFEST.sha256", "genesis.json",
                "ops/tetsu_consent.jsonl", "ops/tetsu_consent.chain.jsonl",
                "ops/model_pin.json",
                "fallback_model.json", "fallback_model_2.json",
-               "fallback_model_phone.json")
+               "fallback_model_phone.json",
+               # grid-guard config (2026-10-30); kept in sync with
+               # covenant_head_commit.BOUND_FILES. Absent at an older named commit
+               # -> skipped; a newer commitment binds them.
+               "ops/grid_signers.json", "ops/grid_interlocks.json",
+               "ops/grid_policy.json")
 
 
 def _frame(domain, *fields):

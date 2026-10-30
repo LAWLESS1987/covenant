@@ -82,7 +82,11 @@ def main():
         # NA1.floor: the fourteen subjects the covenant has committed to protect are all present (names the floor;
         # the behavioural cases above are what actually fail if one is dropped, but this says the intended set out loud).
         MUST = {"money", "holdings", "wallet", "trader", "venue", "order", "rule", "principle",
-                "judge", "seat", "model", "phone", "consent", "key"}
+                "judge", "seat", "model", "phone", "consent", "key",
+                # grid / ICS-OT actuation subjects (2026-10-30, covenant_grid_guard.py) -- the
+                # self-heal engine proposes, never actuates the grid; pinned here as a committed floor.
+                "grid", "breaker", "relay", "feeder", "substation", "setpoint",
+                "load_shed", "actuat", "scada", "intertie"}
         missing = sorted(MUST - set(H.NEVER_AUTOMATIC))
         check("NA1.floor every committed subject is still on the list (money, the seats, the rules, consent, keys...)",
               not missing, "missing: %s" % missing)
