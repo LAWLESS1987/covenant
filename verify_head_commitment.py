@@ -116,22 +116,24 @@ def verify_rows(rows, pubkey_pem):
     return (len(findings) == 0), findings
 
 
-def _committed_bytes(repo, relpath):
-    """Bytes of relpath as committed at HEAD. Prefer `git show HEAD:relpath` so a
-    dirty working tree cannot change the answer; fall back to the on-disk file for
-    a source tarball that carries no .git. Returns (bytes|None, source|reason)."""
+def _committed_bytes(repo, relpath, ref=None):
+    """Bytes of relpath as committed at REF -- the commit the commitment NAMES, so
+    a dirty working tree or an advanced HEAD cannot change the answer (default HEAD).
+    Falls back to the on-disk file for a source tarball with no .git, or a file not
+    yet tracked at ref. Returns (bytes|None, source|reason)."""
     env = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
+    ref = ref or "HEAD"
     try:
-        r = subprocess.run(["git", "-C", repo, "show", f"HEAD:{relpath}"],
+        r = subprocess.run(["git", "-C", repo, "show", f"{ref}:{relpath}"],
                            capture_output=True, timeout=20, env=env)
         if r.returncode == 0:
-            return r.stdout, "git HEAD"
+            return r.stdout, f"git {ref[:12]}"
     except Exception:  # noqa: BLE001
         pass
     p = os.path.join(repo, relpath)
     if os.path.exists(p):
         with open(p, "rb") as fh:
-            return fh.read(), "on-disk (no git; could be a dirty tree)"
+            return fh.read(), "on-disk (not tracked at ref, or no git)"
     return None, "absent"
 
 
@@ -145,29 +147,60 @@ def _git(repo, *args):
         return None
 
 
-def verify_binding(tip_payload, repo):
-    """Check 4. Returns (status, findings) with status in PASS/FAIL/UNDETERMINED."""
-    findings = []
-    undetermined = []
+def _git_ok(repo, *args):
+    """True iff the git command exits 0 -- for checks like `merge-base --is-ancestor`
+    that answer through the exit code, not stdout."""
+    env = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
+    try:
+        r = subprocess.run(["git", "-C", repo, *args], capture_output=True, timeout=20, env=env)
+        return r.returncode == 0
+    except Exception:  # noqa: BLE001
+        return False
 
-    head = _git(repo, "rev-parse", "HEAD")
-    tree = _git(repo, "rev-parse", "HEAD^{tree}")
-    if head is None or tree is None:
-        undetermined.append("no git checkout here: cannot confirm head/tree "
-                            "(verify against a fresh clone at the committed head)")
+
+def verify_binding(tip_payload, repo):
+    """Check 4, against the commit the commitment NAMES -- never the current HEAD,
+    so a tree that merely ADVANCED past the commitment is not mistaken for a tamper.
+    Returns (status, findings) with status in PASS / STALE / FAIL / UNDETERMINED:
+      PASS  -- the named commit is current HEAD and its tree+bound files match what was signed.
+      STALE -- the named commit is a valid ANCESTOR of HEAD (the tree advanced; the current
+               tip is simply not yet committed-to). Benign: re-run covenant_head_commit.
+      FAIL  -- a tamper: the named commit is gone from this history, its tree/bound files
+               differ from what was signed, or HEAD is NOT a descendant of it (history rewritten).
+      UNDETERMINED -- no git / no named head: bound files were checked against on-disk bytes only.
+    """
+    findings, undetermined, notes = [], [], []
+    committed_head = tip_payload.get("head")
+    cur_head = _git(repo, "rev-parse", "HEAD")
+    ref = None
+
+    if cur_head is None or committed_head is None:
+        undetermined.append("no git / no committed head here: bound files checked "
+                            "against on-disk bytes only (verify in a clone at the committed head)")
+    elif _git(repo, "cat-file", "-t", committed_head) != "commit":
+        findings.append(f"the committed commit {str(committed_head)[:12]} is not in this history "
+                        f"-- it was rewritten away, or this is a different history")
     else:
-        if head != tip_payload.get("head"):
-            findings.append(f"HEAD mismatch: repo is at {head[:12]}, the newest "
-                            f"commitment names {str(tip_payload.get('head'))[:12]}")
-        if tree != tip_payload.get("tree"):
-            findings.append("tree mismatch: the committed tree is not the one signed")
+        ref = committed_head
+        if _git(repo, "rev-parse", f"{committed_head}^{{tree}}") != tip_payload.get("tree"):
+            findings.append(f"tree mismatch at {committed_head[:12]}: the named commit's tree "
+                            f"is not the one signed")
+        if cur_head == committed_head:
+            pass                                             # freshest: commitment covers the tip
+        elif _git_ok(repo, "merge-base", "--is-ancestor", committed_head, "HEAD"):
+            notes.append(f"STALE: HEAD has advanced to {cur_head[:12]}; the newest commitment "
+                         f"covers {committed_head[:12]} (an ancestor). Re-run covenant_head_commit "
+                         f"to cover the current tip.")
+        else:
+            findings.append(f"DIVERGED: current HEAD {cur_head[:12]} is NOT a descendant of the "
+                            f"committed {committed_head[:12]} -- history was rewritten or forked")
 
     bound = tip_payload.get("bound", {})
     for rel in BOUND_FILES:
-        raw, src = _committed_bytes(repo, rel)
+        raw, src = _committed_bytes(repo, rel, ref)
         if raw is None:
             if rel in bound and bound[rel] is not None:
-                undetermined.append(f"{rel}: committed but not reachable here ({src})")
+                undetermined.append(f"{rel}: bound but not reachable at the named commit ({src})")
             continue
         if rel == "genesis.json":
             try:
@@ -179,15 +212,17 @@ def verify_binding(tip_payload, repo):
             actual = hashlib.sha256(raw).hexdigest()
         want = bound.get(rel)
         if want is None:
-            undetermined.append(f"{rel}: present now but not bound by the commitment")
+            undetermined.append(f"{rel}: present at the named commit but not bound by the commitment")
         elif actual != want:
-            findings.append(f"{rel}: digest mismatch -- the committed file differs "
+            findings.append(f"{rel}: digest mismatch -- the file at the named commit differs "
                             f"from what was signed (bound {str(want)[:12]}, got {actual[:12]})")
 
     if findings:
         return "FAIL", findings
+    if notes and not undetermined:
+        return "STALE", notes
     if undetermined:
-        return "UNDETERMINED", undetermined
+        return "UNDETERMINED", undetermined + notes
     return "PASS", []
 
 
@@ -213,10 +248,15 @@ def run(ledger, pubkey_path, repo):
             f"(all {len(rows)} rows signed by the published key; chain intact)"]
 
     status, bfind = verify_binding(rows[-1]["payload"], repo)
-    out += [f"BINDING (newest commitment vs this repo): {status}"]
+    out += [f"BINDING (newest commitment vs the commit it names): {status}"]
     out += [f"  - {m}" for m in bfind]
     if status == "FAIL":
         return 1, out
+    if status == "STALE":
+        out += ["=> OVERALL: PASS (STALE). The committed history is intact and the newest "
+                "commitment is valid for the commit it names; the tree has merely advanced "
+                "since. Re-run covenant_head_commit to cover the current tip."]
+        return 0, out
     if status == "UNDETERMINED":
         out += ["=> OVERALL: PASS on signatures and chain; BINDING UNDETERMINED "
                 "(named above). The signed history is intact; it was not confirmed "

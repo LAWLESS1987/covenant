@@ -2189,7 +2189,11 @@ def detect_head_commitment_broken(health=None, ledger=None, pub=None, repo=None,
         return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
     if code == 1:   # FAIL -- a real tamper the outside verifier would also catch
         return {"state": PRESENT, "measured": {"verdict": "FAIL", "detail": " | ".join(lines)[:300]}}
-    return {"state": ABSENT, "measured": {"verdict": "PASS" if code == 0 else "UNDETERMINED"}}
+    stale = any("STALE" in ln for ln in lines)
+    m = {"verdict": "STALE" if stale else "PASS"}
+    if stale:                                                # benign: the tree advanced past the commitment
+        m["hint"] = "re-run covenant_head_commit to cover the current tip (not a tamper)"
+    return {"state": ABSENT, "measured": m}
 
 
 def detect_consent_chain_broken(health=None, ledger=None, chain=None, **kwargs):
