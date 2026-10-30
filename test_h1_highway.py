@@ -979,12 +979,33 @@ def main():
         check("H1gh deployed + info/refs 200 -> ABSENT", d["state"] == H.ABSENT, str(d))
     finally:
         _ghd.shutdown()
+
+    class _Gh404(_hsrv.BaseHTTPRequestHandler):                   # server alive, unknown repo path
+        def do_GET(self):                                         # noqa: N802
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write(b"not found")
+
+        def log_message(self, *a):
+            pass
+
+    _g4 = _hsrv.HTTPServer(("127.0.0.1", 0), _Gh404)
+    _g4p = _g4.server_address[1]
+    _g4t = _hth.Thread(target=_g4.serve_forever, daemon=True)
+    _g4t.start()
+    try:
+        d = H.detect_git_host_down(url="http://127.0.0.1:%d/info/refs" % _g4p, marker=_ghmark)
+        check("H1gh server answers 404 (unknown repo) -> ABSENT -- alive, NOT a false restart",
+              d["state"] == H.ABSENT, str(d))
+    finally:
+        _g4.shutdown()
+
     _gs = _hsk.socket()
     _gs.bind(("127.0.0.1", 0))
     _gdp = _gs.getsockname()[1]
     _gs.close()
     d = H.detect_git_host_down(url="http://127.0.0.1:%d/info/refs" % _gdp, marker=_ghmark)
-    check("H1gh deployed but the git host is DOWN -> PRESENT", d["state"] == H.PRESENT, str(d))
+    check("H1gh deployed but the git host is DOWN (no response) -> PRESENT", d["state"] == H.PRESENT, str(d))
     d = H.detect_git_host_down(url="http://127.0.0.1:%d/info/refs" % _gdp,
                                marker=os.path.join(_ghdir, "absent.vbs"))
     check("H1gh not deployed here (no launcher) -> UNKNOWN, never a false alarm on a clone/CI",

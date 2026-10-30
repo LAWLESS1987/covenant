@@ -2356,8 +2356,10 @@ def detect_git_host_down(health=None, url=None, marker=None, **kwargs):
     this machine but not serving. The sibling of headscale_down: deployed-here is marked by
     the Startup launcher, so a clone or a non-host node reads UNKNOWN, never PRESENT. Its
     remedy (restart_git_host) is AUTO_REVERSIBLE -- relaunching our own daemon touches
-    nothing in NEVER_AUTOMATIC. info/refs answering HTTP 200 is ABSENT; the launcher present
-    but the server not answering is PRESENT."""
+    nothing in NEVER_AUTOMATIC. ANY HTTP response (even a 404 for an unknown repo path)
+    means the server PROCESS is alive -> ABSENT; only no response at all (a transport
+    failure) is PRESENT, the restart-worthy state. (A restart cannot fix a misconfig and
+    must never be triggered by one.)"""
     url = url or GITHOST_HEALTH
     marker = _githost_launcher() if marker is None else marker
     if not marker or not os.path.exists(marker):
@@ -2365,12 +2367,12 @@ def detect_git_host_down(health=None, url=None, marker=None, **kwargs):
                                                "machine (no Startup launcher)"}}
     try:
         with urllib.request.urlopen(url, timeout=5) as r:
-            code = getattr(r, "status", 200)
             r.read(80)
-        if code == 200:
-            return {"state": ABSENT, "measured": {"serving": True, "url": url}}
-        return {"state": PRESENT, "measured": {"why": "git host answered but not 200", "code": code}}
+        return {"state": ABSENT, "measured": {"serving": True, "url": url}}
     except Exception as e:                                   # noqa: BLE001
+        if hasattr(e, "code"):    # HTTPError: the server ANSWERED (e.g. 404) -> process alive
+            return {"state": ABSENT, "measured": {"serving": True, "url": url,
+                                                  "answered_code": getattr(e, "code", None)}}
         return {"state": PRESENT, "measured": {
             "why": "git host is not answering -- clone/push over the self-hosted mesh is down",
             "url": url, "error": "%s: %s" % (type(e).__name__, str(e)[:120])}}
