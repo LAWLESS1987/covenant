@@ -64,3 +64,13 @@ shipped model).
 Scaffold + this prereg committed. No weights trained yet → witness returns
 UNKNOWN. Benchmark harness `tools/grid_snn_bench.py` and the training run (spiking
 lab venv) are the next step; their result — GO or NO-GO — will be recorded here.
+
+**Preliminary baseline run (2026-10-30, `tools/grid_snn_bench.py`; single seed set,
+no held-out split, crude features — NOT yet the full sealed protocol):** every
+synthesized attack command is individually in-bounds (premise holds). The trivial
+**B4 baseline (lagged cross-zone correlation) already detects family D at 1.00 @
+~1% false-alarm** — i.e. the one niche the SNN was hoped to fill appears ALREADY
+saturated by a trivial detector, which *strengthens the NO-GO prior*. A/B/C scored
+0.00 under the current crude features (feature/generator refinement is a later
+tick). This is a signal, not the verdict; the full ≥5-seed held-out protocol and
+the trained-SNN comparison remain. Recorded, not deleted (tombstone-everything).
