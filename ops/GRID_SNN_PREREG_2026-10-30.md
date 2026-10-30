@@ -86,3 +86,17 @@ the SNN as framed** — a trivial detector already ceilings family D, and A/B/C 
 pre-registered as baseline territory, not SNN territory. To be confirmed by the
 trained-net comparison (spiking-lab venv) before the verdict is sealed; the witness
 stays UNKNOWN until then. Recorded, not deleted.
+
+**Baselines completed (2026-10-30, tick 5): added a CUSUM and a shed-slope detector**
+so the SNN is measured against the baselines' best shot (it must beat the *best*
+trivial detector). Re-run: **family A is now caught by the shed-slope baseline
+(0.97 ± 0.04)** — though test FA ≈ 0.047, above the ≤1% budget (a small-n threshold
+artifact at n=60, needs larger n). **Family D stays saturated by B4 (1.00).**
+Families B and C remain 0.00 — **but this reflects MISSING trivial detectors**
+(a breaker-alternation autocorrelation for B; a raw-setpoint-*value* slope for C,
+which the current `|delta|` encoding drops), **not** evidence of an SNN niche.
+Reading a baseline/encoding gap as an SNN win is exactly the theater this prereg
+guards against. **Conclusion unchanged and strengthened: NO-GO leading** — no family
+has been shown to need a different mechanism. Remaining before sealing: complete the
+B/C trivial detectors (expected to catch them) or run the trained net. Witness stays
+UNKNOWN. Recorded, not deleted.

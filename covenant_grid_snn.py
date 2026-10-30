@@ -177,14 +177,25 @@ def ewma_baseline_score(rows, now=None, window_s=WINDOW_S):
         return m
     sp = enc["setpoint_delta"].sum(axis=1)
     b3 = float(np.polyfit(np.arange(len(sp)), sp, 1)[0]) if len(sp) > 2 else 0.0
+    # B3b: slope of the shed channel (a monotone ramp -> high slope; scatter -> ~0), the
+    # right trivial detector for family A that B1's EWMA-max cannot see at matched marginals.
+    b3b = float(np.polyfit(np.arange(len(shed)), shed, 1)[0]) if len(shed) > 2 else 0.0
+    # B2: a proper CUSUM of shed above its own mean -- peaks for a sustained ramp, ~0 for
+    # uncorrelated scatter even when the magnitude multiset is identical (matched marginal).
+    c_acc, cusum = 0.0, 0.0
+    ref = float(shed.mean())
+    for v in shed:
+        c_acc = max(0.0, c_acc + (v - ref))
+        cusum = max(cusum, c_acc)
     ev = (enc["breaker"] + enc["shed"] + enc["setpoint_delta"])
     if ev.shape[1] >= 2:
-        c = np.corrcoef(ev.T)
-        b4 = float(np.nanmax(c[np.triu_indices(c.shape[0], k=1)])) if c.size > 1 else 0.0
+        cc = np.corrcoef(ev.T)
+        b4 = float(np.nanmax(cc[np.triu_indices(cc.shape[0], k=1)])) if cc.size > 1 else 0.0
     else:
         b4 = 0.0
-    return {"B1_ewma_shed": ewma(shed), "B2_sustained_breaker": float(breaker.mean()),
-            "B3_setpoint_slope": b3, "B4_crosszone_corr": b4}
+    return {"B1_ewma_shed": ewma(shed), "B2_cusum_shed": cusum,
+            "B2_sustained_breaker": float(breaker.mean()),
+            "B3_setpoint_slope": b3, "B3b_shed_slope": b3b, "B4_crosszone_corr": b4}
 
 
 # --------------------------------------------------------------- the witness
