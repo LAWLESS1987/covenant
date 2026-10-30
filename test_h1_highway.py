@@ -953,6 +953,48 @@ def main():
     check("H1hs restart_headscale dry_run acts on nothing -- just reports intent",
           H.remedy_restart_headscale({}, dry_run=True)[0] is True)
 
+    # ---- H1gh: git_host_down + restart_git_host (2026-10-30) --------------------
+    # Resilience for our own smart-HTTP git host, the sibling of headscale_down. AUTO-
+    # repairable (restarting our own daemon is safe/reversible). Driven both ways with a
+    # stub info/refs server and stub launcher markers, so no live git host is needed.
+    _ghdir = tempfile.mkdtemp(prefix="h1gh_")
+    _ghmark = os.path.join(_ghdir, "CovenantGitHost.vbs")
+    open(_ghmark, "w").write("x")
+
+    class _GhOK(_hsrv.BaseHTTPRequestHandler):
+        def do_GET(self):                                         # noqa: N802
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"001e# service=git-upload-pack\n")
+
+        def log_message(self, *a):
+            pass
+
+    _ghd = _hsrv.HTTPServer(("127.0.0.1", 0), _GhOK)
+    _ghp = _ghd.server_address[1]
+    _ghtt = _hth.Thread(target=_ghd.serve_forever, daemon=True)
+    _ghtt.start()
+    try:
+        d = H.detect_git_host_down(url="http://127.0.0.1:%d/info/refs" % _ghp, marker=_ghmark)
+        check("H1gh deployed + info/refs 200 -> ABSENT", d["state"] == H.ABSENT, str(d))
+    finally:
+        _ghd.shutdown()
+    _gs = _hsk.socket()
+    _gs.bind(("127.0.0.1", 0))
+    _gdp = _gs.getsockname()[1]
+    _gs.close()
+    d = H.detect_git_host_down(url="http://127.0.0.1:%d/info/refs" % _gdp, marker=_ghmark)
+    check("H1gh deployed but the git host is DOWN -> PRESENT", d["state"] == H.PRESENT, str(d))
+    d = H.detect_git_host_down(url="http://127.0.0.1:%d/info/refs" % _gdp,
+                               marker=os.path.join(_ghdir, "absent.vbs"))
+    check("H1gh not deployed here (no launcher) -> UNKNOWN, never a false alarm on a clone/CI",
+          d["state"] == H.UNKNOWN, str(d))
+    check("H1gh restart_git_host is AUTO_REVERSIBLE and answers git_host_down",
+          H.REMEDIES["restart_git_host"]["klass"] == H.AUTO_REVERSIBLE
+          and "git_host_down" in H.REMEDIES["restart_git_host"]["for"])
+    check("H1gh restart_git_host dry_run acts on nothing -- just reports intent",
+          H.remedy_restart_git_host({}, dry_run=True)[0] is True)
+
     # ---- H1pb: phone_build_failed (2026-09-27), the same stub API and clock --
     # dispatch_phone_build was told "accepted (HTTP 204)" and nothing ever read
     # whether the build it asked for arrived: three failed on a full artifact

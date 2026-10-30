@@ -2337,6 +2337,45 @@ def detect_headscale_down(health=None, url=None, marker=None, **kwargs):
             "url": url, "error": "%s: %s" % (type(e).__name__, str(e)[:120])}}
 
 
+GITHOST_HEALTH = "http://127.0.0.1:8088/covenant.git/info/refs?service=git-upload-pack"
+
+
+def _githost_launcher():
+    """The Startup launcher is both the always-on mechanism AND the deployed-here marker,
+    exactly like _headscale_launcher: a machine without it is not running our git host and
+    is not meant to."""
+    appdata = os.environ.get("APPDATA") or ""
+    if not appdata:
+        return ""
+    return os.path.join(appdata, "Microsoft", "Windows", "Start Menu", "Programs",
+                        "Startup", "CovenantGitHost.vbs")
+
+
+def detect_git_host_down(health=None, url=None, marker=None, **kwargs):
+    """Our own smart-HTTP git host (git_http_server.py in WSL, 2026-10-30) is deployed on
+    this machine but not serving. The sibling of headscale_down: deployed-here is marked by
+    the Startup launcher, so a clone or a non-host node reads UNKNOWN, never PRESENT. Its
+    remedy (restart_git_host) is AUTO_REVERSIBLE -- relaunching our own daemon touches
+    nothing in NEVER_AUTOMATIC. info/refs answering HTTP 200 is ABSENT; the launcher present
+    but the server not answering is PRESENT."""
+    url = url or GITHOST_HEALTH
+    marker = _githost_launcher() if marker is None else marker
+    if not marker or not os.path.exists(marker):
+        return {"state": UNKNOWN, "measured": {"why": "the git host is not deployed on this "
+                                               "machine (no Startup launcher)"}}
+    try:
+        with urllib.request.urlopen(url, timeout=5) as r:
+            code = getattr(r, "status", 200)
+            r.read(80)
+        if code == 200:
+            return {"state": ABSENT, "measured": {"serving": True, "url": url}}
+        return {"state": PRESENT, "measured": {"why": "git host answered but not 200", "code": code}}
+    except Exception as e:                                   # noqa: BLE001
+        return {"state": PRESENT, "measured": {
+            "why": "git host is not answering -- clone/push over the self-hosted mesh is down",
+            "url": url, "error": "%s: %s" % (type(e).__name__, str(e)[:120])}}
+
+
 DETECTORS = {
     "node_down": detect_node_down,
     "tetsu_cannot_answer": detect_tetsu_cannot_answer,
@@ -2351,6 +2390,8 @@ DETECTORS = {
     # Our own Tailscale control plane (headscale) -- AUTO-repairable: restarting our own
     # daemon is safe and reversible (restart_headscale), unlike the takeover guards above.
     "headscale_down": detect_headscale_down,
+    # Our own smart-HTTP git host -- AUTO-repairable, the sibling of headscale_down.
+    "git_host_down": detect_git_host_down,
     "stale_test_mesh": detect_stale_test_mesh,
     "defender_threat": detect_defender_threat,
     "defense_lapse": detect_defense_lapse,
@@ -2555,6 +2596,33 @@ def remedy_restart_headscale(measured, dry_run=True):
         except Exception:                                    # noqa: BLE001
             continue
     return False, "relaunched but headscale did not answer /health within ~12 s"
+
+
+def remedy_restart_git_host(measured, dry_run=True):
+    """STATELESS: relaunch our own smart-HTTP git host via the SAME hidden Startup launcher
+    logon uses. Reversible; touches nothing in NEVER_AUTOMATIC. The sibling of
+    remedy_restart_headscale (2026-10-30, the self-hosted mesh's git host)."""
+    import subprocess
+    vbs = _githost_launcher()
+    if not vbs or not os.path.exists(vbs):
+        return False, "no git-host launcher on this machine to restart"
+    if dry_run:
+        return True, "would relaunch the git host via the Startup launcher (wscript, hidden)"
+    # end a stuck server by its unique script name (the process is plain 'python3', so -f on
+    # the script path, never -x python3, which would hit unrelated interpreters)
+    subprocess.run(["wsl.exe", "-d", "Ubuntu", "--", "pkill", "-f", "git_http_server.py"],
+                   creationflags=_NOWIN, capture_output=True, timeout=30)
+    time.sleep(1)
+    subprocess.run(["wscript.exe", vbs], creationflags=_NOWIN, capture_output=True, timeout=30)
+    for _ in range(6):                                       # ~12 s to come up and answer info/refs
+        time.sleep(2)
+        try:
+            with urllib.request.urlopen(GITHOST_HEALTH, timeout=4) as r:
+                if getattr(r, "status", 200) == 200:
+                    return True, "git host restarted and serving"
+        except Exception:                                    # noqa: BLE001
+            continue
+    return False, "relaunched but the git host did not answer info/refs within ~12 s"
 
 
 def remedy_dispatch_phone_build(measured, dry_run=True):
@@ -3071,6 +3139,12 @@ REMEDIES = {
                           "benefit": {"gains": ["our own Tailscale control plane keeps coordinating the mesh"],
                                       "cost": ["a few seconds with the coordinator down; existing tunnels keep flowing"],
                                       "irreversible": []}},
+    "restart_git_host": {"fn": remedy_restart_git_host, "klass": AUTO_REVERSIBLE,
+                         "for": ["git_host_down"], "kind": "stateless",
+                         "touches": ["the git-host server process (in WSL)"],
+                         "benefit": {"gains": ["clone/push over the self-hosted git host comes back"],
+                                     "cost": ["a few seconds with the git host down; existing clones are unaffected"],
+                                     "irreversible": []}},
     "dispatch_phone_build": {"fn": remedy_dispatch_phone_build, "klass": AUTO_REVERSIBLE,
                              "for": ["phone_build_behind_core"], "kind": "stateless",
                              # The build takes about ten minutes; thirty is the
