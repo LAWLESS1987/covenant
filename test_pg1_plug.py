@@ -63,6 +63,22 @@ ok("never_automatic_is_live", P._never_automatic() == live and len(live) > 0, "l
 ok("never_automatic_doc_matches_live", P._NEVER_AUTOMATIC_DOC == live,
    "doc=%r" % (P._NEVER_AUTOMATIC_DOC,))
 
+# --- 3b. the CONTRACT an external AI reads names every live protected subject (2026-10-30) ------
+# The grid words joined the highway's tuple while the readable copy and the contract still listed
+# the old fourteen (a rule-6 recurrence: a list widened without every consumer). The contract is
+# what an outside operator reads first, so a subject it omits is one that operator is never told of.
+def _contract_missing(text):
+    low = text.lower()
+    return [w for w in live if w.lower() not in low]
+
+
+ok("contract_names_every_live_subject", _contract_missing(P.CONTRACT) == [],
+   "missing=%r" % (_contract_missing(P.CONTRACT),))
+# both ways: the same check on a contract with one subject struck out goes red.
+ok("contract_check_bites_on_a_dropped_subject",
+   _contract_missing(P.CONTRACT.replace("intertie", "")) == ["intertie"],
+   "missing=%r" % (_contract_missing(P.CONTRACT.replace("intertie", "")),))
+
 # --- 5. may_act() refuses a PAUSED highway (on a temp switch, never the live one) ----------------
 tmp_pause = tempfile.mkdtemp(prefix="pg1_pause_")
 old_pause_dir = os.environ.get("COVENANT_PAUSE_DIR")

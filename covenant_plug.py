@@ -23,7 +23,9 @@ event stream on a documented contract, runs the witness, and returns one advisor
 
 WHAT IT IS NOT, AND CANNOT BECOME HERE. It never acts on a NEVER_AUTOMATIC subject
 (covenant_highway.py:95 -- money, holdings, wallet, trader, venue, order, rule, principle, judge,
-seat, model, phone, consent, key); the highway refuses those whatever the caller, and this module
+seat, model, phone, consent, key, and the grid / ICS-OT actuation subjects: grid, breaker, relay,
+feeder, substation, setpoint, load_shed, actuat, scada, intertie); the highway refuses those
+whatever the caller, and this module
 never reaches around it. The spiking layer is advisory only and is never consulted to decide a
 verdict. Letting a plugged-in AI take an outward action, influence a verdict, or gain scoped
 autonomy is NEW CAPABILITY: it needs the Tetsu-and-Lawrence together-vote
@@ -61,7 +63,11 @@ if HERE not in sys.path:
 # test_na1_never_automatic.py. If the two ever disagree, the highway's tuple wins; _never_automatic()
 # reads the live tuple so this plug can never quietly narrow it.
 _NEVER_AUTOMATIC_DOC = ("money", "holdings", "wallet", "trader", "venue", "order",
-                        "rule", "principle", "judge", "seat", "model", "phone", "consent", "key")
+                        "rule", "principle", "judge", "seat", "model", "phone", "consent", "key",
+                        # grid / ICS-OT actuation (2026-10-30, covenant_grid_guard.py) -- joined the
+                        # highway's tuple that day; this copy lagged it and PG1 caught it.
+                        "grid", "breaker", "relay", "feeder", "substation",
+                        "setpoint", "load_shed", "actuat", "scada", "intertie")
 
 
 def _never_automatic():
@@ -208,7 +214,8 @@ YOU MAY ACT ONLY through covenant_plug.heal(act=True), AND ONLY when covenant_pl
 True (production tree + highway not paused). Even then you repair ONLY the highway's own
 AUTO_REVERSIBLE remedies; the highway refuses, for any caller:
   * anything touching money, holdings, wallet, trader, venue, order, rule, principle, judge, seat,
-    model, phone, consent, or key  (covenant_highway.NEVER_AUTOMATIC, pinned by test_na1).
+    model, phone, consent, or key, or actuating the grid (grid, breaker, relay, feeder, substation,
+    setpoint, load_shed, actuat, scada, intertie)  (covenant_highway.NEVER_AUTOMATIC, pinned by test_na1).
   * a PROPOSE_ONLY remedy, or one with no recorded undo, or one under quarantine/cooldown.
 
 YOU MUST NOT, and this plug gives you no path to:

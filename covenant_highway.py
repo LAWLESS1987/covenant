@@ -2616,14 +2616,18 @@ def remedy_restart_git_host(measured, dry_run=True):
                    creationflags=_NOWIN, capture_output=True, timeout=30)
     time.sleep(1)
     subprocess.run(["wscript.exe", vbs], creationflags=_NOWIN, capture_output=True, timeout=30)
+    # "It came back" is the DETECTOR's definition of alive, read by calling the detector
+    # itself -- ANY HTTP answer (a 404 included) is the server process up; only no answer
+    # at all is down. (2026-10-30: this loop used to accept only a 200, so a restarted
+    # server answering 404 was ledgered a FAILED remedy while git_host_down read ABSENT.
+    # H1gr drives both ways.)
     for _ in range(6):                                       # ~12 s to come up and answer info/refs
         time.sleep(2)
-        try:
-            with urllib.request.urlopen(GITHOST_HEALTH, timeout=4) as r:
-                if getattr(r, "status", 200) == 200:
-                    return True, "git host restarted and serving"
-        except Exception:                                    # noqa: BLE001
-            continue
+        d = detect_git_host_down(url=GITHOST_HEALTH, marker=vbs)
+        if d.get("state") == ABSENT:
+            code = (d.get("measured") or {}).get("answered_code")
+            return True, ("git host restarted and serving" if code is None
+                          else "git host restarted and serving (answered HTTP %s)" % code)
     return False, "relaunched but the git host did not answer info/refs within ~12 s"
 
 

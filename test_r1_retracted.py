@@ -177,7 +177,11 @@ def main():
         # C* -- the actual guard.
         if violations:
             for rp, ln, line, src in violations[:12]:
-                print("        %s:%d  [%s]  %s" % (rp, ln, src, line))
+                # backslashreplace: a violation line with a non-cp1252 character
+                # (an arrow, 2026-10-30) crashed this print on a Windows console,
+                # which lost the finding and skipped every later retraction.
+                print(("        %s:%d  [%s]  %s" % (rp, ln, src, line))
+                      .encode("ascii", "backslashreplace").decode("ascii"))
         check("R1.%s.C no live file restates this retracted claim without "
               "citing %s within %d lines" % (rid, rid, window),
               not violations, "%d violation(s)" % len(violations))

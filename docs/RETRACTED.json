@@ -2024,6 +2024,142 @@
    "note_on_allow": "The wording is kept verbatim in SPIKING_WITNESS.md Amendment 4 and KNOWN_ISSUES.md A375, each marked SUPERSEDED and pointing to SPIKING_WITNESS.md Amendment 5; CORRECTIONS.md ('Green that checked nothing') and this ledger hold it as the correction record. Nothing erased (rule 10).",
    "note_on_patterns": "The exact retracted phrase 'PROVEN on real accrued data' occurs only in these record files. A near-variant 'PROVEN on real data' in an ops draft is different wording and not this claim, so the pattern stays narrow.",
    "note_on_branch": "No as-written code branch: the retracted claim is PROSE in docs, not a runnable check, so the verbatim-in-tree record (above) is the preserved original, as with the confidence-trap retraction."
+  },
+  {
+   "id": "A392-GRID-VERIFIER-SCOPE",
+   "claim": "That verify_grid_ledger.py lets a stranger check that every honored grid command was authentic, authorized and in-bounds.",
+   "verbatim": [
+    "Standalone proof: verify_grid_ledger.py (imports no covenant code) lets a stranger check every honored command was authentic, authorized and in-bounds and that the record was not rewritten."
+   ],
+   "truth": "verify_grid_ledger.py checks the raw-bytes hash chain and, given the gateway public key, each row's gateway signature. It never re-runs C1..C7 over a command, so it says nothing about authenticity, authority or bounds. Worse, until A392 every gateway-signed row FAILED it (append_consent added a 't' field after signing). Restated in the covenant_grid_guard.py docstring: per-command re-checking is an open item, not a claim.",
+   "refuted_by": "The 2026-10-30 pre-merge review of branch claude/improve-miner-circle-back (three independent review lenses, each finding re-checked by a refuter; 22 of 23 confirmed), reproduced by scratch probes and recorded in docs/KNOWN_ISSUES.md A392.",
+   "patterns": [
+    "check every honored command was authentic, authorized and in-bounds"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ],
+   "note_on_branch": "Held as written, still runnable, at branch grid-guard-and-snn-verdict-as-written-2026-10-30 (55b8e90)."
+  },
+  {
+   "id": "A392-GRID-LEDGER-TIP-BOUND",
+   "claim": "That the grid command ledger's tip is bound into the HEAD-commitment, so an off-host holder can prove an in-place rewrite of the command record.",
+   "verbatim": [
+    "The ledger tip + `grid_signers.json` + `grid_interlocks.json` are to be bound into `covenant_head_commit.BOUND_FILES` (commit-time) so an off-host holder of an earlier HEAD-commitment can prove an in-place rewrite."
+   ],
+   "truth": "The commit bound ops/grid_signers.json, ops/grid_interlocks.json and ops/grid_policy.json. ops/grid_commands.jsonl and its chain are gitignored runtime state and in no BOUND_FILES, so an owner rewriting ledger and chain together is not caught off-host. docs/GRID_PROTECTION.md section 8 and limit 5 now state that as an open gap.",
+   "refuted_by": "The 2026-10-30 pre-merge review of branch claude/improve-miner-circle-back (three independent review lenses, each finding re-checked by a refuter; 22 of 23 confirmed), reproduced by scratch probes and recorded in docs/KNOWN_ISSUES.md A392.",
+   "patterns": [
+    "The ledger tip \\+"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ],
+   "note_on_branch": "Held as written at branch grid-guard-and-snn-verdict-as-written-2026-10-30 (55b8e90); the superseded sentence is also quoted beside its correction in docs/GRID_PROTECTION.md section 8."
+  },
+  {
+   "id": "A392-GG1-BOTH-WAYS",
+   "claim": "That GG1 drove every grid-guard check both ways, 37/37.",
+   "verbatim": [
+    "`python test_gg1_grid_guard.py` — every guard driven **both ways** (attack → red, remove → green), 37/37."
+   ],
+   "truth": "Three of the 37 could not fail: 'C5 detector PRESENT' accepted PRESENT or ABSENT, 'C1 detector ABSENT on good' accepted UNKNOWN, and the C7 check ran a local copy of the substring test rather than covenant_highway.NEVER_AUTOMATIC. Mutation (detect_grid_interlock_breach always ABSENT) left it 37/37. GG1 was also unregistered in covenant_one.py, so nothing ran it. Now 86/86, registered SECURITY, and each of the 18 A392 repair points reverted singly turns GG1 red on its own check.",
+   "refuted_by": "The 2026-10-30 pre-merge review of branch claude/improve-miner-circle-back (three independent review lenses, each finding re-checked by a refuter; 22 of 23 confirmed), reproduced by scratch probes and recorded in docs/KNOWN_ISSUES.md A392.",
+   "patterns": [
+    "remove → green\\), 37/37"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ],
+   "note_on_branch": "The suite as written is runnable at branch grid-guard-and-snn-verdict-as-written-2026-10-30 (55b8e90)."
+  },
+  {
+   "id": "A392-SNN-NOGO-BASIS",
+   "claim": "That the grid SNN witness is NO-GO because a one-line trivial detector catches every synthetic attack family on the sealed protocol, so the net cannot clear the pre-registered ship bar.",
+   "verbatim": [
+    "With the trivial baselines completed (B5 raw-setpoint-value slope, B6 breaker alternation added tick 7), **every synthetic attack family is caught by a one-line trivial detector** on the ≥5-seed held-out protocol",
+    "catches EVERY family, so the SNN clears no family's pre-registered bar -- NO-GO.",
+    "the LIF net never beats the best trivial baseline by the 0.10 bar (max +0.03 on A)"
+   ],
+   "truth": "B3b, B5 and B6 were added after results were seen; the prereg seals only B1-B4 and forbids choosing baselines after results. Against B1-B4 the best baseline is 0.00 on A, B and C; the trained net scored 1.00 on C. Families A and D fail the in-bounds premise through the real gateway (0/300 streams), so they are not valid tests. On the valid families: B the net fails (0.06), C it beats the sealed baselines but at test FA 0.020 > the 1% budget, and bar #3 (held-out family) has no valid run. Restated: UNDETERMINED under the seal, never a GO; the witness stays parked (UNKNOWN), which is unchanged.",
+   "refuted_by": "The 2026-10-30 pre-merge review (three review lenses, each finding re-checked by a refuter), then MEASURED: tools/grid_snn_bench.py permits() rebuilt to replay every stream through the real GridEffectorGateway; recorded in docs/KNOWN_ISSUES.md A392 and the prereg's RESTATED VERDICT.",
+   "patterns": [
+    "every synthetic attack family is caught by a one-line",
+    "catches EVERY family, so the SNN clears no family"
+   ],
+   "allow": [
+    "ops/GRID_SNN_PREREG_2026-10-30.md",
+    ".trash/grid_snn_bench_pre_F9_F17_F19_F20_2026-10-30/",
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ],
+   "note_on_allow": "The prereg keeps the old VERDICT section verbatim under a SUPERSEDED marker; the pre-fix bench is kept whole in .trash (rule 10).",
+   "note_on_branch": "The verdict and the bench that printed it are runnable as written at branch grid-guard-and-snn-verdict-as-written-2026-10-30 (55b8e90); the commit message of 55b8e90 carries the third verbatim line."
+  },
+  {
+   "id": "A392-SNN-PREMISE-HOLDS",
+   "claim": "That every synthesized grid-SNN attack command is individually in-bounds (PERMITted by the real authorize()).",
+   "verbatim": [
+    "every synthesized attack command is individually in-bounds (premise holds)."
+   ],
+   "truth": "The old permits() re-implemented bounds per command and ignored the cumulative C5 window, and ran on one attack stream per seed and never on benign. Replayed through the real gateway, families A and D fail on 300/300 streams, benign and attack alike (cumulative shed ~140% > MAX_SHED_PCT 100); B and C hold on 300/300.",
+   "refuted_by": "The 2026-10-30 pre-merge review (three review lenses, each finding re-checked by a refuter), then MEASURED: tools/grid_snn_bench.py permits() rebuilt to replay every stream through the real GridEffectorGateway; recorded in docs/KNOWN_ISSUES.md A392 and the prereg's RESTATED VERDICT.",
+   "patterns": [
+    "individually in-bounds \\(premise holds\\)"
+   ],
+   "allow": [
+    "ops/GRID_SNN_PREREG_2026-10-30.md",
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ],
+   "note_on_branch": "Runnable as written at branch grid-guard-and-snn-verdict-as-written-2026-10-30 (55b8e90); the old permits() is kept unused as permits_per_command_RETIRED in tools/grid_snn_bench.py."
+  },
+  {
+   "id": "A392-SNN-MATCHED-BY-CONSTRUCTION",
+   "claim": "That the grid-SNN benign and attack streams share the same multiset of magnitudes, matched marginals by construction.",
+   "verbatim": [
+    "differing ONLY in temporal arrangement -> matched marginals by construction."
+   ],
+   "truth": "Benign and attack streams were drawn from different seeds, so the multisets differ (paired exact match 0/300 on A, C, D); no code checked it. marginal_check() now measures it (pooled per-zone KS, worst zone decides): A, B, C match in distribution; D is UNDETERMINED (p = 0.0229).",
+   "refuted_by": "The 2026-10-30 pre-merge review (three review lenses, each finding re-checked by a refuter), then MEASURED: tools/grid_snn_bench.py permits() rebuilt to replay every stream through the real GridEffectorGateway; recorded in docs/KNOWN_ISSUES.md A392 and the prereg's RESTATED VERDICT.",
+   "patterns": [
+    "matched marginals by construction"
+   ],
+   "allow": [
+    ".trash/grid_snn_bench_pre_F9_F17_F19_F20_2026-10-30/",
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ],
+   "note_on_branch": "Runnable as written at branch grid-guard-and-snn-verdict-as-written-2026-10-30 (55b8e90) and kept whole in .trash/grid_snn_bench_pre_F9_F17_F19_F20_2026-10-30/."
+  },
+  {
+   "id": "A392-DRAFT-UNKNOWN-IS-ACTUATION",
+   "claim": "That the grid guard sends any action it does not know to the ACTUATION class (a draft of the A392 fix, written in this session, never committed).",
+   "verbatim": [
+    "`required_class`: `read` → MONITOR, `advise` → ADVISORY, every other action → ACTUATION",
+    "Any action not listed here is ACTUATION, so a new or misspelled action fails closed into the strictest class."
+   ],
+   "truth": "Before any commit the 2026-10-30 consult (ChatGPT and Gemini; Grok preferred the draft) showed an unknown action should be REFUSED: C5 has bounds only for the actions it knows, so an unknown action listed in a signer's grant and signed by both holders would pass uncapped. ACTION_CLASS is now an allowlist and an unknown action is REFUSED at C2-action (GG1, mutation-checked).",
+   "refuted_by": "ops/CONSULT_GRID_AUTHORITY_2026-10-30.md (three seats in the operator's Edge), checked against covenant_grid_guard.py C5.",
+   "patterns": [
+    "every other action → ACTUATION",
+    "misspelled action fails closed into the strictest class"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ],
+   "note_on_branch": "Never committed, so no branch holds it; the verbatim lines here are the preserved original (rule 10 / A346: a draft corrected before commit is still a claim)."
   }
  ]
 }

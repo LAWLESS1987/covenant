@@ -68,8 +68,12 @@ The highway refuses, for **any** caller — this plug included — any remedy th
 subject, matched against what the remedy says it touches rather than the class it claims:
 
 > `money, holdings, wallet, trader, venue, order, rule, principle, judge, seat, model, phone,
-> consent, key` — `covenant_highway.NEVER_AUTOMATIC` (covenant_highway.py:95), enforced in
-> `apply_remedy` (covenant_highway.py:3351), pinned by `test_na1_never_automatic.py`.
+> consent, key`, and since 2026-10-30 the grid/ICS-OT actuation subjects `grid, breaker, relay,
+> feeder, substation, setpoint, load_shed, actuat, scada, intertie` —
+> `covenant_highway.NEVER_AUTOMATIC` (covenant_highway.py:95-104), enforced in `apply_remedy`
+> (the `crossed` set, covenant_highway.py:3646), pinned by `test_na1_never_automatic.py`; the
+> plug's readable copy is pinned to the live tuple by `test_pg1_plug.py` (A392: it had fallen
+> behind by those ten words).
 
 This plug **gives you no path** to:
 

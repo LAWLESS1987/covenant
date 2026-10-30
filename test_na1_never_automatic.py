@@ -15,7 +15,8 @@ good-faith-alliance note's reciprocal standard -- the auditor is not exempt and 
 This was a real, if narrow, gap: eight of the fourteen protected subjects were unpinned.
 
 DRIVEN BOTH WAYS. NA1.0 the control -- an AUTO_REVERSIBLE remedy touching none of the words is EXECUTED, so the
-refusals below are real, not a blanket block. NA1.<word> each of the fourteen refuses on touch and never enters
+refusals below are real, not a blanket block. NA1.<word> each word of the LIVE tuple (fourteen when written, twenty-four
+since 2026-10-30) refuses on touch and never enters
 the remedy. NA1.M the earned-green mutation: remove one word from NEVER_AUTOMATIC and its remedy executes;
 restore it and the refusal returns -- so the refusal rides on the TUPLE, which is the thing that must not shrink.
 
@@ -79,7 +80,8 @@ def main():
             check("NA1[%s] a remedy touching '%s' is refused whatever class it claims, and never runs" % (w, w),
                   refused and not calls, "outcome=%s why=%s calls=%d" % (row.get("outcome"), row.get("why", "")[:60], len(calls)))
 
-        # NA1.floor: the fourteen subjects the covenant has committed to protect are all present (names the floor;
+        # NA1.floor: the subjects the covenant has committed to protect are all present -- fourteen, plus the ten
+        # grid words since 2026-10-30 (names the floor;
         # the behavioural cases above are what actually fail if one is dropped, but this says the intended set out loud).
         MUST = {"money", "holdings", "wallet", "trader", "venue", "order", "rule", "principle",
                 "judge", "seat", "model", "phone", "consent", "key",

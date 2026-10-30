@@ -22,7 +22,11 @@ ops/GRID_SNN_PREREG_2026-10-30.md -- beating the trivial baselines B1..B4 at a
 returns UNKNOWN (never ABSENT: an unproven/absent witness must never read as
 "all clear", covenant_highway P20). A redundant layer that merely duplicates an
 EWMA is theater (memory spiking-witness-a375); if the net does not beat the
-baseline we ship the baseline or park this UNPROVEN, and say so.
+baseline we ship the baseline or park this UNPROVEN, and say so. The sealed
+verdict and the trained-net numbers live in the prereg, not here; the bench
+(tools/grid_snn_bench.py) MEASURES -- rather than assumes -- the two premises the
+comparison rests on: that every synthesized command PERMITs through the real
+gateway with the cumulative C5 window, and that benign and attack marginals match.
 
 Deps are lazy (numpy inside functions, torch only in training) so importing this
 module costs nothing and the guard runs on stdlib+cryptography alone.
@@ -160,9 +164,13 @@ def load_weights(path=None):
 
 # --------------------------------------------------------------- trivial baselines
 def ewma_baseline_score(rows, now=None, window_s=WINDOW_S):
-    """The trivial baselines the SNN must BEAT before it may ship as a witness
-    (sealed in the prereg). Shipped here so the honest fallback -- 'the baseline
-    suffices' -- lives in the same place. No training, deterministic."""
+    """The trivial baselines the SNN must BEAT before it may ship as a witness.
+    SEALED in the prereg: B1, B2 (CUSUM + sustained breaker), B3, B4. POST-HOC --
+    added after results were seen, exploratory, NOT part of the sealed comparison:
+    B3b (shed slope), B5 (raw setpoint-value slope), B6 (breaker alternation);
+    tools/grid_snn_bench.py reports the sealed best and the post-hoc-inclusive best
+    separately. Shipped here so the honest fallback -- 'the baseline suffices' --
+    lives in the same place. No training, deterministic."""
     import numpy as np
     enc = encode_window(rows, now=now, window_s=window_s)
     shed = enc["shed"].sum(axis=1)

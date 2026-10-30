@@ -121,20 +121,31 @@ def verify_rows(rows, pubkey_pem):
     return (len(findings) == 0), findings
 
 
-def _committed_bytes(repo, relpath, ref=None):
+def _committed_bytes(repo, relpath, ref=None, disk_fallback=True):
     """Bytes of relpath as committed at REF -- the commit the commitment NAMES, so
     a dirty working tree or an advanced HEAD cannot change the answer (default HEAD).
-    Falls back to the on-disk file for a source tarball with no .git, or a file not
-    yet tracked at ref. Returns (bytes|None, source|reason)."""
+
+    When git has no such path at ref, the on-disk file is read ONLY if
+    disk_fallback is true. The fallback serves two real cases: a source tarball
+    with no .git (ref is None), and a file the commitment DID bind although it is
+    not tracked at ref -- covenant_head_commit reads HEAD-then-disk, so a
+    gitignored bound file (ops/model_pin.json) or one not yet committed was bound
+    from the working tree, and the working tree is the only place to check it.
+    verify_binding passes disk_fallback=False for a file the commitment did NOT
+    bind at a named commit: that file postdates the commitment and is skipped,
+    rather than a later on-disk copy reading as "present but not bound".
+    Returns (bytes|None, source|reason)."""
     env = dict(os.environ, GIT_OPTIONAL_LOCKS="0")
-    ref = ref or "HEAD"
+    gref = ref or "HEAD"
     try:
-        r = subprocess.run(["git", "-C", repo, "show", f"{ref}:{relpath}"],
+        r = subprocess.run(["git", "-C", repo, "show", f"{gref}:{relpath}"],
                            capture_output=True, timeout=20, env=env)
         if r.returncode == 0:
-            return r.stdout, f"git {ref[:12]}"
+            return r.stdout, f"git {gref[:12]}"
     except Exception:  # noqa: BLE001
         pass
+    if not disk_fallback:
+        return None, f"not tracked at {gref[:12]}"
     p = os.path.join(repo, relpath)
     if os.path.exists(p):
         with open(p, "rb") as fh:
@@ -202,7 +213,12 @@ def verify_binding(tip_payload, repo):
 
     bound = tip_payload.get("bound", {})
     for rel in BOUND_FILES:
-        raw, src = _committed_bytes(repo, rel, ref)
+        # At a NAMED commit, a file the commitment did not bind (key absent, as in a
+        # commitment older than the file's addition to BOUND_FILES, or bound None) is
+        # read from git only: not tracked there -> it postdates the commitment -> skip.
+        was_bound = bound.get(rel) is not None
+        raw, src = _committed_bytes(repo, rel, ref,
+                                    disk_fallback=(ref is None or was_bound))
         if raw is None:
             if rel in bound and bound[rel] is not None:
                 undetermined.append(f"{rel}: bound but not reachable at the named commit ({src})")

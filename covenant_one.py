@@ -619,7 +619,8 @@ SUITES = [
     # mutation-tested. Hermetic: fixture conditions, temp ledgers, no node and
     # no network, so it measures the rules rather than the machine.
     ("test_h1_highway.py", 180, "DAILY + GUARDS"),
-    # NA1 (2026-10-20): H1i names six protected subjects; the engine's NEVER_AUTOMATIC tuple has fourteen.
+    # NA1 (2026-10-20): H1i names six protected subjects; the engine's NEVER_AUTOMATIC tuple had fourteen
+    # (twenty-four since 2026-10-30: the grid/ICS-OT actuation words, A392).
     # NA1 drives every one through apply_remedy so the money/seat/rule/consent/key list cannot silently shrink.
     ("test_na1_never_automatic.py", 120, "DAILY + GUARDS"),
     # PB1 (2026-09-26, A231): the highway's two phone-build signals measure what they name -- a look that finds
@@ -778,6 +779,10 @@ SUITES = [
     ("test_oc1_octopus.py", 120, "JUDGE"),
     # A382: these existing suites were orphaned. Both isolate their grants/act gates; SW1 stubs all fetches.
     ("test_pg1_plug.py", 120, "SECURITY"),
+    # GG1/GS1 (2026-10-30): the grid guard's both-ways suite and the SNN witness's never-authorize guard. The
+    # pre-merge review found both unregistered, so nothing ran them; every GG1 fix is mutation-checked.
+    ("test_gg1_grid_guard.py", 180, "SECURITY"),
+    ("test_gs1_grid_snn.py", 120, "SECURITY"),
     ("test_sw1_study_web.py", 120, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
     # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every

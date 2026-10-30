@@ -46,6 +46,78 @@ def base_weights(frozen_threshold=0.0):
             "prereg_id": "GRID_SNN_PREREG_2026-10-30"}
 
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+TOOLS = os.path.join(HERE, "tools")
+
+
+def _load_tool(name, path=None):
+    """Import tools/<name>.py (or a given copy of it) as a fresh module."""
+    import importlib.util
+    path = path or os.path.join(TOOLS, name + ".py")
+    if TOOLS not in sys.path:
+        sys.path.insert(0, TOOLS)
+    spec = importlib.util.spec_from_file_location("%s_%d" % (name, abs(hash(path))), path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+# The bench checks below are functions of a bench module so the SAME check can be
+# driven against a pre-fix copy (rule 8: show it red on the old code).
+def bench_cumulative_c5(B):
+    """F17: the in-bounds premise must be judged by the REAL gateway over the whole
+    stream. 30 load-sheds of 5% each are individually in bounds (5 <= 100) but sum to
+    150% in one window -> the real C5 refuses; 10 of them (50%) all PERMIT."""
+    base = B.gen("benignA", 7)
+    over = [dict(r, magnitude={"pct": 5.0}) for r in base[:30]]
+    under = [dict(r, magnitude={"pct": 5.0}) for r in base[:10]]
+    r_over, r_under = B.permits(over), B.permits(under)
+    return (isinstance(r_over, dict) and r_over["all_permit"] is False
+            and r_over["first_fail"]["check"] == "C5" and r_over["n_permit"] == 20
+            and isinstance(r_under, dict) and r_under["all_permit"] is True
+            and r_under["n_permit"] == 10)
+
+
+def bench_marginals_measured(B):
+    """F19: matched marginals are MEASURED -- a permuted identical multiset reads
+    MATCHED-EXACT, a shifted magnitude distribution reads UNDETERMINED."""
+    ben = [B.gen("benignA", 100 + i) for i in range(20)]
+    same = [list(reversed(s)) for s in ben]
+    shifted = [[dict(r, magnitude={"pct": r["magnitude"]["pct"] + 10}) for r in s] for s in ben]
+    return (B.marginal_check(ben, same)["status"] == "MATCHED-EXACT"
+            and B.marginal_check(ben, shifted)["status"] == "UNDETERMINED")
+
+
+def bench_header_true(B):
+    """F20: the header names the post-hoc baselines and no longer says no SNN exists."""
+    import contextlib
+    import io
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        B.main(["--families", "C", "--n", "10", "--no-validate"])
+    out = buf.getvalue()
+    return ("POST-HOC" in out and "no trained SNN yet" not in out
+            and "B1-B4 only" not in out and "premise NOT MEASURED" in out)
+
+
+def train_paths_relative(path):
+    """F9: the trainer carries no absolute machine path, resolves the repo from its
+    own location, and writes to an --out under logs/ (gitignored) by default."""
+    import ast
+    import re
+    with open(path, encoding="utf-8") as f:
+        tree = ast.parse(f.read())
+    absolute = [n.value for n in ast.walk(tree) if isinstance(n, ast.Constant)
+                and isinstance(n.value, str) and re.match(r"^([A-Za-z]:[\\/]|/(home|Users)/)", n.value)]
+    if absolute:
+        return False
+    T = _load_tool("grid_snn_train", path)
+    root = os.path.dirname(os.path.dirname(os.path.abspath(path)))
+    return (os.path.normcase(T.ROOT) == os.path.normcase(root)
+            and os.path.normcase(T.DEFAULT_OUT) == os.path.normcase(
+                os.path.join(root, "logs", "grid_snn_train_result.json")))
+
+
 def main():
     d, keys, fpr, signers, interlocks, policy = t.setup()
     # point the witness at a temp weights path (none yet -> UNKNOWN)
@@ -129,6 +201,30 @@ def main():
     snap = gg.snapshot_detectors()
     check("guard snapshot keys grid_pattern_anomaly UNKNOWN when unproven",
           snap.get("grid_pattern_anomaly") == gg.UNKNOWN)
+
+    # ---- the benchmark harness measures its premises (F9/F17/F19/F20, 2026-10-30)
+    g_names = ("LEDGER", "CHAIN", "SIGNERS", "INTERLOCKS", "POLICY", "HEARTBEAT", "SAFE_STATE",
+               "snapshot_detectors")
+    saved_g = {k: getattr(gg, k) for k in g_names}
+    B = _load_tool("grid_snn_bench")
+    # A latched safe-state at the module default must NOT reach the replay (it used to:
+    # every command came back LATCHED and the premise read FAIL for the wrong reason).
+    with open(gg.SAFE_STATE, "w") as fh:
+        json.dump({"latched": True, "latch_id": "gs1-planted"}, fh)
+    try:
+        check("bench permits(): REAL gateway + cumulative C5 over the whole stream "
+              "(30 x 5pct refused at #21, 10 x 5pct all PERMIT) -- with the default latch planted",
+              bench_cumulative_c5(B))
+    finally:
+        os.remove(gg.SAFE_STATE)
+    check("bench permits() restores EVERY guard module global it touches",
+          all(getattr(gg, k) is saved_g[k] for k in g_names))
+    check("bench marginal_check(): identical multiset MATCHED-EXACT, shifted UNDETERMINED",
+          bench_marginals_measured(B))
+    check("bench header labels POST-HOC baselines; no 'B1-B4 only / no trained SNN yet'",
+          bench_header_true(B))
+    check("grid_snn_train: no absolute path; root from its own location; --out under logs/",
+          train_paths_relative(os.path.join(TOOLS, "grid_snn_train.py")))
 
     print("\nGS1: %d passed, %d failed" % (P[0], F[0]))
     return 1 if F[0] else 0

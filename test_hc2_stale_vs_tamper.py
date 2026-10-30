@@ -9,7 +9,9 @@ read as a tamper (a false alarm that fired the moment ac35ad3 landed, 2026-10-29
 Driven in a throwaway GIT repo:
   - a commitment at the tip verifies PASS;
   - after another commit (HEAD advances) it verifies STALE, exit 0 -- NOT a tamper;
-  - a fabricated/rewritten named commit, or a changed bound digest, is FAIL.
+  - a fabricated/rewritten named commit, or a changed bound digest, is FAIL;
+  - (S6-S8) a commitment older than a BOUND_FILES addition stays STALE, while a
+    bound gitignored file is still checked on disk and its tamper FAILs.
 Rule 8: the red (STALE must not be FAIL) is the exact bug this guards.
 """
 import copy
@@ -36,6 +38,66 @@ def _git(repo, *args):
     env = dict(os.environ, GIT_OPTIONAL_LOCKS="0",
                GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
     return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True, env=env)
+
+
+def _older_commitment_newer_bound_file():
+    """S6-S8 (2026-10-30). A file added to BOUND_FILES AFTER a commitment was made
+    (the grid-guard config) is not tracked at the commit that commitment names. The
+    verifier fell back to the ON-DISK copy and reported it "present at the named
+    commit but not bound" -> BINDING UNDETERMINED, where origin/main read STALE on the
+    same live ledger (head b4d9887). It must be skipped. The fallback stays for what
+    it really serves: a bound file that is never tracked (ops/model_pin.json is
+    gitignored and bound from disk) -- a tamper of it must still FAIL."""
+    grid = ("ops/grid_signers.json", "ops/grid_interlocks.json", "ops/grid_policy.json")
+    with tempfile.TemporaryDirectory() as repo, tempfile.TemporaryDirectory() as keys:
+        _git(repo, "init", "-q")
+        _git(repo, "config", "commit.gpgsign", "false")
+        os.makedirs(os.path.join(repo, "ops"))
+        open(os.path.join(repo, "MANIFEST.sha256"), "w").write("aa  x.py\n")
+        json.dump({"hash": "0000beef"}, open(os.path.join(repo, "genesis.json"), "w"))
+        open(os.path.join(repo, ".gitignore"), "w").write("ops/model_pin.json\n")
+        pin = os.path.join(repo, "ops", "model_pin.json")
+        open(pin, "w").write('{"pin": "a"}\n')                 # gitignored, bound from disk
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-q", "-m", "c1 (no grid files)")
+
+        key, pub, led = (os.path.join(keys, "k.key"), os.path.join(keys, "pub.pem"),
+                         os.path.join(keys, "hc.jsonl"))
+        hc.make_commitment(repo=repo, key_path=key, pubkey_path=pub, ledger=led, now=1700000100)
+        row = [json.loads(x) for x in open(led, encoding="utf-8") if x.strip()][-1]
+        p_none = copy.deepcopy(row["payload"])                # grid files bound None
+        p_absent = copy.deepcopy(row["payload"])              # older BOUND_FILES: keys absent
+        for g in grid:
+            p_absent["bound"].pop(g, None)
+
+        # the grid files arrive LATER, committed and on disk
+        for g in grid:
+            open(os.path.join(repo, g), "w").write('{"later": true}\n')
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-q", "-m", "c2 adds grid files")
+
+        for label, p in (("bound None", p_none), ("keys absent, as on the live ledger", p_absent)):
+            st, f = vhc.verify_binding(p, repo)
+            check(f"HC2 an older commitment whose named commit lacks a bound file is STALE ({label})",
+                  st == "STALE" and not any("not bound" in m for m in f), f"{st} {f}")
+
+        # S7: a file the commitment DID bind from disk (gitignored) -- tamper still FAILs
+        st, f = vhc.verify_binding(p_none, repo)
+        check("HC2 the gitignored bound file is checked against disk (honest -> no finding)",
+              not any("model_pin" in m for m in f), f"{st} {f}")
+        open(pin, "w").write('{"pin": "TAMPERED"}\n')
+        st, f = vhc.verify_binding(p_none, repo)
+        check("HC2 a tamper of a bound, never-tracked file still FAILs",
+              st == "FAIL" and any("ops/model_pin.json: digest mismatch" in m for m in f), f"{st} {f}")
+        open(pin, "w").write('{"pin": "a"}\n')
+
+        # S8: a grid file a commitment DID bind (digest) but that is absent at the named
+        # commit is not skipped -- it is checked, and a mismatch FAILs
+        p_claim = copy.deepcopy(p_none)
+        p_claim["bound"]["ops/grid_policy.json"] = "ab" * 32
+        st, f = vhc.verify_binding(p_claim, repo)
+        check("HC2 a bound digest for a file absent at the named commit is not silently skipped",
+              st == "FAIL" and any("ops/grid_policy.json" in m for m in f), f"{st} {f}")
 
 
 def main():
@@ -87,6 +149,8 @@ def main():
         # S5: an honest STALE binding re-reads as STALE (idempotent, not drifting to FAIL)
         st3, _ = vhc.verify_binding(rows[-1]["payload"], tmp)
         check("HC2 the honest advanced-tree binding is STALE", st3 == "STALE", st3)
+
+    _older_commitment_newer_bound_file()
 
     passed, total = sum(_results), len(_results)
     print(f"\nHC2: {passed}/{total} checks passed")

@@ -1016,6 +1016,58 @@ def main():
     check("H1gh restart_git_host dry_run acts on nothing -- just reports intent",
           H.remedy_restart_git_host({}, dry_run=True)[0] is True)
 
+    # ---- H1gr: the remedy's "it came back" is the DETECTOR's "alive" (2026-10-30) --
+    # detect_git_host_down reads ANY HTTP answer (a 404 included) as the process alive.
+    # The remedy used to count success only on a 200, so a restarted server answering
+    # 404 was ledgered as a FAILED remedy while the detector read ABSENT -- two
+    # definitions of one fact. Driven both ways, with EVERY action stubbed: the launcher
+    # is a temp marker, subprocess.run is a spy (no pkill, no wscript, no WSL), sleep is
+    # a no-op, and the probe URL is a stub server or a closed port. Nothing real is
+    # killed or launched.
+    import subprocess as _gsub
+    _gr_saved = (H._githost_launcher, H.GITHOST_HEALTH, _gsub.run, H.time.sleep)
+    _gr_argv = []
+
+    def _gr_spy_run(argv, *a, **k):
+        _gr_argv.append(list(argv))
+        return _gsub.CompletedProcess(argv, 0, "", "")
+
+    def _gr_restart(url):
+        _gr_argv.clear()
+        H._githost_launcher = lambda: _ghmark
+        H.GITHOST_HEALTH = url
+        _gsub.run = _gr_spy_run
+        H.time.sleep = lambda *_a, **_k: None
+        try:
+            return H.remedy_restart_git_host({}, dry_run=False)
+        finally:
+            (H._githost_launcher, H.GITHOST_HEALTH, _gsub.run, H.time.sleep) = _gr_saved
+
+    _gr4 = _hsrv.HTTPServer(("127.0.0.1", 0), _Gh404)
+    _gr4t = _hth.Thread(target=_gr4.serve_forever, daemon=True)
+    _gr4t.start()
+    try:
+        _gr4url = "http://127.0.0.1:%d/info/refs" % _gr4.server_address[1]
+        _gr_d = H.detect_git_host_down(url=_gr4url, marker=_ghmark)
+        _gr_ok, _gr_msg = _gr_restart(_gr4url)
+    finally:
+        _gr4.shutdown()
+    check("H1gr a restarted git host answering 404 is a SUCCESSFUL remedy -- the same 'alive' the detector "
+          "reads ABSENT, not a failure ledgered against a live server",
+          _gr_d["state"] == H.ABSENT and _gr_ok is True, "detector=%s remedy=%r" % (_gr_d["state"], (_gr_ok, _gr_msg)))
+    check("H1gr ...and the remedy is otherwise unchanged: it ended the server by its script and relaunched "
+          "via the launcher (both STUBBED -- nothing real ran)",
+          _gr_argv == [["wsl.exe", "-d", "Ubuntu", "--", "pkill", "-f", "git_http_server.py"],
+                       ["wscript.exe", _ghmark]], _gr_argv)
+
+    _gr_ok2, _gr_msg2 = _gr_restart("http://127.0.0.1:%d/info/refs" % _gdp)     # closed port: no answer at all
+    _gr_d2 = H.detect_git_host_down(url="http://127.0.0.1:%d/info/refs" % _gdp, marker=_ghmark)
+    check("H1gr broken the other way: no response at all after the restart (transport failure) is a FAILED "
+          "remedy, exactly where the detector still reads PRESENT",
+          _gr_d2["state"] == H.PRESENT and _gr_ok2 is False, "detector=%s remedy=%r" % (_gr_d2["state"], (_gr_ok2, _gr_msg2)))
+    check("H1gr nothing was left patched: the launcher, the probe URL, subprocess.run and sleep are the real ones",
+          (H._githost_launcher, H.GITHOST_HEALTH, _gsub.run, H.time.sleep) == _gr_saved)
+
     # ---- H1pb: phone_build_failed (2026-09-27), the same stub API and clock --
     # dispatch_phone_build was told "accepted (HTTP 204)" and nothing ever read
     # whether the build it asked for arrived: three failed on a full artifact
