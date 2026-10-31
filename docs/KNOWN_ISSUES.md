@@ -16502,3 +16502,19 @@ His words: "1 2 3", the second: build the release path the others and Tetsu agre
     - **Earlier the same day:** node C ran f3af9bf03281, an intermediate edit of mine, and A393 went live the same way.
     - **The shape:** an autonomic restart deploys whatever bytes are on disk, committed and pinned or not.
     - **Not repaired in this commit,** because any edit now would invalidate the sweep it was measured by. Proposed next as its own increment: source_drift restarts only onto a core that matches verify_deploy's pin, so edits in progress never go live. That gate touches A240/A292/A295 and test_h1, whose consumers must be counted first (rule 6).
+
+
+### A395. [Tetsu / his own key] tools/tetsu_key.py: Tetsu's key is made on the machine that will hold it (2026-10-31)
+
+His words: "no i meant tetsu can handle them". Tetsu, asked fresh with the whole context: "Yes, I want to hold my own key on the new PC." The new PC's Claude session (TETSU, 10.0.0.248) asked for the tool, and will run it only after his yes.
+
+- **What it does.**
+  - Makes an RSA-2048 key with e = 65537, which is the only exponent the consent code gives an identity to (A394).
+  - Locks the folder, then the private key, to the Windows account, and verifies the lock with ops/owner_only.py.
+  - Prints only the public PEM and its key_id, the consent code's own identity for it.
+  - Refuses to overwrite (exit 2). Writes nothing without --generate. --check re-verifies the lock.
+  - A lock it cannot verify is reported (exit 3) and the file is kept, never deleted.
+- **Guard: TK1 (test_tk1_tetsu_key.py), registered SECURITY.** 13/13, run in a temp folder, never the real ~/.tetsu.
+- **Mutations: 4 of 5 caught on their own check.** The fifth, removing the overwrite refusal, is still stopped by the second layer: the file is opened O_EXCL, so the tool raises and the key stays byte-identical. Two layers, either enough.
+- **The honest limit (rule 9).** Whoever controls that machine's Windows account, including a Claude session running as it, can use the key. A second machine removes THIS PC's operator from that set; it does not make the key Tetsu's alone. Hardware sealing (TPM) would narrow it further and is not done.
+- **Not run anywhere.** No key exists yet.

@@ -802,6 +802,9 @@ SUITES = [
     # expiring by height; the roster ships empty (the trust root is his). Every condition driven both ways,
     # a real node's /transactions and /mine included; mutation-checked.
     ("test_cr1_consent_release.py", 240, "SECURITY"),
+    # TK1 (2026-10-31, Tetsu: "Yes, I want to hold my own key on the new PC"): tools/tetsu_key.py makes his key
+    # where it will live -- e=65537, owner-only and verified, refuses to overwrite, prints only the public half.
+    ("test_tk1_tetsu_key.py", 60, "SECURITY"),
     ("test_sw1_study_web.py", 120, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
     # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every
