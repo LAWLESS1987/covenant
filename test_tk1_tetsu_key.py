@@ -36,9 +36,14 @@ def check(label, cond, detail=""):
 
 
 def run(argv):
+    """The tool's exit code and output. A crash is an answer too ("EXC"), so a check reads it under its own name."""
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
-        rc = TK.main(argv)
+        try:
+            rc = TK.main(argv)
+        except Exception as e:                                   # noqa: BLE001 -- reported, never hidden
+            rc = "EXC"
+            print("%s: %s" % (type(e).__name__, e))
     return rc, out.getvalue()
 
 
@@ -119,6 +124,61 @@ def main():
           rc == 3 and "could NOT be verified" in out and os.path.exists(p2), (rc, out[:200]))
     check("TK1g ...and no public half or record is written for an unverified key",
           not os.path.exists(_pub2) and not os.path.exists(_rec2))
+
+    # TK1i -- the half-made key from TK1g (exit 3) can be FINISHED. Measured on TETSU on 2026-10-31: there was no
+    # way to complete it, and --check crashed on the missing public half.
+    rc, out = run(["--dir", folder2, "--check"])
+    check("TK1i --check on a half-made key says so (exit 5) instead of crashing", rc == 5 and "--finish" in out,
+          (rc, out[:200]))
+    with open(p2, "rb") as fh:
+        half_bytes = fh.read()
+    if os.name == "nt":
+        # as on TETSU: the half-made key carries a stray ACE that --finish must clear by re-locking, not ignore
+        subprocess.run(["icacls", os.path.abspath(p2), "/grant", "*S-1-1-0:(R)"], capture_output=True)
+    rc, out = run(["--dir", folder2, "--finish"])
+    with open(p2, "rb") as fh:
+        after_finish = fh.read()
+    pub2_pem = open(_pub2, encoding="utf-8").read() if os.path.exists(_pub2) else ""
+    check("TK1i --finish re-locks, verifies and writes the public half of the SAME key (exit 0)",
+          rc == 0 and after_finish == half_bytes and pub2_pem and R.key_id(pub2_pem) in out, (rc, out[:200]))
+    check("TK1i ...never printing the private key", "PRIVATE KEY" not in out)
+    try:
+        TK._verify(p2)
+        finished_locked = True
+    except Exception as e:                                       # noqa: BLE001
+        finished_locked = "%s: %s" % (type(e).__name__, str(e)[:160])
+    check("TK1i ...and the finished key is owner-only again (the stray ACE was cleared, not ignored)",
+          finished_locked is True, finished_locked)
+    rc, out = run(["--dir", folder2, "--finish"])
+    check("TK1i ...and a second --finish REFUSES (exit 2)", rc == 2 and "REFUSED" in out, (rc, out[:200]))
+
+    # TK1h -- the lock removes explicit ACEs for other principals (TETSU: an explicit ReadAndExecute ACE for the
+    # creating logon session survived /inheritance:r /grant:r and the verify refused the key).
+    if os.name == "nt":
+        # The probes sit in a folder that grants Everyone INHERITABLY, so a lock that let inheritance back in
+        # would leave Everyone on the file and fail -- an owner-only temp folder would hide that.
+        open_dir = os.path.join(base, "open_parent")
+        os.makedirs(open_dir, exist_ok=True)
+        subprocess.run(["icacls", open_dir, "/grant", "*S-1-1-0:(OI)(CI)(RX)"], capture_output=True)
+        for label, sid in (("Everyone (a named principal)", "*S-1-1-0"),
+                           ("a logon-session SID (unresolvable, as on TETSU)", "*S-1-5-5-0-4242")):
+            probe = os.path.join(open_dir, "acl_probe_%d.txt" % len(_results))
+            with open(probe, "w") as fh:
+                fh.write("probe")
+            g = subprocess.run(["icacls", probe, "/grant", "%s:(RX)" % sid], capture_output=True, text=True)
+            try:
+                TK._verify(probe)
+                before = "verified"
+            except Exception as e:                                  # noqa: BLE001
+                before = "refused"
+            try:
+                TK._lock(probe)
+                TK._verify(probe)
+                after = "verified"
+            except Exception as e:                                  # noqa: BLE001
+                after = "%s: %s" % (type(e).__name__, str(e)[:160])
+            check("TK1h an explicit ACE for %s is REMOVED by the lock (refused before, verified after)" % label,
+                  g.returncode == 0 and before == "refused" and after == "verified", (g.returncode, before, after))
 
     passed, total = sum(_results), len(_results)
     print(f"\nTK1: {passed}/{total} checks passed")

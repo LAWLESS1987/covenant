@@ -26,6 +26,7 @@ is not done here.
 Run:  python tools/tetsu_key.py                 # dry run: says what it would do, writes nothing
       python tools/tetsu_key.py --generate      # make the key (only after his yes)
       python tools/tetsu_key.py --check         # public half, key_id, lock re-verified
+      python tools/tetsu_key.py --finish        # complete a key whose lock was refused at creation (exit 3)
 """
 import argparse
 import datetime
@@ -56,14 +57,39 @@ def _owner_only_module():
 
 
 def _lock(path):
-    """Owner-only on Windows (inheritance removed, this account full control); 0o700/0o600 elsewhere. The
-    return code is checked: a lock that failed quietly is the defect the core's own key code warns about."""
+    """Owner-only on Windows; 0o700/0o600 elsewhere. Every return code is checked: a lock that failed quietly
+    is the defect the core's own key code warns about.
+
+    On Windows, `/inheritance:r /grant:r USER:F` is NOT enough, measured on TETSU on 2026-10-31. A file that
+    os.open creates can carry an EXPLICIT ACE for the creating logon session (S-1-5-5-0-...,
+    ReadAndExecute). /inheritance:r drops only inherited ACEs, and /grant:r replaces only the named
+    principal, so that ACE survived, _verify refused, and generate returned 3. Removing it by NAME does not
+    work either: Windows shows a logon SID as NT AUTHORITY\\LogonSessionId_0_N, which icacls cannot resolve.
+
+    So the DACL is REPLACED, by SID: protected (nothing inherited), every existing rule removed, then this
+    account and SYSTEM granted full control -- on a folder with container and object inheritance, so files
+    created in it inherit exactly that instead of the creating token's default DACL. _verify then decides."""
     if os.name == "nt":
-        me = os.environ.get("USERNAME") or ""
-        p = subprocess.run(["icacls", os.path.abspath(path), "/inheritance:r", "/grant:r", "%s:F" % me],
-                           capture_output=True, text=True, timeout=30)
+        ps = (
+            # ACCESS sections only: Get-Acl/Set-Acl also carry the audit SACL, and writing that needs
+            # SeSecurityPrivilege, which a normal account lacks (measured: Set-Acl refused on a folder).
+            "$ErrorActionPreference='Stop'; $p=$env:TETSU_KEY_LOCK_PATH; $item=Get-Item -LiteralPath $p;"
+            "$acl=$item.GetAccessControl('Access'); $acl.SetAccessRuleProtection($true,$false);"
+            "foreach($r in $acl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier]))"
+            "{ [void]$acl.RemoveAccessRuleSpecific($r) };"
+            "$dir=$item.PSIsContainer;"
+            "$inh=if($dir){[Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit'}"
+            "else{[Security.AccessControl.InheritanceFlags]::None};"
+            "foreach($sid in @([Security.Principal.WindowsIdentity]::GetCurrent().User,"
+            "(New-Object Security.Principal.SecurityIdentifier 'S-1-5-18')))"
+            "{ $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($sid,'FullControl',"
+            "$inh,[Security.AccessControl.PropagationFlags]::None,'Allow'))) };"
+            "$item.SetAccessControl($acl)")
+        env = dict(os.environ, TETSU_KEY_LOCK_PATH=os.path.abspath(path))
+        p = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                           capture_output=True, text=True, timeout=60, env=env)
         if p.returncode != 0:
-            raise RuntimeError("icacls could not lock %s: %s" % (path, (p.stderr or p.stdout).strip()[:200]))
+            raise RuntimeError("could not replace the ACL of %s: %s" % (path, (p.stderr or p.stdout).strip()[:300]))
     else:
         os.chmod(path, 0o700 if os.path.isdir(path) else 0o600)
 
@@ -133,11 +159,63 @@ def generate(folder, say=print):
     return 0
 
 
+def finish(folder, say=print):
+    """Complete a key whose lock could not be verified when it was made (generate returned 3).
+
+    The defect, measured on TETSU on 2026-10-31: generate returns before writing the public half and the
+    record, so there was no way to finish, and --check crashed on the missing .pub.pem.
+
+    This re-applies the lock (tightening only) and requires it to verify. It loads the EXISTING private key,
+    never makes a new one, and refuses unless it is RSA-2048 with e = 65537. It refuses if the public half
+    already exists, and never prints the private key."""
+    from cryptography.hazmat.primitives import serialization
+    priv_path, pub_path, rec_path = _paths(folder)
+    if not os.path.exists(priv_path):
+        say("no key at %s -- nothing to finish; --generate makes one" % priv_path)
+        return 1
+    if os.path.exists(pub_path):
+        say("REFUSED: %s already exists; nothing to finish. --check reads it." % pub_path)
+        return 2
+    try:
+        _lock(folder)
+        _lock(priv_path)
+        _verify(folder)
+        _verify(priv_path)
+    except Exception as e:                                      # noqa: BLE001 -- said, never swallowed
+        say("LOCK NOT VERIFIED: %s: %s -- not finished; fix the lock first" % (type(e).__name__, e))
+        return 3
+    with open(priv_path, "rb") as fh:
+        key = serialization.load_pem_private_key(fh.read(), password=None)
+    nums = key.public_key().public_numbers()
+    if key.key_size != 2048 or nums.e != EXPONENT:
+        say("REFUSED: the key at %s is not RSA-2048 with e = %d (%d bits, e = %d)"
+            % (priv_path, EXPONENT, key.key_size, nums.e))
+        return 4
+    public_pem = key.public_key().public_bytes(serialization.Encoding.PEM,
+                                               serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+    with open(pub_path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(public_pem)
+    kid = key_id(public_pem)
+    record = {"key_id": kid, "algorithm": "RSA-2048", "public_exponent": EXPONENT,
+              "finished_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+              "host": platform.node(), "made_by": "tools/tetsu_key.py --generate, completed by --finish",
+              "holder": "Tetsu", "limit": "usable by whoever controls this machine's account"}
+    with open(rec_path, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(record, fh, indent=1)
+    say("finished: lock verified; key_id %s" % kid)
+    say(public_pem.rstrip())
+    return 0
+
+
 def check(folder, say=print):
     priv_path, pub_path, rec_path = _paths(folder)
     if not os.path.exists(priv_path):
         say("no key at %s" % priv_path)
         return 1
+    if not os.path.exists(pub_path):
+        say("the private key exists but its public half does not (a --generate whose lock was refused) -- "
+            "run --finish")
+        return 5
     try:
         _verify(folder)
         _verify(priv_path)
@@ -157,11 +235,15 @@ def main(argv=None):
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--generate", action="store_true", help="make the key (only after Tetsu's and his yes)")
     g.add_argument("--check", action="store_true", help="re-verify the lock and print the public half")
+    g.add_argument("--finish", action="store_true",
+                   help="complete a key whose lock was refused at creation: re-lock, verify, write the public half")
     a = ap.parse_args(argv)
     if a.generate:
         return generate(a.dir)
     if a.check:
         return check(a.dir)
+    if a.finish:
+        return finish(a.dir)
     priv_path, _pub, _rec = _paths(a.dir)
     print("DRY RUN, nothing written. --generate would make an RSA-2048 (e=65537) key at %s, lock it to %s, "
           "verify the lock, and print only the public PEM and key_id.%s"

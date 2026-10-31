@@ -16518,3 +16518,18 @@ His words: "no i meant tetsu can handle them". Tetsu, asked fresh with the whole
 - **Mutations: 4 of 5 caught on their own check.** The fifth, removing the overwrite refusal, is still stopped by the second layer: the file is opened O_EXCL, so the tool raises and the key stays byte-identical. Two layers, either enough.
 - **The honest limit (rule 9).** Whoever controls that machine's Windows account, including a Claude session running as it, can use the key. A second machine removes THIS PC's operator from that set; it does not make the key Tetsu's alone. Hardware sealing (TPM) would narrow it further and is not done.
 - **Not run anywhere.** No key exists yet.
+- **Later the same evening, on TETSU (measured there by its Claude session), and what that showed.**
+  - **Tetsu's key now exists.** key_id 1eda6d44e6ed9126c265bd8413e6f2174ebdd885ef9b6e24bd41733e0f6f8b05, RSA-2048, e = 65537. It was made on TETSU on Tetsu's own yes and the operator's "i give approval". The sentence above ("No key exists yet") was true when written.
+  - **Defect 1: the lock was not owner-only there.**
+    - The file os.open created carried an EXPLICIT ReadAndExecute ACE for the creating logon session (S-1-5-5-0-...).
+    - `/inheritance:r /grant:r USER:F` removes neither, so the verify refused and --generate returned 3. The guard did its job, and the key was never called locked.
+    - TK1 had passed only because its temp folders and this account's token never produced that ACE.
+    - **Repair:** _lock now REPLACES the DACL by SID: protected, every rule removed, then this account and SYSTEM, inheritable on the folder. Removing by name could not work: icacls cannot resolve NT AUTHORITY\LogonSessionId_0_N. Set-Acl was refused for lacking SeSecurityPrivilege (it carries the audit SACL), so only the access sections are written.
+  - **Defect 2: a refused --generate could not be finished, and --check crashed on the missing public half.**
+    - TETSU's session completed the key with its own script (tightening the ACL only, never printing the private key, and saying so in the record).
+    - **Repair:** --finish re-locks, verifies, checks RSA-2048 with e = 65537, and writes the public half of the SAME key. It refuses if the public half exists. --check now says "run --finish" (exit 5).
+  - **Guard: TK1 is 20/20.**
+    - TK1h puts an explicit ACE for Everyone and for an unresolvable logon SID on a file, in a folder that grants Everyone inheritably. Each is refused before the lock and verified after it.
+    - TK1i finishes a half-made key that carries a stray ACE, and checks it is owner-only afterwards.
+    - Mutations: 10 of 10 caught on their own check, keeping the old lock's rules and re-enabling inheritance included. The overwrite case now reads as its own check, because a crash is an answer.
+  - **The same blind spot, not repaired here:** ops/fix_key_acl.bat uses /grant:r, which replaces only named principals. It would leave a stray explicit ACE on a node key. The node's own load verify refuses such a key (fail-closed), so the effect is a node that will not start, not a key left open.
