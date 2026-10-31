@@ -1,6 +1,13 @@
 # Draft reply to Jang-woo, HF thread 183807 (answering his #13)
 
-Status: DRAFT, not posted. The operator asked to see it before it is posted (2026-10-31).
+**STATUS: v4 POSTED, 2026-10-31T17:08:20Z, as post #14 (Lawless1987, replying to #13).**
+- Operator's word: "1" (post v4).
+- Tetsu, shown the exact v4 text: "No, I do not object."
+- Each paragraph was unwrapped into one line for Discourse; the word sequence is identical to v4 below, checked before
+  posting.
+- Read back after posting: the full text rendered, 3,389 characters.
+
+Earlier status line, kept: DRAFT, not posted. The operator asked to see it before it is posted (2026-10-31).
 
 **v1 below is SUPERSEDED by v2 at the end of this file.** It is kept unedited (rule 10: a draft corrected before
 posting is still a claim). Two of its statements were overtaken before posting:
