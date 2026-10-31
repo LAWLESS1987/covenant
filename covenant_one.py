@@ -783,6 +783,13 @@ SUITES = [
     # pre-merge review found both unregistered, so nothing ran them; every GG1 fix is mutation-checked.
     ("test_gg1_grid_guard.py", 180, "SECURITY"),
     ("test_gs1_grid_snn.py", 120, "SECURITY"),
+    # CC1/HC1/HC2/HW1 (2026-10-31): the consent chain, the signed HEAD-commitment ledger and its verifier,
+    # stale-vs-tamper, and the two takeover detectors. They shipped unregistered, so public CI on 943b809 read
+    # "orphaned on disk" and INCOMPLETE. Measured before adding, clean Linux copy and this PC: 7/7, 7/7, 10/10, 12/12.
+    ("test_cc1_consent_chain.py", 60, "SECURITY"),
+    ("test_hc1_head_commitment.py", 60, "SECURITY"),
+    ("test_hc2_stale_vs_tamper.py", 60, "SECURITY"),
+    ("test_hw1_takeover_detectors.py", 60, "SECURITY"),
     ("test_sw1_study_web.py", 120, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
     # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every
@@ -859,6 +866,14 @@ DELIBERATELY_OFF = {
         "question. Nothing about it can fail.",
     "verify_csv.py":        "data utility, run against realdata by hand",
     "verify_deploy.py":     "an ACTION (restarts nodes) -- runs under --restart",
+    "verify_grid_ledger.py":
+        "a STANDALONE verifier a stranger runs against a grid ledger, not a "
+        "suite. Driven both ways inside GG1 (signed rows PASS, an edited row "
+        "FAILs).",
+    "verify_head_commitment.py":
+        "a STANDALONE verifier a stranger runs against the published HEAD "
+        "ledger, not a suite. Driven both ways inside HC1 (rows) and HC2 "
+        "(stale vs tamper).",
     "trace_runner.py":      "helper, not a suite",
     # NOT a wiring oversight. run_all_tests.sh names this suite; it exists
     # NOWHERE on the production PC, and the fix it tests exists nowhere either:
