@@ -950,8 +950,30 @@ def main():
     check("H1hs restart_headscale is AUTO_REVERSIBLE and answers headscale_down",
           H.REMEDIES["restart_headscale"]["klass"] == H.AUTO_REVERSIBLE
           and "headscale_down" in H.REMEDIES["restart_headscale"]["for"])
-    check("H1hs restart_headscale dry_run acts on nothing -- just reports intent",
-          H.remedy_restart_headscale({}, dry_run=True)[0] is True)
+    # The dry run reads the REAL launcher path under APPDATA, so a stub APPDATA is planted
+    # both ways: a check that read this PC's own Startup folder passed here and went red on
+    # CI, where no launcher exists (2026-10-30, run 41141403776).
+    def _with_appdata(launcher, fn):
+        root = tempfile.mkdtemp(prefix="h1appdata_")
+        if launcher:
+            sd = os.path.join(root, "Microsoft", "Windows", "Start Menu", "Programs", "Startup")
+            os.makedirs(sd)
+            open(os.path.join(sd, launcher), "w").write("x")
+        old = os.environ.get("APPDATA")
+        os.environ["APPDATA"] = root
+        try:
+            return fn()
+        finally:
+            if old is None:
+                os.environ.pop("APPDATA", None)
+            else:
+                os.environ["APPDATA"] = old
+
+    r = _with_appdata("CovenantHeadscale.vbs", lambda: H.remedy_restart_headscale({}, dry_run=True))
+    check("H1hs restart_headscale dry_run acts on nothing -- just reports intent", r[0] is True, str(r))
+    r = _with_appdata(None, lambda: H.remedy_restart_headscale({}, dry_run=True))
+    check("H1hs broken the other way: no launcher here -> the remedy refuses, even as a dry run",
+          r[0] is False, str(r))
 
     # ---- H1gh: git_host_down + restart_git_host (2026-10-30) --------------------
     # Resilience for our own smart-HTTP git host, the sibling of headscale_down. AUTO-
@@ -1013,8 +1035,11 @@ def main():
     check("H1gh restart_git_host is AUTO_REVERSIBLE and answers git_host_down",
           H.REMEDIES["restart_git_host"]["klass"] == H.AUTO_REVERSIBLE
           and "git_host_down" in H.REMEDIES["restart_git_host"]["for"])
-    check("H1gh restart_git_host dry_run acts on nothing -- just reports intent",
-          H.remedy_restart_git_host({}, dry_run=True)[0] is True)
+    r = _with_appdata("CovenantGitHost.vbs", lambda: H.remedy_restart_git_host({}, dry_run=True))
+    check("H1gh restart_git_host dry_run acts on nothing -- just reports intent", r[0] is True, str(r))
+    r = _with_appdata(None, lambda: H.remedy_restart_git_host({}, dry_run=True))
+    check("H1gh broken the other way: no launcher here -> the remedy refuses, even as a dry run",
+          r[0] is False, str(r))
 
     # ---- H1gr: the remedy's "it came back" is the DETECTOR's "alive" (2026-10-30) --
     # detect_git_host_down reads ANY HTTP answer (a 404 included) as the process alive.

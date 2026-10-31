@@ -14,7 +14,11 @@ import json
 import os
 import sys
 
-import numpy as np
+try:
+    import numpy as np                       # optional: the witness's own mechanism needs it
+    _HAVE_NP = True
+except ImportError:                          # public CI installs requirements.txt only
+    _HAVE_NP = False
 
 import test_gg1_grid_guard as t
 import covenant_grid_guard as gg
@@ -118,8 +122,53 @@ def train_paths_relative(path):
                 os.path.join(root, "logs", "grid_snn_train_result.json")))
 
 
+def boundary_checks(keys, fpr, signers, interlocks, policy):
+    """The LOAD-BEARING boundary: none of it needs numpy, so it runs everywhere."""
+    # ---- SOURCE INVARIANT: authorize() must never reference the witness (anti-smuggle)
+    src = inspect.getsource(gg.authorize)
+    check("authorize() source contains no 'snn' / 'pattern_anomaly' (gate stays deterministic)",
+          "snn" not in src.lower() and "pattern_anomaly" not in src.lower())
+
+    # ---- BOUNDARY PURITY: authorize() decision identical whether the witness imports or not
+    env = t.actuation(keys, fpr, signers, policy, seq=100)
+    dec_with = t.A(env, signers, interlocks, policy)
+    saved = sys.modules.get("covenant_grid_snn")
+    sys.modules["covenant_grid_snn"] = None      # force ImportError on deferred import
+    try:
+        dec_without = t.A(env, signers, interlocks, policy)
+    finally:
+        sys.modules["covenant_grid_snn"] = saved
+    check("authorize() decision is byte-identical with the witness present vs absent",
+          json.dumps(dec_with, sort_keys=True) == json.dumps(dec_without, sort_keys=True))
+
+    # ---- NEVER AUTHORIZE: a screaming witness changes no gateway decision
+    import tempfile as _tf
+    fresh_led = os.path.join(_tf.mkdtemp(), "g.jsonl")
+    fresh_ch = fresh_led + ".chain"
+    orig = snn.pattern_anomaly_state
+    snn.pattern_anomaly_state = lambda **k: gg._st(gg.PRESENT, recommend="HOLD", note="forced")
+    try:
+        gw2 = gg.GridEffectorGateway(ledger=fresh_led, chain=fresh_ch, heartbeat=gg.HEARTBEAT)
+        t.fresh_heartbeat()
+        ok_env = t.actuation(keys, fpr, signers, policy, seq=0)   # one breaker op in a fresh window
+        dd = gw2.submit(ok_env)
+        bad = t.actuation(keys, fpr, signers, policy, seq=1, both=False)   # missing authz
+        db = gw2.submit(bad)
+        check("a PERMIT still PERMITs even while the witness screams PRESENT",
+              dd["decision"] == gg.PERMIT)
+        check("a REFUSE still REFUSEs; the witness can alarm, never clear/actuate",
+              db["decision"] == gg.REFUSE and db["failed_check"] == "C6")
+    finally:
+        snn.pattern_anomaly_state = orig
+
+
 def main():
     d, keys, fpr, signers, interlocks, policy = t.setup()
+    if not _HAVE_NP:
+        boundary_checks(keys, fpr, signers, interlocks, policy)
+        print("\nGS1: mechanism checks NOT RUN -- numpy absent; the boundary checks above still ran.")
+        print("GS1: %d passed, %d failed" % (P[0], F[0]))
+        return 1 if F[0] else 0
     # point the witness at a temp weights path (none yet -> UNKNOWN)
     snn.WEIGHTS = os.path.join(d, "grid_snn_weights.npz")
     gw = honor_many(keys, fpr, signers, policy, n=12)
@@ -159,42 +208,7 @@ def main():
     # ---- determinism: identical score across repeated calls (no RNG at inference)
     check("encode+run_lif deterministic", snn.run_lif(enc, base_weights(0.0)) == hi)
 
-    # ---- SOURCE INVARIANT: authorize() must never reference the witness (anti-smuggle)
-    src = inspect.getsource(gg.authorize)
-    check("authorize() source contains no 'snn' / 'pattern_anomaly' (gate stays deterministic)",
-          "snn" not in src.lower() and "pattern_anomaly" not in src.lower())
-
-    # ---- BOUNDARY PURITY: authorize() decision identical whether the witness imports or not
-    env = t.actuation(keys, fpr, signers, policy, seq=100)
-    dec_with = t.A(env, signers, interlocks, policy)
-    saved = sys.modules.get("covenant_grid_snn")
-    sys.modules["covenant_grid_snn"] = None      # force ImportError on deferred import
-    try:
-        dec_without = t.A(env, signers, interlocks, policy)
-    finally:
-        sys.modules["covenant_grid_snn"] = saved
-    check("authorize() decision is byte-identical with the witness present vs absent",
-          json.dumps(dec_with, sort_keys=True) == json.dumps(dec_without, sort_keys=True))
-
-    # ---- NEVER AUTHORIZE: a screaming witness changes no gateway decision
-    import tempfile as _tf
-    fresh_led = os.path.join(_tf.mkdtemp(), "g.jsonl")
-    fresh_ch = fresh_led + ".chain"
-    orig = snn.pattern_anomaly_state
-    snn.pattern_anomaly_state = lambda **k: gg._st(gg.PRESENT, recommend="HOLD", note="forced")
-    try:
-        gw2 = gg.GridEffectorGateway(ledger=fresh_led, chain=fresh_ch, heartbeat=gg.HEARTBEAT)
-        t.fresh_heartbeat()
-        ok_env = t.actuation(keys, fpr, signers, policy, seq=0)   # one breaker op in a fresh window
-        dd = gw2.submit(ok_env)
-        bad = t.actuation(keys, fpr, signers, policy, seq=1, both=False)   # missing authz
-        db = gw2.submit(bad)
-        check("a PERMIT still PERMITs even while the witness screams PRESENT",
-              dd["decision"] == gg.PERMIT)
-        check("a REFUSE still REFUSEs; the witness can alarm, never clear/actuate",
-              db["decision"] == gg.REFUSE and db["failed_check"] == "C6")
-    finally:
-        snn.pattern_anomaly_state = orig
+    boundary_checks(keys, fpr, signers, interlocks, policy)
 
     # ---- the detector keys UNKNOWN in the guard snapshot when weights absent
     os.remove(snn.WEIGHTS)
