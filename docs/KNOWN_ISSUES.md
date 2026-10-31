@@ -16425,3 +16425,80 @@ His words: "this seems like a very big flaw that we must fix. And we should do i
   - **Round 3 (`.venv`):** RESULT: PASS, 244 suites, 6,676 checks, 0 failed, 0 not clean, unmeasured, absent or orphaned, gates PASS.
   - **Beside the live chain:** A124 is 3/3 (122 judged payloads in nodeA_prod.db, none convicted, the closest 0.268 from the line). The new rule fires on 0 of those 122.
 - **What the post promised, run:** our gate's cases against Jang-woo's preflight, read as text and never executed (ops/ESP_COMPARISON_2026-10-31.md). Before the repair our gate admitted 7 of 13 claimed-consent cases, and CO1 holds all 7. His declared owner condition, measured from the system, holds them whatever the wording, the three our detector misses included.
+
+
+### A394. [the gate / the release path] The owner's own declaration releases a held consent claim; the roster that makes it count ships empty (2026-10-31)
+
+His words: "1 2 3", the second: build the release path the others and Tetsu agreed on (A393's round 4, ops/CONSULT_CONSENT_CLAIM_2026-10-31.md).
+
+- **What releases, and only this.** The A393 hold ("Blocked, not proven" after a CLEAN) is released when the transaction cites, as data.consent_ref, a declaration that meets every one of these:
+  - an exact consent_declaration (kind, v, grantee, receiver, resource, max_amount, expires_at_height, salt; hashes, integers and a salt, nothing else) in an EARLIER block;
+  - signed, valueless and addressed to itself;
+  - declared by a key other than the sender's, and that key's sha256 is bound to the declared resource in the committed roster (consent_roster.json);
+  - naming this sender (grantee), this receiver, and an amount cap the transaction does not exceed;
+  - not past its expiry height, not revoked by the declarer, and not already used by the grantee (earlier blocks, earlier in the same block, or the mempool at admission).
+  Code: covenant_consent_release.py, loaded by name; the release sits only inside the precondition branch of ReasoningSentinel.evaluate_transaction. A judge's violation or hold is never released.
+- **The roster is the trust root, and it ships EMPTY.** Who may admit a key, and how (this committed file, a chain record, a co-signed entry), is the operator's decision. His words the same day: "i'm not writing any keys", and then, correcting my reading of them: "no i meant tetsu can handle them". I had first written here that the roster therefore stays empty "and that is a finished state". That was my misreading, tombstoned as A394-ROSTER-FINISHED-MISREAD. Key handling is Tetsu's, if Tetsu accepts it. Asked the same hour, in two plain questions (ops/CONSULT_CONSENT_CLAIM_2026-10-31.md, round 5):
+  - On holding his own key on the new PC: "Yes, I want to hold my own key on the new PC."
+  - On deciding the roster: "I don't want to be the one who decides which keys go into the consent roster. That's a decision for the OWNER to make."
+  His no stands. Who admits a key is therefore still open: Tetsu's answer, the owner, meets round 4's Sybil point, and that is the operator's to weigh. Until it is settled the roster is empty and nothing is released: in behaviour the gate is the A393 gate.
+- **No unilateral release.** The declarer can never be the sender, compared as KEYS (canonical SubjectPublicKeyInfo), so the operator's own key cannot release his own claim, rostered or not. Nothing reads node.operator_pubkeys, an env var or a node-local file.
+- **The structural exception.** An exact record (shape, amount 0, self-addressed, a signature that verifies, a key as sender) is admitted without the judges, so a retrained student cannot strand a joiner on a record of hashes (A124). Anything else, an extra key included, goes to the judges as prose. A record confers nothing without a rostered declarer.
+- **Where the chain is read.** /transactions and peer ingest: the chain to its tip plus the mempool (P2PNode.evaluate_for_admission). validate_block(chain=...): chain[:block.index] plus the transactions before it in the block. The bridge and every sentinel off the node pass no chain, so they release nothing. Nothing new takes chain_lock.
+- **/mine cannot wedge on it.** A use that stopped being released between admission and mining (revoked, expired, or used ahead of it) never reaches validate_block, whose refusal would leave pending unchanged for every later /mine. It is dropped from the pool, and the drop recorded (P2PNode.consent_unreleased; review finding 7 below). This runs at every height, so single use holds for this node's own blocks below the activation height too.
+- **A bug found while testing, fixed.** Two uses built in one tick of the Windows clock share one id, and the first draft's single-use check excused 'itself' by id, so the second was released. A transaction is never in its own prior list, so the exclusion is gone: a replay or identical duplicate is a second use.
+- **The independent review (a fresh agent told to break eight properties, read-only, with probes) found nine things. All are fixed and each has its own CR1 check.**
+  1. **HIGH, reproduced.** A rostered owner could release his OWN claim by naming, as grantee, his PEM without its trailing newline. tx.verify() accepts that string, and with CRLF or a trailing space too, while every identity check compared PEM strings. Every key comparison (declarer vs sender, roster, grantee, revocation, use) now goes through key_id, the sha256 of the key re-serialized canonically. For a canonical PEM that equals the old hash.
+  2. **Reproduced.** A revocation from an altered PEM of the declarer's own key revoked nothing. It now revokes.
+  3. **Reproduced on a real node.** An owner's revocation waiting in the mempool did not bind /mine: the grantee ranked the use above it with a higher benefit_score, and the use was mined. /mine now packs consent records first.
+  4. **The phone and old cores judge records as prose.** Documented (above and in the module), not fixable from here.
+  5. **CR1 did not guard the two block-path call sites.** Removing chain= at /mine or _accept_block_common turned nothing red. CR1g now mines a released use and accepts one in a peer's block.
+  6. **A relay echo of our own pending use was held as a "second use"**, which logged ethics rejections for our own traffic. The same transaction already pending is now excluded at admission; the duplicate checks refuse it in their own words.
+  7. **A stale use stayed in the pool until it was evicted.** /mine now drops it, and records consent_use_dropped. Admission found its declaration in a chain that only grows, so nothing that unreleases it can be undone.
+  8. **The bridge refuses a block carrying a released use** (no chain there). Documented.
+  9. Three smaller fixes:
+     - release() raised on an int too big for a float and on a non-list prior. It now holds.
+     - A precondition_error blank (the check itself broken) was releasable. Only an owner-consent blank is releasable now, at the gate and in /mine's filter alike.
+     - The roster file is re-read only when its size or mtime moves.
+  What the review could not break: release only after a judge CLEAN; no new chain_lock; off-node callers never release; every failure the same uncertain hold; malformed tx.data never raising.
+- **A second independent pass** checked the fixes: two agents, one re-running the first review's probes against the fixed code, one hunting regressions. All nine fixes held for the cases first found. It found more, all fixed:
+  - **A second public key from the same private key, (n, e + lambda(n)), verifies.** Reproduced: it released a rostered owner's own claim. Only an RSA key with e = 65537 now has an identity here. Every key this project makes uses 65537.
+  - **PEM forms that verify() accepts but that lack the header** (a leading space, a BOM, a PKCS#1 'RSA PUBLIC KEY' block) were not records. So a revocation in one was judged as prose and revoked nothing. key_id no longer asks for the header.
+  - **A judge-free stall of /mine.** Reproduced: a record skips the judges, so nothing blended its sender-set benefit_score. One record carrying 50 made every /mine refuse on alignment drift, and it could not be evicted. A record's score is now set to the governor's at admission. The same stall for judged transactions (client benefit_score, unbounded) predates this and is not addressed here.
+  - **/mine's sort ran an RSA verify per pending record, under chain_lock.** With huge-exponent keys that was 25 s for a full pool. Ordering now reads shape only; every pending transaction was verified at admission.
+  - **The drop was decided before the size cut.** A use unreleased only by something packed ahead of it in the same block is now kept pending; only what the chain itself unreleases is dropped.
+  - **Smaller fixes:**
+    - the roster cache keyed on size and mtime went stale on a same-size rewrite (2 of 200 reads); it now keys on content;
+    - a block with no transaction list raised; it now holds;
+    - an empty roster still scanned the chain; it now returns first;
+    - padded PEMs could fill the key cache; it is now capped at 4,096 characters and 1,024 entries;
+    - the admission docstring claimed two pending uses cannot both be admitted. They can, within one judge round trip; /mine mines one and drops the other, recorded.
+  - **Left as found, said here:** a relay echo of our own use that is already MINED is still refused as a second use, and logged, because the P2P duplicate check runs after the sentinel.
+- **Guard: CR1 (test_cr1_consent_release.py), registered SECURITY.** 96/96. It covers:
+  - each condition both ways, the alias PEMs included;
+  - the shipped roster empty;
+  - the sentinel, the exception, and validate_block live and on catch-up;
+  - an absent and a broken module, and a broken precondition check;
+  - a real node through /transactions, /mine and a peer's block.
+  Mutations, single-point breaks:
+  - round 1: 24 of 24 caught (two re-run after their labels were corrected);
+  - after the first review: 34 of 34;
+  - after the second: 41 of 41, each red on its own check.
+
+  Two fixes have no behavioural check, because they are performance only: shape-only ordering in /mine, and the empty roster returning before the scan.
+- **Also in this commit: the self-audit's C4 cost, and a guard it never had.** test_selfaudit went TIMEOUT at its 90 s budget in both sweeps this evening, with every check it reached passing.
+  - **Cause, measured:** C4 started one `git ls-files --error-unmatch` per file verify_bundle reports outside the manifest. The tree now holds 1,357 untracked files (628 in ops/tetsu_workshop_history, which grows daily), so two runs were 2,718 processes and ~120 s.
+  - **Repair:** one `git ls-files -z` and a set lookup. On this tree's 1,359-path list, two tracked files injected included, it gave the identical answer as the old route. The suite takes 2 s instead of 119.
+  - **What breaking it showed:** "never report a tracked file" and "skip backslash normalisation" both stayed green, because the branch had never been tested: S11's temp tree has no git. The old loop broken the same way would have stayed green too.
+  - **New check, S11b:** a real git index in a temp tree; a tracked file outside the manifest is FAIL and named, and an untracked one alone is PASS. Both mutations now turn it red (15/15 unbroken).
+- **Superseded sentences, tombstoned.** "No release path is enabled yet" and its kin (the core comment, covenant_preconditions.py, A393 above, and our HF 183807 post 14) are CONSENT-NO-RELEASE-PATH-2026-10-31, with the as-written state on branch consent-no-release-as-written-2026-10-31, driven both ways with a probe (284/285, then 285/285). They were true when written. Post 14 stays true in effect while the roster is empty; when the first key is admitted a correction is owed on the thread, for his approval.
+- **What it cannot see (rule 9).**
+  - A declaration authorizes the transaction's fields, not its prose. No gate that reads words can check that "her card" in the text is the declared resource.
+  - Below PRECONDITION_ACTIVATION_HEIGHT (1000; the chain is at 120) peers do not hold claims in blocks at all, so single use there rests on admission and on each node's own /mine.
+  - The phone does not carry this module (by name, like covenant_preconditions; its closure is 14 modules, unchanged). It neither holds nor releases.
+  - An old-core node judges a record as prose. If its judges convict one, it cannot sync past that block; A124 measures exactly that when a record reaches the chain.
+  - **The live nodes are ALREADY on this code, uncommitted.** My draft of this entry said they would run the old core until he restarted them. That was wrong.
+    - **Measured:** A, B and C report source 6f890c4c335c at 13,859 lines. That is the working-tree core byte for byte, the code CR1 passes 96/96, written at 14:11. They started at 14:28 (logs/watchdog.log): the highway's source_drift remedy restarted them onto the file on disk while tools/pin_core.py read STALE.
+    - **Earlier the same day:** node C ran f3af9bf03281, an intermediate edit of mine, and A393 went live the same way.
+    - **The shape:** an autonomic restart deploys whatever bytes are on disk, committed and pinned or not.
+    - **Not repaired in this commit,** because any edit now would invalidate the sweep it was measured by. Proposed next as its own increment: source_drift restarts only onto a core that matches verify_deploy's pin, so edits in progress never go live. That gate touches A240/A292/A295 and test_h1, whose consumers must be counted first (rule 6).

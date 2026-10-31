@@ -160,6 +160,33 @@ def behavioural_checks():
     check(drifted.status == SA.FAIL and fresh.status == SA.PASS,
           "S11 a manifest with changed or missing files is FAIL, a clean one is PASS")
 
+    # S11b -- C4's other half, never driven until 2026-10-31: a file git TRACKS
+    # that the manifest lacks (the A56 ordering trap). S11's temp tree has no
+    # git, so that branch never ran, and C4's lookup could have answered
+    # "none tracked" forever, green. This tree has a real index: sub/probe.txt is
+    # added, loose.txt is not. The stub names both as NOT IN MANIFEST, the
+    # tracked one in Windows form (sub\probe.txt), as verify_bundle may print it.
+    import subprocess as _sp
+    saved_git = {k: os.environ.pop(k) for k in list(os.environ) if k.startswith("GIT_")}
+    try:
+        with _records() as r:
+            r.write("sub/probe.txt", "tracked\n")
+            r.write("loose.txt", "untracked\n")
+            ok_git = (_sp.run(["git", "init", "-q"], cwd=r.dir, capture_output=True).returncode == 0
+                      and _sp.run(["git", "add", "sub/probe.txt"], cwd=r.dir, capture_output=True).returncode == 0)
+            r.write("verify_bundle.py", "print('412 in manifest, 0 changed or missing')\n"
+                                        "print('NOT IN MANIFEST  sub\\\\probe.txt')\n"
+                                        "print('NOT IN MANIFEST  loose.txt')\n")
+            outside = SA.c4_manifest_covers_the_tree()
+            r.write("verify_bundle.py", "print('412 in manifest, 0 changed or missing')\n"
+                                        "print('NOT IN MANIFEST  loose.txt')\n")
+            only_loose = SA.c4_manifest_covers_the_tree()
+    finally:
+        os.environ.update(saved_git)
+    check(ok_git and outside.status == SA.FAIL and "probe.txt" in (outside.detail or "")
+          and only_loose.status == SA.PASS,
+          "S11b a TRACKED file outside the manifest is FAIL and named; an untracked one alone is PASS")
+
     # S12 -- C5. A guarded document with no anchor is a guard that cannot fire,
     # which is the same shape of hole as the mutation this file was fixed for.
     with _records() as r:

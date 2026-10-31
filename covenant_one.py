@@ -797,6 +797,11 @@ SUITES = [
     # recorded one -- the gate held a sender's claim of someone else's consent as clean. Jang-woo's preflight
     # principle (HF 183807); tighten-only, A124-safe, every party human or AI; mutation-checked.
     ("test_co1_consent_claim.py", 180, "SECURITY"),
+    # CR1 (2026-10-31, his "1 2 3", the second: build the release path): the one release of that hold, the
+    # owner's own declaration -- rostered key bound to the resource, earlier block, single use, revocable,
+    # expiring by height; the roster ships empty (the trust root is his). Every condition driven both ways,
+    # a real node's /transactions and /mine included; mutation-checked.
+    ("test_cr1_consent_release.py", 240, "SECURITY"),
     ("test_sw1_study_web.py", 120, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
     # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every

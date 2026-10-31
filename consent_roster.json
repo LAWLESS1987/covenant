@@ -1,0 +1,5 @@
+{
+  "v": 1,
+  "note": "The trust root for consent releases (covenant_consent_release.py). EMPTY BY DESIGN: who may admit a key here, and how (this committed file, a chain record, a co-signed entry), is the operator's decision and has not been taken. With no entries nothing is released and the gate holds every claimed consent, as it did before the release path existed. An entry binds one key (sha256 of its exact PEM) to the resources (sha256 hashes) that key may declare for. It must be identical on every node; never write it from a node, an env var or a runtime.",
+  "entries": []
+}

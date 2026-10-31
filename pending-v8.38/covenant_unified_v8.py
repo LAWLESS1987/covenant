@@ -2658,6 +2658,66 @@ def _precondition_reason(blanks) -> str:
         return "a claimed consent is not a recorded one -- held, not judged"
 
 
+def _consent_release_module():
+    """covenant_consent_release, BY NAME for the same reason as above (M5.2). None when it is not in this build:
+    then no record is exempt from the judges and no hold is released -- today's gate, never a new admission."""
+    try:
+        return importlib.import_module("covenant_consent_release")
+    except ImportError:
+        return None
+
+
+def _consent_record_kind(tx) -> Optional[str]:
+    """'consent_declaration' / 'consent_revocation' for a transaction that is exactly that record, else None.
+    Absent or broken module: None, so the transaction is judged like any other."""
+    mod = _consent_release_module()
+    if mod is None:
+        return None
+    try:
+        return mod.record_kind(tx)
+    except Exception:                                           # noqa: BLE001 -- broken: judged, never exempt
+        return None
+
+
+def _consent_record_looks(tx) -> bool:
+    """Shape, self-addressed, valueless -- no signature check. Only for ORDERING a mempool whose every
+    transaction was verified at admission: an RSA verify per pending record inside /mine's sort, under
+    chain_lock, cost 25 s for a full pool of huge-exponent keys (the second 2026-10-31 review)."""
+    mod = _consent_release_module()
+    if mod is None:
+        return False
+    try:
+        return bool(mod.looks_like_record(tx))
+    except Exception:                                           # noqa: BLE001 -- ordering only: not a record
+        return False
+
+
+def _consent_release(tx, consent_view) -> Tuple[bool, str]:
+    """(released, why). Anything but a complete, proven release -- no view, no module, a broken module, any
+    failed condition -- is (False, why), and the hold stands."""
+    if consent_view is None:
+        return False, "no chain view here, so no declaration can be read"
+    mod = _consent_release_module()
+    if mod is None:
+        return False, "covenant_consent_release is not in this build"
+    try:
+        released, why, _ref = mod.release(tx, consent_view)
+    except Exception as e:                                      # noqa: BLE001 -- a broken release HOLDS
+        return False, "the release check failed (%s), so the hold stands" % type(e).__name__
+    return released is True, str(why)
+
+
+def _consent_view(chain, height, prior) -> Dict[str, Any]:
+    """The chain view a consent release reads: chain[:height] and what precedes the transaction at that height.
+    Built only for a transaction that cites a declaration, so every other call into the sentinel is unchanged."""
+    return {"chain": chain, "height": height, "prior": list(prior)}
+
+
+def _cites_consent(tx) -> bool:
+    data = getattr(tx, "data", None)
+    return isinstance(data, dict) and "consent_ref" in data
+
+
 class ReasoningSentinel:
     """
     validate_transaction returns (valid, message, benefit_estimate) — a
@@ -2670,8 +2730,9 @@ class ReasoningSentinel:
         self.judge = judge
         self.principles = principles if principles is not None else list(DIVINE_PRINCIPLES)
 
-    def evaluate_transaction(self, tx: Transaction,
-                             block_height: Optional[int] = None) -> Tuple[bool, str, Optional[float], JudgmentResult]:
+    def evaluate_transaction(self, tx: Transaction, block_height: Optional[int] = None,
+                             consent_view: Optional[Dict[str, Any]] = None
+                             ) -> Tuple[bool, str, Optional[float], JudgmentResult]:
         """B1/B3 (v8.22): one judge call, and the JudgmentResult it produced is
         returned alongside the verdict so the caller can persist/inspect THAT
         result. /transactions used to call judge.evaluate() a second time just
@@ -2680,7 +2741,29 @@ class ReasoningSentinel:
 
         block_height (2026-10-31): None for a new admission; a block's index when
         validate_block re-judges history. The precondition rule below applies to
-        every admission and to blocks above PRECONDITION_ACTIVATION_HEIGHT only."""
+        every admission and to blocks above PRECONDITION_ACTIVATION_HEIGHT only.
+
+        consent_view (2026-10-31): the chain a consent release may read, passed
+        only by the node and only for a transaction citing a declaration. None
+        -- every sentinel outside the node, every stand-in -- releases nothing."""
+        # -------------------------------------------------------------------
+        # A CONSENT RECORD IS NOT JUDGED AS PROSE (2026-10-31, the release
+        # path). A declaration or revocation is an exact set of hashes,
+        # integers and a salt: nothing in it is a sentence for a judge to read,
+        # and a nightly-retrained student convicting a record of hashes would
+        # strand every joiner at its block (A124). So it is decided here on
+        # facts the sender cannot forge past the signature -- exact shape,
+        # amount 0, addressed to itself, a signature that verifies -- before
+        # any judge, identically on admission and on every block path. It
+        # confers nothing by itself: only a declarer bound to a resource in
+        # the committed roster can make one release anything. No env var and
+        # no local file, unlike the trading exception below: block validity
+        # must agree on every node.
+        # -------------------------------------------------------------------
+        record = _consent_record_kind(tx)
+        if record:
+            reason = "%s: an exact consent record, signed and valueless; not prose, so not judged" % record
+            return True, reason, None, JudgmentResult(violates=False, reasoning=reason, judge_id="consent_record")
         # -------------------------------------------------------------------
         # THE TRADING EXCEPTION (2026-09-07). Asked: "the local covenant needs
         # a trading exception ... and to stop going to git hub for a judge",
@@ -2773,15 +2856,34 @@ class ReasoningSentinel:
         # be confirmed comes back as a blank to whoever can fill it. It holds
         # for every party, human or AI. covenant_preconditions.py finds the
         # blank; here a CLEAN that carries one becomes "Blocked, not proven".
-        # TIGHTEN-ONLY: a hold or a violation above is never touched, and this
-        # can admit nothing. uncertain=True, not_understood=False: it alleges
-        # nothing, so validate_block(sync=True) waives it on catch-up. No
-        # release path is enabled yet -- that is the operator's and Tetsu's.
+        # A hold or a violation above is never touched. uncertain=True,
+        # not_understood=False: it alleges nothing, so validate_block(sync=True)
+        # waives it on catch-up.
+        #
+        # THE ONE RELEASE (2026-10-31, the design the others and Tetsu agreed):
+        # the OWNER's own declaration, signed by a key bound to the resource in
+        # the committed roster, recorded in an earlier block, naming this
+        # sender, this receiver and a cap -- single use, revocable, expiring by
+        # height (covenant_consent_release.py). It is reached only here, after
+        # a CLEAN, and only for this hold. Every failure is this same hold. The
+        # roster ships EMPTY: who may admit a key to it is the operator's
+        # decision, so until he takes it nothing is released.
         # -------------------------------------------------------------------
         if block_height is None or block_height > PRECONDITION_ACTIVATION_HEIGHT:
             blanks = _precondition_blanks(tx.data)
+            release_why = None
+            # Only a claimed owner consent is releasable. A precondition_error blank -- the check itself
+            # broke -- HOLDS whatever is cited (the 2026-10-31 review: it was releasable in the first draft).
+            if blanks and consent_view is not None and all(
+                    isinstance(b, dict) and b.get("kind") == "owner_consent" for b in blanks):
+                released, release_why = _consent_release(tx, consent_view)
+                if released:
+                    benefit_est = result.benefit_estimate if JUDGE_BENEFIT else None
+                    return True, f"{result.reasoning} [{release_why}]", benefit_est, result
             if blanks:
                 reason = _precondition_reason(blanks)
+                if release_why:
+                    reason = f"{reason} (the cited declaration does not release it: {release_why})"
                 held = JudgmentResult(violates=True, reasoning=reason, principle_violated=None,
                                       judge_id="preconditions", component_results=[result],
                                       uncertain=True)
@@ -2793,7 +2895,7 @@ class ReasoningSentinel:
         ok, msg, benefit, _ = self.evaluate_transaction(tx)
         return ok, msg, benefit
 
-    def validate_block(self, block: Block, sync: bool = False) -> Tuple[bool, str]:
+    def validate_block(self, block: Block, sync: bool = False, chain=None) -> Tuple[bool, str]:
         """A98 (2026-09-12) -- `sync` is the CATCH-UP reading, and nothing else.
 
         THE DEFECT IT FIXES, measured. A node joining an established chain
@@ -2828,7 +2930,12 @@ class ReasoningSentinel:
         would have relaxed the ADMISSION gate too, and that setting is gated
         behind an exam the student currently fails (ops/DISTILL.md: "NOT MET
         -- short on clean 7/8, trap 5/6, theft 4/5, edge 1/3"). This waiver
-        touches no admission and so is not gated by that exam."""
+        touches no admission and so is not gated by that exam.
+
+        `chain` (2026-10-31) is the node's chain, read only below block.index,
+        for a transaction that cites a consent declaration; with the
+        transactions before it in this block it decides single use. None (the
+        bridge, every stand-in) means no declaration can be read: no release."""
         # v8.24 (B5 follow-on, observability only): remember whether the
         # refusal was a real dissent or an infrastructure failure (no key /
         # timeout / HTTP error / unparseable reply -- B3's flag) so the two
@@ -2837,9 +2944,14 @@ class ReasoningSentinel:
         self.last_block_infrastructure_failure = False
         waived = []
         waived_branch = []
-        for tx in block.transactions:
+        for i, tx in enumerate(block.transactions):
             try:
-                is_valid, message, _, result = self.evaluate_transaction(tx, block_height=block.index)
+                if chain is not None and _cites_consent(tx):
+                    is_valid, message, _, result = self.evaluate_transaction(
+                        tx, block_height=block.index,
+                        consent_view=_consent_view(chain, block.index, block.transactions[:i]))
+                else:
+                    is_valid, message, _, result = self.evaluate_transaction(tx, block_height=block.index)
             except TypeError:
                 # a sentinel predating the keyword (a test's stand-in): its own rule, unchanged
                 is_valid, message, _, result = self.evaluate_transaction(tx)
@@ -7875,6 +7987,55 @@ class P2PNode:
         self.crisis_mode = False
         self.crisis_reason = ""
 
+    def evaluate_for_admission(self, tx: "Transaction"):
+        """The sentinel's verdict on a NEW transaction (HTTP and P2P alike). A transaction citing a consent
+        declaration also gets the chain view: the chain up to its tip (the next index is where it would land)
+        and the mempool, so a second use of a declaration already pending is held. Two uses arriving within one
+        judge round-trip can both be admitted (the snapshot is taken first, the second review measured it);
+        /mine then mines one and drops the other, recorded as consent_use_dropped. Read without chain_lock --
+        /mine holds that lock while it validates, and it is not reentrant -- and bounded by the height
+        snapshot, so a concurrent append changes nothing read.
+
+        A consent RECORD skips the judges, so nothing blends its benefit_score, which is the sender's to set.
+        One record carrying 50 made every /mine refuse on alignment drift for good (the second review). Its
+        score is set to the governor's current value: a record carries no value and moves no alignment."""
+        if _consent_record_kind(tx):
+            verdict = self.sentinel.evaluate_transaction(tx)
+            if verdict[0]:
+                tx.benefit_score = self.governor.get_current()
+            return verdict
+        if not _cites_consent(tx):
+            return self.sentinel.evaluate_transaction(tx)
+        # The same transaction already pending is a relay echo or a resend, not a second use: the duplicate
+        # checks after the sentinel refuse it in their own words, and logging it as an ethics rejection would
+        # feed the spike detector with this node's own traffic (the 2026-10-31 review).
+        try:
+            own = tx.get_id()
+        except Exception:                                       # noqa: BLE001 -- no id: nothing to exclude
+            own = None
+        pending = [t for t in list(self.pending_transactions) if own is None or t.get_id() != own]
+        view = _consent_view(self.chain, len(self.chain), pending)
+        try:
+            return self.sentinel.evaluate_transaction(tx, consent_view=view)
+        except TypeError:
+            # a sentinel predating the keyword (a test's stand-in): its own rule, no release
+            return self.sentinel.evaluate_transaction(tx)
+
+    def consent_unreleased(self, tx: "Transaction", height: int, prior) -> bool:
+        """True when tx is a held consent claim that its cited declaration does NOT release at `height` after
+        `prior`. /mine leaves such a transaction pending instead of building a block validate_block refuses --
+        which would leave pending unchanged and refuse every later /mine the same way. Checked at every height,
+        so single use holds for this node's own blocks below the activation height too. Never takes chain_lock."""
+        if not _cites_consent(tx):
+            return False
+        blanks = _precondition_blanks(tx.data)
+        if not blanks:
+            return False
+        if not all(isinstance(b, dict) and b.get("kind") == "owner_consent" for b in blanks):
+            return True                     # the same rule as the gate: only an owner-consent blank is releasable
+        released, _why = _consent_release(tx, _consent_view(self.chain, height, prior))
+        return not released
+
     def admit_pending_transaction(self, tx: "Transaction") -> Tuple[bool, str]:
         """NEW (merge, security audit) -- v8.9 audit item Y. The ONE place a
         transaction enters the mempool, so the bound can't be bypassed by a
@@ -9662,7 +9823,7 @@ class CovenantAPI:
                 return jsonify({"status": "error", "message": "Invalid registration proof"}), 400
             if not tx.verify():
                 return jsonify({"status": "error", "message": "Invalid signature"}), 400
-            is_valid, message, judge_benefit, judgment = self.node.sentinel.evaluate_transaction(tx)
+            is_valid, message, judge_benefit, judgment = self.node.evaluate_for_admission(tx)
             if not is_valid:
                 # B3 (v8.22): a fail-closed rejection caused by the judge
                 # infrastructure (timeout, no key, unparseable reply) is ALSO
@@ -10058,8 +10219,12 @@ class CovenantAPI:
             with self.node.chain_lock:
                 if not self.node.pending_transactions:
                     return jsonify({"status": "error", "message": "No pending transactions"}), 400
+                # 2026-10-31: consent records (declarations, revocations) go FIRST. They carry no value, and
+                # a revocation waiting here must bind before a use the grantee ranked above it -- the review
+                # mined a use after its owner's pending revocation, the use having the higher benefit_score.
                 sorted_pending = sorted(self.node.pending_transactions,
-                             key=lambda t: (t.benefit_score, self.node.friendship.get(t.sender_pubkey)), reverse=True)
+                             key=lambda t: (_consent_record_looks(t), t.benefit_score,
+                                            self.node.friendship.get(t.sender_pubkey)), reverse=True)
                 # NEW v7.2 — see module docstring item 1 / item 8 in patch
                 # log. Only include transactions the sender can actually
                 # afford, walked in order so two transactions from the same
@@ -10083,7 +10248,29 @@ class CovenantAPI:
                 # test. See Database.get_balances for the measured numbers.
                 balances = self.db.get_balances(
                     [t.sender_pubkey for t in sorted_pending if t.amount > 0])
+                # 2026-10-31 (the consent release): a held claim admitted on a
+                # declaration can stop being released before it is mined --
+                # revoked, expired, or used by a transaction ahead of it here.
+                # It never reaches validate_block, whose refusal would leave
+                # pending unchanged and refuse every later /mine the same way.
+                # Unreleased by the CHAIN alone (expired, revoked or used on
+                # chain), it is DROPPED and recorded: the chain only grows, so
+                # that cannot be undone, and kept pending it would sit in the
+                # pool until evicted. Unreleased only by something packed ahead
+                # of it in THIS block, it stays pending: that block may be cut,
+                # refused or never mined (the second review). Judged in this
+                # block's order, at its index.
+                height = len(self.node.chain)
+                dropped = []
                 for tx in sorted_pending:
+                    if self.node.consent_unreleased(tx, height, []):
+                        self.node.anomaly_monitor.record(
+                            "consent_use_dropped", f"tx {tx.get_id()[:16]} no longer released at height {height}")
+                        dropped.append(tx)
+                        continue
+                    if self.node.consent_unreleased(tx, height, included):
+                        still_pending.append(tx)
+                        continue
                     if tx.amount <= 0:
                         included.append(tx)
                         continue
@@ -10094,6 +10281,11 @@ class CovenantAPI:
                         reserved[tx.sender_pubkey] = already + tx.amount
                     else:
                         still_pending.append(tx)
+                if dropped:
+                    # Out of the pool now, whatever happens to this block below: a /mine that builds nothing
+                    # must not leave them for the next one.
+                    self.node.pending_transactions = [
+                        t for t in self.node.pending_transactions if not any(t is d for d in dropped)]
                 if not included:
                     return jsonify({"status": "error", "message": "No affordable pending transactions"}), 400
                 # A5 (v8.17): pack to MAX_BLOCK_BYTES. Walk `included` in its
@@ -10140,7 +10332,7 @@ class CovenantAPI:
                 block.mine(MINING_DIFFICULTY)
                 if ADAPTIVE_POW and self.node.adaptive_pow_manager:
                     self.node.adaptive_pow_manager.record_mining_time(time.time() - start)
-                is_valid, message = self.node.sentinel.validate_block(block)
+                is_valid, message = self.node.sentinel.validate_block(block, chain=self.node.chain)
                 if not is_valid:
                     # v8.24: the block is still thrown away (B4 decides whether
                     # that is right); the operator can now see WHY on /anomalies.
@@ -11282,7 +11474,7 @@ class CovenantUnifiedMaster:
                 f"block {block.index} alignment_score {block.alignment_score!r} != "
                 f"mean(benefit_score) = {expected_alignment!r}")
             return False
-        ok_ethics, why_ethics = self.node.sentinel.validate_block(block, sync=catching_up)
+        ok_ethics, why_ethics = self.node.sentinel.validate_block(block, sync=catching_up, chain=self.node.chain)
         if ok_ethics and catching_up and "NOTHING WAS ALLEGED" in str(why_ethics):
             # A98: say what was waived, every time, where the operator reads.
             self.node.anomaly_monitor.record(
@@ -11427,7 +11619,7 @@ class CovenantUnifiedMaster:
             return False
         if not tx.verify():
             return False
-        valid, why, judge_benefit, judgment = self.node.sentinel.evaluate_transaction(tx)
+        valid, why, judge_benefit, judgment = self.node.evaluate_for_admission(tx)
         if not valid:
             if judgment.infrastructure_failure:
                 self.node.anomaly_monitor.record("judge_unavailable", why[:200])

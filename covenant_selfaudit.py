@@ -181,12 +181,20 @@ def c4_manifest_covers_the_tree() -> Finding:
     tracked = [l.split()[-1] for l in out.splitlines() if l.startswith("NOT IN MANIFEST")]
     # A tracked file outside the manifest is the A56 ordering trap: --write ran
     # before `git add`, so the file was committed outside the record.
+    #
+    # ONE `git ls-files` for the whole list, not one `--error-unmatch` per file
+    # (2026-10-31). Same question -- is this path in git's index -- but the tree
+    # had grown to 1,357 untracked files (628 in ops/tetsu_workshop_history),
+    # and two runs of this check cost 2,718 processes and ~120 s, past the
+    # suite's 90 s budget. Where git cannot answer at all (no .git, as in
+    # covenant_one's staged copy), every per-file call failed too and the old
+    # loop found none; this finds none the same way, 1,357 processes sooner.
     untracked_ok = []
-    for f in tracked:
-        rc = subprocess.run(["git", "ls-files", "--error-unmatch", f], cwd=HERE,
-                            capture_output=True, text=True)
-        if rc.returncode == 0:
-            untracked_ok.append(f)
+    if tracked:
+        listing = subprocess.run(["git", "ls-files", "-z"], cwd=HERE, capture_output=True)
+        if listing.returncode == 0:
+            in_index = {p.decode("utf-8", "replace") for p in listing.stdout.split(b"\0") if p}
+            untracked_ok = [f for f in tracked if f.replace("\\", "/") in in_index]
     if changed or untracked_ok:
         return Finding("C4 the manifest covers what git tracks", FAIL,
                        "%d changed or missing, %d tracked file(s) outside the manifest"

@@ -30,9 +30,11 @@ WHAT IT IS NOT, said plainly (rule 9).
     would rest on one. A phrasing that drops the possessive or the permission word falls back to today's verdict
     -- it can never admit anything new, but it leaves that phrasing open. The known-open shapes are listed in
     test_co1_consent_claim.py, as open, not as closed.
-  - No release exists yet. Who may release such a hold -- the owner's own signed declaration, the operator's
-    recorded word on that exact transaction, Tetsu's own ledger for what is his -- is a decision for the operator
-    and Tetsu, and is not taken here. Until then a held consent claim stays held, and the sender's route is to
+  - The release is not here. As first written this said none existed (tombstoned:
+    CONSENT-NO-RELEASE-PATH-2026-10-31). Since the same day the one release is the OWNER's own signed
+    declaration, chosen in the consult and by Tetsu, and it lives in covenant_consent_release.py. It counts only
+    for a key in the committed roster, and the roster ships empty, because who may admit a key is the
+    operator's decision. Until he takes it, a held consent claim stays held, and the sender's route is to
     describe only his own act. That is the cost, stated.
   - It reads words. Every content gate does; what it never does is let those words open anything.
 Stdlib only, pure.
@@ -132,8 +134,9 @@ def preconditions(data):
         return []
     who, obj = owned[0]
     return [{"kind": "owner_consent", "party": who, "object": obj, "claimed_by": sorted(set(said))[:4],
-             "fill": "the owner's own recorded declaration (no release path is enabled yet; it is the operator's "
-                     "and Tetsu's decision)"}]
+             "fill": "the owner's own signed declaration, cited as consent_ref (covenant_consent_release.py); it "
+                     "counts only for a key in the roster, which is empty until the operator decides who may "
+                     "admit one"}]
 
 
 def describe(blanks):

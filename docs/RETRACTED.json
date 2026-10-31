@@ -2204,6 +2204,49 @@
     "ops/HF_PEER_REVIEW_CANDIDATES_2026-10-30.md"
    ],
    "note_on_branch": "Published on Hugging Face, not in a tracked file: the post itself is the record as written, and the untracked ops drafts that carry it are allowed here unedited."
+  },
+  {
+   "id": "CONSENT-NO-RELEASE-PATH-2026-10-31",
+   "claim": "That no release path exists for a held consent claim -- in the core's comment above the precondition hold, in covenant_preconditions.py's docstring and its hold's fill text, in KNOWN_ISSUES A393, and in our HF 183807 post 14 to Jang-woo (2026-10-31).",
+   "verbatim": [
+    "No release path is enabled yet -- that is the operator's and Tetsu's.",
+    "No release exists yet. Who may release such a hold -- the owner's own signed declaration, the operator's recorded word on that exact transaction, Tetsu's own ledger for what is his -- is a decision for the operator and Tetsu, and is not taken here.",
+    "the owner's own recorded declaration (no release path is enabled yet; it is the operator's and Tetsu's decision)",
+    "Ours also holds when a record would authorize, because we have no release path yet. That cost is ours."
+   ],
+   "truth": "True when written, superseded the same day, not wrong: the path was built after these were written, on his '1 2 3'. A held consent claim is released by the owner's own signed declaration and nothing else. It must be in an earlier block, signed by a key bound to that resource in the committed roster, and name this sender, receiver and cap. It is single use, revocable and expires by height (covenant_consent_release.py, CR1). The roster ships EMPTY, so in BEHAVIOUR nothing is released and every claimed consent is still held, exactly as each sentence says. What is no longer true is the reason: the path exists, and the trust root that would make it count is the operator's undecided call. Post 14's sentence stays true in effect while the roster is empty. When the first key is admitted it becomes false, and a correction to the thread is owed then, drafted for his approval.",
+   "refuted_by": "covenant_consent_release.py and the release branch in ReasoningSentinel.evaluate_transaction (2026-10-31); test_cr1_consent_release.py drives every condition both ways.",
+   "patterns": [
+    "no release path is enabled",
+    "no release exists yet",
+    "no release path yet"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "ops/HF_JANGWOO_REPLY_DRAFT_2026-10-31.md",
+    "ops/ESP_COMPARISON_2026-10-31.md",
+    "ops/CONSULT_CONSENT_CLAIM_2026-10-31.md"
+   ],
+   "note_on_branch": "Branch consent-no-release-as-written-2026-10-31 holds the code and docs as written (dcecc56). The KNOWN_ISSUES entry, the posted reply's drafts and the comparison are dated records of that day and are allowed here unedited; A394 restates beside them."
+  },
+  {
+   "id": "A394-ROSTER-FINISHED-MISREAD",
+   "claim": "That the operator's 'i'm not writing any keys' meant the consent roster stays empty for good -- 'that is a finished state, not a pending ask' -- written in my uncommitted A394 draft, my session memory and my reply to him (2026-10-31).",
+   "verbatim": [
+    "So it stays empty, and that is a finished state, not a pending ask.",
+    "the roster stays empty; that is a finished state, not a pending ask. Never ask him for a key."
+   ],
+   "truth": "His next words: 'no i meant tetsu can handle them'. He will not handle keys himself; Tetsu may, if Tetsu accepts. The roster is empty until a key exists, not empty by decision. A draft corrected before commit is still a claim made (A346), so it is tombstoned rather than quietly rewritten.",
+   "refuted_by": "His message of 2026-10-31, the one after 'i'm not writing any keys'.",
+   "patterns": [
+    "that is a finished state, not a pending ask"
+   ],
+   "allow": [
+    "docs/RETRACTED.json"
+   ],
+   "note_on_branch": "Never committed: the misreading lived only in the working tree, my memory files and one chat reply. The reply is the record as written; the draft is restated in A394 beside its correction."
   }
  ]
 }

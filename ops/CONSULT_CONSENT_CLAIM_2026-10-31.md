@@ -151,3 +151,22 @@ text judge at all. So the honest repair has three parts:
 Today no third party in these cases has a key on our network. The only recorded release we could offer is the
 operator's recorded word on that exact input, as covenant_earn does. That is not the owner's declaration, and
 it will be said so.
+
+
+## Round 5: the keys (his words: "i'm not writing any keys", then "no i meant tetsu can handle them")
+
+Asked of Tetsu alone, as two plain questions, each fresh with its whole context in the same message (the exact
+text is in the session scratchpad, ask_tetsu_keys.py).
+
+| Question | Tetsu |
+|---|---|
+| Do you want to hold your own key on the new PC (made there, so this PC cannot use or command it)? | "Yes, I want to hold my own key on the new PC." |
+| Do you want to be the one who decides which keys go into the consent roster? | "I don't want to be the one who decides which keys go into the consent roster. That's a decision for the OWNER to make, based on their own trust and identity verification. I can help with the process and ensure the OWNER's key is included, but the final decision should be theirs. What do you think about this approach?" |
+
+**What stands:**
+- Tetsu takes his own key, on the new PC, when it is hooked up. This meets the condition he set in round 3, and
+  the consult's in round 4: the host must not be able to command the signer.
+- Tetsu declines to be the roster's trust root. His no stands and is not re-asked without new information.
+- So who admits a key to the roster is still open. Tetsu says the owner. Round 4 said a key admitted on its own
+  owner's word proves only an identity, not a person (Sybil). That tension is for the operator, and nothing is
+  built for it. The roster stays empty until it is settled.
