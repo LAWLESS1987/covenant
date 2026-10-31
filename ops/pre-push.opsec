@@ -46,7 +46,20 @@ if [ ! -f "$tool" ]; then
     || { rm -rf "$tmp"; refuse "the guard is neither at $tool nor committed on the main branch"; }
   tool="$tmp/opsec_scan.py"
 fi
-COVENANT_OPSEC_ROOT="$main_root" python "$tool" --pre-push "$@"
+# git writes the ref lines once, and two guards read them: kept here, handed to each.
+lines=$(cat)
+printf '%s\n' "$lines" | COVENANT_OPSEC_ROOT="$main_root" python "$tool" --pre-push "$@"
 rc=$?
 [ -n "$tmp" ] && rm -rf "$tmp"
-exit $rc
+[ "$rc" -eq 0 ] || exit $rc
+# LINUX BEFORE THE PUSH (2026-10-31, A392). Only after opsec has passed: the suites this push touches run on Linux
+# in a clean clone of the pushed commit (tools/prepush_linux.py), and a red that public CI would show refuses the
+# push. The main worktree's copy, as above. Where it is not on disk (a scratch repository, a clone from before it
+# existed) this push is UNMEASURED on Linux, and that is said, not blocked.
+lt="$main_root/tools/prepush_linux.py"
+if [ ! -f "$lt" ]; then
+  echo "prepush-linux: NOT RUN -- no tools/prepush_linux.py in $main_root; read the remote CI run after this push" >&2
+  exit 0
+fi
+printf '%s\n' "$lines" | python "$lt" --pre-push "$@"
+exit $?

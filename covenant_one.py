@@ -790,6 +790,9 @@ SUITES = [
     ("test_hc1_head_commitment.py", 60, "SECURITY"),
     ("test_hc2_stale_vs_tamper.py", 60, "SECURITY"),
     ("test_hw1_takeover_detectors.py", 60, "SECURITY"),
+    # PP1 (2026-10-31, A392, his words "Build the pre-push guard"): tools/prepush_linux.py runs what CI runs, on
+    # Linux, in a clean clone of the pushed commit, before the push. Both ways; 10/10 single mutations caught.
+    ("test_pp1_prepush_linux.py", 120, "JUDGE"),
     ("test_sw1_study_web.py", 120, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
     # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every

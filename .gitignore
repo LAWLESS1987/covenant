@@ -287,6 +287,8 @@ ops/pause/
 ops/local_peers.txt
 # The pre-push guard's record of pushes let through on his say (masked values only).
 ops/opsec_overrides.jsonl
+ops/prepush_overrides.jsonl
+ops/prepush_linux.jsonl
 
 # The operator's standing decision about the ethics quorum (2026-09-11). This
 # repository is public and is meant to be read as GUIDANCE, and a policy file
