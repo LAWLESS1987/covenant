@@ -86,6 +86,102 @@ def allowed(relpath, allow):
     return any(relpath == a or relpath.startswith(a) for a in allow)
 
 
+_SPECIAL = set(".^$*+?{}[]\\|()")
+
+
+def required_literal(pattern):
+    """The substrings every match of `pattern` must contain, casefolded, or None when none can be proven.
+
+    WHY (2026-10-31). R1 searched every pattern (about 250) across every scanned file (about 5,200), and on
+    this PC took 386 s standalone -- three times its 120 s sweep budget, so the sweep read it TIMEOUT (red)
+    before and after A393. Most of those searches cannot match. A plain substring test is far cheaper than
+    the regex, so a file that lacks the literal is skipped WITHOUT the regex -- it could not have matched.
+    The result is identical by construction: only the literal runs at the top level of the pattern, outside
+    every group and class, not made optional by a quantifier, are used, and a pattern with any top-level
+    alternation or a non-ASCII literal gets no shortcut at all (always searched in full)."""
+    runs, cur, depth_paren, depth_class, i = [], [], 0, 0, 0
+    while i < len(pattern):
+        c = pattern[i]
+        nxt = pattern[i + 1] if i + 1 < len(pattern) else ""
+        if depth_class:
+            if c == "\\":
+                i += 2
+                continue
+            if c == "]":
+                depth_class -= 1
+            i += 1
+            continue
+        if c == "[":
+            depth_class += 1
+            runs.append(cur); cur = []
+            i += 1
+            continue
+        if c == "(":
+            depth_paren += 1
+            runs.append(cur); cur = []
+            i += 1
+            continue
+        if c == ")":
+            depth_paren -= 1
+            runs.append(cur); cur = []
+            i += 1
+            continue
+        if depth_paren:
+            if c == "\\":
+                i += 2
+                continue
+            i += 1
+            continue
+        if c == "|":
+            return None                                          # top-level alternation: no shortcut
+        if c == "{":
+            # a repetition count ("{0,30}") is not text: skip it whole. (Measured 2026-10-31: read as the literal
+            # "0,30", it made the shortcut demand those digits; the ledger self-check below turned R1 red on it.)
+            close = pattern.find("}", i)
+            runs.append(cur); cur = []
+            i = (close + 1) if close >= 0 else len(pattern)
+            continue
+        if c == "\\":
+            esc = nxt
+            if esc and not esc.isalnum():                        # an escaped punctuation mark is a literal
+                lit, step = esc, 2
+            else:                                                # \s \b \d ...: not a literal, ends the run
+                runs.append(cur); cur = []
+                i += 2
+                continue
+        elif c in _SPECIAL:
+            runs.append(cur); cur = []
+            i += 1
+            continue
+        else:
+            lit, step = c, 1
+        after = pattern[i + step] if i + step < len(pattern) else ""
+        if after in ("?", "*", "{"):                             # this character may be absent
+            runs.append(cur); cur = []
+        elif after == "+":                                       # present at least once, then the run ends
+            cur.append(lit)
+            runs.append(cur); cur = []
+        else:
+            cur.append(lit)
+        i += step
+    runs.append(cur)
+    # EVERY top-level run is required (each sits outside every group and is not optional), so all of them must
+    # be present, not only the longest: "still\s+PRESENT\s+is\s+`did\s+not\s+fix`" needs "still", "present",
+    # "`did" and "fix`" together (2026-10-31: the longest-run version still read 2,626 files for one pattern).
+    # A non-ASCII LETTER has case forms re.I may match that casefold() does not, so a run holding one is not
+    # used; a symbol such as an arrow has no case and is safe.
+    import unicodedata
+    out = []
+    for r in runs:
+        s = "".join(r)
+        if len(s) < 3:
+            continue
+        if any(ord(ch) > 127 and unicodedata.category(ch).startswith("L") for ch in s):
+            continue
+        out.append(s.casefold())
+    return tuple(out) if out and max(len(s) for s in out) >= 4 else None
+
+
 def walk_files():
     for dp, dn, fn in os.walk(HERE):
         dn[:] = [d for d in dn if d not in SKIP_DIR]
@@ -110,7 +206,8 @@ def main():
     if not os.path.isfile(LEDGER):
         check("R1.0 docs/RETRACTED.json exists", False, LEDGER)
         return 1
-    led = json.load(open(LEDGER, encoding="utf-8"))
+    ledger_text = open(LEDGER, encoding="utf-8").read()
+    led = json.loads(ledger_text)
     window = int(led.get("window", 10))
     floor = int(led.get("coverage_floor", 1))
     retractions = led.get("retractions", [])
@@ -129,6 +226,9 @@ def main():
     check("R1.V1 the scan actually read the tree (floor %d files)" % floor,
           len(files) >= floor, "%d files read" % len(files))
     present = {rel(p).split("/")[0] for p in files}
+    rels = {p: rel(p) for p in files}
+    # casefold, not lower: re.I treats the long s and the Kelvin sign as s and k, and so does casefold().
+    lowered = {p: t.casefold() for p, t in files.items()}    # for the literal shortcut only (see required_literal)
     missing = [d for d in led.get("expect_dirs", []) if d not in present]
     check("R1.V2 every directory the ledger expects was present to scan -- an "
           "absent one is reported, never counted clean",
@@ -148,11 +248,21 @@ def main():
               % rid,
               bool(pats) and bool(allow) and bool(r.get("truth")))
 
-        dead, violations = [], []
+        dead, violations, bad_lit = [], [], []
         for src, rx in pats:
             in_record = 0
+            lit = required_literal(src)
+            if lit is not None:
+                # The shortcut's own guard: in the ledger itself, which holds every claim's verbatim wording, every
+                # match is searched in full (no shortcut) and must contain the literal. A literal some match lacks
+                # would hide files that DO match. (The ledger alone: the allow-lists also name whole transcripts and
+                # private/, and searching those in full undid the speed-up -- 376 s, measured.)
+                if any(any(piece not in m.group(0).casefold() for piece in lit) for m in rx.finditer(ledger_text)):
+                    bad_lit.append(src)
             for p, text in files.items():
-                rp = rel(p)
+                if lit is not None and any(piece not in lowered[p] for piece in lit):
+                    continue                                     # it cannot match here: the regex is not needed
+                rp = rels[p]
                 hit = rx.search(text)
                 if hit and allowed(rp, allow):
                     in_record += 1
@@ -172,7 +282,8 @@ def main():
         # L* -- a pattern that matches nothing is a silent green.
         check("R1.%s.L every pattern still matches inside the record, so none "
               "is a dead regex quietly passing" % rid,
-              not dead, "dead patterns: %s" % dead)
+              not dead and not bad_lit,
+              "dead patterns: %s; shortcut literal absent from a match: %s" % (dead, bad_lit))
 
         # C* -- the actual guard.
         if violations:

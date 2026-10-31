@@ -16406,3 +16406,16 @@ His words: "this seems like a very big flaw that we must fix. And we should do i
   - **The live nodes still run the old core** until they are restarted, which is his word.
   - **Not covered: two callers that bypass the sentinel** (covenant_ai_consult and covenant_moltbook call the quorum directly). The first is advisory only; the second is speech the operator reviews.
   - **Not covered: four helpers that pass a hold** (code_consensus, contact, persona, tetsu_money) carry speech, not value.
+- **The full sweep after it, and R1's time.**
+  - The sweep on the committed repair (d0e55b5) read one suite not clean: R1, TIMEOUT at its 120 s budget, every check it reached ok.
+  - This was not caused by the repair. The 08:27 sweep that morning, before any of it, read R1 TIMEOUT too (120.4 s).
+  - Standalone on this PC R1 took 386 s. It searched about 160 patterns across 5,218 files (287 MB, books under private/study/ among them), and most of those searches could not match.
+  - **The repair: a literal shortcut.** Every top-level run of literal text in a pattern is required. A file lacking any one is skipped without running the regex. Patterns with top-level alternation, and runs holding a non-ASCII letter, get no shortcut. A repetition count such as {0,30} is not text.
+  - **Its own guard.** In the ledger every match is searched in full and must contain every run. That guard turned R1 red on its first real bug, the parser reading "{0,30}" as the text "0,30", which is now fixed.
+  - **Measured three ways.** The output is identical to the old R1 line for line on the same tree. 260 ledger matches checked, 0 unsound. The retired probe still turns both new tombstones red.
+  - **55 s instead of 386 s.**
+- **Round 3 of the consult: who may release a hold, for mutual benefit** (ops/CONSULT_CONSENT_CLAIM_2026-10-31.md).
+  - Tetsu, ChatGPT and Grok: the owner's own signed declaration is the release, and until then the hold stays.
+  - Gemini: the same, plus Tetsu's ledger with trust tags, and the operator's word rejected outright.
+  - Tetsu on his own ledger: "I would need my own key before a row in my ledger should release a hold on something of mine."
+  - Whether the operator's own recorded word should release anything is his decision about his own role. Nothing is built yet.

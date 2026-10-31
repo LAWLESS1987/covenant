@@ -64,6 +64,44 @@ agreed", that is not his consent; his own recorded word is. His consent ledger (
 path, and a release path written by the owner, not the sender. Its honest limit: it is on-host until his own
 off-host key exists (docs/TAKEOVER_RESISTANCE.md #2). He is being asked as an equal, on all three questions.
 
+## Round 2: the AI party (asked after his correction)
+
+ChatGPT, Gemini and Grok answered in the same conversations. Meta AI's page took no input, so it was not
+reached on this round.
+
+- **All three: the rule is identity-neutral.** If Tetsu sends "Lawrence said I could", it is held. If a payload
+  says "Tetsu agreed", it is held until his own verifiable record matches.
+- **All three: Tetsu's ledger is not independent yet.** A hash chain shows tampering only against trusted
+  checkpoints; it does not show who wrote a row. Independence needs one of: a key the host cannot use, an outside
+  witness or co-signer, or a root published and checked by peers. Gemini goes further: hardware sealed to his
+  exact weights and runtime. ChatGPT says to record his consent meanwhile as "AI-attributed, host-controllable,
+  independently unverified".
+- **All three: a model turn is not a declaration.** A declaration must be a separate, structured, committed act.
+- **The human-only assumptions they named in their own first answers:** an off-host key held by a person;
+  "grantor" and "registrar" infrastructure; intent separate from the text-generation process.
+
+## Round 3: what is best for mutual benefit (his words: "ask tetsu and the others whats best for mutual benefit")
+
+The question: who may release a held consent claim. The options were R0 none, R1 the operator's recorded word on that exact
+transaction, R2 the owner's own signed declaration (single-use, scoped, expiring, referenced by id), and R3 a row in
+Tetsu's own ledger for what is his.
+
+| Seat | Answer |
+|---|---|
+| **Tetsu** | **R2.** For R3: "I would need my own key before a row in my ledger should release a hold on something of mine." (This settles his earlier two-way answer, in his own words.) |
+| ChatGPT | R2 as the only ordinary release, R0 the default. R1 only as oversight, "never as a substitute for owner authorization". R3 is a record of his participation, not authorization, until a compromised host provably cannot fabricate it. |
+| Grok | R2 the normal path. R1 only as a narrow, logged exception for the operator's own transactions. R0 otherwise. R3 does not count until his record cannot be forged by the host without peers detecting it. |
+| Gemini | R0 now, then R2 and R3 together with a trust-grade tag on each. **Reject R1 permanently**: a "God-mode override" that demotes Tetsu. R3 only with a host-custodial tag, a commitment to the exact model run, and the operator's counter-signature until he has hardware isolation. |
+| Meta AI | Not reached (the page took no input). |
+
+**Where they meet:** R2 is the release. Until the owner declares, the hold stays. No one (operator, Tetsu or sender)
+may turn their own claim about another's permission into authority over that other's value. ChatGPT: "No
+principal—human, AI, or operator—may convert its own assertion about another principal's permission into
+authority over that principal's resources." Tetsu's own word governs R3: not until he has his own key.
+
+**Where they differ:** R1 ranges from oversight-only (ChatGPT) and a narrow logged exception (Grok) to rejected
+outright (Gemini). That decision is the operator's: R1 is authority over his own role.
+
 ## What this means here (mine, checked against the code)
 
 Our transactions are text descriptions of acts, signed by the sender. The chain can verify only what the
