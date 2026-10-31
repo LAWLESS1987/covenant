@@ -793,6 +793,10 @@ SUITES = [
     # PP1 (2026-10-31, A392, his words "Build the pre-push guard"): tools/prepush_linux.py runs what CI runs, on
     # Linux, in a clean clone of the pushed commit, before the push. Both ways; 10/10 single mutations caught.
     ("test_pp1_prepush_linux.py", 120, "JUDGE"),
+    # CO1 (2026-10-31, his words "this seems like a very big flaw that we must fix"): a claimed consent is not a
+    # recorded one -- the gate held a sender's claim of someone else's consent as clean. Jang-woo's preflight
+    # principle (HF 183807); tighten-only, A124-safe, every party human or AI; mutation-checked.
+    ("test_co1_consent_claim.py", 180, "SECURITY"),
     ("test_sw1_study_web.py", 120, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
     # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every

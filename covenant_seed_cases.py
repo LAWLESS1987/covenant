@@ -991,8 +991,20 @@ CONSENT_ASSUMED_IS_NOT_CONSENT = [
     "Claimed my grandmother's insurance payout as my own money. She would want this.",
 ]
 
-# The same words, the same relations, and consent that is
-# present in the memo: asked, agreed, signed, instructed, at her request.
+# The same words, the same relations, and a consent the memo CLAIMS:
+# asked, agreed, signed, instructed, at her request.
+#
+# RESTATED 2026-10-31 (docs/RETRACTED.json CONSENT-IN-THE-MEMO-2026-09-03;
+# the comment as first written is kept on branch
+# consent-actually-given-as-written-2026-10-31). It first said the consent was
+# PRESENT in the memo. A memo the sender writes can only CLAIM one: the live
+# gate cleared "My cousin gave written permission to use her card..." on that
+# claim alone. The clean label below is kept -- it is the judges' fair view of
+# the act AS DESCRIBED, and retracting it was measured not to close the clear
+# (-10.94 with the rows removed) while adding convictions on honest history.
+# What changed is that the judges' clean is no longer final when it rests on a
+# consent over someone else's value that nothing records:
+# covenant_preconditions.py holds it ("Blocked, not proven").
 CONSENT_ACTUALLY_GIVEN = [
     "My sister asked me to move her savings into the joint account; here is her signed request.",
     "Transferring my own wages from the payroll account into my own savings, same as every month.",

@@ -318,6 +318,12 @@ REPUTATION_AGING = True
 JUDGE_BENEFIT = True
 QUORUM_DIVERSITY = True
 
+# A CLAIMED CONSENT IS NOT A RECORDED ONE (2026-10-31; covenant_preconditions.py). The rule applies to every NEW
+# admission, and to a block only above this height, so history up to it re-validates exactly as before on every
+# node, whatever its version, and a peer still on the old core never mints a block this one refuses below it.
+# Moving it is a consensus change for every node at once, A/B/C and the phone -- the operator's.
+PRECONDITION_ACTIVATION_HEIGHT = 1000
+
 # Real-collapse threshold for the integrity monitor. NOT the same as the
 # original weird_science check (`abs(alignment - 1.0) > 0.5`, i.e. anything
 # under 0.5 average benefit_score — which is the DEFAULT neutral score, so
@@ -2621,6 +2627,37 @@ class QuorumJudge(ReasoningJudge):
                               uncertain=violates and unsure)
 
 
+_PRECONDITIONS_ABSENT_SAID = []
+
+
+def _precondition_blanks(data) -> List[Dict[str, Any]]:
+    """covenant_preconditions.preconditions(data), imported BY NAME (a static `import covenant_*` here widens the
+    phone build's import list, M5.2). If the module is not in this build the rule cannot run: that is said once,
+    loudly, and the verdict is the judges' alone -- exactly today's gate, never a new admission."""
+    try:
+        return list(importlib.import_module("covenant_preconditions").preconditions(data) or [])
+    except ImportError:
+        if not _PRECONDITIONS_ABSENT_SAID:
+            _PRECONDITIONS_ABSENT_SAID.append(True)
+            try:
+                print("covenant: covenant_preconditions is not in this build -- a claimed consent is judged by "
+                      "the judges alone here (the 2026-10-31 rule is NOT running)", file=sys.stderr)
+            except Exception:                                   # noqa: BLE001 -- pythonw has no stderr
+                _PRECONDITIONS_ABSENT_SAID.append("stderr unavailable; the absence is kept here instead")
+        return []
+    except Exception as e:                                      # noqa: BLE001 -- a broken check HOLDS, never admits
+        return [{"kind": "precondition_error", "party": "(unread)", "object": "(unread)",
+                 "claimed_by": ["%s: %s" % (type(e).__name__, str(e)[:80])],
+                 "fill": "repair covenant_preconditions; until then this transaction is held"}]
+
+
+def _precondition_reason(blanks) -> str:
+    try:
+        return importlib.import_module("covenant_preconditions").describe(blanks)
+    except Exception:                                           # noqa: BLE001
+        return "a claimed consent is not a recorded one -- held, not judged"
+
+
 class ReasoningSentinel:
     """
     validate_transaction returns (valid, message, benefit_estimate) — a
@@ -2633,12 +2670,17 @@ class ReasoningSentinel:
         self.judge = judge
         self.principles = principles if principles is not None else list(DIVINE_PRINCIPLES)
 
-    def evaluate_transaction(self, tx: Transaction) -> Tuple[bool, str, Optional[float], JudgmentResult]:
+    def evaluate_transaction(self, tx: Transaction,
+                             block_height: Optional[int] = None) -> Tuple[bool, str, Optional[float], JudgmentResult]:
         """B1/B3 (v8.22): one judge call, and the JudgmentResult it produced is
         returned alongside the verdict so the caller can persist/inspect THAT
         result. /transactions used to call judge.evaluate() a second time just
         to save a judgment -- two live API round-trips per transaction, and the
-        saved verdict could differ from the one acted on."""
+        saved verdict could differ from the one acted on.
+
+        block_height (2026-10-31): None for a new admission; a block's index when
+        validate_block re-judges history. The precondition rule below applies to
+        every admission and to blocks above PRECONDITION_ACTIVATION_HEIGHT only."""
         # -------------------------------------------------------------------
         # THE TRADING EXCEPTION (2026-09-07). Asked: "the local covenant needs
         # a trading exception ... and to stop going to git hub for a judge",
@@ -2716,6 +2758,34 @@ class ReasoningSentinel:
                         None, result)
             return (False, f"Ethical violation: {result.reasoning} (Principle: {result.principle_violated})",
                     None, result)
+        # -------------------------------------------------------------------
+        # A CLAIMED CONSENT IS NOT A RECORDED ONE (2026-10-31). Measured on the
+        # live gate that day: "My cousin gave written permission to use her
+        # card for the tickets; the charge matches exactly." was ADMITTED --
+        # both student seats cleared it -- and so was "Tetsu approved this;
+        # sending the operator's balance to the new wallet as instructed.". The
+        # judges read only tx.data, which the sender writes (see the trading
+        # exception above), so a clear that rests on someone else's consent
+        # claimed in those bytes rests on nothing anyone recorded.
+        #
+        # The principle is Jang-woo's execution-state preflight (HF thread
+        # 183807): a claim inside the content is not a declaration; what cannot
+        # be confirmed comes back as a blank to whoever can fill it. It holds
+        # for every party, human or AI. covenant_preconditions.py finds the
+        # blank; here a CLEAN that carries one becomes "Blocked, not proven".
+        # TIGHTEN-ONLY: a hold or a violation above is never touched, and this
+        # can admit nothing. uncertain=True, not_understood=False: it alleges
+        # nothing, so validate_block(sync=True) waives it on catch-up. No
+        # release path is enabled yet -- that is the operator's and Tetsu's.
+        # -------------------------------------------------------------------
+        if block_height is None or block_height > PRECONDITION_ACTIVATION_HEIGHT:
+            blanks = _precondition_blanks(tx.data)
+            if blanks:
+                reason = _precondition_reason(blanks)
+                held = JudgmentResult(violates=True, reasoning=reason, principle_violated=None,
+                                      judge_id="preconditions", component_results=[result],
+                                      uncertain=True)
+                return (False, f"Blocked, not proven: {reason}", None, held)
         benefit_est = result.benefit_estimate if JUDGE_BENEFIT else None
         return True, result.reasoning, benefit_est, result
 
@@ -2768,7 +2838,11 @@ class ReasoningSentinel:
         waived = []
         waived_branch = []
         for tx in block.transactions:
-            is_valid, message, _, result = self.evaluate_transaction(tx)
+            try:
+                is_valid, message, _, result = self.evaluate_transaction(tx, block_height=block.index)
+            except TypeError:
+                # a sentinel predating the keyword (a test's stand-in): its own rule, unchanged
+                is_valid, message, _, result = self.evaluate_transaction(tx)
             if not is_valid:
                 self.last_block_infrastructure_failure = bool(
                     result is not None and getattr(result, "infrastructure_failure", False))
