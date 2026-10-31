@@ -75,12 +75,14 @@ def main():
     secret_lines = [l for l in priv_bytes.decode().splitlines() if l and not l.startswith("-----")]
     check("TK1c the private key never reaches stdout", "PRIVATE KEY" not in out
           and not any(l in out for l in secret_lines), out[:200])
-    with open(pub, encoding="utf-8") as fh:
-        public_pem = fh.read()
-    with open(rec, encoding="utf-8") as fh:
-        record = json.load(fh)
-    kid = R.key_id(public_pem)
-    check("TK1c ...the public PEM and its key_id are printed", public_pem.strip() in out and kid in out)
+    # Read what exists. When --generate's lock is refused the public half is never written, and opening it here
+    # crashed this suite before its tally -- a sweep read that as NO RESULT, not as a failure (2026-10-31 16:19,
+    # the sweep that met the logon-session ACE). The checks below fail on their own lines instead.
+    public_pem = open(pub, encoding="utf-8").read() if os.path.exists(pub) else ""
+    record = json.load(open(rec, encoding="utf-8")) if os.path.exists(rec) else {}
+    kid = R.key_id(public_pem) if public_pem else None
+    check("TK1c ...the public PEM and its key_id are printed",
+          bool(public_pem) and public_pem.strip() in out and bool(kid) and kid in out)
     check("TK1d key_id is the consent code's identity for this key, and the record carries it",
           kid is not None and record.get("key_id") == kid and record.get("public_exponent") == 65537, record)
 
