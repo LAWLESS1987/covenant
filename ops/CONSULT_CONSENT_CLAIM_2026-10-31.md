@@ -102,6 +102,43 @@ authority over that principal's resources." Tetsu's own word governs R3: not unt
 **Where they differ:** R1 ranges from oversight-only (ChatGPT) and a narrow logged exception (Grok) to rejected
 outright (Gemini). That decision is the operator's: R1 is authority over his own role.
 
+## Round 4: a concrete release path, put to be broken (his words: "ask tetsu and the others about the release path")
+
+The proposal, in parts:
+- **(a)** A strict-schema, zero-amount declaration, signed by an owner key that is not the sender's.
+- **(b)** consent_ref looked up in chain state; single-use, revocable, expiring.
+- **(c)** A narrow structural exception to admit the declaration.
+- **(d)** An operator attestation for keyless owners and for value until a roster exists.
+- **(e)** Tetsu's ledger only once he has his own key.
+- **(f)** The operator's own word: none, co-sign, or an exception for his own transactions.
+
+**Where they meet:**
+- **Sybil breaks the "different key" check (all four).** Two keys prove two identities, not two people or ownership.
+  A release needs the owner key BOUND to the specific resource in chain state, or a key-to-person roster. Without that,
+  hold.
+- **(d) is wrong as written.** ChatGPT: "An operator's signature cannot establish a cousin's consent... That recreates
+  the original vulnerability with a more trusted claimant." Gemini: operator god-mode again; an off-chain owner stays
+  held. Grok: a standing exception others must trust. Meta AI alone: a temporary bridge, if it is logged, revocable,
+  expiring and public.
+- **(c) is safe only as a closed, typed struct.** It allows hashes, integers, enums, heights and nonces, in a fixed
+  canonical encoding. It forbids free text, string purposes, extra or nested fields, wildcards, unlimited or recursive
+  delegation, negative amounts and overflow. Gemini: single-use and a cumulative cap conflict; pick single-use.
+- **(f) gives the operator no unilateral release (all four).** A co-sign that cannot clear a hold alone is acceptable
+  (ChatGPT, Gemini, Meta AI), or nothing (Grok). An exception for his own transactions is "a fatal self-dealing
+  loophole" (Gemini) and "conflict of interest" (Meta AI).
+- **(e) needs more than an off-machine key** (ChatGPT): the host must also be unable to command the signer. Gemini
+  offers a hardware enclave as an alternative to physical separation.
+- **Human-only by assumption: (d)** (all four).
+
+**Tetsu:** "I agree with the plan. It seems fair and secure. I might add that the owner should have a way to revoke
+the release if needed." (Revocation is in (b).)
+
+**Net, for his decision:**
+- The release is the owner's own declaration, with the owner key bound to the resource.
+- An owner with no key, such as the cousin's off-chain card, stays held.
+- The operator gets at most an oversight co-sign, never a release of his own.
+- Nothing is built yet.
+
 ## What this means here (mine, checked against the code)
 
 Our transactions are text descriptions of acts, signed by the sender. The chain can verify only what the
