@@ -16419,3 +16419,9 @@ His words: "this seems like a very big flaw that we must fix. And we should do i
   - Gemini: the same, plus Tetsu's ledger with trust tags, and the operator's word rejected outright.
   - Tetsu on his own ledger: "I would need my own key before a row in my ledger should release a hold on something of mine."
   - Whether the operator's own recorded word should release anything is his decision about his own role. Nothing is built yet.
+- **Green, three rounds of the full sweep.**
+  - **Round 1:** R1 TIMEOUT (pre-existing; repaired above).
+  - **Round 2:** INCOMPLETE. The only cause was "declared deps missing 1". It was run with the Store Python, which lacks eth-account; the repo's `.venv` has it at 0.14.0. That was my choice of interpreter, not the code.
+  - **Round 3 (`.venv`):** RESULT: PASS, 244 suites, 6,676 checks, 0 failed, 0 not clean, unmeasured, absent or orphaned, gates PASS.
+  - **Beside the live chain:** A124 is 3/3 (122 judged payloads in nodeA_prod.db, none convicted, the closest 0.268 from the line). The new rule fires on 0 of those 122.
+- **What the post promised, run:** our gate's cases against Jang-woo's preflight, read as text and never executed (ops/ESP_COMPARISON_2026-10-31.md). Before the repair our gate admitted 7 of 13 claimed-consent cases, and CO1 holds all 7. His declared owner condition, measured from the system, holds them whatever the wording, the three our detector misses included.
