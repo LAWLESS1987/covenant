@@ -1,5 +1,16 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__claude-in-chrome__tabs_create_mcp|mcp__Claude_Browser__tabs_create|mcp__Claude_Browser__preview_start",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:\\Users\\Lawre\\covenant\\.venv\\Scripts\\python.exe\" \"C:\\Users\\Lawre\\covenant\\.claude\\hooks\\ram_guard.py\""
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

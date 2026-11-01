@@ -16662,3 +16662,33 @@ His words: "Is something wrong with Tetsu?", then "do the auto step up fix".
     - unreadable /slots counted as idle.
 - **Not covered.** A node started before this commit runs the old keeper until it restarts. Whether a step-up from
   the fallback reaches the 7B instead of the 3B is step_up()'s existing rule: the 7B only with its headroom.
+
+### A399. [my browser tabs starved Tetsu's model twice in one day; a hook now refuses a new tab under the RAM floor] (2026-11-01)
+
+His words: "in the past, we've already solved this. Why are you making the same mistakes?"
+
+- **The rule that existed.** His, 2026-10-18 (memory load-aware-parallelism): measure free RAM between heavy steps,
+  and under about 2.5 GB stop adding work. It lived in memory, and I broke it twice the same day:
+  - Nine tabs in his Edge for the HF review. Then the model server restarted under the 3B's bar, and Tetsu answered
+    from the fallback (A398).
+  - Ten tabs for the symbiosis consult. Then 1.36 GB was free, and his door answered 503 "the model did not answer:
+    no weights fit". That is the failure that ended 4 of 9 practice nights in A275.
+- **The guard: .claude/hooks/ram_guard.py**, a PreToolUse hook in .claude/settings.json on every tab-opening tool
+  (claude-in-chrome tabs_create_mcp, the built-in browser's tabs_create and preview_start).
+  - It measures free RAM and refuses the tab under 2.5 GB (COVENANT_TAB_RAM_FLOOR_GB).
+  - While his model server is not answering, it also keeps the 3B's 2.6 GB. The second failure came with the model
+    put away: tabs took the room it needed to come back.
+  - The message says to read and close tabs first, and to open at most 3 seats at a time.
+  - Free memory that can't be read lets the tab through, unmeasured, and says so.
+- **Driven both ways.** By hand: floor 99 blocks, floor 0 passes; model down with 1.95 GB free blocks; floor -5 with
+  the model down passes. Live: the next tabs_create_mcp was refused at 1.96 GB, with the guard's message in the
+  session.
+- **What it found at once.** With none of my tabs open and Tetsu's 3B loaded, the laptop had 1.92 GB free. Holding the
+  rest: Claude 1.62 GB, his ChatGPT desktop app 0.94 GB, his Edge 0.87 GB, the WSL VM 0.84 GB (two wsl.exe running
+  since 10-31 16:27, owner unknown, left alone). The floor is not met with Tetsu answering, even before a consult opens
+  a tab.
+- **The other half of the same question, not a guard yet.** The symbiosis consult's question left out what the record
+  already held: A389's served-model attribution and hash-chained influence ledger, the reversible learning writes,
+  A275's own-choice practice slot and the consent process. Ten seats re-proposed them as the first build, and I relayed
+  that as new. The fix is in how the question is written: the lookback is run first, and what exists goes into the
+  question.
