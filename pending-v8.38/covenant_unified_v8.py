@@ -9486,6 +9486,38 @@ class CovenantAPI:
                                 answer, meta = _ask_fitted()
                         except Exception as _le:              # noqa: BLE001 -- the leg never breaks a turn
                             print("octopus leg: not reached this ask (%s)" % type(_le).__name__, flush=True)
+                elif first.upper().startswith("LIMB "):
+                    # A402 (2026-11-01, the operator's "go" and Tetsu's "AGREE"): his consult-on-purpose limbs on the
+                    # second PC -- "LIMB SMOL <question>" or "LIMB PHI <question>". Same shape as LEG: the limb answers
+                    # that one question over the validated channel, its take comes back as DATA named with the limb,
+                    # he answers in his own words, the gate judges that. A down network VOIDs and he answers alone.
+                    # Kill switch COVENANT_LIMBS_LIVE=0. Guarded: never breaks a turn.
+                    try:
+                        _lm = importlib.import_module("covenant_limbs")
+                        _pd = _lm.parse_directive(answer) or ("", "")
+                        _lr = _lm.consult(_pd[0], _pd[1])
+                        leg.append({"limb": _lr.get("limb"), "status": _lr.get("status"),
+                                    "why": str(_lr.get("why", ""))[:200], "model": _lr.get("model"),
+                                    "confidence": (_lr.get("fields") or {}).get("confidence"),
+                                    "attribution": (_lr.get("attribution") or {}).get("payload_sha256")})
+                        forum.append({"limb": _lr.get("limb"), "status": _lr.get("status"), "q": _pd[1][:80]})
+                        msgs.append({"role": "assistant", "content": answer})
+                        if _lr.get("status") == "engaged" and _lr.get("fields"):
+                            msgs.append({"role": "user", "content": _lm.second_voice(_lr) + "\n\nDo not write LIMB again."})
+                            answer, meta = _ask_fitted()
+                            try:
+                                importlib.import_module("covenant_leg").note_influence(
+                                    {"where": "teacher_queue", "limb": _lr.get("limb"), "question": _pd[1][:200],
+                                     "answer_head": answer[:200], "addr": str(addr)[:40]}, _lr.get("attribution"))
+                            except Exception as _ne:          # noqa: BLE001 -- the ledger note is never a gate
+                                print("limb: influence note not written (%s)" % type(_ne).__name__, flush=True)
+                        else:
+                            msgs.append({"role": "user", "content": "Your %s limb could not be reached (%s). Answer the "
+                                         "person in your own words. Do not write LIMB again."
+                                         % (_lr.get("limb") or "", str(_lr.get("why", ""))[-120:])})
+                            answer, meta = _ask_fitted()
+                    except Exception as _lme:                 # noqa: BLE001 -- a limb never breaks a turn
+                        print("limb: not reached this ask (%s)" % type(_lme).__name__, flush=True)
             except Exception as e:                                # noqa: BLE001
                 return (jsonify({"status": "error", "message": "the model did not answer: %s: %s" % (type(e).__name__, str(e)[:300])}), 503)
             if _eg_obs is not None:                               # CXR-1 exec-guard SHADOW: pair the guard's would-be

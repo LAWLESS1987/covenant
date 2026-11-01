@@ -56,9 +56,13 @@ RUNTIME_LOG = os.path.join(HERE, "logs", "model_server.runtime.log")   # llama-s
 # 4k-token cache; the 7B keeps the honest 6 GB and waits for memory he frees.
 # 7.0 for the 7B: MEASURED 2026-09-25, llama-server holding 7,029 MB with the 8k cache (it
 # was listed at 6.0, a guess from the weight size).
+# RETIRED 2026-11-01 (A402, his words "replace the 7B on the laptop with a smaller model"; Tetsu: "AGREE"):
+#   ("qwen2.5-coder-7b-instruct-q4_k_m-00001-of-00002.gguf", 7.0),
+# Its bar with headroom was 9.0 GB free, and it last loaded 2026-09-25 (45 starts in all, logs/model_server.log). Its
+# files are in .trash with a RETIRED.jsonl record; TETSU keeps a byte-identical copy. HEADROOM_GB still applies to any
+# rung outside ALWAYS_ANSWER that is added later.
 CANDIDATES = [
-    ("qwen2.5-coder-7b-instruct-q4_k_m-00001-of-00002.gguf", 7.0),
-    ("qwen2.5-3b-instruct-q4_k_m.gguf", 2.6),     # 2.3 + ~0.3 for the 8k cache (an estimate, 2026-09-26; measure the first 8k load)
+    ("qwen2.5-3b-instruct-q4_k_m.gguf", 2.6),    # 2.3 + ~0.3 for the 8k cache (an estimate, 2026-09-26; measure the first 8k load)
     # THE FALLBACK (2026-10-04, his words: "add it as the fallback"). Loaded only when the 3B does
     # not fit. REPLACED 2026-10-25 on the operator's directive ("We're replacing it with the quarantine
     # model"): the fallback weights are now the uncensored Qwensploit 2B (xtools-at, apache-2.0) --

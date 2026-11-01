@@ -169,6 +169,11 @@ def mk1o():
 
 def main():
     tmp = tempfile.mkdtemp(prefix="mk1_")
+    # A402 (2026-11-01): the 7B left CANDIDATES. These checks used CANDIDATES[0] as "the big rung" to pin the headroom
+    # and step-up rules, which still hold for any rung outside ALWAYS_ANSWER. So they run against a fixture big rung
+    # (the 7B's own 7.0 bar) above the real list, restored at the end: the same checks, no longer tied to the 7B's files.
+    real_candidates = M.CANDIDATES
+    M.CANDIDATES = [("mk1-fixture-big-rung.gguf", 7.0)] + list(real_candidates)
     big, small = M.CANDIDATES[0][0], M.CANDIDATES[-1][0]
     for name in (big, small):
         open(os.path.join(tmp, name), "wb").write(b"x")
@@ -562,6 +567,7 @@ def main():
         for k, v in real.items():
             setattr(M, k, v)
         M._last_step_try[0] = real_step_try
+        M.CANDIDATES = real_candidates
 
     # MK1m (A341b, 2026-10-13): a server that answers with no state is ADOPTED only when it is provably this
     # keeper's own -- its binary, one of its weights. Temp state and log; the port and the process are stand-ins.

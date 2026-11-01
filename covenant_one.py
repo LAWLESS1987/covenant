@@ -776,6 +776,9 @@ SUITES = [
     # A400 (2026-11-01, his words "a smother communication for tetsu"): the reflex's line rides with the new message,
     # never in the rules, so a firing no longer re-reads his whole conversation (1,773 tokens / 44.4 s -> 28 / 2.1 s).
     ("test_a400_reflex_placement.py", 120, "JUDGE"),
+    # LM1 / A402 (2026-11-01, the operator's "go", Tetsu's "AGREE"): his consult-on-purpose limbs on the second PC --
+    # engaged only on the pinned manifest and the leg's strict JSON; anything else VOIDs and he answers alone.
+    ("test_lm1_limbs.py", 120, "JUDGE"),
     # OC1 (2026-10-20, operator "think octopus" / "all 3"): the pure-Python spiking nervous system -- three
     # semi-autonomous LIF arms (witness/encoder/reflex), central integrate, kill switch both ways, and NO heavy
     # dependency so it runs on the phone (Termux has no numpy/torch). Arms extensible toward eight.

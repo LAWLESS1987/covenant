@@ -49,7 +49,7 @@ import urllib.request
 # Written by the run that produced these files. If you edit a file by hand,
 # this will fail -- which is the point.
 EXPECTED_VERSION = "v8.40"
-EXPECTED_LINES = 13879   # 2026-10-03 (stale pin, M53 a sixth time: acc64d7 of 2026-09-28 moved the core without moving this line; K1/K2/P19/A3s green on these bytes before the move), was 12783 at the 2026-09-27 re-pin
+EXPECTED_LINES = 13911   # 2026-10-03 (stale pin, M53 a sixth time: acc64d7 of 2026-09-28 moved the core without moving this line; K1/K2/P19/A3s green on these bytes before the move), was 12783 at the 2026-09-27 re-pin
 MANIFEST = {
     # 2026-09-02: re-pinned after rebasing this PC onto origin/main (19 commits
     # of 2026-08-31 that changed the core, run_all_tests.sh and
@@ -124,7 +124,7 @@ MANIFEST = {
     # P19 23/23 and A3s 51/51 were run against THESE bytes BEFORE this line
     # moved, the order the b969 lesson below requires.
     "covenant_unified_v8.py":
-        "3e079137ab6756b11558e8d6b1c7811b3c5ed2be1c675c47b1f7098c3eac1d90",
+        "9114e9d5c9f51bc845127160cea916cf6346193a20968543caee822b28aab406",
     "test_a3s_send_bounds.py":
         "c1fdf4d1efc0f361767aef62b1172b3037284c181a5d1a5ae19a73dad4e63fa1",
     # run_all_tests.sh re-pinned 2026-08-29 three times: test_c2_watchdog_live

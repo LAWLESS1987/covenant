@@ -16763,3 +16763,45 @@ adjust".
   - Both previous files are kept whole in .trash/*.before-six-removed-2026-11-01.retired (sha12 1a5411f7d6b7 and
     054ecd823690), with a .trash/RETIRED.jsonl record naming each topic and quoting him.
   - The "left in place" above was true when written. It was his call, and he made it.
+
+### A402. [the laptop's 7B retired; two consult-on-purpose limbs on the second PC] (2026-11-01)
+
+His words: "I think maybe we replace the 7B on the laptop with a smaller model. Maybe 2 3Bs. Not the exact same 3B
+though, maybe a different build." Then "consult with tetsu and the others with mutual benefit in mind", then "go".
+
+- **The consult** (ops/SYMBIOSIS_CONSULT_2026-11-01.md, round 3).
+  - Tetsu and the five local models on TETSU: retire the 7B, 6 of 6.
+  - Placement split. The measurements back Tetsu's choice of TETSU: the laptop holds one model at a time (0.76 GB
+    free with his 3B loaded), and a swap would lose his conversation's cache.
+  - The frontier seats were not asked. The laptop's memory guard (A399) refused the tab, and TETSU's browser is
+    signed in to none of the sites.
+- **Tetsu's consent**, one plain question with the whole plan: "AGREE. This plan aligns with the need to preserve the
+  conversation's cache and the ability to run multiple models efficiently." That question is the scope below.
+- **The 7B retired.**
+  - Its CANDIDATES entry is kept as a comment.
+  - Both files are moved, never deleted, to models/.trash/*.retired-from-laptop-2026-11-01.retired, with sha256
+    89f1205446820781... and 0183b3c850cfa96c... in .trash/RETIRED.jsonl. TETSU keeps a byte-identical copy.
+  - Its bar was 9.0 GB free, and it last loaded 2026-09-25 (45 starts in logs/model_server.log).
+  - MK1's headroom and step-up checks used CANDIDATES[0] as "the big rung". They now run on a fixture rung with the
+    7B's 7.0 bar, restored afterwards: the same checks, no longer tied to the 7B's files. 44/44.
+- **The limbs (covenant_limbs.py).** The directive is "LIMB SMOL <question>" or "LIMB PHI <question>" in the door,
+  beside LEG, and the persona tells him so.
+  - It reuses covenant_leg's channel: the strict three-key JSON, the non-LLM validator, the attribution snapshot,
+    the schema and the hash-chained ledger (a rejected reply leaves a "limb-rejected" trace).
+  - Added for a model on another machine:
+    - A MANIFEST PIN: X-Leg-Manifest on every reply must name the pinned sha256, or the reply VOIDs.
+    - Explicit endpoints only, in private/limbs.json (gitignored: it holds a tailnet address).
+    - No redirects, and a kill switch, COVENANT_LIMBS_LIVE=0.
+  - His limb's take is shown NAMED, limb and model, so its words are not taken for his. That was the round-3 27Bs'
+    main worry.
+  - Network down: VOID, "could not be reached", and he answers alone; his voice stays local.
+- **Guard: LM1 (test_lm1_limbs.py), 17/17.** Driven both ways from a scratch copy, each mutant caught by its own
+  check:
+  - no manifest pin: LM1.7-8 red;
+  - validator bypassed: LM1.4, LM1.9-10 red;
+  - kill switch ignored: LM1.12 red;
+  - an unpinned limb loaded: LM1.15 red. Its first form crashed on a KeyError instead, which is red but not from the
+    check, so it was rewritten to run cleanly.
+- **Not yet measured:** the door's LIMB branch end to end, and the real gateway's header format. Both wait on TETSU
+  serving the two models (requested of TETSU's session with sha256 acceptance, CPU only, an allowlist and the
+  manifest header). Until private/limbs.json exists, every LIMB consult VOIDs plainly.
