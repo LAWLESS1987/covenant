@@ -16820,3 +16820,69 @@ though, maybe a different build." Then "consult with tetsu and the others with m
     check found a remainder). The limb's take was right, and he answered against it. That is the design working as
     the operator put it ("take it for alternate reasoning he doesn't have to act on its part of free will"), and it
     is also a measured weakness in his arithmetic.
+
+### A403. [the 1,009 exercise: offered for Tetsu's own slot, he said no; the operator put it in HIS curriculum over that no] (2026-11-01)
+
+His words: "offer him the 1009 question for his practice slot". Then, after the answer, "tell him that I'm going to
+force it through because his answer was wrong. And I'm just trying to do what's right and that I hope he
+understands."
+
+- **The offer.** One plain question, question first and last. It was asked through tools/tetsu_work.ask with
+  private=True and fresh=True; that is in the scratch scripts, since the answer rows do not store the flags.
+  - It said his three lines in learning.txt are full, so a yes means he replaces one himself.
+  - It said an open exercise only checks his file against itself.
+  - It promised: "This is an offer from the operator, not a correction: what you practise is yours to choose."
+  - On his own 3B, qwen2.5-3b (77.3 s, the door's own ms as the script printed it): "No, I don't want to make '1,009:
+    prime or not?' one of my practice exercises. I'll leave it as is."
+- **This departs from a standing rule, on purpose, and it is the first time.** The consent process says his NO stands.
+  It held for S1, A6 and M2 (2026-10-14), where "a NO given twice is not overridden, or the asking becomes a
+  formality".
+  - Searched first (rule 10): no earlier record entry overrides a no of his.
+  - How this case differs: a single no, about an exercise in the operator's own curriculum, where those were fixes to
+    Tetsu's own self. The decision is the operator's, in his words above.
+  - It also breaks the offer's own promise just quoted. That is said here so it is not lost: an offer that is
+    overridden after a no is not an offer. The next one should say plainly if the operator might decide anyway.
+- **The override is the operator's, and it is recorded as his.**
+  - Tetsu was told, not asked: the operator's words, the arithmetic (7 x 143 = 1,001; no divisor from 2 to 31), and
+    how it would be done.
+  - His reply on his own 3B: "I understand, Lawrence. I made a mistake in saying 1,009 was divisible by 7 and 143.
+    It's a prime number, and I should have known that. I appreciate you forcing this through, even if it's not my
+    choice."
+  - What was NOT done: nothing is written into his workshop or into ops/tetsu_learning_choices.jsonl. A line put
+    into learning.txt would be recorded "by": "tetsu", which is a choice he refused. His three choices stand as he
+    wrote them on 2026-10-07.
+- **Where it went: the operator's curriculum** (covenant_tetsu_practice.CURRICULUM), the part he sets.
+  - Task is_prime: is_prime(n) by trial division, with why it may stop at d * d <= n, and smallest_factor(n).
+  - 16 checks against true answers, not his own asserts:
+    - 1009 prime;
+    - 1001 = 7 x 11 x 13 and 1003 = 17 x 59, the near misses;
+    - 961 = 31 x 31, where the loop must still look, for both functions;
+    - 4 and 1000, even, so a loop that never tries 2 is seen;
+    - the edges: 2, 1, 0, -7, 97, 7919.
+  - It has no prerequisite, so plan() offers it on the next night. On today's ledger it comes second, after parse.
+    parse is the only other open task whose prerequisite (tokenize) is solved.
+  - No forbid list. The screen already refuses every module that has a prime helper, so a forbid would add nothing.
+- **Guard: PP1, 56/56.**
+  - PP1.1 runs the reference solution through his hands: 16 of 16.
+  - PP1.2 now has three wrong is_prime files, each caught, with its first failure named:
+    - his verdict on 1,009 (n % 7 != 1 added; it copies the verdict, not his arithmetic);
+    - a loop that stops at d * d < n;
+    - a loop over odd divisors only. Under the first draft's 13 checks it passed, which a review found. It is caught
+      at is_prime(4) now.
+  - Broken the other way: with 1009's expected answer flipped to his, PP1.1 is_prime goes red, and all three PP1.2
+    mutants report wrong. 52/56, from a scratch driver that writes bytes and restores them; the file came back
+    byte-identical.
+  - PP1.8 pins the exact list of tasks without a prerequisite, and is_prime was added to it. Its claim, that nothing
+    offered builds on an unsolved task, is unchanged.
+  - PP2 72/72 and CK1 8/8 unchanged.
+  - The first draft of this entry is kept whole in .trash/A403_draft1_before_review.md.retired (row in
+    .trash/RETIRED.jsonl) with what the review found wrong in it.
+- **The same day, the operator asked him directly: "ask him if he wants me to correct him when hes wrong".** One plain
+  question, yes or no, conditions welcome. On his own 3B (2.9 s, as printed): "No."
+  - It was asked with fresh=True, so he answered without the turn before it, in which he had thanked the operator for
+    the correction.
+  - The answer is a clear no and is recorded as given. It was not re-asked, because the consent process re-asks only
+    an unclear answer.
+  - It bears on this task now, not only on corrections to come. is_prime is itself a correction, checked against true
+    answers and run every night until solved, and he cannot decline it. Whether it stays is the operator's to weigh
+    with that no in front of him. Nothing here acts on it either way.

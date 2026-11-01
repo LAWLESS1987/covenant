@@ -328,6 +328,19 @@ def d(t, var):
 def derive(src, var):
     return show(simp(d(parse(src), var)))
 ''',
+    "is_prime": '''
+def smallest_factor(n):
+    d = 2
+    while d * d <= n:
+        if n % d == 0:
+            return d
+        d += 1
+    return n
+
+
+def is_prime(n):
+    return n >= 2 and smallest_factor(n) == n
+''',
 }
 
 # ---- PP1.1: every task is solvable under the screen, and every expected value is right
@@ -341,7 +354,16 @@ check("PP1.1b each attempt put two acts to the gate, the write and the run", len
 # ---- PP1.2: broken the other way -- a wrong file is caught, and the failure is named
 wrong = [("flatten", REF["flatten"].replace("isinstance(x, list)", "isinstance(x, (list, tuple))"), "flatten([1, (2, 3)])"),
          ("parse", REF["parse"].replace('return ("^", base, unary())', 'return ("^", base, atom())'), "parse('2 ^ 3 ^ 2')"),
-         ("derive", REF["derive"].replace("return show(simp(d(parse(src), var)))", "return show(d(parse(src), var))"), "derive('x ^ 3', 'x')")]
+         ("derive", REF["derive"].replace("return show(simp(d(parse(src), var)))", "return show(d(parse(src), var))"), "derive('x ^ 3', 'x')"),
+         # his VERDICT on the live LIMB PHI turn (A402), 1,009 not prime -- the verdict only, not his arithmetic
+         # (1009 % 7 is 1; the 7 * 143 = 1,001 slip): of the checks, only 1009 (and 1, already not prime) has n % 7 == 1
+         ("is_prime", REF["is_prime"].replace("return n >= 2 and smallest_factor(n) == n",
+                                              "return n >= 2 and smallest_factor(n) == n and n % 7 != 1"), "is_prime(1009)"),
+         # stopping one short of d * d == n calls 961 = 31 * 31 prime
+         ("is_prime", REF["is_prime"].replace("while d * d <= n:", "while d * d < n:"), "is_prime(961)"),
+         # odd divisors only (from 3, by 2): passed every odd check until 4 and 1000 were added
+         ("is_prime", REF["is_prime"].replace("    d = 2\n    while d * d <= n:", "    d = 3\n    while d * d <= n:")
+                                     .replace("        d += 1", "        d += 2"), "is_prime(4)")]
 for tid, code, first in wrong:
     res, stop = PR.attempt(PR.BY_ID[tid], code, gate=gate_clean, workshop=WS, hands_ledger=HLED)
     check("PP1.2 broken the other way: a wrong %s is caught, and the first failure is named (%s)" % (tid, first),
@@ -537,7 +559,8 @@ check("PP1.7d the retries are bounded: a passing error that persists is asked 1 
 # ---- the curriculum's order, his own code as the next task's ground, and retention
 w6, l6 = fresh()
 check("PP1.8 the plan offers nothing that builds on an unsolved task",
-      [t["id"] for t, _r in PR.plan(20, l6)] == ["flatten", "permutations", "n_queens", "count_paths", "tokenize"],
+      [t["id"] for t, _r in PR.plan(20, l6)] == ["flatten", "permutations", "n_queens", "count_paths", "tokenize",
+                                                 "is_prime"],
       [t["id"] for t, _r in PR.plan(20, l6)])
 seen6 = []
 PR.practise(PR.BY_ID["tokenize"], scripted(["```python\n" + TOKENIZE.strip() + "\n```"], seen6), gate=gate_clean,

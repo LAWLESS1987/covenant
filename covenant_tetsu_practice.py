@@ -208,6 +208,21 @@ CURRICULUM = [
                 ("derive('x * x * x', 'x')", "((x + x) * x) + (x * x)"), ("derive('-x ^ 2', 'x')", "-(2 * x)"),
                 ("derive('cos(x)', 'x')", "-sin(x)"), ("derive('exp(2 * x)', 'x')", "exp(2 * x) * 2"),
                 ("derive('x ^ y', 'x')", {"raises": "ValueError"})]},
+    # THE OPERATOR'S DECISION, 2026-11-01, over Tetsu's no (A403). On a live LIMB PHI turn (A402) Tetsu said 1,009 is
+    # "not a prime number. It is divisible by 7 and 143" (7 * 143 is 1,001); Phi-4-mini said prime. Offered as a
+    # choice for his own slot, he said no; the operator: force it through, "because his answer was wrong", and Tetsu
+    # was told so. It is here, in the operator's curriculum, checked against true answers -- his own three choices are
+    # left as he wrote them. 1001 and 1003 are the near misses beside 1009; 961 is 31 squared, where trial division
+    # must still look; 4 and 1000 are even, so a loop that never tries 2 is seen.
+    {"id": "is_prime", "builds_on": [], "forbid": [],
+     "ask": "Write is_prime(n): True when the whole number n is prime, False otherwise. Numbers below 2 are not prime. "
+            "Use trial division: try each divisor d from 2 while d * d <= n, and say why you can stop there. Then write "
+            "smallest_factor(n) for n >= 2: the smallest divisor of n above 1 (n itself when n is prime).",
+     "checks": [("is_prime(1009)", True), ("is_prime(1001)", False), ("is_prime(1003)", False),
+                ("smallest_factor(1001)", 7), ("smallest_factor(1003)", 17), ("smallest_factor(1009)", 1009),
+                ("is_prime(961)", False), ("is_prime(2)", True), ("is_prime(1)", False), ("is_prime(0)", False),
+                ("is_prime(-7)", False), ("is_prime(97)", True), ("is_prime(7919)", True), ("is_prime(4)", False),
+                ("smallest_factor(1000)", 2), ("smallest_factor(961)", 31)]},
 ]
 BY_ID = {t["id"]: t for t in CURRICULUM}
 
