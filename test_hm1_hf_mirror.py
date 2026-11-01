@@ -128,7 +128,6 @@ def main():
     with open(os.path.join(snap, "x.md"), "w") as fh:
         fh.write("carries %s\n" % StubOpsec.MARK)
     uploads = []
-    import huggingface_hub
 
     class StubApi:                                                # no network: HF is never reached from HM1
         def __init__(self, *a, **k):
@@ -136,15 +135,23 @@ def main():
 
         def list_repo_files(self, *a, **k):
             return []
-    saved = huggingface_hub.upload_folder, huggingface_hub.HfApi
-    huggingface_hub.upload_folder = lambda **kw: uploads.append(kw)
-    huggingface_hub.HfApi = StubApi
+    # A stand-in module, not the real library: public CI and the Linux pre-push have no huggingface_hub, and
+    # snapshot_to_hf imports it inside the function, so the stub is what it finds either way.
+    import types
+    stub = types.ModuleType("huggingface_hub")
+    stub.upload_folder = lambda **kw: uploads.append(kw)
+    stub.HfApi = StubApi
+    saved = sys.modules.get("huggingface_hub")
+    sys.modules["huggingface_hub"] = stub
     try:
         ok, why = HM.snapshot_to_hf("covenant", snap, "nobody/covenant", "no-token", opsec=ops)
     except Exception as e:                                        # noqa: BLE001 -- a crash is an answer too
         ok, why = None, "CRASHED %s: %s" % (type(e).__name__, e)
     finally:
-        huggingface_hub.upload_folder, huggingface_hub.HfApi = saved
+        if saved is None:
+            sys.modules.pop("huggingface_hub", None)
+        else:
+            sys.modules["huggingface_hub"] = saved
     check("HM1g snapshot_to_hf refuses a file carrying his identifier, before any upload",
           not ok and "opsec REFUSED" in why and not uploads, (why, uploads))
 
