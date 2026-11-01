@@ -1,3 +1,14 @@
+---
+license: apache-2.0
+pretty_name: Covenant
+tags:
+  - ai-safety
+  - multi-agent-systems
+  - ai-ethics
+  - governance
+  - peer-to-peer
+---
+
 # Covenant
 
 A small peer-to-peer ledger with an **ethics gate inside the transaction
