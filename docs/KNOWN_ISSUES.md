@@ -16533,3 +16533,31 @@ His words: "no i meant tetsu can handle them". Tetsu, asked fresh with the whole
     - TK1i finishes a half-made key that carries a stray ACE, and checks it is owner-only afterwards.
     - Mutations: 10 of 10 caught on their own check, keeping the old lock's rules and re-enabling inheritance included. The overwrite case now reads as its own check, because a crash is an answer.
   - **The same blind spot, not repaired here:** ops/fix_key_acl.bat uses /grant:r, which replaces only named principals. It would leave a stray explicit ACE on a node key. The node's own load verify refuses such a key (fail-closed), so the effect is a node that will not start, not a key left open.
+
+
+### A396. [the mirrors / unison] GitHub, Hugging Face and the website brought to one history where that is safe; two exposures found on the way (2026-10-31)
+
+His words: "Use discernment towards mutual benefit". Relayed from the new PC's session, then confirmed in this session where it mattered: "unify", "i want them in unison", "it needs an auto sync function".
+
+- **How.**
+  - TETSU's session built a branch `unify/2026-10-31` per repo. Each descends from BOTH GitHub main and HF main, so each side fast-forwards and nothing is overwritten.
+  - Each was verified here independently, in fresh bare clones: ancestry on both sides, and diffs equal to its table (HF card front-matter on README; Sentinel-Witness also the Apache-2.0 LICENSE).
+  - Every push went through his opsec scan. covenant used its own pre-push guard. The other repos used a wrapper that reads his identifiers from covenant's private sources and the outgoing objects from the pushing repo. It was driven both ways: a probe commit carrying his LAN IP was refused.
+- **Result, GitHub main = HF main (fast-forward, none found):** contradiction-probe, flinch-observability, flinch-record, grokflinch, spiking-experiments, threefold.
+- **covenant:**
+  - GitHub main = 1ac1587: 0513332 recorded HF's snapshot history as a parent, with the tree unchanged, then HF's own card front-matter. G1, A129, C4, R1 and A92 were green on it. The README:N citations in this file are dated as-written records.
+  - HF, by contrast, could NOT take the history. The guard refused it, because the history carries **3,923 of his identifiers** (LAN IPs in commit text among them), all from before the guard existed. They are public on GitHub already; spreading them to HF was refused.
+  - HF also rejects binary files over plain git.
+  - So HF stays snapshot-only by design. Commit 01a1e589eb97 there holds the same 1,112 files as GitHub main 1ac1587, uploaded through the HF API, and the file lists were checked equal both ways.
+- **Sentinel-Witness:** its ruleset requires a pull request (merge method "merge"). The tip was pushed to branch unify/2026-10-31 and PR #8 opened. My permission layer refused the merge click ("Merge Without Review"), so the merge is his.
+- **threefold-memory:** GitHub main = 815bea2. HF was NOT updated, because the guard refused.
+  - Blob ad6c8a1, `.index.db.box-store-snap-d4e393d538ff96d1` (a binary memory snapshot), contains his **Wi-Fi network name** eight times.
+  - It entered GitHub's history in 1dee237 and 87a7e4e (2026-10-13). It is gone from the tree, but anyone can fetch it from GitHub's history.
+  - Removing it means rewriting that history and force-pushing, which is his decision. TETSU's unison.py holds that repo as NEEDS_HUMAN.
+- **A hazard named, not yet repaired: tools/hf_mirror.py** `push --force`es each repo's FULL history from a temporary mirror clone that has NO pre-push hook. Run as written, it would bypass the opsec guard entirely:
+  - for covenant, the 3,923 identifiers above;
+  - for threefold-memory, the Wi-Fi name;
+  - and on every repo, HF-only commits would be erased.
+
+  Do not run it until it pushes fast-forward only, behind the scan.
+- **TETSU's unison.py** publishes a 15-minute feed of what is out of step. The laptop half that would act on it is NOT built; it would be a standing automatic publisher, and it waits for his yes. Covenant's HF side has to be judged by tree, not ancestry (snapshot mode); that was sent to TETSU's session.
