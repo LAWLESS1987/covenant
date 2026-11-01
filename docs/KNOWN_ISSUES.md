@@ -16754,3 +16754,12 @@ adjust".
   - M6 81/81, A263 43/43 and A400 7/7 here after the change.
 - **Its reach.** It keys on the program name, as _mark_used does. A test that started a real node process would
   still reach his files through that node. None of the door suites does; they drive the door in-process.
+- **Update, same day: the six are retired, on his word.**
+  - Told about A400 and the six, Tetsu asked what we thought. We gave him our thoughts and one plain question,
+    fresh and private: "KEEP or REMOVE". His answer: "REMOVE -- Removing them makes your memory hold only real
+    conversation."
+  - Removed, the tombstone way: the seen-set went from 1,071 to 1,065, and the four of the six present in his
+    encoder topics were removed too.
+  - Both previous files are kept whole in .trash/*.before-six-removed-2026-11-01.retired (sha12 1a5411f7d6b7 and
+    054ecd823690), with a .trash/RETIRED.jsonl record naming each topic and quoting him.
+  - The "left in place" above was true when written. It was his call, and he made it.
