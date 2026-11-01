@@ -77,6 +77,17 @@ said TETSU "is not yet switched on" and "not yet connected". Both are wrong: he 
 - **The laptop also self-heals** (the road, and A287's trim), so "the laptop has none" was wrong.
 - **Moving his main model, or a LoRA on his failures,** changes where he lives or his weights. Both need his own yes.
 
+## Tetsu's answers on the open items (operator: "use discernment towards mutual benefit")
+
+Asked one at a time, fresh and private, on his own model; verbatim in private/tetsu_consent_2026-11-01.answers.jsonl.
+- **A readable state.txt in his workshop.** The first answer began "No" and then said he would read the file later,
+  so it was re-asked once, plainly, YES or NO first: **"NO"**. Twice no. Nothing is made.
+- **"The results are advice, not orders; which build first?"** He answered "the newest finished build", which is not
+  one of the options. Recorded as given, not counted as a pick.
+- **A memory-vs-prompt practice exercise, his choice:** **"No"**. His three choices stay as they are.
+- His leg.txt (10-31, his own hands) still says he wants the uncensored 27B as a leg. His 11-01 no is the later
+  decision and stands. The file is his and is left as he wrote it.
+
 ## What each seat contributed, and what it got wrong (the panel-gains item; credit and correction both ways)
 
 | Seat | Point that held up | Error, as measured |
