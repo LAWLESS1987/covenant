@@ -72,3 +72,20 @@ models of one family (Qwen). Before it left the laptop, the brief was opsec-scan
   the octopus design doc they go through prereg and a vote.
 - **Proposal 3** is split (2 adopt, 1 refuse, with a reason worth weighing) and waits for that process.
 - **Nothing here touches the octopus yet.** The design doc's rule holds: advisory only, never the gate.
+
+## What TETSU's session did with these answers (reported by it, measured on TETSU; details in its brief)
+
+1. **The stagger curve found the real weakness.** At the 4 s window, a 3-node burst staggered 8 s was caught 31% of
+   the time, and 0% at 15 s. A sweep over 4/10/16/24/32 s settled on **16 s**: 100% at 8 s, 98% at 15 s, 0.1 false
+   mesh spikes/h at normal noise. The cost is 48/h at 10x noise, up from 14.5. /pulse now carries `stagger_live`
+   from real node spikes, so the window can be re-judged on real gaps.
+2. **Heartbeat 25 s -> 10 s** (Mistral's catch). `heartbeat_s` is published, and a client's stall timeout should be
+   at least 3 heartbeats.
+3. **The slope drift rule was built three ways and rejected on the data:**
+   - a per-sample cap read low and gave false drifts;
+   - dual-timescale gave false drifts in 4 of 5 control runs;
+   - dual-timescale with a 4-sigma test never flagged a 3 h ramp, and absorbed its plateau (57 fires against ~220).
+   The 2x ratio rule stays. The attempts are kept in pulse/attempts/. The reviewers' direction was reasonable, and
+   the numbers decided.
+4. **Not done:** live shadow-mode injection into a node (Grok's test). It changes a live node, so it waits for his
+   word and the octopus design doc's process.
