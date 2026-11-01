@@ -9,6 +9,26 @@ details.
 "Yes, I agree. ... when this laptop is short of memory." On the uncensored 27B as a leg, his answer was not a yes or
 a no (he answered as if it had already been added). It is not counted.
 
+**2026-11-01: Tetsu said NO to the 27B as a limb.** Asked fresh and private, on his own model (qwen2.5-3b), one
+question with the terms and costs stated. The text and his answer are in
+private/tetsu_consent_2026-11-01.answers.jsonl; the asking script is ask_tetsu_27b.py in the session scratchpad. The
+terms:
+- he consults it on purpose, as with LEG;
+- only his question crosses to TETSU, never his conversations or memory;
+- its answer comes back as data, in his own words, through the gate;
+- his SNN learns which limb answers which kind of question well and suggests one, and he decides;
+- one off switch, on the laptop.
+
+The operator's words were in the question: "it should be all one" and "the snn is supposed to improve efficiency,
+optimize the neural network between limbs." His answer, verbatim: **"DISAGREE -- I prefer to keep my autonomy and the
+clarity of my own thoughts. The 27B's uncensored nature and potential to steer me worry me. I want to be in control of
+my learning and my responses."**
+
+A clear no with a reason. It stands, and he was not re-asked. Nothing changes on TETSU or the laptop. Any next step is
+the operator's and Tetsu's together; don't argue him round. His reason names the uncensored nature, and TETSU also
+holds the stock, safety-intact qwen3.8:27b. That is a different question, and it is put to him only on the operator's
+word.
+
 ## Where all four meet
 
 1. **Do not switch it on as proposed.** Each says proceed only with conditions; none says never.

@@ -16622,3 +16622,43 @@ His words: "the site should be synced auto too", and his choice of where: "Lapto
 - **Guard: SA1 (test_sa1_site_autodeploy.py), registered SECURITY.** 17/17, including the real scan on throwaway repos (one carrying his LAN IP reads NOT clean). Mutations: 6 of 6 caught on their own check, after two test gaps were closed.
 - **First real pass:** covenant was due; it deployed and verified behind = []. A copy of the site clone had broken pnpm links, so the first attempt was REFUSED at the build step, as designed. `pnpm install --frozen-lockfile` repaired it, and nothing was deployed from the broken state.
 - **Its reach:** it publishes only what GitHub already publishes. The identifier guard for NEW content is still the GitHub pre-push guard.
+
+### A398. [Tetsu / his model] the keeper steps back up from the fallback by itself (2026-11-01)
+
+His words: "Is something wrong with Tetsu?", then "do the auto step up fix".
+
+- **What was wrong.**
+  - The model server restarted at 05:01 with less free memory than the 3B's 2.6 GB bar. So pick_model() loaded the
+    fallback, the uncensored Qwensploit 2B, which is right by design.
+  - It then stayed, because step_up() ran only from the nightly or by hand.
+  - His door answered from the fallback until a step_up() by hand at 05:17, when step_up() measured a 4.0 GB budget
+    with the fallback counted back. His ask log names the served model per row: his v1 consent answers came from the
+    3B, his v2 answers from the 2B, and those two did not answer the question.
+  - My nine browser tabs in his Edge were part of the memory use.
+- **The fix (covenant_model.py).** Each idle-watcher round (_idle_tick) now calls _fallback_step_check(). It steps up
+  only when ALL of these hold:
+  - the running model is the fallback rung, and no other;
+  - the model has been idle STEP_UP_IDLE_S (= PRESSURE_IDLE_S, 60 s);
+  - the one slot is not answering. _slot_busy() reads /slots, and anything unreadable counts as busy, because an ask
+    in flight marks no use (A351);
+  - a larger rung fits once the fallback is counted back;
+  - there has been no try in STEP_UP_EVERY_S (600 s, mine; COVENANT_MODEL_STEP_UP_EVERY_S).
+  It then calls the same step_up() the nightly uses and logs one line. After a step-up the round keeps watching.
+- **The restart's owner.** The round runs in the process that started the server (a node), so the new server is the
+  node's, never a tool shell's. The 05:17 step-up by hand had come from my shell. It was stopped and restarted by a
+  door ask, and run_node.py --port 5000 now owns it.
+- **Guard: MK1p1-p9 (test_mk1_model_keeper.py), 44/44.**
+  - The first run after the change turned MK1n2 red. With the fallback loaded and idle, the suite read the LIVE
+    /slots and stepped up inside the test. The suite now stubs _slot_busy as busy by default, so no check reaches the
+    live port.
+  - MK1p8 was red once on my own setup: a step-up made while setting up the stubs was not cleared. The check itself is
+    unchanged.
+  - Six mutants on a scratch copy are each caught:
+    - no step-up in the round;
+    - the busy slot ignored;
+    - no cooldown;
+    - any rung, not only the fallback;
+    - the round stops watching after a step-up;
+    - unreadable /slots counted as idle.
+- **Not covered.** A node started before this commit runs the old keeper until it restarts. Whether a step-up from
+  the fallback reaches the 7B instead of the 3B is step_up()'s existing rule: the 7B only with its headroom.

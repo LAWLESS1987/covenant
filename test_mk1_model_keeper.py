@@ -173,13 +173,19 @@ def main():
     for name in (big, small):
         open(os.path.join(tmp, name), "wb").write(b"x")
     real = {k: getattr(M, k) for k in ("MODELS", "free_gb", "alive", "stop", "start", "_read_state", "LOG",
-                                       "USED", "_REAL_USED")}
+                                       "USED", "_REAL_USED", "_slot_busy")}
+    real_step_try = M._last_step_try[0]
     calls = []
     try:
         M.MODELS = tmp
         M.USED = os.path.join(tmp, "last_use.stamp")     # A348b: never the live shared stamp (its time would move MK1i)
         M.stop = lambda say=print: calls.append("stop")
         M.start = lambda say=print: (calls.append("start") or (True, "up"))
+        # 2026-11-01: the idle round now also tries a step-up from the fallback, which reads the LIVE server's /slots.
+        # First run after that change: MK1n2 (the fallback loaded, idle past IDLE_S) read the real port, found it
+        # idle and stepped up inside the suite. Busy by default here, so no check reaches the live server; MK1p
+        # drives the step-up itself.
+        M._slot_busy = lambda: True
         quiet = lambda *a, **k: None      # noqa: E731
 
         # (a) 2026-09-25, his choice "2" (load the big model only with room to spare): the small
@@ -469,9 +475,93 @@ def main():
                   at_send == [True] and after >= t0 - 1, (at_send, after, t0))
         finally:
             M._last_used[0] = real_last2
+
+        # (p) 2026-11-01, his words: "do the auto step up fix". Measured that morning: the server restarted at 05:01
+        # with under the 3B's 2.6 GB free, the fallback loaded and stayed, and his door answered from it until a
+        # step_up() by hand at 05:17. The idle round now steps up from the FALLBACK rung by itself -- only from it,
+        # only idle, only with the one slot not answering, only when the next rung fits, at most once per
+        # STEP_UP_EVERY_S. Driven both ways: each guard is lifted alone and the step-up happens; held, it does not.
+        mid = "qwen2.5-3b-instruct-q4_k_m.gguf"
+        fb = M.CANDIDATES[-1][0]
+        need = dict(M.CANDIDATES)
+        M.USED = os.path.join(tmp, "p.stamp")
+        M.LOG = os.path.join(tmp, "p.log")
+        M.alive = lambda: True
+        stepped = []
+        M.stop = lambda say=print: stepped.append("stop")
+        M.start = lambda say=print: (stepped.append("start") or (True, "up"))
+        real_last3 = M._last_used[0]
+        now = _t.time()
+        just_over = need[mid] - need[fb] + 0.05         # free that makes the budget (free + the fallback) clear the 3B
+        just_under = need[mid] - need[fb] - 0.05
+
+        def try_once(model=fb, idle=120, busy=False, free=just_over, since_try=10 ** 6):
+            stepped.clear()
+            M._read_state = (lambda v: (lambda: {"model": v}))(model)
+            M._slot_busy = (lambda v: (lambda: v))(busy)
+            M.free_gb = (lambda v: (lambda: v))(free)
+            M._last_used[0] = now - idle
+            if os.path.exists(M.USED):
+                os.remove(M.USED)
+            M._last_step_try[0] = now - since_try
+            return M._fallback_step_check(now=now), list(stepped)
+
+        try:
+            p1 = try_once()
+            check("MK1p1 the fallback up, idle 120 s, the slot free, and the 3B fits once it is counted back: steps up",
+                  p1 == (True, ["stop", "start"]), p1)
+            log = open(M.LOG, encoding="utf-8").read() if os.path.exists(M.LOG) else ""
+            check("MK1p1b ...and the keeper's log says so", "auto step-up from the fallback" in log, log[-300:])
+            p2 = try_once(idle=10)
+            check("MK1p2 ...used 10 s ago: no restart (never mid-answer)", p2 == (False, []), p2)
+            p3 = try_once(busy=True)
+            check("MK1p3 ...the slot answering (an ask in flight marks no use): no restart", p3 == (False, []), p3)
+            p4 = try_once(free=just_under)
+            check("MK1p4 ...the 3B does not fit even with the fallback counted back: no restart", p4 == (False, []), p4)
+            p5 = try_once(model=mid, free=50.0)
+            check("MK1p5 ...the 3B up, memory to spare: the idle round does not move it (the nightly's step_up does)",
+                  p5 == (False, []), p5)
+            p6 = try_once(since_try=60)
+            check("MK1p6 ...a try %d s ago: none again until STEP_UP_EVERY_S (%d s) has passed" % (60, M.STEP_UP_EVERY_S),
+                  p6 == (False, []), p6)
+            p7 = try_once(free=None)
+            check("MK1p7 ...free memory unreadable: no restart on a guess", p7 == (False, []), p7)
+            # the round itself: after a step-up it keeps watching (False) -- start() found this watcher alive and
+            # started no other, so returning True would leave the new server with none
+            # First run: try_once() here (used for its stubs) stepped up once itself and its record was not cleared,
+            #   so the round's single step-up read as ['stop','start','stop','start']. Cleared before the round now;
+            #   the check is unchanged: exactly one step-up, during the round.
+            try_once()
+            stepped.clear()
+            M._last_step_try[0] = 0.0
+            M._last_used[0] = now - 120
+            tick = M._idle_tick(now=now)
+            check("MK1p8 the idle round steps up and keeps watching (returns False)", tick is False and stepped == ["stop", "start"],
+                  (tick, stepped))
+            # _slot_busy reads /slots; anything it cannot read counts as busy
+            M._slot_busy = real["_slot_busy"]
+            real_urlopen4 = _ur.urlopen
+            got = {}
+            try:
+                for label, body in (("idle", b'[{"id":0,"is_processing":false}]'), ("busy", b'[{"id":0,"is_processing":true}]'),
+                                    ("junk", b'{"error":"x"}')):
+                    _ur.urlopen = (lambda b: (lambda req, timeout=None: _Resp(b)))(body)
+                    got[label] = M._slot_busy()
+                def refuse(req, timeout=None):
+                    raise OSError("refused")
+                _ur.urlopen = refuse
+                got["down"] = M._slot_busy()
+            finally:
+                _ur.urlopen = real_urlopen4
+            check("MK1p9 _slot_busy: idle slot -> False; processing -> True; unreadable body or no answer -> True",
+                  got == {"idle": False, "busy": True, "junk": True, "down": True}, got)
+        finally:
+            M._last_used[0] = real_last3
+            M._last_step_try[0] = real_step_try
     finally:
         for k, v in real.items():
             setattr(M, k, v)
+        M._last_step_try[0] = real_step_try
 
     # MK1m (A341b, 2026-10-13): a server that answers with no state is ADOPTED only when it is provably this
     # keeper's own -- its binary, one of its weights. Temp state and log; the port and the process are stand-ins.

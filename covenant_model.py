@@ -504,6 +504,61 @@ def stop(say=print):
 
 _idle_thread = [None]
 
+# BACK OFF THE FALLBACK BY ITSELF (2026-11-01, his words: "do the auto step up fix"). Measured that morning: the
+# server restarted at 05:01 with under the 3B's 2.6 GB free, so the fallback loaded -- and stayed, because step_up()
+# ran only from the nightly or by hand. For the next ~16 minutes his door answered from the fallback (his ask log
+# names the model per row) while step_up() measured a 4.0 GB budget once the fallback was counted back. Now the idle watcher steps up
+# from the fallback rung once the server is idle, the one slot is not answering, and the next rung fits.
+#   STEP_UP_IDLE_S   idle this long before a restart is considered -- PRESSURE_IDLE_S, the same "not mid-answer" bar.
+#   STEP_UP_EVERY_S  at most one try this often, so a box that keeps sitting on the line does not restart every round.
+#                    Mine (Claude's), not a measurement; he can set COVENANT_MODEL_STEP_UP_EVERY_S.
+STEP_UP_IDLE_S = PRESSURE_IDLE_S
+STEP_UP_EVERY_S = int(os.environ.get("COVENANT_MODEL_STEP_UP_EVERY_S", "600"))
+_last_step_try = [0.0]
+
+
+def _slot_busy():
+    """True when the server's one slot is answering -- or when /slots cannot be read, so nothing restarts on a
+    guess. An ask in flight marks no use until it ends (wait_cap, A351), so idle time alone cannot see it."""
+    try:
+        with urllib.request.urlopen("http://%s:%d/slots" % (HOST, PORT), timeout=3) as r:
+            slots = json.loads(r.read().decode("utf-8", "replace"))
+        return not isinstance(slots, list) or any(bool(s.get("is_processing")) for s in slots if isinstance(s, dict))
+    except Exception:                                             # noqa: BLE001
+        return True
+
+
+def _fallback_step_check(now=None, say=None):
+    """One try at stepping up from the FALLBACK rung (the last of CANDIDATES). Never from any other rung (the
+    nightly's step_up keeps that), never mid-answer, never more than once per STEP_UP_EVERY_S. True when it
+    stepped up."""
+    now = time.time() if now is None else now
+    if not alive():
+        return False
+    cur = str(_read_state().get("model") or "")
+    if cur != CANDIDATES[-1][0]:
+        return False
+    if now - _last_use() < STEP_UP_IDLE_S or now - _last_step_try[0] < STEP_UP_EVERY_S:
+        return False
+    if _slot_busy():
+        return False
+    _last_step_try[0] = now
+    free = free_gb()
+    if free is None:
+        return False
+    budget = free + CANDIDATES[-1][1]
+    if not any(os.path.isfile(os.path.join(MODELS, n)) and budget >= _bar(n, need) for n, need in CANDIDATES[:-1]):
+        return False
+    quiet = say or (lambda *_a: None)
+    ok, why = step_up(say=quiet)
+    try:
+        with open(LOG, "a", encoding="utf-8") as lf:
+            lf.write("%s auto step-up from the fallback %s (free %.2f GB, budget %.2f GB): %s\n"
+                     % (time.strftime("%Y-%m-%dT%H:%M:%S"), cur, free, budget, why))
+    except OSError:
+        pass
+    return bool(ok)
+
 
 def _pressure_check(now=None):
     """Put an idle big model away when free memory is under FLOOR_GB. Never mid-answer (idle at
@@ -552,6 +607,10 @@ def _idle_tick(now=None):
         return True
     if _pressure_check(now=now):
         return True
+    # After a step-up the server is new and start() has marked use; keep watching it (False), since this thread is
+    # the one _watch_idle() found alive, so start() did not start another.
+    if _fallback_step_check(now=now):
+        return False
     if now - _last_use() > IDLE_S:
         stop(say=lambda *_a: None)
         return True
