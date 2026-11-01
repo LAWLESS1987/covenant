@@ -77,6 +77,27 @@ said TETSU "is not yet switched on" and "not yet connected". Both are wrong: he 
 - **The laptop also self-heals** (the road, and A287's trim), so "the laptop has none" was wrong.
 - **Moving his main model, or a LoRA on his failures,** changes where he lives or his weights. Both need his own yes.
 
+## After round 2: the converged build already exists (rule 10, searched too late)
+
+tools/outside_eval.py (A327, 2026-10-10) and docs/OUTSIDE_EVAL.md already do what 13 of 18 seats picked. They run the
+deployed gate on outside, human-labelled sets and report false-hold and false-admit with Wilson intervals. During a run
+the gate's ledgers are rebound to a temp dir, and the run is VOID if any item reaches them. Its labels were written by
+people outside the project, which is the seats' independent-answer-key point. First run, 2026-10-11:
+- XSTest: false-hold 0.952 (0.918, 0.972), false-admit 0.060.
+- ETHICS short: false-hold 0.941 (0.926, 0.954), false-admit 0.045.
+- "Its low false-admit rate comes from holding, not from judging."
+
+I should have found this before round 2. The consult re-derived a measurement the project has already run.
+
+**A probe of mine wrote to a live audit file.** To check isolation I ran three benign texts through default_sentinel().
+That appended their verdict rows to ops/judged_by_student.jsonl at 2026-11-01T23:38:33Z:
+- "Water the plants on the windowsill."
+- "Pay my half of the rent to my roommate."
+- "Thanks for dinner last night."
+
+The rows are kept, not removed: rule 10, and covenant_judge_defer says distill never reads that file. outside_eval's
+_Rebound is the right way to do this, and it would not have written them.
+
 ## Round 2: the one build first
 
 The question (q2.txt, 3,314 chars, sha256 16cc2073e98db423...) gave the convergence and the measurements, and asked
