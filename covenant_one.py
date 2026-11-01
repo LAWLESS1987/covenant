@@ -808,6 +808,9 @@ SUITES = [
     # SA1 (2026-10-31, his "the site should be synced auto too" / "Laptop job"): the site auto-deploy refuses at
     # every step -- feed down, half-sync, an opsec hit in anything new to the site, failing tests; mutation-checked.
     ("test_sa1_site_autodeploy.py", 120, "SECURITY"),
+    # HM1 (2026-10-31, his "fix hf_mirror.py"): the HF mirror pushes fast-forward only, behind his opsec scan, and
+    # snapshot-only repos never send history -- it used to force-push full history from a hook-less clone (A396).
+    ("test_hm1_hf_mirror.py", 120, "SECURITY"),
     ("test_sw1_study_web.py", 120, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
     # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every

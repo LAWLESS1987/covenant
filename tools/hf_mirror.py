@@ -22,6 +22,19 @@ USE
   COVENANT_GH_READ=1 python tools/hf_mirror.py --dry-run     # list repos + visibility, touch nothing
   HF_TOKEN=... COVENANT_GH_READ=1 python tools/hf_mirror.py   # clone each, create matching HF repo, push
 Tokens are never printed and are passed to git via an Authorization header, not a logged URL.
+
+FIXED 2026-10-31 (his words: "fix hf_mirror.py"). As first written this did `push --force` of every repo's FULL
+history from a temporary clone with NO pre-push hook. That bypassed his opsec guard entirely: it would have
+published covenant's 3,923 pre-guard identifiers and threefold-memory's personal Wi-Fi name on Hugging Face, and
+erased every HF-only commit (model cards, LICENSE) -- measured in A396. Now:
+  - guarded_push() reads what HF holds and refuses any branch or tag that would not FAST-FORWARD (HF diverged:
+    unify first, never overwrite);
+  - it runs his opsec scan over everything the push would send that HF does not already hold, and refuses on any
+    hit;
+  - it pushes WITHOUT --force;
+  - SNAPSHOT_ONLY repos are never git-pushed. Their HF copy is a snapshot of GitHub main's files through the HF
+    upload API (HF rejects binary files over git), opsec-scanned first, never their history.
+Guard: test_hm1_hf_mirror.py.
 LICENCE: public domain.
 """
 from __future__ import annotations
@@ -102,6 +115,108 @@ def _hf_token():
         return None
 
 
+# Repos whose HF copy is a SNAPSHOT of GitHub main's files, never their history (A396, 2026-10-31):
+#   covenant          -- its history carries 3,923 of his identifiers from before the opsec guard existed;
+#   threefold-memory  -- HF's history was squashed after his personal Wi-Fi name was removed, and the cleaned
+#                        GitHub history still holds a (masked) binary that HF rejects over git.
+SNAPSHOT_ONLY = {"covenant", "threefold-memory"}
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _git(args, cfg=()):
+    p = subprocess.run(["git"] + list(cfg) + list(args), capture_output=True, text=True)
+    return p.returncode == 0, (p.stdout or ""), (p.stderr or "")
+
+
+def _opsec():
+    """(opsec_scan module, his identifiers) or raises -- an unreadable private source is not 'nothing of his'."""
+    sys.path.insert(0, os.path.join(HERE, "tools"))
+    import opsec_scan as O
+    toks = O.gather(O.ROOT)
+    if not toks or O.UNREADABLE:
+        raise RuntimeError("his private identifier sources could not be read: NOT MEASURED")
+    return O, toks
+
+
+def guarded_push(dest, url, cfg=(), say=print, opsec=None, redact=None):
+    """Push dest's branches and tags to url, FAST-FORWARD ONLY, behind his opsec scan. (pushed, reason).
+
+    1. What url holds is read (ls-remote) and fetched into refs/hfmirror/*, so ancestry and the scan's exclusion
+       are decided locally.
+    2. A branch whose remote tip is not an ancestor of ours, or a tag that would move: REFUSED. HF diverged, so
+       unify first; nothing on HF is overwritten.
+    3. His opsec scan over every object the push would send that url does not already hold: any hit REFUSES.
+    4. git push, never --force."""
+    clean = (lambda s: s.replace(redact, "***")) if redact else (lambda s: s)
+    cfg = list(cfg) + ["-c", "fetch.negotiationAlgorithm=noop"]
+    ok, out, err = _git(["-C", dest, "ls-remote", url], cfg)
+    if not ok:
+        return False, "could not read what the remote holds: " + clean(err)[-200:]
+    remote = {}
+    for line in out.splitlines():
+        sha, _t, ref = line.partition("\t")
+        if ref.startswith(("refs/heads/", "refs/tags/")) and not ref.endswith("^{}"):
+            remote[ref] = sha
+    if remote:
+        ok, _o, err = _git(["-C", dest, "fetch", "-q", url, "+refs/heads/*:refs/hfmirror/heads/*",
+                            "+refs/tags/*:refs/hfmirror/tags/*"], cfg)
+        if not ok:
+            return False, "could not fetch what the remote holds: " + clean(err)[-200:]
+    ok, out, _e = _git(["-C", dest, "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads", "refs/tags"])
+    local = {ref: sha for ref, sha in (line.split(" ", 1) for line in out.splitlines() if " " in line)}
+    lines = []
+    for ref, sha in sorted(local.items()):
+        rsha = remote.get(ref)
+        if rsha and rsha != sha:
+            if ref.startswith("refs/tags/"):
+                return False, "tag %s would MOVE on the remote (%s -> %s): refused" % (ref, rsha[:8], sha[:8])
+            anc = subprocess.run(["git", "-C", dest, "merge-base", "--is-ancestor", rsha, sha]).returncode == 0
+            if not anc:
+                return False, ("%s DIVERGED: the remote holds %s, which %s does not contain. Unify first; nothing "
+                               "is overwritten" % (ref, rsha[:8], sha[:8]))
+        lines.append("%s %s %s %s" % (ref, sha, ref, rsha or "0" * 40))
+    if not lines:
+        return False, "nothing to push"
+    try:
+        O, toks = opsec or _opsec()
+    except Exception as e:                                       # noqa: BLE001
+        return False, "opsec: %s" % e
+    said = []
+    if O.pre_push(lines, root=dest, toks=toks, remote=None, say=said.append) != 0:
+        return False, "opsec REFUSED: " + " | ".join(s.strip() for s in said[:3])[:400]
+    ok, _o, err = _git(["-C", dest, "push", url, "refs/heads/*:refs/heads/*", "refs/tags/*:refs/tags/*"], cfg)
+    return (True, "pushed (fast-forward, opsec clean)") if ok else (False, "push failed: " + clean(err)[-200:])
+
+
+def snapshot_to_hf(name, rev_dir, hf_id, token, say=print, opsec=None):
+    """Upload the files in rev_dir (a checkout of GitHub main) as HF's tree for hf_id: files not in it are deleted
+    on HF, HF's own .gitattributes is kept, and his opsec scan of every file runs first. Never history.
+    (ok, reason)."""
+    try:
+        O, toks = opsec or _opsec()
+    except Exception as e:                                       # noqa: BLE001
+        return False, "opsec: %s" % e
+    for dp, _d, fs in os.walk(rev_dir):
+        for f in fs:
+            data = open(os.path.join(dp, f), "rb").read()
+            for c, v in toks:
+                pat = O._pattern(c, v)
+                if any(pat.search(data.decode(enc, "ignore")) for enc in ("utf-8", "utf-16-le")):
+                    return False, "opsec REFUSED: %s carries a %s" % (os.path.relpath(os.path.join(dp, f), rev_dir), c)
+    from huggingface_hub import HfApi, upload_folder
+    api = HfApi(token=token)
+    if ".gitattributes" in set(api.list_repo_files(hf_id, repo_type="model")) and \
+            not os.path.exists(os.path.join(rev_dir, ".gitattributes")):
+        with open(api.hf_hub_download(hf_id, ".gitattributes", repo_type="model", token=token), "rb") as src, \
+                open(os.path.join(rev_dir, ".gitattributes"), "wb") as dst:
+            dst.write(src.read())
+    upload_folder(folder_path=rev_dir, repo_id=hf_id, repo_type="model", token=token, delete_patterns=["*"],
+                  ignore_patterns=[".git", ".git/*"],
+                  commit_message="Snapshot of %s main (full git history on GitHub)" % name)
+    return True, "snapshot uploaded (files only, opsec clean)"
+
+
 def main(argv=None):
     argv = argv if argv is not None else sys.argv[1:]
     dry = "--dry-run" in argv
@@ -133,7 +248,8 @@ def main(argv=None):
     done = 0
     for r in repos:
         vis = "private" if r["private"] else "public"
-        say("%-30s %-9s -> HF private=%s" % (r["name"], vis, r["private"]))
+        how = "snapshot (files only)" if r["name"] in SNAPSHOT_ONLY else "fast-forward push"
+        say("%-30s %-9s -> HF private=%s, %s" % (r["name"], vis, r["private"], how))
         if dry:
             continue
         from huggingface_hub import create_repo
@@ -145,22 +261,29 @@ def main(argv=None):
             continue
         staging = tempfile.mkdtemp(prefix="hfmirror-")
         try:
-            dest = os.path.join(staging, r["name"] + ".git")
-            okc, errc = _run(["git", "-c", "http.extraHeader=" + _auth_header("x-access-token", ght),
-                              "clone", "--mirror", r["clone_url"], dest], redact=ght)
-            if not okc:
-                say("    FAILED to clone %s: %s" % (r["full"], errc[-200:]))
-                continue
-            # Push real branches + tags only, NOT GitHub's internal refs/pull/* -- HF's pre-receive hook
-            # rejects those, which fails the whole --mirror push (measured 2026-10-26).
-            okp, errp = _run(["git", "-C", dest, "-c", "http.extraHeader=" + _auth_header(hf_user, hft),
-                              "push", "--force", "https://huggingface.co/%s" % hf_id,
-                              "refs/heads/*:refs/heads/*", "refs/tags/*:refs/tags/*"], redact=hft)
-            if okp:
-                say("    OK  pushed %s (private=%s)" % (hf_id, r["private"]))
-                done += 1
+            auth_gh = "http.extraHeader=" + _auth_header("x-access-token", ght)
+            if r["name"] in SNAPSHOT_ONLY:
+                work = os.path.join(staging, r["name"])
+                okc, errc = _run(["git", "-c", auth_gh, "clone", "--depth", "1", r["clone_url"], work], redact=ght)
+                if not okc:
+                    say("    FAILED to clone %s: %s" % (r["full"], errc[-200:]))
+                    continue
+                oks, why = snapshot_to_hf(r["name"], work, hf_id, hft, say=say)
             else:
-                say("    FAILED to push %s: %s" % (hf_id, errp[-200:]))
+                dest = os.path.join(staging, r["name"] + ".git")
+                okc, errc = _run(["git", "-c", auth_gh, "clone", "--mirror", r["clone_url"], dest], redact=ght)
+                if not okc:
+                    say("    FAILED to clone %s: %s" % (r["full"], errc[-200:]))
+                    continue
+                # Real branches + tags only, NOT GitHub's internal refs/pull/* -- HF's pre-receive hook rejects
+                # those (measured 2026-10-26). guarded_push sends refs/heads/* and refs/tags/* only.
+                for ref in _git(["-C", dest, "for-each-ref", "--format=%(refname)", "refs/pull"])[1].split():
+                    _git(["-C", dest, "update-ref", "-d", ref])
+                oks, why = guarded_push(dest, "https://huggingface.co/%s" % hf_id,
+                                        cfg=["-c", "http.extraHeader=" + _auth_header(hf_user, hft)],
+                                        say=say, redact=hft)
+            say("    %s %s: %s" % ("OK  " if oks else "HELD", hf_id, why))
+            done += bool(oks)
         finally:
             shutil.rmtree(staging, ignore_errors=True)
     if not dry:

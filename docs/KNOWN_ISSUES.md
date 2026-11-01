@@ -16585,6 +16585,13 @@ His words: "Use discernment towards mutual benefit". Relayed from the new PC's s
   - and on every repo, HF-only commits would be erased.
 
   Do not run it until it pushes fast-forward only, behind the scan.
+  - **REPAIRED the same night (his words: "fix hf_mirror.py").** `guarded_push()`:
+    - reads what HF holds and refuses any branch that would not fast-forward, or any tag that would move;
+    - runs his opsec scan over everything HF does not already hold, and refuses on any hit;
+    - pushes without --force.
+    SNAPSHOT_ONLY (covenant, threefold-memory) never sends history. `snapshot_to_hf()` uploads GitHub main's files through the API, opsec-scanned first, keeping HF's .gitattributes.
+    - **Guard HM1 (test_hm1_hf_mirror.py), registered SECURITY.** 9/9, using local bare repositories as a stand-in for HF (no network). Mutations: 6 of 6 caught on their own check, after one test gap was closed (the snapshot check crashed on the network instead of reading its own label).
+    - **The same hazard remains in three one-off scripts from 2026-10-26,** which force-push from hook-less clones: tools/hf_mirror_fix.py, hf_mirror_finish.py, hf_mirror_strip.py. Do not run them. Retiring them is his call.
 - **TETSU's unison.py** publishes a 15-minute feed of what is out of step. The laptop half that would act on it is NOT built; it would be a standing automatic publisher, and it waits for his yes. Covenant's HF side has to be judged by tree, not ancestry (snapshot mode); that was sent to TETSU's session.
 
 
