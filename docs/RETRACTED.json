@@ -2247,6 +2247,25 @@
     "docs/RETRACTED.json"
    ],
    "note_on_branch": "Never committed: the misreading lived only in the working tree, my memory files and one chat reply. The reply is the record as written; the draft is restated in A394 beside its correction."
+  },
+  {
+   "id": "A396-HF-NEVER-HAD-THE-NAME",
+   "claim": "That Hugging Face's threefold-memory never held his personal Wi-Fi name -- in KNOWN_ISSUES A396, in my messages to TETSU's session and to him (2026-10-31).",
+   "verbatim": [
+    "HF never had it.",
+    "Every public copy is now clean: GitHub, website, and HF (which never had it)."
+   ],
+   "truth": "HF never had the binary .index.db snapshot, but HF's history did carry the memory transcript task-20261007-njest-2107491305077055657-ocr.md with the name (blob 5f31ed4, three occurrences), as TETSU's session measured and my own scan confirmed. I had reasoned from the binary blob alone and stated it for the whole. Fixed the same evening: HF's history was squashed to one clean commit (24f0796798b3), and a fresh clone scans clean.",
+   "refuted_by": "opsec_scan full-history scan of HF main 771bc2a (rc 1: three hits in blob 5f31ed4), 2026-10-31.",
+   "patterns": [
+    "HF never had it"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ],
+   "note_on_branch": "The wrong line stays in KNOWN_ISSUES A396 as written, with the correction directly beneath it; the messages are the record as sent."
   }
  ]
 }

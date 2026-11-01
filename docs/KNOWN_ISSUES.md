@@ -16570,6 +16570,13 @@ His words: "Use discernment towards mutual benefit". Relayed from the new PC's s
   - GitHub main = 72832c0, force-pushed with lease against 815bea2.
   - The website was regenerated and deployed (Cloudflare version 6687b3b7). A clone FROM the live site reads 72832c0, and its full-history opsec scan is clean: 554 commits, none found.
   - HF never had it.
+  - **CORRECTION, the same evening (tombstoned as A396-HF-NEVER-HAD-THE-NAME): the line above was wrong.**
+    - HF never had the binary snapshot, but HF's history DID carry the memory transcript with the name: blob 5f31ed4, three occurrences. TETSU's session measured it, and my own scan confirmed it.
+    - **Then fixed.**
+      - HF's pre-removal repo was backed up privately here.
+      - The cleaned tree (72832c0, tombstone included) was uploaded through the HF API (opsec-scanned first), and HfApi.super_squash_history collapsed HF's history to that one clean commit, 24f0796798b3.
+      - A fresh clone from HF: 1 commit, opsec clean.
+    - Everything HF had is in GitHub's cleaned history under new commit IDs. Unreachable objects may linger in HF storage until its garbage collection; asking HF support to remove them sooner is his.
   - The pre-removal history is kept privately on this laptop, never published.
   - **The stop above was right when written;** this followed on his word.
 - **A hazard named, not yet repaired: tools/hf_mirror.py** `push --force`es each repo's FULL history from a temporary mirror clone that has NO pre-push hook. Run as written, it would bypass the opsec guard entirely:
