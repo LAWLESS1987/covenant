@@ -16554,6 +16554,24 @@ His words: "Use discernment towards mutual benefit". Relayed from the new PC's s
   - Blob ad6c8a1, `.index.db.box-store-snap-d4e393d538ff96d1` (a binary memory snapshot), contains his **Wi-Fi network name** eight times.
   - It entered GitHub's history in 1dee237 and 87a7e4e (2026-10-13). It is gone from the tree, but anyone can fetch it from GitHub's history.
   - Removing it means rewriting that history and force-pushing, which is his decision. TETSU's unison.py holds that repo as NEEDS_HUMAN.
+- **The threefold-memory purge was STOPPED, by his rule.**
+  - He confirmed it ("Yes, purge it"), then while it ran: "It should only be my internet. Name.", and then "you're not supposed to take away anything that affects the system. Or Tetsu's memory."
+  - The name is also in a LIVE memory, task-20261007-njest-2107491305077055657-ocr.md.
+  - audit.jsonl records each memory by content_sha (975 entries), so masking even the name breaks that memory's verification against its own trail. A history rewrite would also change every commit ID since 2026-10-07.
+  - **Nothing was pushed; GitHub is untouched.** The pre-purge backup and three trial rewrites are kept private on this laptop, never published. HF stays held.
+  - The only route that keeps the system intact, if he later wants it: a forward, audited update of that memory through its own update path, leaving history as is.
+- **Then removed after all, name only, with a tombstone (the same evening).**
+  - His next words: "remove it. And just put a tombstone that it was my personal Wi-Fi."
+  - What changed: ONLY the name, in every version.
+    - The memory transcript: each occurrence became "[personal Wi-Fi name removed]".
+    - The old binary .index.db snapshot: a same-length mask, so its structure is kept.
+    - No file removed. Every commit kept (553, plus the tombstone commit). The root commit unchanged.
+  - The tombstone in the repo, tombstones/2026-10-31-personal-wifi-name-removed.md, says it was his personal Wi-Fi. It gives each changed file's sha256 before and after, and states that the memory's audit.jsonl content_sha entries describe the pre-removal content, are kept as written, and will not match.
+  - GitHub main = 72832c0, force-pushed with lease against 815bea2.
+  - The website was regenerated and deployed (Cloudflare version 6687b3b7). A clone FROM the live site reads 72832c0, and its full-history opsec scan is clean: 554 commits, none found.
+  - HF never had it.
+  - The pre-removal history is kept privately on this laptop, never published.
+  - **The stop above was right when written;** this followed on his word.
 - **A hazard named, not yet repaired: tools/hf_mirror.py** `push --force`es each repo's FULL history from a temporary mirror clone that has NO pre-push hook. Run as written, it would bypass the opsec guard entirely:
   - for covenant, the 3,923 identifiers above;
   - for threefold-memory, the Wi-Fi name;
