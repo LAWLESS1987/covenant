@@ -16599,6 +16599,7 @@ His words: "Use discernment towards mutual benefit". Relayed from the new PC's s
         - no running process named them.
         They were untracked (gitignored, since they name private repos), so the copies in `.trash/` are the only ones. Their `.gitignore` lines stay, so a restored copy still cannot be pushed.
       - **A fourth local one-off, `tools/hf_mirror_covenant.py`,** remains. It does not force-push. It uploads a shallow clone of GitHub main to HF without the opsec file scan and without `delete_patterns`, so it is superseded by `snapshot_to_hf()`. That content is already public, having passed the push guard on its way to GitHub, so the hazard is lower. It was not in his three and is left for his word.
+        - **RETIRED 2026-11-01, on his word** ("retire the fourth one too"). It was moved to `.trash/hf_mirror_covenant.py.unscanned-snapshot-2026-10-26.retired`, with sha256 checked before and after, and recorded in `.trash/RETIRED.jsonl`. As with the three, before the move nothing imported it and no scheduled task or running process named it. The run and sweep reports listed it only as NOT IN MANIFEST. `tools/hf_mirror.py` is now the only HF mirror tool in `tools/`.
 - **TETSU's unison.py** publishes a 15-minute feed of what is out of step. The laptop half that would act on it is NOT built; it would be a standing automatic publisher, and it waits for his yes. Covenant's HF side has to be judged by tree, not ancestry (snapshot mode); that was sent to TETSU's session.
 
 
