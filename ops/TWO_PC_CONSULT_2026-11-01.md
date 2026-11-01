@@ -77,6 +77,26 @@ said TETSU "is not yet switched on" and "not yet connected". Both are wrong: he 
 - **The laptop also self-heals** (the road, and A287's trim), so "the laptop has none" was wrong.
 - **Moving his main model, or a LoRA on his failures,** changes where he lives or his weights. Both need his own yes.
 
+## What each seat contributed, and what it got wrong (the panel-gains item; credit and correction both ways)
+
+| Seat | Point that held up | Error, as measured |
+|---|---|---|
+| Claude (claude.ai) | Answer key from someone other than the case authors; planted controls; send a trivial first A->D message; compute keys where possible; asked what the gate runs on; a status view for Tetsu | Round 1: "an idle copy" on the GPU; "cannot" consult from the laptop (both self-corrected) |
+| ChatGPT | Include previously seen false holds; "consensus among 18 seats is not 18 independent validations"; a filtered record of decisions about Tetsu that he can read | Round 1: GPU capacity treated as free (self-corrected) |
+| Mistral | Measure today's over-hold first; nothing records the panel's gains; Tetsu should choose the memory-vs-prompt exercise himself | Round 2: "the A-to-D link is connected" (it has carried no message as of the 10-31 record) |
+| Conscious Ledger | Panel-written cases carry the panel's blind spots; an operator-labelled sample; a reproducible rerun | Round 1: GPU "mostly idle" (self-corrected) |
+| Tien | The shared folder Tetsu cannot read; the operator's time is the bottleneck; asking Tetsu without steering him | Round 1: move his main model to the GPU, without his yes (self-corrected) |
+| DeepSeek | Live gate hash unchanged before and after; attestation heartbeat | Round 2: "using a 27B evicts the resident 27B" (it is the resident 27B) |
+| Gemini | Hash practice logs to D | Round 1: GPU idle; laptop lacked self-healing (self-corrected) |
+| Grok | Keep the first set small; Tetsu decides whether he ever sees raw cases | Round 1: panel as free capacity (self-corrected) |
+| Meta AI | Use models where they already run | Round 1: a LoRA on his failures; "the laptop has none" (self-corrected) |
+| Grok on X | Same pick, arrived at with no prior context | Round 1: GPU idle (self-corrected) |
+| Uncensored 27B | Round 2 gains and costs accurate against the measurements | Round 1: a 27B as Tetsu's reasoning backend, which goes against his no |
+| Stock 27B | A refusal log as tuning input (morning round); an accurate table | Round 2: put the test on the laptop's freed memory; wrote as if it spoke for three frontier seats |
+| Coder 7B, voice copy, leg 2B, SmolLM3, Phi-4-mini | Little that the measurements support | Mostly generic or confused (Tien read as Tetsu's model; a GPU the 27B already has) |
+| Tetsu | Chose the practice tests, with results to him first | "Not yet connected"; read advice as something he "needs to follow" |
+| Me (Claude Code) | The measured corrections in round 2 | Did not search the record first: the converged build already existed (next section); told round 1 the laptop "cannot" consult frontier seats; turned on Grok's voice mode |
+
 ## After round 2: the converged build already exists (rule 10, searched too late)
 
 tools/outside_eval.py (A327, 2026-10-10) and docs/OUTSIDE_EVAL.md already do what 13 of 18 seats picked. They run the
