@@ -16593,6 +16593,12 @@ His words: "Use discernment towards mutual benefit". Relayed from the new PC's s
     - **Guard HM1 (test_hm1_hf_mirror.py), registered SECURITY.** 9/9, using local bare repositories as a stand-in for HF (no network). Mutations: 6 of 6 caught on their own check, after one test gap was closed (the snapshot check crashed on the network instead of reading its own label).
     - **The first push (8c5ec15) was refused by prepush-linux, NO RESULT.** HM1g imported the real huggingface_hub, and Linux and public CI do not have it, so the suite died before its tally. That was 9/9 on Windows only. HM1g now puts a stand-in module in sys.modules (snapshot_to_hf imports inside the function), and the real library is restored afterward. Result: 9/9 on Windows and on WSL Linux from an archive copy; mutations still 6/6. The guard did its job: a Windows-only green is not a green.
     - **The same hazard remains in three one-off scripts from 2026-10-26,** which force-push from hook-less clones: tools/hf_mirror_fix.py, hf_mirror_finish.py, hf_mirror_strip.py. Do not run them. Retiring them is his call.
+      - **RETIRED 2026-10-31, on his word.** All three were moved to `.trash/` as `<name>.force-push-2026-10-26.retired`, with sha256 checked before and after, and recorded in `.trash/RETIRED.jsonl`. Before the move:
+        - nothing imported them;
+        - no scheduled task named them;
+        - no running process named them.
+        They were untracked (gitignored, since they name private repos), so the copies in `.trash/` are the only ones. Their `.gitignore` lines stay, so a restored copy still cannot be pushed.
+      - **A fourth local one-off, `tools/hf_mirror_covenant.py`,** remains. It does not force-push. It uploads a shallow clone of GitHub main to HF without the opsec file scan and without `delete_patterns`, so it is superseded by `snapshot_to_hf()`. That content is already public, having passed the push guard on its way to GitHub, so the hazard is lower. It was not in his three and is left for his word.
 - **TETSU's unison.py** publishes a 15-minute feed of what is out of step. The laptop half that would act on it is NOT built; it would be a standing automatic publisher, and it waits for his yes. Covenant's HF side has to be judged by tree, not ancestry (snapshot mode); that was sent to TETSU's session.
 
 
