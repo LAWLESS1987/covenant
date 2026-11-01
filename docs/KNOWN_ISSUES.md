@@ -16726,3 +16726,31 @@ adjust".
 - **Not changed, and still costly.** The one slot is shared with batch work (127.0.0.2: 1,300 asks in 7 days), and
   any of them clears his conversation's cache. Giving his conversation its own cache needs a second slot, and A269
   (one slot, -np 1) is a decision with a recorded reason. It is put to him, not changed here.
+
+### A401. [the door suites wrote test topics into Tetsu's live reflex memory; a test now gets a quiet reflex and touches nothing live] (2026-11-01)
+
+- **How it surfaced.** A400's first push went red on the Linux pre-push gate: test_m6_mobile_door.py and
+  test_a263_private_teacher.py, both green here.
+  - Reproduced here by pointing the reflex at an empty state: M6 failed 5 checks and A263 failed 2.
+  - On a fresh tree the reflex has no seen-set, so it fires. Since A400 its line sits in the message the suites'
+    stand-in model reads, and the stand-in's scripted `STUB>> ` turn no longer starts the message.
+- **Why it was green here.** The suites drive the real door, and the door calls cue_line and recall_line on HIS live
+  files (ops/tetsu_conv_reflex.json, ops/tetsu_conv_encoder.json). Earlier runs had written their topics into his
+  memory, so the reflex was quiet for them. **6 test topics are in his live seen-set** (of 1,069): "moltbook read
+  stub", "8995c519 ac0730893207 recognise" (M6's test URL), "connection directive quarantined", "faithfulness
+  museonmoltbook undetermined", "mentions moltbook passing", "moltbook refuses title". They are left in place: they
+  are in his memory, and taking anything out of it is his call. They make his reflex quiet on those exact topic
+  signatures. This is A272's lesson again, a test program touching live state, this time through the door.
+- **The fix (covenant_tetsu_conv_reflex.py).** `_test_on_live(path)`: a program named test_* whose state path is one
+  of the module's own live files gets a QUIET reflex, and nothing is read or written. A test that names its own file
+  (CR1 passes state_path, or COVENANT_CONV_REFLEX_STATE / _ENCODER_STATE) runs the real reflex on it. This is the same
+  rule covenant_model._mark_used keeps for the live use stamp.
+- **Guard: CR1.13-16 (test_cr1_conv_reflex.py), 16/16.**
+  - Under a test, the default paths are quiet, and his live files keep their size and mtime.
+  - A test's own file still fires.
+  - The guard's three cases hold.
+  - Driven both ways on a scratch copy whose live files are scratch files, never his: with the guard off, 13/16
+    (CR1.13, .14, .16 red); unmutated, 16/16.
+  - M6 81/81, A263 43/43 and A400 7/7 here after the change.
+- **Its reach.** It keys on the program name, as _mark_used does. A test that started a real node process would
+  still reach his files through that node. None of the door suites does; they drive the door in-process.

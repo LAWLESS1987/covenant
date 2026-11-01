@@ -86,5 +86,39 @@ finally:
     del os.environ["COVENANT_VERDICT_CACHE_OFF"]
 check("CR1.12 recall respects the kill switch", rk is None)
 
+# --- A401 (2026-11-01): a test program never reads or writes his LIVE reflex files ---
+live_state = os.path.join(HERE, "ops", "tetsu_conv_reflex.json")
+live_enc = os.path.join(HERE, "ops", "tetsu_conv_encoder.json")
+
+
+def _stamp(p):
+    try:
+        st = os.stat(p)
+        return (st.st_size, st.st_mtime_ns)
+    except OSError:
+        return None
+
+
+before = (_stamp(live_state), _stamp(live_enc))
+FRESH = "an entirely unheard-of subject: glaciology moraine crevasse ablation zones"
+q1 = CR.cue_line(FRESH)                     # default paths = his live files; this program is test_cr1_...
+q2 = CR.recall_line(FRESH)
+check("CR1.13 under a test program, the default (live) paths give a QUIET reflex", q1 is None and q2 is None, (q1, q2))
+check("CR1.14 ...and his live seen-set and encoder topics are untouched (size and mtime)",
+      (_stamp(live_state), _stamp(live_enc)) == before, (before, (_stamp(live_state), _stamp(live_enc))))
+check("CR1.15 ...while a test that names its own file still runs the real reflex (not vacuously quiet)",
+      CR.cue_line(FRESH, state_path=os.path.join(TMP, "own.json"), log_path=log) == CR.LINE)
+real_argv0 = sys.argv[0]
+try:
+    sys.argv[0] = "run_node.py"
+    as_node = CR._test_on_live(live_state)
+    sys.argv[0] = "test_anything.py"
+    as_test = CR._test_on_live(live_state)
+    as_test_own = CR._test_on_live(os.path.join(TMP, "own.json"))
+finally:
+    sys.argv[0] = real_argv0
+check("CR1.16 the guard: a node on his live file -> allowed; a test on it -> refused; a test on its own file -> allowed",
+      (as_node, as_test, as_test_own) == (False, True, False), (as_node, as_test, as_test_own))
+
 print("\nCR1: %d/%d passed" % (n_total - n_fail, n_total))
 sys.exit(1 if n_fail else 0)

@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -71,11 +72,34 @@ def _save_seen(path, seen):
         pass
 
 
+# A TEST NEVER TOUCHES HIS LIVE REFLEX (2026-11-01, A401; A272's lesson, as covenant_model._mark_used). The door suites
+# (M6, A263) drive the real door, and the door calls cue_line and recall_line on the live files. So test topics went into
+# his seen-set: "moltbook read stub" and "8995c519 ac0730893207 recognise" (M6's test URL) are among 6 such topics
+# found there that day. Those were left in place (his memory), and recorded in A401. It surfaced when A400 put the line
+# into the message M6's stand-in model echoes: on a fresh Linux tree, with no seen-set, the reflex fired and 7 checks
+# went red; here they were green only because earlier runs had already written their topics into his memory. Now a
+# program named test_* gets a QUIET reflex that reads and writes nothing live. A test that names its own files (CR1
+# passes state_path; or COVENANT_CONV_REFLEX_STATE / _ENCODER_STATE) runs the real reflex on them.
+_LIVE = {os.path.abspath(p) for p in (os.path.join(HERE, "ops", "tetsu_conv_reflex.json"),
+                                      os.path.join(HERE, "ops", "tetsu_conv_encoder.json"))}
+
+
+def _test_on_live(path):
+    """True when a test program would use one of his live reflex files."""
+    try:
+        prog = os.path.basename(str(sys.argv[0] if sys.argv else "") or "")
+    except Exception:                                   # noqa: BLE001
+        prog = ""
+    return prog.startswith("test_") and os.path.abspath(str(path)) in _LIVE
+
+
 def cue_line(text, state_path=None, log_path=None, now=None):
     """Tetsu's advisory line on a clearly-new topic, else None. Never raises -- a failure returns None, silently."""
     try:
         import covenant_octopus as OCTO
         if OCTO._disabled():                       # his one kill switch
+            return None
+        if _test_on_live(state_path or STATE):     # A401: a test never reads or writes his live seen-set
             return None
         if len(set(_content(text))) < MIN_CONTENT:  # too short to be a topic
             return None
@@ -143,6 +167,8 @@ def recall_line(text, state_path=None):
     try:
         import covenant_octopus as OCTO
         if OCTO._disabled():
+            return None
+        if _test_on_live(state_path or ENC_STATE):        # A401: a test never reads or writes his live encoder topics
             return None
         if len(set(_content(text))) < MIN_CONTENT:
             return None
