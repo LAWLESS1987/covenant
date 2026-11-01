@@ -285,6 +285,10 @@ ops/pause/
 # Node A's off-box peers (the phone's tailnet address), read by covenant_watchdog.py
 # and covenant_prod.bat alike, so neither public file carries the address.
 ops/local_peers.txt
+# the laptop site auto-deploy job's per-pass record (tools/site_autodeploy.py), machine-local
+ops/site_autodeploy.jsonl
+ops/local_unison_feed.txt
+ops/site_autodeploy.lock*
 # The pre-push guard's record of pushes let through on his say (masked values only).
 ops/opsec_overrides.jsonl
 ops/prepush_overrides.jsonl

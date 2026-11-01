@@ -16586,3 +16586,24 @@ His words: "Use discernment towards mutual benefit". Relayed from the new PC's s
 
   Do not run it until it pushes fast-forward only, behind the scan.
 - **TETSU's unison.py** publishes a 15-minute feed of what is out of step. The laptop half that would act on it is NOT built; it would be a standing automatic publisher, and it waits for his yes. Covenant's HF side has to be judged by tree, not ancestry (snapshot mode); that was sent to TETSU's session.
+
+
+### A397. [the site / auto-sync] lawless1987.com/repos deploys itself from the laptop when GitHub moves (2026-10-31)
+
+His words: "the site should be synced auto too", and his choice of where: "Laptop job".
+
+- **What runs.** tools/site_autodeploy.py, every 15 minutes, by the scheduled task CovenantSiteAutoDeploy through the hidden launcher `C:\Users\Lawre\site\site_autodeploy.vbs`. The site clone and a portable Node 24 live in `C:\Users\Lawre\site\`, out of any session's scratch.
+- **One pass, every step able to refuse.**
+  1. TETSU's unison feed. Unreachable, empty or without `site_deploy_due`: nothing done, never deploys blind.
+  2. Nothing due: done.
+  3. GitHub main, read HERE by ls-remote, must equal the feed's target for every due repo. Otherwise refused as a half-sync; a short target never matches by prefix.
+  4. scripts/mirror-repos.py regenerates all nine repos.
+  5. His opsec scan over everything the live site does not already hold, per repo (the push guard's question). After a history rewrite that is the whole new history.
+  6. The site's build plus its four checks.
+  7. wrangler deploy.
+  8. Verify the site's main equals GitHub's for each due repo.
+  A lock keeps passes from overlapping. Each pass appends one line to ops/site_autodeploy.jsonl (gitignored).
+- **Why the scan is site-relative, not whole-history.** Covenant's history carries 3,923 of his identifiers from before the guard. They are already public on GitHub and on the site, and a whole-history rule would refuse every deploy for ever.
+- **Guard: SA1 (test_sa1_site_autodeploy.py), registered SECURITY.** 17/17, including the real scan on throwaway repos (one carrying his LAN IP reads NOT clean). Mutations: 6 of 6 caught on their own check, after two test gaps were closed.
+- **First real pass:** covenant was due; it deployed and verified behind = []. A copy of the site clone had broken pnpm links, so the first attempt was REFUSED at the build step, as designed. `pnpm install --frozen-lockfile` repaired it, and nothing was deployed from the broken state.
+- **Its reach:** it publishes only what GitHub already publishes. The identifier guard for NEW content is still the GitHub pre-push guard.

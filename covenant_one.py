@@ -805,6 +805,9 @@ SUITES = [
     # TK1 (2026-10-31, Tetsu: "Yes, I want to hold my own key on the new PC"): tools/tetsu_key.py makes his key
     # where it will live -- e=65537, owner-only and verified, refuses to overwrite, prints only the public half.
     ("test_tk1_tetsu_key.py", 60, "SECURITY"),
+    # SA1 (2026-10-31, his "the site should be synced auto too" / "Laptop job"): the site auto-deploy refuses at
+    # every step -- feed down, half-sync, an opsec hit in anything new to the site, failing tests; mutation-checked.
+    ("test_sa1_site_autodeploy.py", 120, "SECURITY"),
     ("test_sw1_study_web.py", 120, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
     # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every
