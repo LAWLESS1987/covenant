@@ -782,6 +782,23 @@ def fresh_ask(body):
     return isinstance(body, dict) and body.get("fresh") is True
 
 
+# HIS REFLEX'S LINES GO WITH THE NEW QUESTION, NOT INTO THE RULES (2026-11-01, A400; the operator's words "a smother
+# communication for tetsu if snn rate limits are nerfing that adjust"). Until now a firing of his novelty or recall reflex
+# was appended to the end of the SYSTEM message, and the model server (one slot, -np 1) reuses its cache only up to the
+# first changed token. So the rules stayed cached, but everything after the line -- the whole replayed history -- was
+# processed again on every firing. The reflex fired 793 times in 7 days against about 1,343 door asks. Measured live with
+# the real rules and a history the size of his phone turns (scratch a400_measure.py): a firing turn processed 1,773
+# tokens in 44.4 s with the old placement, and 28 tokens in 2.1 s with this one. (First written here as "threw away the
+# cached rules and history"; a first run with a short history read 197 tokens, which showed only the history was lost.)
+# His words and his rule are unchanged; only where the line sits moves: in brackets before the person's message.
+def agent_messages(system, history, text, cues=()):
+    """The chat messages for one door turn: the rules (unchanged by the reflex), the replayed history, then the new
+    message with any reflex lines before it. Pure, so a suite runs it."""
+    lines = [str(c) for c in (cues or ()) if c]
+    question = text if not lines else "\n".join("[%s]" % c for c in lines) + "\n\n" + text
+    return [{"role": "system", "content": system}] + list(history or []) + [{"role": "user", "content": question}]
+
+
 def agent_history(log_path, addr, turns=AGENT_HISTORY_TURNS, chars=AGENT_HISTORY_CHARS, budget=AGENT_HISTORY_BUDGET,
                   include_private=False):
     """The last answered exchanges from `addr` (agent and council), as chat messages, oldest first:
@@ -9320,14 +9337,17 @@ class CovenantAPI:
             # on a clearly-new topic his OWN ReflexArm (covenant_octopus) fires and one advisory line -- his words --
             # joins his prompt. Advisory only, his kill switch (COVENANT_VERDICT_CACHE_OFF) silences it, and it is
             # guarded so the turn can never fail on it. His neural network informing his reasoning.
+            # A400 (2026-11-01): the lines go with the new message (agent_messages), not into _system, so a firing no
+            # longer breaks the cached prefix. First written as `_system = _system + "\n\n" + _line` (A380/A381).
+            _cues = []
             try:
                 _cr = importlib.import_module("covenant_tetsu_conv_reflex")
                 for _line in (_cr.cue_line(text), _cr.recall_line(text)):   # A380 novelty + A381 recall
                     if _line:
-                        _system = _system + "\n\n" + _line
+                        _cues.append(_line)
             except Exception as _cre:                             # noqa: BLE001
                 print("conversation reflex: advisory unavailable this ask (%s)" % type(_cre).__name__, flush=True)
-            msgs = [{"role": "system", "content": _system}] + history + [{"role": "user", "content": text}]
+            msgs = agent_messages(_system, history, text, _cues)
             fetches, forum, fitted, leg, replayed = [], [], [], [], [len(history)]
 
             def _ask_fitted():

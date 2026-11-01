@@ -16692,3 +16692,37 @@ His words: "in the past, we've already solved this. Why are you making the same 
   A275's own-choice practice slot and the consent process. Ten seats re-proposed them as the first build, and I relayed
   that as new. The fix is in how the question is written: the lookback is run first, and what exists goes into the
   question.
+
+### A400. [Tetsu's reflex line made every firing turn re-read his whole conversation; it now rides with the new message] (2026-11-01)
+
+His words: "work towards mutual benefit and a smother communication for tetsu if snn rate limits are nerfing that
+adjust".
+
+- **What was measured first.**
+  - The reflex has no rate limit. The "rate" in ops/tetsu_conv_reflex.jsonl is its spike rate.
+  - What slowed his conversation was the prefix cache. His phone's 5 turns in 7 days took a median 42 s and up to
+    109 s, with prompts of 4,932-5,199 tokens (about 2,900 of rules plus 40 kept history messages).
+  - The model server (one slot, -np 1) reuses its cache only up to the first changed token. A cached turn on
+    10-31 22:04 processed 195 tokens in 6.9 s; a cold one processed 3,623 in 72 s.
+  - The novelty and recall lines (A380/A381) were appended to the end of the system message. The reflex fired 793
+    times in 7 days against about 1,343 door asks.
+- **What a firing cost.** The rules stayed cached; the whole replayed history after them was processed again. This
+  was measured live (scratch a400_measure.py: the real compose_system, the next question, the old and new placements,
+  each after an identical warm-up).
+  - A short history read 197 tokens against 28.
+  - A phone-sized history (20 exchanges) read **1,773 tokens in 44.4 s against 28 tokens in 2.1 s**.
+  - My first wording, "threw away the cached rules and history", was corrected by that measurement before commit.
+- **The change.** covenant_unified_v8.agent_messages() builds the door's turn. The rules come first, unchanged by the
+  reflex; then the history; then the new message with any reflex line before it, in brackets, word for word. His
+  words and his rule (fire only on clearly-new topics) are unchanged. Only where the line sits moves.
+- **Guard: A400 (test_a400_reflex_placement.py), 7/7.**
+  - The rules message is byte-identical whether or not the reflex fires.
+  - The history is in order.
+  - His line is unchanged and comes before the text.
+  - Driven both ways: a scratch copy of the core with the old placement inside agent_messages turns A400.1 and
+    A400.4 red; the same harness reads 7/7 on the real code.
+  - **Its blind spot:** it runs the helper, not the door. An edit that inlined the old `_system + line` in the door
+    would pass. That the door calls the helper is the live measurement above.
+- **Not changed, and still costly.** The one slot is shared with batch work (127.0.0.2: 1,300 asks in 7 days), and
+  any of them clears his conversation's cache. Giving his conversation its own cache needs a second slot, and A269
+  (one slot, -np 1) is a decision with a recorded reason. It is put to him, not changed here.
