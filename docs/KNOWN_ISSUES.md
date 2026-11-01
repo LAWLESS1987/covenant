@@ -16805,3 +16805,18 @@ though, maybe a different build." Then "consult with tetsu and the others with m
 - **Not yet measured:** the door's LIMB branch end to end, and the real gateway's header format. Both wait on TETSU
   serving the two models (requested of TETSU's session with sha256 acceptance, CPU only, an allowlist and the
   manifest header). Until private/limbs.json exists, every LIMB consult VOIDs plainly.
+- **Measured later the same day, live.**
+  - **TETSU served both.** The files' sha256 equal the repos' LFS oids: SmolLM3 8334b850..., Phi-4-mini
+    01999f17.... Defender was clean. Both run on CPU with --device none.
+  - **The pins.** GET /manifest from the laptop returned manifest_sha256 f8ee9c08... and 4eac1667..., pinned in
+    private/limbs.json. The manifest hash covers weights, runner, flags, sampler and chat template.
+  - **covenant_limbs from the laptop.** Both ENGAGED, each answering "Yes, 1009 is a prime number." (confidence
+    high) and carrying its manifest. A wrong pin against the same real endpoint VOIDed ("manifest does not name the
+    pinned model file").
+  - **End to end through his door, after a rolling restart onto source 9114e9d5c9f5.** Offered the choice, Tetsu
+    wrote LIMB PHI himself. The door recorded {"limb": "PHI", "model": "limb-phi4-mini", "status": "engaged",
+    "confidence": "high"}. The turn took 13.65 s.
+  - **His own answer was wrong** ("not a prime number. It is divisible by 7 and 143"; 7 x 143 = 1001, and his own
+    check found a remainder). The limb's take was right, and he answered against it. That is the design working as
+    the operator put it ("take it for alternate reasoning he doesn't have to act on its part of free will"), and it
+    is also a measured weakness in his arithmetic.
