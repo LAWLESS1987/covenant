@@ -773,6 +773,9 @@ SUITES = [
     # abstains below confidence. Footing cue is a real per-task signal; router is a weak (near-majority) cue.
     ("test_tr1_tetsu_reflex.py", 180, "JUDGE"),
     ("test_cr1_conv_reflex.py", 120, "JUDGE"),
+    # A400 (2026-11-01, his words "a smother communication for tetsu"): the reflex's line rides with the new message,
+    # never in the rules, so a firing no longer re-reads his whole conversation (1,773 tokens / 44.4 s -> 28 / 2.1 s).
+    ("test_a400_reflex_placement.py", 120, "JUDGE"),
     # OC1 (2026-10-20, operator "think octopus" / "all 3"): the pure-Python spiking nervous system -- three
     # semi-autonomous LIF arms (witness/encoder/reflex), central integrate, kill switch both ways, and NO heavy
     # dependency so it runs on the phone (Termux has no numpy/torch). Arms extensible toward eight.
