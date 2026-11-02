@@ -2295,6 +2295,50 @@ def main():
     check("H1nr a detector whose docstring says it has no remedy has none registered (A348g)",
           _says_none and not _contradicted, (_contradicted, _says_none))
 
+    # ---- H1sf: the sync-fabric registrations, driven HERE as well (A405, 2026-11-02) ----------
+    #
+    # unison_feed_stale / sync_task_not_firing / sync_task_missing / mirror_lag / github_push_lag, and the
+    # remedies rerun_sync_task / trigger_mirror_sync / propose_unison_feed arrived 2026-11-02 and H1v caught them
+    # with no coverage here, which is exactly what H1v is for. The full both-ways behavioural pinning is
+    # test_sf1_sync_fabric.py (38 checks); these drive them here, for real, so the registry and this suite cannot
+    # drift apart -- H1v satisfied by COVERAGE, not by the string appearing in a comment. Each is driven both ways
+    # where that fits in one line: a healthy reading and the fault.
+    _fresh = {"status": "ok", "interval_s": 900, "checked": time.strftime("%Y-%m-%dT%H:%M:%S"),
+              "repos": {"r": {"target": "a" * 40, "heads": {"github": "a" * 40, "hf": "a" * 40, "website": "a" * 40}}}}
+    _lag = {"status": "ok", "interval_s": 900, "checked": "2026-11-02T10:00:00",
+            "repos": {"r": {"target": "a" * 40, "heads": {"github": "b" * 40, "hf": "b" * 40, "website": "a" * 40}}}}
+    check("H1sf unison_feed_stale: a status!=ok feed is PRESENT, a fresh ok feed ABSENT",
+          H.detect_unison_feed_stale(feed={"status": "starting", "checked": _fresh["checked"], "interval_s": 900})["state"] == H.PRESENT
+          and H.detect_unison_feed_stale(feed=_fresh)["state"] == H.ABSENT)
+    _t_ok = {"CovenantHFMirror": {"present": True, "state": "Ready", "result": 0, "interval_s": 7200, "last_run": time.time()},
+             "CovenantSiteAutoDeploy": {"present": True, "state": "Ready", "result": 0, "interval_s": 900, "last_run": time.time()}}
+    _t_bad = dict(_t_ok, CovenantHFMirror=dict(_t_ok["CovenantHFMirror"], result=1))
+    check("H1sf sync_task_not_firing: a nonzero last result is PRESENT, all-green ABSENT",
+          H.detect_sync_task_not_firing(tasks=_t_bad)["state"] == H.PRESENT
+          and H.detect_sync_task_not_firing(tasks=_t_ok)["state"] == H.ABSENT)
+    check("H1sf sync_task_missing: an absent expected task is PRESENT, both present ABSENT",
+          H.detect_sync_task_missing(tasks={"CovenantHFMirror": {"present": False}, "CovenantSiteAutoDeploy": {"present": True}})["state"] == H.PRESENT
+          and H.detect_sync_task_missing(tasks={"CovenantHFMirror": {"present": True}, "CovenantSiteAutoDeploy": {"present": True}})["state"] == H.ABSENT)
+    _cp = tmp_ledger()
+    check("H1sf mirror_lag / github_push_lag: a not-ready feed is UNKNOWN (never OK)",
+          H.detect_mirror_lag(feed={"status": "starting"}, cache_path=_cp)["state"] == H.UNKNOWN
+          and H.detect_github_push_lag(feed={"status": "starting"}, cache_path=_cp)["state"] == H.UNKNOWN)
+    # a first reading of a real lag is cycle 1 -> below threshold -> ABSENT (persistence, not a blip), and the
+    # github copy is never mirror_lag's to re-run
+    _ml = H.detect_mirror_lag(feed=_lag, cache_path=_cp)
+    check("H1sf mirror_lag at one reading is ABSENT and never claims a github copy",
+          _ml["state"] == H.ABSENT and not _ml["measured"]["rerun_tasks"], _ml["measured"])
+    check("H1sf rerun_sync_task / trigger_mirror_sync run when named, decline when not (held, not a failure)",
+          H.remedy_rerun_sync_task({"not_firing": ["CovenantHFMirror"]}, dry_run=True)[0] is True
+          and H.remedy_rerun_sync_task({"not_firing": []}, dry_run=True)[0] is False
+          and H.remedy_trigger_mirror_sync({"rerun_tasks": ["CovenantSiteAutoDeploy"]}, dry_run=True)[0] is True
+          and H.remedy_trigger_mirror_sync({"rerun_tasks": []}, dry_run=True)[0] is False)
+    _led_sf = tmp_ledger()
+    _row_pf = H.apply_remedy("propose_unison_feed", present({"reachable": False}), "unison_feed_stale",
+                             dry_run=False, ledger=_led_sf, choices={}, cooldown_s=0)
+    check("H1sf propose_unison_feed is PROPOSE_ONLY: the engine refuses it as a proposal",
+          _row_pf["outcome"] == "proposed" and bool(_row_pf.get("mutual_benefit", {}).get("cost")), _row_pf.get("outcome"))
+
     undriven_d = [k for k in H.DETECTORS if k not in src]
     undriven_r = [k for k in H.REMEDIES if k not in src]
     check("H1v every registered detector is named somewhere in this suite",
