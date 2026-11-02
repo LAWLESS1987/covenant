@@ -55,10 +55,18 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
-# A "handful of high-value guards" (the brief): the reserve clamp A74 named as
-# its worst case, its unit-level floor, the tally parser K2 pins, and the venue
-# money-gate V2 pins. Each target names the behaviour in words so a MISSED reads
-# as a sentence, not a diff.
+# Two groups. FIRST, a "handful of high-value guards" (the brief): the reserve
+# clamp A74 named as its worst case, its unit-level floor, the tally parser K2
+# pins, and the venue money-gate V2 pins. SECOND (added when the probe was
+# pointed at the A74 SEMANTIC MISSES): three suites A74 REPAIRED 2026-09-09 by
+# adding a behavioural check beside a source-reading one. For these, the probe
+# re-breaks the exact behaviour each repair's own journal names, so a CAUGHT is
+# that repair still earning its green and a MISSED would be a regression lead --
+# NOT a fresh find (these were already repaired). k3's owner-only repair
+# (MainnetGuardError translation / require_owner_only narrowing) is a documented
+# candidate left OUT for now: its mutation is an ACL/icacls insertion whose
+# verdict would turn on the platform, not on the guard. Each target names the
+# behaviour in words so a MISSED reads as a sentence, not a diff.
 TARGETS = [
     {
         "id": "f5-plan-clamp",
@@ -98,6 +106,43 @@ TARGETS = [
                      "goes to VALIDATE, never the live book, unless armed",
         "find": b'live=False, ordertype="market", price=None):',
         "replace": b'live=True, ordertype="market", price=None):',
+        "count": 1,
+    },
+    # ---- A74-repaired suites: confirm the repair still catches the break ----
+    {
+        "id": "b2-arming-block",
+        "suite": "test_b2_quorum_diversity.py",
+        "subject": "covenant_unified_v8.py",
+        "behaviour": "build_semantic_quorum arms COVENANT_REQUIRE_JUDGE_DIVERSITY "
+                     "on the report's answer -- it refuses a NON-diverse quorum, "
+                     "never a genuinely diverse one (E3b walks the diverse case, "
+                     "where A74's E3 only ever reached its except-branch)",
+        "find": b'if not rep.get("diverse"):',
+        "replace": b"if True:  # mutation_probe: arm on every build",
+        "count": 1,
+    },
+    {
+        "id": "r2-private-record-flag",
+        "suite": "test_r2_redundancy.py",
+        "subject": "redundancy.py",
+        "behaviour": "principle_check FLAGS a git-tracked path inside a private "
+                     "segment (the record, the backups, the keys); S1b/S2b run "
+                     "the shipped classifier, not the hand-copied rule A74 found",
+        "find": b"if any(s in FORBIDDEN_SEGMENTS for s in segments[:-1]):",
+        "replace": b"if False and any(s in FORBIDDEN_SEGMENTS "
+                   b"for s in segments[:-1]):",
+        "count": 1,
+    },
+    {
+        "id": "p20-self-eval-write-gate",
+        "suite": "test_p20_watchdog_self_eval.py",
+        "subject": "covenant_watchdog.py",
+        "behaviour": "one_pass actually WRITES the self-eval ledger when the round "
+                     "gate fires; E11c/d RUN one_pass and read the bytes, where "
+                     "A74's source-reading E11a/b stay green on this same break",
+        "find": b'if SELF_EVAL_EVERY > 0 and _self_eval["round"] '
+                b'% SELF_EVAL_EVERY == 0:',
+        "replace": b'if False and _self_eval["round"] % SELF_EVAL_EVERY == 0:',
         "count": 1,
     },
 ]
