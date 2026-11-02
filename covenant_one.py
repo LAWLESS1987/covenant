@@ -804,6 +804,11 @@ SUITES = [
     # the current chain still extends an earlier commitment (append-only). Driven both ways:
     # a rewrite/truncation below the checkpoint is caught; honest appends stay honored.
     ("test_gs4_grid_ledger_anchor.py", 120, "SECURITY"),
+    # AG1 (2026-11-02): the covenant console (covenant_app.py) binds loopback and can restart
+    # nodes / submit tx / mine / run armed actions. Its guard only proved the CONNECTION was
+    # loopback; a DNS-rebound page in the user's browser connects from loopback too. AG1 drives
+    # the new Host-header check both ways (loopback Host allowed; Host: evil.example refused).
+    ("test_ag1_app_host_guard.py", 60, "SECURITY"),
     # CC1/HC1/HC2/HW1 (2026-10-31): the consent chain, the signed HEAD-commitment ledger and its verifier,
     # stale-vs-tamper, and the two takeover detectors. They shipped unregistered, so public CI on 943b809 read
     # "orphaned on disk" and INCOMPLETE. Measured before adding, clean Linux copy and this PC: 7/7, 7/7, 10/10, 12/12.
