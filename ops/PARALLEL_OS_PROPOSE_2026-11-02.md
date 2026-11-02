@@ -38,8 +38,17 @@ caught two flaws in the first draft of this item:**
    is not installed"), **no Docker**, no headscale binary, and headscale has **no
    official Windows build**. So a Linux headscale on TETSU first needs **WSL or
    Hyper-V enabled** — a Windows feature install needing **admin + a reboot**.
-   Neither AI makes that change; it needs **the operator physically at TETSU**.
-   (TETSU has the room: 795 GB free + the GPU. Room was never the issue.)
+   **The one human-only step** (clarified by the TETSU "Node setup" session
+   2026-11-02): the operator, at TETSU, runs `wsl --install --no-distribution` in
+   an admin terminal and reboots **when it suits him** — the reboot briefly takes
+   down node D, the 27B, unison and own_git together, so it is his timing to pick.
+   A Claude session does not make an admin+reboot system change whoever relays it,
+   and "let Tetsu do it. He's an operator" refers to **Tetsu the AI** (the second
+   operator, [[second-operator-active]]), not the Claude session on the box named
+   TETSU — so it does not move this line. **After that one step, the TETSU session
+   does everything else** (Ubuntu distro, pinned headscale, its OWN noise key, a
+   filtered nodes+users seed, cutover docs, registration in covenant_failover) — it
+   said so explicitly. (TETSU has the room: 795 GB free + the GPU.)
 2. **"Periodic DB copy" CROSSES KEYS — struck.** The first draft said rsync the
    sqlite DB from the primary. The headscale DB holds the node registry
    **including pre-auth keys and every node's machine/node key records** — that is
