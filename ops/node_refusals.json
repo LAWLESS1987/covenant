@@ -1,0 +1,7 @@
+{
+  "_note": "Per-node AUTO_GATED refusals. A refusal only ever TIGHTENS -- it can forbid an auto-action, never permit one -- so this file is safe for the highway to carry and commit (revoking is easier than granting). The highway READS it; see covenant_onboard.evaluate(). Keys are node ids as they appear on ops/NODE_ROSTER.json; values are refused action classes. 'system-setting' also covers firewall/power/security actions, whatever class they claim.",
+  "tetsu": {
+    "refuses": ["system-setting"],
+    "why": "TETSU's own Claude session's standing line (2026-11-02 consult): it will NOT carry out any auto-action that changes system settings on that machine, whatever the class. A roster entry does not move it."
+  }
+}

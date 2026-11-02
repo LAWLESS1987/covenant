@@ -628,6 +628,13 @@ SUITES = [
     # (twenty-four since 2026-10-30: the grid/ICS-OT actuation words, A392).
     # NA1 drives every one through apply_remedy so the money/seat/rule/consent/key list cannot silently shrink.
     ("test_na1_never_automatic.py", 120, "DAILY + GUARDS"),
+    # OG1 (2026-11-02, "loosen autonomy ... create its own lane"): the highway's AUTO_GATED auto-onboard lane
+    # (covenant_onboard.py) -- a third class between AUTO_REVERSIBLE and PROPOSE_ONLY. Every gate driven both
+    # ways: a model trigger refused, an off-roster node never onboarded, an absent/unsigned/bad-signature roster
+    # dark, a failed whois refused, a verified node auto-peered AND un-peered, a system-setting action refused on
+    # a flagged node, an outward action never AUTO_GATED. Hermetic: an in-process key signs a fixture roster,
+    # identity is stubbed, every path is a temp file. Ships DARK and NOT ARMED.
+    ("test_og1_onboard.py", 120, "DAILY + GUARDS"),
     # PB1 (2026-09-26, A231): the highway's two phone-build signals measure what they name -- a look that finds
     # nothing newer counts as a look (fetch_build was quarantined for it), and "behind" means behind in the
     # files the APK ships, not in every docs commit.

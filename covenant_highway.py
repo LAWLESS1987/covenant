@@ -4521,6 +4521,22 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
                 # repairs it" without that is a nudge, not a finding.
                 alerts.append("highway: %s is present and nothing here repairs it -- %s"
                               % (name, json.dumps(c["measured"])[:400]))
+    # A405 (2026-11-02, "loosen autonomy ... create its own lane"): the AUTO_GATED
+    # auto-onboard lane runs as its OWN pass in covenant_onboard.py -- a third class
+    # between AUTO_REVERSIBLE and PROPOSE_ONLY, gated on an operator-rooted roster and
+    # a verified node identity. This hook is the whole of its footprint here: it does
+    # not touch apply_remedy or the existing remedies. dry_run carries A244 (the
+    # watchdog passes dry_run=not highway_may_act(), so a staged copy runs it DRY), and
+    # a paused highway has already returned above, so the lane never acts when paused.
+    # It SHIPS DARK: no roster and not armed, so this adds one "DARK" info line and
+    # repairs nothing. Guarded -- a notice from a new lane must never fell the road.
+    try:
+        import covenant_onboard as _ob
+        ob_alerts, ob_infos = _ob.run_once(dry_run=dry_run, ledger=ledger)
+        alerts.extend(ob_alerts)
+        infos.extend(ob_infos)
+    except Exception as _e:                                      # noqa: BLE001
+        infos.append("highway: auto-onboard lane unavailable -- %s: %s" % (type(_e).__name__, _e))
     return alerts, infos
 
 
