@@ -1467,6 +1467,13 @@ IN_PLACE = [
     # (file, seconds, why it may not be run from a scratch copy)
     ("verify_bundle.py", 120,
      "hashes the DELIVERY against MANIFEST.sha256 -- a copy is not the delivery"),
+    # TG1 (2026-11-02): the tab RAM guard lives in .claude/hooks/ram_guard.py and its matcher in
+    # .claude/settings.json. stage() never copies .claude ("hooks and settings run in the folder,
+    # never from a copy"), so from a scratch copy this suite would read neither and report NO
+    # RESULT. In place it loads the real hook and the live matcher and drives the coverage of
+    # every tab-opening door both ways.
+    ("test_tg1_tab_ram_guard.py", 60,
+     "loads the real .claude/hooks/ram_guard.py and the live .claude/settings.json matcher -- a copy has no .claude"),
     ("test_p18_version_collision.py", 180,
      "walks the tree for other copies of the core -- a copy has a different tree"),
     # A117 (2026-09-14), registered in the change that created it. IN PLACE for
