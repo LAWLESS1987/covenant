@@ -18,6 +18,8 @@ been red first.
   OG1e  a rostered, identity-verified node auto-peers AND un-peers (exactly reversible).
   OG1f  a system-setting action is refused on a node with the refusal flag (TETSU's line).
   OG1g  a non-reversible (outward) action is never AUTO_GATED.
+  OG1j  a grid/ICS-classed effect is refused and handed to covenant_grid_guard's
+        together-vote (class derived from the guard's allowlist, reused not forked).
   OG1h  it ships DARK and NOT ARMED: no roster, no arm file -> nothing auto-acts.
 
 Hermetic: a keypair made in-process signs a fixture roster, identity is stubbed,
@@ -220,6 +222,30 @@ def main():
               "not reversible" not in d.get("reason", ""), d.get("reason"))
     finally:
         O.ACTIONS["push"] = real_push
+
+    # ---- OG1j: a grid/ICS-classed effect is refused and handed to the grid guard (together-vote)
+    import covenant_grid_guard as G
+    # breaker_open is ACTUATION in the grid guard's OWN allowlist -- a grid effect, though it is NOT one
+    # of this lane's actions. AUTO_GATED must REFUSE it and route it to the operator+Tetsu together-vote.
+    d = O.evaluate("breaker_open", {"node": "known"}, scan, **base_gate(roster, pem))
+    check("OG1j a grid ACTUATION action is REFUSED by AUTO_GATED and routed to the grid guard",
+          d["decision"] == O.REFUSE and d.get("route") == "grid_guard" and "together-vote" in d["reason"],
+          "%s route=%s" % (d["decision"], d.get("route")))
+    # mutation 1: a non-grid action (peer), everything else identical, is NOT grid-routed -> ACT
+    d2 = O.evaluate("peer", known, scan, **base_gate(roster, pem))
+    check("OG1j mutation: a non-grid action is not routed to the grid guard -> ACT",
+          d2["decision"] == O.ACT and d2.get("route") != "grid_guard", d2["decision"])
+    # mutation 2: the class is DERIVED from the grid guard's allowlist (reused, not forked) -- remove the
+    # entry and the SAME action stops being grid-routed, proving the single source of truth.
+    real_ac = dict(G.ACTION_CLASS)
+    try:
+        G.ACTION_CLASS.pop("breaker_open", None)
+        d3 = O.evaluate("breaker_open", {"node": "known"}, scan, **base_gate(roster, pem))
+        check("OG1j mutation: drop breaker_open from the grid allowlist -> no longer grid-routed",
+              d3.get("route") != "grid_guard", "%s route=%s" % (d3["decision"], d3.get("route")))
+    finally:
+        G.ACTION_CLASS.clear()
+        G.ACTION_CLASS.update(real_ac)
 
     # ---- OG1h: ships DARK and NOT ARMED (the real files, read from disk as production would)
     armed, root, why = O.is_armed()

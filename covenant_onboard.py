@@ -436,6 +436,26 @@ def verify_identity(node_id, entry, operator_account, whois_fn=None, status_fn=N
 
 # ----------------------------------------------------------------- the gate
 
+def _grid_route(action):
+    """A reason string if `action` is a grid/ICS effect that must go to the grid
+    guard's together-vote, else None. The class is DERIVED from covenant_grid_guard's
+    ACTION_CLASS allowlist -- the one source of truth, reused not forked. If the guard
+    cannot be imported, this returns None: the known-action check still refuses
+    anything that is not one of this lane's own (non-grid) reversible actions, so a
+    missing guard opens no hole."""
+    try:
+        import covenant_grid_guard as G
+        cls = G.required_class(action)
+    except Exception:                                           # noqa: BLE001
+        return None
+    if cls is not None:
+        holders = "+".join(getattr(G, "AUTHORITY_ROLES", ("operator", "tetsu")))
+        return ("grid/ICS action %r (class %s) -> covenant_grid_guard together-vote (%s), "
+                "fail-closed, never AUTO_GATED (data/anomaly is ALARM-only, never authority)"
+                % (action, cls, holders))
+    return None
+
+
 def is_armed(roster=None, armed_cfg=None, pubkey=None, committed=None):
     """(armed, trust_root, reason). The lane is armed ONLY when the operator wrote
     ops/AUTO_ONBOARD_ARMED choosing a trust root AND that trust root is satisfiable
@@ -476,11 +496,22 @@ def evaluate(action, target, trigger, *, roster=None, choices=None, refusals=Non
         return out(REFUSE, "trigger source %r is not operator-rooted -- a model's output can never "
                            "trigger AUTO_GATED (data is not authority)" % src)
 
-    # 2. a known action
+    # 2. GRID / ICS DEFERS TO covenant_grid_guard -- BEFORE the known-action check, so a
+    #    grid action named on a roster is routed to the guard rather than called "unknown".
+    #    The class is DERIVED from the grid guard's own ACTION_CLASS allowlist (the single
+    #    source of truth -- no forked grid word list, per the PG1/rule-6 lesson): any action
+    #    it recognises is grid-domain and goes to the together-vote (operator + Tetsu),
+    #    fail-closed, never AUTO_GATED. An action the allowlist does not know is not treated
+    #    as grid here; it falls to the known-action check below, which refuses the unknown.
+    gr = _grid_route(action)
+    if gr:
+        return dict(base, decision=REFUSE, reason=gr, route="grid_guard")
+
+    # 3. a known action
     if spec is None:
         return out(REFUSE, "unknown action %r" % action)
 
-    # 3. a per-node refusal, honoured whatever the class and BEFORE the
+    # 4. a per-node refusal, honoured whatever the class and BEFORE the
     #    PROPOSE_ONLY short-circuit below, so it is a guard in its own right: a
     #    node that refuses 'system-setting' REFUSES (a hard no), where an
     #    unflagged node's system-setting action merely PROPOSES. TETSU sets this.
@@ -490,42 +521,42 @@ def evaluate(action, target, trigger, *, roster=None, choices=None, refusals=Non
     if spec.get("cls") in refused or (cls_refusal and cls_refusal in refused):
         return out(REFUSE, "%s refuses %s auto-actions (per-node refusal)" % (node_id, cls_refusal or spec["cls"]))
 
-    # 4. PROPOSE_ONLY forever -- by the action's declared class, and by its subject
+    # 5. PROPOSE_ONLY forever -- by the action's declared class, and by its subject
     if spec.get("cls") in PROPOSE_ONLY_CLASSES:
         return out(PROPOSE, "action class %r is PROPOSE_ONLY forever -- a person decides" % spec["cls"])
     crossed = sorted({w for w in NEVER_AUTOMATIC for t in spec.get("touches", []) if w in t.lower()})
     if crossed:
         return out(PROPOSE, "touches %s -- refused whatever class it claims" % ", ".join(crossed))
 
-    # 5. outward actions are not reversible, so never AUTO_GATED
+    # 6. outward actions are not reversible, so never AUTO_GATED
     if not spec.get("reversible"):
         return out(PROPOSE, "action %r is not reversible (outward: cannot be unsent) -- PROPOSE_ONLY" % action)
 
-    # 6. ARMED and a trust root present, else DARK (fail closed -> propose)
+    # 7. ARMED and a trust root present, else DARK (fail closed -> propose)
     armed, root, why = is_armed(roster=roster, armed_cfg=armed_cfg, pubkey=pubkey, committed=committed)
     if not armed:
         return out(PROPOSE, "auto-onboard dark: %s" % why)
     base["root"] = root
 
-    # 7. the target is on the roster (an unknown node is never auto-onboarded)
+    # 8. the target is on the roster (an unknown node is never auto-onboarded)
     r = load_roster() if roster is None else roster
     nodes = (r.get("nodes") or {}) if isinstance(r, dict) else {}
     entry = nodes.get(node_id)
     if not isinstance(entry, dict):
         return out(PROPOSE, "node %r is not on the roster -- onboarding an unknown node is PROPOSE_ONLY" % node_id)
 
-    # 8. the roster allows THIS action for THIS node
+    # 9. the roster allows THIS action for THIS node
     allowed = entry.get("allowed") or entry.get("actions") or []
     if action not in allowed:
         return out(REFUSE, "the roster does not allow %r for %s (allowed: %s)" % (action, node_id, allowed))
 
-    # 9. identity verified, not minted
+    # 10. identity verified, not minted
     acct = operator_account if operator_account is not None else r.get("operator_account")
     ok, idreason = verify_identity(node_id, entry, acct, whois_fn=whois_fn, status_fn=status_fn)
     if not ok:
         return out(REFUSE, "identity not verified: %s" % idreason)
 
-    # 10. the operator's explicit choices are untouchable
+    # 11. the operator's explicit choices are untouchable
     choices = _operator_choices() if choices is None else choices
     clash = sorted(set(spec.get("touches", [])) & set(choices or {}))
     if node_id in (choices or {}):
@@ -537,7 +568,7 @@ def evaluate(action, target, trigger, *, roster=None, choices=None, refusals=Non
     undo_fn = spec.get("undo")
     base["undo"] = undo_fn(target) if callable(undo_fn) else "n/a"
 
-    # 11. pause / may_act==False -> it would act, but DRY (A244)
+    # 12. pause / may_act==False -> it would act, but DRY (A244)
     if paused is None:
         paused = _paused()
     if paused or not may_act:
