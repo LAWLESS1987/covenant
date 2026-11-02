@@ -229,6 +229,26 @@ def cmd_digest(payload):
     return _sha_hex(_canon(core))
 
 
+def _policy_fingerprint(signers=None, interlocks=None, policy=None):
+    """sha256 of the canonical signer allowlist / interlocks / authorization policy the gate
+    decides under. Recorded on every honored row so a later audit can tell whether a row's
+    policy is still the one in force. None for an entry that is unreadable. Passing a value
+    fingerprints THAT value (so a reverify can match what it hands authorize); passing None
+    reads the live file. (2026-11-02: lets reverify_ledger_decisions separate a gate that
+    contradicted its OWN policy -- integrity -- from a policy that legitimately changed since.)"""
+    def _h(val, path):
+        if val is None:
+            val, ok = _load_json(path)
+            if not ok:
+                return None
+        try:
+            return _sha_hex(_canon(val))
+        except Exception:  # noqa: BLE001
+            return None
+    return {"signers": _h(signers, SIGNERS), "interlocks": _h(interlocks, INTERLOCKS),
+            "policy": _h(policy, POLICY)}
+
+
 def make_authz_token(payload, issuer_fpr, priv_pem, ttl_s=300, now=None):
     """An authority-holder authorizes ONE command (bound by cmd_sha256)."""
     now = _now() if now is None else now
@@ -551,6 +571,12 @@ def reverify_ledger_decisions(ledger=None, signers=None, signers_ok=None,
     prefix = os.path.join(tmpd, "prefix.jsonl")
     open(prefix, "wb").close()
     _SKIP = {"HALT", "LATCHED", "C6-deadman"}
+    # The policy reverify decides under, fingerprinted the same way the gate recorded it, so a
+    # divergence can be read against the row's own policy_sha: equal -> policy UNCHANGED since
+    # the row was honored, so a divergence is the gate contradicting its own policy (integrity);
+    # different -> the mutable policy changed since (reported, not convicted).
+    cur_pf = _policy_fingerprint(signers if signers_ok is not False else None,
+                                 interlocks if interlocks_ok is not False else None, policy)
     replayed = 0
     for i, r in enumerate(rows):
         if r is not None:
@@ -566,8 +592,13 @@ def reverify_ledger_decisions(ledger=None, signers=None, signers_ok=None,
                 if d["decision"] != rec_dec or d["failed_check"] != rec_chk:
                     why = ("recorded %s/%s, re-decided %s/%s -- %s"
                            % (rec_dec, rec_chk, d["decision"], d["failed_check"], d["reason"]))
-                    if rec_dec == PERMIT and d["failed_check"] in ("C0", "C3", "C4", "C5"):
-                        integrity.append((i, "recorded PERMIT fails a reproducible check on replay: " + why))
+                    reproducible = d["failed_check"] in ("C0", "C3", "C4", "C5")
+                    row_pf = r.get("policy_sha")
+                    policy_same = row_pf is not None and row_pf == cur_pf
+                    if rec_dec == PERMIT and (reproducible or policy_same):
+                        tag = ("fails a reproducible check (C0/C3/C4/C5)" if reproducible
+                               else "contradicts the gate's OWN policy, unchanged since (policy_sha matches)")
+                        integrity.append((i, "recorded PERMIT %s on replay: %s" % (tag, why)))
                     else:
                         policy_div.append((i, why))
         with open(prefix, "ab") as fh:        # append even an unparseable row (skipped on read)
@@ -679,6 +710,9 @@ class GridEffectorGateway:
             "failed_check": decision["failed_check"],
             "reason": decision["reason"],
             "detector_snapshot": detector_snapshot,
+            # The policy the gate decided under, by hash (A392 residual, 2026-11-02): lets an
+            # audit tell a gate that contradicted its OWN policy from a policy changed since.
+            "policy_sha": _policy_fingerprint(),
         }
         if self.gateway_priv_pem:
             row["gateway_sig"] = _sign(CMD_DOMAIN, row, self.gateway_priv_pem)

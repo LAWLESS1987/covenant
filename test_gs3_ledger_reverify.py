@@ -159,6 +159,27 @@ def main():
     check("GS3 broken the other way: un-revoking the signer clears the divergence",
           back["ok"] and not back["policy"], str(back))
 
+    # ---- INTEGRITY via policy_sha (A392 residual close): a recorded PERMIT for an actuation
+    # with NO together-vote, under UNCHANGED policy, re-decides C6 REFUSE. Because the row's
+    # policy_sha matches the policy in force, that is the gate contradicting its OWN policy ->
+    # INTEGRITY, not drift. (With CHANGED policy it would be the revoke case above -> policy.)
+    d3 = tempfile.mkdtemp(prefix="gs3c_")
+    l3, c3 = os.path.join(d3, "l.jsonl"), os.path.join(d3, "c.jsonl")
+    notoks = gg.build_command(0, "breaker_open", "Z1", {}, "ACTUATION", fpr["controller"], now=T0)
+    env_nt = gg.sign_command(notoks, keys["controller"][0])
+    env_nt["payload"]["authz_tokens"] = []     # the together-vote the gate requires is absent
+    utc3 = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(T0))
+    forged_c6 = {"seq": 0, "utc": utc3, "t": utc3, "honored_utc": T0, "command": env_nt,
+                 "signer_fpr": fpr["controller"], "decision": gg.PERMIT, "failed_check": None,
+                 "reason": "FORGED PERMIT with no together-vote", "detector_snapshot": {},
+                 "policy_sha": gg._policy_fingerprint()}     # the policy in force, unchanged
+    cc.append_consent(forged_c6, ledger_path=l3, chain_path=c3)
+    c6 = gg.reverify_ledger_decisions(ledger=l3)
+    check("GS3 a recorded PERMIT missing the together-vote, under UNCHANGED policy, is INTEGRITY "
+          "(gate contradicts its own policy via policy_sha), not mere drift",
+          c6["ok"] is False and any(i == 0 and "OWN policy" in why for i, why in c6["integrity"])
+          and not c6["policy"], str(c6))
+
     # ---- SKIP: halt / pre-authorize rows are NOT replayed (no false divergence)
     d2 = tempfile.mkdtemp(prefix="gs3b_")
     gw2 = gg.GridEffectorGateway(ledger=os.path.join(d2, "l.jsonl"),
