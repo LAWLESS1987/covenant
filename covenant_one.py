@@ -798,6 +798,12 @@ SUITES = [
     # recorded PERMIT the record proves over-cap is INTEGRITY; a since-revoked signer is POLICY,
     # not a verdict; halt/latched rows are not replayed; the standalone verifier stays uncoupled.
     ("test_gs3_ledger_reverify.py", 120, "SECURITY"),
+    # GS4 (2026-11-02): the OFF-HOST binding of the grid command ledger. It is gitignored
+    # runtime state, so each head-commitment carries a from-disk checkpoint of the command
+    # chain's head (covenant_head_commit.grid_ledger_checkpoint); grid_ledger_anchor_ok proves
+    # the current chain still extends an earlier commitment (append-only). Driven both ways:
+    # a rewrite/truncation below the checkpoint is caught; honest appends stay honored.
+    ("test_gs4_grid_ledger_anchor.py", 120, "SECURITY"),
     # CC1/HC1/HC2/HW1 (2026-10-31): the consent chain, the signed HEAD-commitment ledger and its verifier,
     # stale-vs-tamper, and the two takeover detectors. They shipped unregistered, so public CI on 943b809 read
     # "orphaned on disk" and INCOMPLETE. Measured before adding, clean Linux copy and this PC: 7/7, 7/7, 10/10, 12/12.
