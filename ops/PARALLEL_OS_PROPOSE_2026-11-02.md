@@ -28,33 +28,48 @@ Priority order matches the three hard SPOFs in
 ## 1. headscale standby on TETSU (SPOF #1 — the mesh coordinator)
 
 **Why:** headscale runs only in the laptop's one WSL/Ubuntu. Lose that distro,
-that laptop, or that OS and no node can (re)join or re-key. A warm standby on a
+that laptop, or that OS and no node can (re)join or re-key. A standby on a
 **different host (TETSU)** removes the single-OS dependency.
 
-**Where:** TETSU (its own Linux, or TETSU's WSL). Warm standby, manual cutover —
-headscale is not trivially active-active, so this is a standby + periodic state
-copy, not HA magic.
+**CORRECTED 2026-11-02 — the TETSU "Node setup" session measured its host and
+caught two flaws in the first draft of this item:**
 
-**Steps (on TETSU, operator):**
+1. **TETSU cannot host it as written.** TETSU has **no WSL** ("Subsystem for Linux
+   is not installed"), **no Docker**, no headscale binary, and headscale has **no
+   official Windows build**. So a Linux headscale on TETSU first needs **WSL or
+   Hyper-V enabled** — a Windows feature install needing **admin + a reboot**.
+   Neither AI makes that change; it needs **the operator physically at TETSU**.
+   (TETSU has the room: 795 GB free + the GPU. Room was never the issue.)
+2. **"Periodic DB copy" CROSSES KEYS — struck.** The first draft said rsync the
+   sqlite DB from the primary. The headscale DB holds the node registry
+   **including pre-auth keys and every node's machine/node key records** — that is
+   key material crossing OS environments, which violates the rule this very doc
+   states. **Do not copy the DB.** Either copy a **filtered export** (nodes + users
+   only, no pre-auth/API keys) or accept that standby clients **re-register**.
+3. **It is a COLD standby with MANUAL cutover, not warm.** A standby with its own
+   noise key is a **different server identity**; clients do not fail over silently
+   — cutover means each client re-points `login_server` and, in practice,
+   **re-authenticates**. State that plainly; don't promise seamless failover.
+
+**Steps (on TETSU, OPERATOR — needs admin + a reboot):**
 ```bash
-# 1. install headscale (pin the SAME version the laptop runs)
-#    check the laptop's version first:  wsl -d Ubuntu -- headscale version
+# 0. OPERATOR, at TETSU: enable WSL (or Hyper-V) -- admin PowerShell, then reboot:
+#    wsl --install            # (then a distro), OR Enable-WindowsOptionalFeature Microsoft-Hyper-V
+# 1. install headscale, SAME version as the laptop (check: wsl -d Ubuntu -- headscale version)
 curl -fsSL https://github.com/juanfont/headscale/releases/download/v<VERSION>/headscale_<VERSION>_linux_amd64 -o headscale
 chmod +x headscale && sudo mv headscale /usr/local/bin/headscale
-# 2. copy the laptop's config (NON-secret parts only) to TETSU, adjust server_url/listen_addr
-#    /etc/headscale/config.yaml  -- do NOT copy private keys; TETSU generates its own
-# 3. periodic DB copy from the primary (the standby is only as fresh as its last copy):
-#    rsync the sqlite db (or switch both to the same Postgres) on a schedule
-# 4. start as a standby (serving, but not the advertised control URL until cutover)
-sudo systemctl enable --now headscale
+# 2. copy the laptop's config (NON-secret parts only); TETSU generates its OWN noise key
+# 3. seed state by FILTERED EXPORT (no keys): `headscale nodes/users export` on the laptop,
+#    import on TETSU -- NEVER rsync db.sqlite (it carries pre-auth/node keys). Or skip and let
+#    clients re-register on cutover.
+# 4. run as a cold standby (serving, NOT the advertised login_server until cutover)
 ```
-**Cutover (when the laptop's headscale is down):** point the tailnet's
-`server_url` / DNS at TETSU's headscale and restart nodes. Document the one DNS
-record to flip.
+**Cutover (laptop headscale down):** re-point each client's `login_server` at
+TETSU and re-authenticate. Document it; it is manual by construction.
 
-**Resilience bought:** the mesh keeps a coordinator when the laptop/WSL dies.
-**Cost:** an always-on headscale on TETSU (~tens of MB) + a copy schedule.
-**Undo:** `systemctl disable --now headscale` on TETSU; remove the binary/config.
+**Then the TETSU session can finish the build** — it said so explicitly, once the
+operator has enabled WSL at TETSU. **Resilience:** the mesh regains a coordinator
+after the laptop/WSL dies (manual cutover). **Undo:** stop + remove on TETSU.
 
 ---
 
@@ -79,18 +94,30 @@ so the mirror stays fresh while the primary is up.
 
 ---
 
-## 3. unison feed standby on TETSU (SPOF #3 — the sync fabric source)
+## 3. unison feed redundancy — a READ-ONLY REPLICA, not a second builder
 
-**Why:** the `:8800/unison` feed + `:8400` own_git are one host. A second feed on
-TETSU lets the sync fabric survive the laptop.
+**CORRECTED 2026-11-02 — the TETSU session caught a correctness bug in the first
+draft ("run a second feed"):** the feed's UNIFIED targets are **merge commits with
+fresh timestamps**, so two builders given the same heads publish **different shas**.
+The laptop's GitHub pusher would then see two conflicting "targets" for one repo.
+**unison is ff-safe only because exactly one builder publishes `unify/auto`.** A
+second builder breaks that. Struck.
 
-**Steps (TETSU, operator):** run the feed/own_git server (coordinate the exact
-launcher with the grow-highway-sync-fabric / auto-onboard branches, which own
-the feed) against a mirror of the same repos, on TETSU, distinct ports. Add it to
-`SERVICES["unison_feed"]` as the `tetsu` redundant instance once live.
+**Safe redundancy = a read-only REPLICA** (no building):
+- mirror the primary's `:8800/unison` JSON and own_git's `unify/auto` refs,
+- serve them marked **`replica, last_checked=<ts>`**, and **never build**,
+- consumers prefer the primary and fall back to the replica **only when its
+  `last_checked` is fresh**, applying the same `FETCH_HEAD == target` rule. A
+  replica going stale is then **visible, not silent**.
 
-**Resilience bought:** the fabric has a second source of truth on another host.
-**Cost:** always-on feed + mirror on TETSU. **Undo:** stop it; drop the entry.
+The laptop can host this replica (it has the repos). **If a failover *builder* is
+ever wanted**, it needs a **lease**: only one host holds it, the holder's id goes
+in the feed, and the pusher refuses a target from a non-holder.
+
+**Owner:** this is the **sync-fabric session's** design (branch
+`claude/elastic-proskuriakova-1e327a`) — relayed to it. Not the laptop failover
+module's to build. `covenant_failover` already **monitors** the real remote feed
+(via `ops/local_unison_feed.txt`) so a laptop consumer sees it go down.
 
 ---
 
