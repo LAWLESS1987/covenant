@@ -42,7 +42,7 @@ Registry key (in `covenant_failover.SERVICES`) is given in backticks.
 | Service | What it is | Runs on (today) | Redundant instance on a DIFFERENT OS/host? | Status |
 |---|---|---|---|---|
 | **headscale control** (`headscale`) | our Tailscale control plane; the mesh coordinator | laptop **WSL/Ubuntu only** (127.0.0.1:8080) | none | **SPOF** |
-| **git host** (`git_host`) | self-hosted smart-HTTP git (clone/push over the mesh) | laptop **WSL/Ubuntu only** (127.0.0.1:8088; own_git :8400) | none | **SPOF** |
+| **git host** (`git_host`) | self-hosted smart-HTTP git (clone/push over the mesh) | laptop **WSL/Ubuntu** primary (127.0.0.1:8088; own_git :8400) | **Windows cold read-only standby** (same host, different OS; :8089) | **PAIRED (cold)** |
 | **unison feed** (`unison_feed`) | fleet sync feed (`:8800/unison`) + own_git (`:8400`) | laptop (one host) | none | **SPOF** |
 | **PC covenant node** (`pc_node`) | judge/API node (5000/5020/5060; P2P 5001) | laptop Windows | TETSU node (when up); phone node (intermittent) | PAIRED* |
 | **model / consult limbs** (`model`) | Tetsu's model + LIMB SMOL/PHI consult limbs | TETSU (laptop 7B retired) | none that answers for TETSU | **SPOF** |
@@ -53,7 +53,7 @@ Registry key (in `covenant_failover.SERVICES`) is given in backticks.
 is intermittent. So the node layer degrades to single-host whenever TETSU sleeps
 — flagged, not assumed.
 
-### The three hard SPOFs
+### The remaining hard SPOFs (git host now resolved)
 
 1. **headscale control — laptop WSL only.** If this one Ubuntu (or the laptop,
    or WSL itself) goes down, the mesh loses its coordinator. Existing tunnels
@@ -61,19 +61,35 @@ is intermittent. So the node layer degrades to single-host whenever TETSU sleeps
    already restarts it *on the same host*; that does nothing for host/OS loss.
    **The redundant instance must live on TETSU (a different host).** PROPOSE-only
    (install + config). See `ops/PARALLEL_OS_PROPOSE_2026-11-02.md` #1.
-2. **git host — laptop WSL only.** Same shape: a Windows-side or TETSU-side
-   read-only standby removes the single-OS dependency. PROPOSE #2 / #3.
-3. **unison feed + own_git — one host.** The sync fabric's source. A second
+2. **unison feed + own_git — one host.** The sync fabric's source. A second
    feed on TETSU makes the fabric survive the laptop. PROPOSE #4.
+
+**git host — RESOLVED (2026-11-02, no install).** `covenant_githost_standby.py`
+is a READ-ONLY Windows standby of the same git-http-backend (found portably via
+`git --exec-path`), serving a local ~17 MB mirror. It is a **cold** standby
+(zero idle RAM): started on demand by `start_githost_standby` (AUTO_REVERSIBLE)
+only when WSL is *unreachable* — not on an ordinary process restart, which stays
+`restart_git_host`'s job. It refuses push (receive-pack → 403), so there is no
+split brain; the primary stays the only master. Proven live (below).
+
+### Space-wise placement (the operator: "use space wisely between pc laptop n phone")
+
+Placement is the optimization. `covenant_failover.HOSTS` + `placement_ok()`
+enforce it: the **laptop** auto-starts only *light* hot instances (≤512 MB) and
+leaves a 0.5 GB operational floor — a heavier one is refused by size and routed
+to **TETSU** (`heavy-ok`, 32 GB); the **phone** is lightest (≤128 MB). A **cold**
+standby (git host) is space-free until a failover needs it. So the engine never
+starves the model, and heavy, always-on redundancy lands on TETSU by construction.
 
 ## What is live now vs. proposed
 
-- **Live (no install):** the **redundancy beacon** — a genuine cross-OS
+- **Live (no install):** (a) the **redundancy beacon** — a genuine cross-OS
   redundant pair (Windows Python primary + WSL/Ubuntu Python standby, same
   stdlib code), plus the failover detectors and the AUTO_REVERSIBLE
-  start-standby remedy. Proven both ways (FO1 + the live cross-OS takeover
-  record below). Ships **DARK** (not auto-started) to respect the 2.98 GB RAM
-  budget; the operator arms it with `ops/REDUNDANCY_ARMED`.
+  start-standby remedy; ships **DARK** (arm with `ops/REDUNDANCY_ARMED`). (b) the
+  **git-host Windows cold standby** — a read-only cross-OS fallback promoting the
+  git host from SPOF to a pair, started on demand. Both proven both ways (FO1 +
+  the live records below).
 - **Proposed (needs install / another host / a reboot):** a headscale standby on
   TETSU, a cross-OS git-host standby, a second unison feed, a rootless container
   runtime, and a full Linux VM on TETSU. All in
@@ -114,3 +130,19 @@ different OSes**; killing either one leaves the other answering a Windows client
 over real TCP; and `start_redundant_instance` (AUTO_REVERSIBLE) brought the down
 instance back on its own OS. The pair and the marker were torn down after — the
 beacon ships DARK.
+
+### Live cross-OS git-host failover — measured
+
+`python covenant_failover.py --prove-git`, measured 2026-11-02, **ALL STEPS PASSED**:
+
+```
+[ok] mirror provisioned/refreshed from the primary
+[ok] Windows standby serving info/refs                   127.0.0.1:8089
+[ok] primary down -> resolver serves the Windows standby  git_http_server_win @ windows
+[ok] REAL git clone from the Windows standby             HEAD 55c8a43d36a3
+[ok] push (receive-pack) refused                         HTTP 403 (read-only, no split brain)
+```
+
+A **real `git clone` ran against a read-only git server on Windows** while the
+primary was treated as down — the git host survives the loss of the WSL/Linux
+userland. Push is refused, so the Windows mirror is never a second master.

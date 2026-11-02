@@ -2355,6 +2355,28 @@ def main():
           H.REMEDIES["propose_provision_redundancy"]["klass"] == H.PROPOSE_ONLY
           and _ppr.get("outcome") == "proposed", _ppr.get("outcome"))
 
+    # start_githost_standby: AUTO_REVERSIBLE cold cross-OS read fallback for git_host_down. It
+    # DECLINES while WSL is up (that is restart_git_host's job) and would start the Windows read
+    # standby only when WSL is unreachable. Driven both ways with the WSL/serving probes stubbed.
+    _gs = H.REMEDIES["start_githost_standby"]
+    _w, _s = _F._wsl_alive, _F._githost_standby_serving
+    try:
+        _F._githost_standby_serving = lambda *a, **k: False
+        _F._wsl_alive = lambda *a, **k: True
+        _gs_decline = _gs["fn"]({}, dry_run=True)                 # WSL up -> declines
+        _F._wsl_alive = lambda *a, **k: False
+        _gs_would = _gs["fn"]({}, dry_run=True)                   # WSL unreachable -> would start
+        _F._githost_standby_serving = lambda *a, **k: True
+        _gs_already = _gs["fn"]({}, dry_run=True)                 # already serving -> declines
+    finally:
+        _F._wsl_alive, _F._githost_standby_serving = _w, _s
+    check("H1-fo start_githost_standby: AUTO_REVERSIBLE/stateless; declines while WSL up or already "
+          "serving; would start the read-only standby when WSL is unreachable",
+          _gs["klass"] == H.AUTO_REVERSIBLE and _gs["kind"] == "stateless" and "git_host_down" in _gs["for"]
+          and _gs_decline[0] is False and _gs_already[0] is False
+          and _gs_would[0] is True and "would start" in _gs_would[1],
+          (_gs_decline, _gs_would, _gs_already))
+
     undriven_d = [k for k in H.DETECTORS if k not in src]
     undriven_r = [k for k in H.REMEDIES if k not in src]
     check("H1v every registered detector is named somewhere in this suite",

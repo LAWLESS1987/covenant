@@ -174,6 +174,63 @@ def main():
           all(r["benefit"].get("gains") and r["benefit"].get("cost") for r in (rsi, ppr)),
           [r["benefit"] for r in (rsi, ppr)])
 
+    # ---- FO1i: cold failover (git_host) is out of the hot-pair scope ---------
+    # git_host is redundancy_model "cold": a Windows read-only standby started on demand. It must
+    # NOT read "degraded" just because the cold standby is not running, must NOT be a bare SPOF
+    # (it has a provisioned cross-OS standby), and must appear in cold_failover for visibility.
+    real_s = F.SERVICES["git_host"]
+    gh = F.detect_redundancy_degraded()
+    check("FO1i git_host is cold_failover, never degraded, never a bare SPOF",
+          real_s.get("redundancy_model") == "cold"
+          and any(c["service"] == "git_host" for c in gh["measured"]["cold_failover"])
+          and not any(s["service"] == "git_host" for s in gh["measured"]["spof"])
+          and not any(d["service"] == "git_host" for d in gh["measured"]["degraded"]),
+          gh["measured"])
+    sp = F.detect_spof_unremediated(remind=True)
+    check("FO1i spof_unremediated no longer lists git_host (it has a cold cross-OS standby)",
+          not any(s["service"] == "git_host" for s in sp["measured"]["spof"]), sp["measured"]["spof"])
+
+    # ---- FO1j: space-wise placement -----------------------------------------
+    hot_laptop = {"name": "x", "host": "laptop", "hot": True, "ram_mb": 200}
+    cold_laptop = {"name": "y", "host": "laptop", "hot": False, "ram_mb": 999}
+    hot_tetsu = {"name": "z", "host": "tetsu", "hot": True, "ram_mb": 8000}
+    heavy_laptop = {"name": "big", "host": "laptop", "hot": True, "ram_mb": 8000}
+    check("FO1j a hot laptop instance over the operational floor is refused and points at TETSU",
+          F.placement_ok(hot_laptop, free_gb=0.5)[0] is False
+          and "TETSU" in F.placement_ok(hot_laptop, free_gb=0.5)[1], F.placement_ok(hot_laptop, free_gb=0.5))
+    check("FO1j a heavy laptop instance is refused by SIZE (>cap), whatever the free RAM -- heavy goes to TETSU",
+          F.placement_ok(heavy_laptop, free_gb=64.0)[0] is False
+          and "cap" in F.placement_ok(heavy_laptop, free_gb=64.0)[1], F.placement_ok(heavy_laptop, free_gb=64.0))
+    check("FO1j the same instance fits when there is room; cold + TETSU always fit",
+          F.placement_ok(hot_laptop, free_gb=8.0)[0] is True
+          and F.placement_ok(cold_laptop, free_gb=0.1)[0] is True
+          and F.placement_ok(hot_tetsu)[0] is True,
+          (F.placement_ok(hot_laptop, free_gb=8.0), F.placement_ok(cold_laptop, free_gb=0.1)))
+    _flg = F._free_local_gb
+    try:
+        F._free_local_gb = lambda: None                      # force the "cannot read RAM" path
+        unreadable = F.placement_ok(hot_laptop)               # free_gb defaults -> _free_local_gb() -> None
+    finally:
+        F._free_local_gb = _flg
+    check("FO1j free RAM unreadable -> refuse a hot local start (never starve the model)",
+          unreadable[0] is False and "unreadable" in unreadable[1], unreadable)
+
+    # ---- FO1k: start_githost_standby declines/would-start (both ways, stubbed) -
+    gs = F.REMEDIES["start_githost_standby"]
+    _w, _s = F._wsl_alive, F._githost_standby_serving
+    try:
+        F._githost_standby_serving = lambda *a, **k: False
+        F._wsl_alive = lambda *a, **k: True
+        decline = gs["fn"]({}, dry_run=True)
+        F._wsl_alive = lambda *a, **k: False
+        would = gs["fn"]({}, dry_run=True)
+    finally:
+        F._wsl_alive, F._githost_standby_serving = _w, _s
+    check("FO1k start_githost_standby: AUTO_REVERSIBLE for git_host_down; declines while WSL up; "
+          "would start the read-only standby when WSL is unreachable",
+          gs["klass"] == F.AUTO_REVERSIBLE and "git_host_down" in gs["for"]
+          and decline[0] is False and would[0] is True and "would start" in would[1], (decline, would))
+
     # ---- FO1g: the map and the registry agree -------------------------------
     doc = os.path.join(HERE, "ops", "PARALLEL_OS_REDUNDANCY_MAP_2026-11-02.md")
     txt = open(doc, encoding="utf-8").read() if os.path.exists(doc) else ""
@@ -192,6 +249,19 @@ def main():
     else:
         print("  [SKIP] FO1h live cross-OS proof -- not the Windows control host with reachable WSL "
               "(NO RESULT is not a pass; the deterministic checks above cover the logic)")
+
+    # ---- FO1h-git: live cross-OS git-host failover (gated) ------------------
+    if os.name == "nt" and F._http_probe(
+            "http://127.0.0.1:8088/covenant.git/info/refs?service=git-upload-pack"):
+        rec = F.prove_githost(verbose=False)
+        if rec.get("skipped"):
+            print("  [SKIP] FO1h-git -- %s" % rec["skipped"])
+        else:
+            check("FO1h-git live: a REAL git clone fails over to the Windows standby, push refused",
+                  rec["ok"], [s for s in rec["steps"] if not s["ok"]])
+    else:
+        print("  [SKIP] FO1h-git live git-host failover -- not the Windows control host with the primary "
+              "git host up (NO RESULT is not a pass; FO1i/FO1k cover the logic)")
 
     ok = sum(results)
     print("\nFO1: %d/%d passed" % (ok, len(results)))

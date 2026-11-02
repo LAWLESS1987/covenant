@@ -1,10 +1,17 @@
 # Parallel-OS redundancy — PROPOSE_LIST (2026-11-02)
 
+**Update 2026-11-02 — the operator: "install is fine towards mutual benefit just
+use space wisely between pc laptop n phone for optimization."** Installs are
+authorized where they serve mutual benefit; the constraint is now PLACEMENT, not
+permission. Heavy, always-on redundancy goes to **TETSU** (32 GB); the laptop
+keeps only light/cold standbys (its model room is protected by
+`covenant_failover.placement_ok`); the phone is lightest. **#2 is DONE** (no
+install was needed). The rest still want the operator / TETSU to run them — the
+engine still does not install on its own (`PROPOSE_ONLY`).
+
 Everything here **requires an install, another host, a new distro/VM/container,
-or a system change. None of it is run by the highway engine** — provisioning a
-new environment is `PROPOSE_ONLY`, permanently (`covenant_failover`,
-`remedy_propose_provision_redundancy`). These are exact steps for the **operator**
-to run and approve. Each says where it should live (TETSU-heavy: 32 GB, headroom;
+or a system change.** These are exact steps for the **operator** to run, now with
+his go-ahead, placed space-wise. Each says where it should live (TETSU-heavy: 32 GB, headroom;
 the laptop is at ~3 GB free with a ram_guard holding the model's room, so heavy
 redundant instances must NOT run there), what resilience it buys, and how to undo
 it.
@@ -51,29 +58,24 @@ record to flip.
 
 ---
 
-## 2. git-host standby — Windows-side, cross-OS (SPOF #2), no second host
+## 2. git-host standby — Windows-side, cross-OS — ✅ DONE (no install)
 
-**Why:** `git_http_server.py` runs only in the laptop's WSL/Ubuntu. A **Windows**
-standby of the SAME server makes the git host survive the loss of the Linux
-userland while staying on one host (cheapest resilience for this SPOF). Git for
-Windows + the existing Python is all it needs.
+**DONE 2026-11-02.** Git for Windows was already present, so this needed no
+install. Shipped as `covenant_githost_standby.py` (a read-only git-http-backend
+server, portable via `git --exec-path`) + `covenant_failover.SERVICES["git_host"]`
+with a Windows cold standby instance + `start_githost_standby` (AUTO_REVERSIBLE,
+fires only when WSL is unreachable). Proven live (`--prove-git`): a real
+`git clone` from the Windows standby, push refused 403. git_host is now a
+cross-OS PAIR, no longer a SPOF.
 
-**Steps (laptop, operator):**
-```powershell
-# 1. Git for Windows (if not present):  winget install --id Git.Git -e
-# 2. a mirror clone of the served repo on the Windows side (read-only standby):
-git clone --mirror \\wsl$\Ubuntu\home\lawre\githost\covenant.git C:\Users\Lawre\covenant-gitmirror\covenant.git
-# 3. run the same server on a DISTINCT port against the mirror (e.g. 8089):
-python git_http_server.py --root C:\Users\Lawre\covenant-gitmirror --port 8089
-# 4. a scheduled `git --git-dir=... remote update` keeps the mirror fresh
+**Operate it:**
+```bash
+python covenant_githost_standby.py --refresh      # provision/refresh the local mirror (keep on a schedule)
+# failover is automatic via start_githost_standby when WSL is down; or by hand:
+python covenant_githost_standby.py --serve --port 8089
 ```
-Then add the Windows instance to `covenant_failover.SERVICES["git_host"]`
-(env `windows`, port 8089, `provisioned: True`, `launch` wired) — that promotes
-git_host from SPOF to a cross-OS PAIR and `start_redundant_instance` can tend it.
-
-**Resilience bought:** clone/read survives WSL/Ubuntu loss.
-**Cost:** a mirror clone on disk + a refresh schedule; read-only (pushes still go
-to the primary). **Undo:** stop the Windows server; delete the mirror.
+**Follow-up (optional):** schedule the `--refresh` (e.g. a Task Scheduler entry)
+so the mirror stays fresh while the primary is up.
 
 ---
 

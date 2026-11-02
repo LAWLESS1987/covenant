@@ -84,6 +84,69 @@ SPOF_REMIND_MARKER = os.path.join(HERE, "ops", "REDUNDANCY_SPOF_REMIND")
 BEACON = os.path.join(HERE, "covenant_beacon.py")
 BEACON_WIN_PORT = 8771
 BEACON_WSL_PORT = 8772
+GITHOST_STANDBY = os.path.join(HERE, "covenant_githost_standby.py")
+GITHOST_STANDBY_PORT = 8089
+
+
+# ----------------------------------------------------------------- space-wise placement
+#
+# The operator, 2026-11-02: "install is fine towards mutual benefit just use space wisely
+# between pc laptop n phone for optimization." Placement is the optimization: heavy,
+# always-on redundancy goes to TETSU (32 GB headroom); the laptop ("Sales") runs at ~3 GB
+# free with a ram_guard holding the model's room, so it carries only LIGHT or COLD standbys;
+# the phone is lightest. A HOT instance (always running) is only auto-started on a host where
+# it fits; a COLD standby (started on demand, stopped when not needed) is space-free until a
+# failover needs it. This encodes "use space wisely" so the engine never starves the model.
+
+HOSTS = {
+    # light_cap_mb: the biggest HOT instance this host will auto-start (bigger => provision on TETSU).
+    # op_floor_gb: free RAM to leave after starting it, so the host (and the model's loader/ram_guard)
+    # stays responsive. A heavy instance is refused by SIZE, which is how "heavy goes to TETSU" is enforced.
+    "laptop": {"policy": "light-only", "light_cap_mb": 512, "op_floor_gb": 0.5,
+               "note": "RAM-tight (~3 GB free); the model's room is protected -- light or cold only"},
+    "tetsu":  {"policy": "heavy-ok",
+               "note": "32 GB, RTX 5060 Ti -- the home for heavy, always-on redundant instances and VMs"},
+    "phone":  {"policy": "light-only", "light_cap_mb": 128, "op_floor_gb": 0.2,
+               "note": "Galaxy S25+ (Termux), intermittent -- lightest, witness-class only"},
+}
+LOCAL_HOST = "laptop"              # this machine (Sales / covenant-pc)
+
+
+def _free_local_gb():
+    """Free physical RAM on THIS machine, GB, or None. Lazy import keeps covenant_model out
+    of a plain `import covenant_failover` and off the DRY staged path unless this is called."""
+    try:
+        import covenant_model
+        return covenant_model.free_gb()
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
+def placement_ok(inst, free_gb=None):
+    """May a HOT instance be auto-started on its host without starving the model? True/False,
+    with a reason. Cold standbys and non-local hosts are always ok here (a cold standby is
+    space-free until used; another host's budget is that host's call, not the laptop's)."""
+    if not inst.get("hot", True):
+        return True, "cold standby: space-free until a failover starts it"
+    host = inst.get("host")
+    if host != LOCAL_HOST:
+        return True, "on %s, not the laptop -- that host's budget is its own call" % host
+    h = HOSTS.get(host) or {}
+    if h.get("policy") == "heavy-ok":
+        return True, "host policy heavy-ok"
+    ram_mb = inst.get("ram_mb", 0)
+    cap = h.get("light_cap_mb")
+    if cap is not None and ram_mb > cap:
+        return False, ("%s is heavy (~%d MB > %d MB cap for %s) -- provision on TETSU instead (PROPOSE)"
+                       % (inst.get("name"), ram_mb, cap, host))
+    free = _free_local_gb() if free_gb is None else free_gb
+    if free is None:
+        return False, "free RAM unreadable -- will not start a hot instance that might starve the model"
+    need_gb = (ram_mb / 1024.0) + h.get("op_floor_gb", 0.5)
+    if free < need_gb:
+        return False, ("%s has %.2f GB free; a hot %s needs ~%.2f GB incl. the operational floor -- "
+                       "provision on TETSU instead (PROPOSE)" % (host, free, inst.get("name"), need_gb))
+    return True, "fits: %.2f GB free >= ~%.2f GB needed" % (free, need_gb)
 
 
 # --------------------------------------------------------------- the service map
@@ -141,11 +204,18 @@ SERVICES = {
     },
     "git_host": {
         "desc": "self-hosted smart-HTTP git (clone/push over the mesh)",
-        "require_redundant": True, "min_environments": 2, "failover_class": PROPOSE_ONLY,
+        # COLD failover: a Windows read-only standby over a local mirror, started on demand when
+        # the WSL host is unreachable (start_githost_standby). Liveness is covenant_highway's
+        # git_host_down; this is no longer a bare SPOF -- it has a cross-OS cold standby.
+        "require_redundant": True, "redundancy_model": "cold", "failover_class": AUTO_REVERSIBLE,
         "instances": [
             {"name": "git_http_server", "kind": "primary", "env": "wsl-ubuntu", "host": "laptop",
-             "provisioned": True, "probe": {"type": "http",
+             "provisioned": True, "hot": True, "ram_mb": 30, "probe": {"type": "http",
              "url": "http://127.0.0.1:8088/covenant.git/info/refs?service=git-upload-pack"}},
+            {"name": "git_http_server_win", "kind": "redundant", "env": "windows", "host": "laptop",
+             "provisioned": True, "hot": False, "ram_mb": 40, "launch": "windows-githost",
+             "port": GITHOST_STANDBY_PORT, "probe": {"type": "http",
+             "url": "http://127.0.0.1:%d/covenant.git/info/refs?service=git-upload-pack" % GITHOST_STANDBY_PORT}},
         ],
     },
     "unison_feed": {
@@ -186,14 +256,14 @@ SERVICES = {
     # DARK until ops/REDUNDANCY_ARMED exists (RAM budget).
     "beacon": {
         "desc": "the redundancy read-API itself -- a provisioned cross-OS pair",
-        "require_redundant": True, "min_environments": 2, "failover_class": AUTO_REVERSIBLE,
-        "arm_gated": True,
+        "require_redundant": True, "min_environments": 2, "redundancy_model": "hot",
+        "failover_class": AUTO_REVERSIBLE, "arm_gated": True,
         "instances": [
             {"name": "beacon-win", "kind": "primary", "env": "windows", "host": "laptop",
-             "provisioned": True, "launch": "windows", "port": BEACON_WIN_PORT,
+             "provisioned": True, "hot": True, "ram_mb": 15, "launch": "windows", "port": BEACON_WIN_PORT,
              "probe": {"type": "http", "url": "http://127.0.0.1:%d/beacon" % BEACON_WIN_PORT}},
             {"name": "beacon-wsl", "kind": "redundant", "env": "wsl-ubuntu", "host": "laptop",
-             "provisioned": True, "launch": "wsl-ubuntu", "port": BEACON_WSL_PORT,
+             "provisioned": True, "hot": True, "ram_mb": 15, "launch": "wsl-ubuntu", "port": BEACON_WSL_PORT,
              "probe": {"type": "http", "url": "http://127.0.0.1:%d/beacon" % BEACON_WSL_PORT}},
         ],
     },
@@ -260,13 +330,20 @@ def detect_redundancy_degraded(health=None, services=None, probe=None, now=None,
     ACTIVE services (so a never-armed beacon and the bare SPOFs never cry wolf);
     known SPOFs ride in measured['spof'] as information, not as an alarm."""
     services = SERVICES if services is None else services
-    degraded, healthy, spof, inactive, unmeasurable = [], [], [], [], []
+    degraded, healthy, spof, inactive, unmeasurable, cold = [], [], [], [], [], []
     for name, svc in services.items():
         if not svc.get("require_redundant"):
             continue
         if not _configured_for_redundancy(svc):
             spof.append({"service": name, "desc": svc.get("desc"), "class": svc.get("failover_class"),
                          "envs": sorted({i["env"] for i in svc["instances"]})})
+            continue
+        if svc.get("redundancy_model") == "cold":
+            # COLD failover (e.g. git_host): liveness is covenant_highway's own detector and the
+            # failover is an on-demand standby -- not a hot pair, so never "degraded" for a cold
+            # standby that is simply not running. Recorded for visibility.
+            cold.append({"service": name, "standby": sorted({i["env"] for i in svc["instances"]
+                                                             if not i.get("hot", True)})})
             continue
         if not _service_active(name, svc):
             inactive.append({"service": name, "why": "arm-gated, not armed" if svc.get("arm_gated")
@@ -290,7 +367,7 @@ def detect_redundancy_degraded(health=None, services=None, probe=None, now=None,
         else:
             healthy.append(entry)
     measured = {"degraded": degraded, "healthy": healthy, "spof": spof, "inactive": inactive,
-                "unmeasurable": unmeasurable}
+                "unmeasurable": unmeasurable, "cold_failover": cold}
     if degraded:
         measured["why"] = "; ".join(
             "%s has %d/%d live environments (down: %s)" % (
@@ -453,6 +530,12 @@ def remedy_start_redundant_instance(measured, dry_run=True):
         for inst in svc["instances"]:
             if inst["name"] not in down_names or not inst.get("provisioned") or not inst.get("launch"):
                 continue
+            # SPACE-WISE (the operator, 2026-11-02): never auto-start a hot instance that would
+            # starve the model on the laptop -- propose TETSU instead.
+            fits, why = placement_ok(inst)
+            if not fits:
+                skipped.append("%s/%s@%s: %s" % (d["service"], inst["name"], inst["env"], why))
+                continue
             ok, msg = _start_instance(inst, dry_run)
             tag = "%s/%s@%s" % (d["service"], inst["name"], inst["env"])
             if dry_run:
@@ -475,6 +558,40 @@ def remedy_start_redundant_instance(measured, dry_run=True):
     if not started:
         return False, "; ".join(failed + skipped) or "nothing started"
     return (not failed), "; ".join(started + failed + skipped)
+
+
+def _githost_standby_serving(port=GITHOST_STANDBY_PORT, timeout=3):
+    return _http_probe("http://127.0.0.1:%d/covenant.git/info/refs?service=git-upload-pack" % port, timeout)
+
+
+def remedy_start_githost_standby(measured, dry_run=True):
+    """STATELESS: bring up the READ-ONLY Windows git-host cold standby when the WSL git host is
+    UNREACHABLE (not merely a crashed process -- that is restart_git_host's job). Serves clone/
+    fetch from the local mirror until the primary returns; it refuses push, so there is no split
+    brain and the primary stays the only master. AUTO_REVERSIBLE, touches nothing in
+    NEVER_AUTOMATIC. Space-wise: a cold standby, started only on real failover, ~40 MB.
+
+    It DECLINES while WSL is alive, so it does not double up with restart_git_host on an ordinary
+    process restart, and it serves the mirror AS-IS without refreshing (the primary is down, so a
+    refresh cannot reach it; the mirror is kept fresh on a schedule while the primary is up)."""
+    if _githost_standby_serving():
+        return False, "the Windows git-host standby is already serving on 127.0.0.1:%d" % GITHOST_STANDBY_PORT
+    if _wsl_alive() is True:
+        return False, ("WSL is up -- a crashed git process is restart_git_host's job; the Windows "
+                       "read standby is for when WSL itself is unreachable")
+    if dry_run:
+        return True, ("would start the read-only Windows git-host standby on 127.0.0.1:%d from the local "
+                      "mirror (clone/fetch only; push stays on the primary)" % GITHOST_STANDBY_PORT)
+    if not os.path.exists(GITHOST_STANDBY):
+        return False, "covenant_githost_standby.py not found at %s" % GITHOST_STANDBY
+    subprocess.Popen([sys.executable, GITHOST_STANDBY, "--serve", "--port", str(GITHOST_STANDBY_PORT)],
+                     creationflags=_NOWIN | _DETACHED, stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
+    for _ in range(6):                                       # ~12 s to come up and answer info/refs
+        time.sleep(2)
+        if _githost_standby_serving():
+            return True, "the Windows git-host read-only standby is serving clone/fetch on 127.0.0.1:%d" % GITHOST_STANDBY_PORT
+    return False, "started the standby but it did not answer info/refs within ~12 s"
 
 
 def remedy_propose_provision_redundancy(measured, dry_run=True):
@@ -506,6 +623,16 @@ REMEDIES = {
                               "the fleet survives the loss of one environment without a person"],
                     "cost": ["a few MB and one port for the restarted standby",
                              "a few seconds before the standby answers"],
+                    "irreversible": []}},
+    "start_githost_standby": {
+        "fn": remedy_start_githost_standby, "klass": AUTO_REVERSIBLE,
+        "for": ["git_host_down"], "kind": "stateless", "noise_s": 900,
+        "touches": ["the read-only Windows git-host standby process (clone/fetch only)"],
+        "benefit": {"gains": ["clone/fetch survives the loss of the laptop's WSL/Ubuntu -- the git host "
+                              "stops being a single-OS point of failure",
+                              "a cross-OS read fallback, served from a local mirror, with no split brain"],
+                    "cost": ["~40 MB for the standby while the primary is down; reads may be as fresh as "
+                             "the mirror's last update, never staler than the primary was"],
                     "irreversible": []}},
     "propose_provision_redundancy": {
         "fn": remedy_propose_provision_redundancy, "klass": PROPOSE_ONLY,
@@ -623,10 +750,95 @@ def prove(verbose=True):
     return rec
 
 
+def prove_githost(verbose=True):
+    """Live: stand up the Windows git-host cold standby and show a REAL cross-OS git clone
+    failover. Returns a record. Needs Windows + git; {'skipped': why} otherwise."""
+    if os.name != "nt":
+        return {"skipped": "the git-host standby proof runs on the Windows control host"}
+    import shutil
+    import tempfile
+    inst = next(i for i in SERVICES["git_host"]["instances"] if i["env"] == "windows")
+    port = inst["port"]
+    rec = {"steps": []}
+
+    def step(name, ok, detail):
+        rec["steps"].append({"step": name, "ok": bool(ok), "detail": detail})
+        if verbose:
+            print("  [%s] %s -- %s" % ("ok" if ok else "XX", name, detail))
+
+    def _rmtree(p):
+        # Windows makes git's object files read-only; plain rmtree fails on them.
+        def _onerr(fn, path, exc):
+            try:
+                os.chmod(path, 0o700); fn(path)
+            except Exception:                                # noqa: BLE001
+                pass
+        shutil.rmtree(p, onerror=_onerr)
+
+    clone_dir = tempfile.mkdtemp(prefix="covenant_githost_proof_")
+    os.rmdir(clone_dir)                                       # git clone wants to create it (or an empty dir)
+    proc = None
+    try:
+        import covenant_githost_standby as GS
+        ok, msg = GS.refresh()
+        step("mirror provisioned/refreshed from the primary", ok, msg)
+        proc = subprocess.Popen([sys.executable, GITHOST_STANDBY, "--serve", "--port", str(port)],
+                                creationflags=_NOWIN | _DETACHED, stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
+        up = False
+        for _ in range(8):
+            time.sleep(1.5)
+            if _githost_standby_serving(port):
+                up = True
+                break
+        step("Windows standby serving info/refs", up, "127.0.0.1:%d" % port)
+        # resolver: with the PRIMARY injected down, git_host resolves to the Windows standby
+        ep = live_endpoint("git_host", probe=lambda i: i["env"] == "windows")
+        step("primary down -> resolver serves the Windows git-host standby",
+             ep and ep["env"] == "windows", json.dumps(ep))
+        # a REAL clone from the Windows standby (a different OS than the WSL primary)
+        if os.path.isdir(clone_dir):
+            _rmtree(clone_dir)
+        r = subprocess.run(["git", "clone", "-q", "http://127.0.0.1:%d/covenant.git" % port, clone_dir],
+                           capture_output=True, text=True, timeout=120)
+        head = ""
+        if r.returncode == 0:
+            head = subprocess.run(["git", "-C", clone_dir, "rev-parse", "HEAD"], capture_output=True,
+                                  text=True, timeout=20).stdout.strip()
+        step("REAL git clone from the Windows standby", r.returncode == 0 and bool(head),
+             "HEAD %s" % head[:12] if head else (r.stderr or "")[:120])
+        # push is refused (read-only; no split brain)
+        refused = _http_probe("http://127.0.0.1:%d/covenant.git/git-receive-pack" % port) is False
+        # a 403 is an HTTPError -> _http_probe returns True (answered); check the code explicitly
+        try:
+            urllib.request.urlopen(urllib.request.Request(
+                "http://127.0.0.1:%d/covenant.git/git-receive-pack" % port, method="POST"), timeout=4)
+            code = 200
+        except urllib.error.HTTPError as e:
+            code = e.code
+        except Exception:                                    # noqa: BLE001
+            code = None
+        step("push (receive-pack) refused -- read-only, no split brain", code == 403, "HTTP %s" % code)
+    except Exception as e:                                    # noqa: BLE001
+        step("exception", False, "%s: %s" % (type(e).__name__, e))
+    finally:
+        if proc is not None:
+            try:
+                proc.terminate()
+            except Exception:                                # noqa: BLE001
+                pass
+        _kill_windows_port(port)
+        if os.path.isdir(clone_dir):
+            _rmtree(clone_dir)
+    rec["ok"] = all(s["ok"] for s in rec["steps"]) and bool(rec["steps"])
+    return rec
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="cross-OS/host service redundancy for the highway")
     ap.add_argument("--map", action="store_true", help="print the machine-readable service map")
     ap.add_argument("--prove", action="store_true", help="live cross-OS failover proof (needs WSL)")
+    ap.add_argument("--prove-git", action="store_true", help="live cross-OS git-host failover proof")
     a = ap.parse_args(argv)
     if a.map:
         print(json.dumps(SERVICES, indent=2))
@@ -634,6 +846,14 @@ def main(argv=None):
     if a.prove:
         print("covenant_failover --prove: live cross-OS beacon failover")
         rec = prove()
+        if rec.get("skipped"):
+            print("SKIPPED:", rec["skipped"])
+            return 0
+        print("\nRESULT:", "ALL STEPS PASSED" if rec["ok"] else "SOME STEPS FAILED")
+        return 0 if rec["ok"] else 1
+    if a.prove_git:
+        print("covenant_failover --prove-git: live cross-OS git-host failover")
+        rec = prove_githost()
         if rec.get("skipped"):
             print("SKIPPED:", rec["skipped"])
             return 0
