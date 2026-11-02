@@ -162,4 +162,55 @@ Prereg + v2 bench (`tools/grid_snn_bench_v2.py`) + v2 trainer
 UNKNOWN. The training run (spiking-lab venv) and the GO/NO-GO verdict will be
 recorded in the VERDICT section appended below, after this file is sealed.
 
+## Amendment A1 — the "don't-cancel / amplify" treatment (pre-registered 2026-11-02, sealed before its run)
+
+**Operator's observation, 2026-11-02 (relayed):** *"a spike that happens too often
+cancels out, and I don't want to cancel it — test it and see what happens,"* then:
+*"we've already run up tests — just amplify the amount we're allowing."*
+
+So this is NOT a new apparatus: it reuses the sealed families, splits, baselines
+B1–B6, the ≤1% FA metric, and the three ship-bar conditions above, UNCHANGED. It
+adds exactly ONE change and reports the numbers both ways.
+
+**Where the cancellation lives** (`covenant_grid_snn.run_lif`): a bin emits at most
+one spike no matter how high the membrane (`sh = (Vh >= th_h)`), the membrane
+subtracts the threshold back off each spike (`Vh -= sh*th_h`), and the alarm readout
+is binarised (`alarm += 1` when `Va >= th_a`). A clustered or repeated burst of
+in-bounds commands is thus flattened toward the same score as a sparse one.
+
+**The ONE change (TREATMENT).** Let the count reflect the excess instead of capping
+it: multi-spike per bin `k = floor(V/th_h)`, subtract `k*th_h`; alarm readout
+`alarm += floor(Va/th_a)`. Shipped form: `run_lif(..., graded=True)` (opt-in; the
+default is the binary CONTROL, unchanged and load-bearing for the shipped witness +
+GS1). Scored form on the SEALED BAR: because the bar is measured on the snntorch
+training net (not `run_lif` — see Equivalence), the corresponding one change there is
+the hidden-layer **reset_mechanism "none"** (membrane accumulates, frequent drive is
+not cancelled) vs the sealed CONTROL **"subtract"**. `tools/grid_snn_train_v2.py
+--reset {subtract|none}`; `--reset subtract` reproduces the sealed control byte-for-byte.
+
+**Directional hypothesis (stated before the run).** If the no-cancel treatment helps
+anywhere, it helps where the attack signal is temporal CLUSTERING / repetition —
+family **D** (cross-zone time-locked coincidence) above all, and perhaps **A** (the
+ramp, whose spike density rises). On the single-channel order families (B, C) it is
+not expected to help. The stated prior for A1 remains the v2 prior: **NO-GO expected.**
+
+**Bar (unchanged + strictly-beats-control).** The treatment ships as the witness net
+ONLY if, over the 5 seeds at the ≤1% FA operating point: it clears ship-bar
+conditions #1 AND #2 AND #3 (held-out family E) above, its own test FA ≤ 1%, AND it
+**strictly beats CONTROL** (treatment detection mean > control detection mean by more
+than the pooled std) on the family it wins. Otherwise it is recorded here (NO-GO /
+UNDETERMINED, tombstone-everything) and the witness stays parked (UNKNOWN); the
+graded path remains opt-in and unshipped.
+
+**Hard boundary unchanged:** whatever wins, the witness is ALARM-only and is never
+imported by `authorize()` (GS1/GS2). A GO additionally requires the Equivalence port
+(train the `run_lif` graded architecture directly, or match it within tolerance)
+before any weights are written.
+
+**Tombstone note (rule 10 / A346).** `covenant_grid_snn.run_lif` and
+`tools/grid_snn_train_v2.py` were extended with the opt-in treatment switches AFTER
+the v2 seal (commit 49e9163). The DEFAULTS reproduce the sealed control exactly
+(GS1 16/16 unchanged); this amendment is itself sealed before any treatment weights
+or numbers exist, so the treatment result cannot be chosen post-hoc.
+
 <!-- VERDICT APPENDED BELOW AFTER THE SEALED RUN -->

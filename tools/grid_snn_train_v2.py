@@ -44,15 +44,19 @@ def feats(rows):
     return np.stack(f, axis=1).astype("float32")               # [T_BINS, 10]
 
 
-def _net_class():
+def _net_class(reset="subtract"):
+    """reset="subtract" is the SEALED CONTROL (snntorch default; a hidden spike
+    subtracts the threshold off -- frequent drive is cancelled). reset="none" is the
+    prereg v2 Amendment A1 TREATMENT (the operator's don't-cancel / amplify): the
+    hidden membrane is NOT reset after a spike, so strong/frequent drive accumulates."""
     import torch.nn as nn
     import snntorch as snn
 
     class Net(nn.Module):
         def __init__(s, h=32):
             super().__init__()
-            s.f1 = nn.Linear(10, h); s.l1 = snn.Leaky(beta=0.9)
-            s.f2 = nn.Linear(h, 1); s.l2 = snn.Leaky(beta=0.9, output=True)
+            s.f1 = nn.Linear(10, h); s.l1 = snn.Leaky(beta=0.9, reset_mechanism=reset)
+            s.f2 = nn.Linear(h, 1); s.l2 = snn.Leaky(beta=0.9, output=True, reset_mechanism=reset)
 
         def forward(s, x):                                     # x [B,T,10]
             m1 = s.l1.init_leaky(); m2 = s.l2.init_leaky(); acc = 0
@@ -80,11 +84,11 @@ def family_data(B2, fam, seed, k=100):
     return (np.stack(tr), ytr, np.stack(val_b), np.stack(test_b), np.stack(test_a))
 
 
-def snn_train_eval(Xtr, ytr, Xvb, Xtb, Xta, seed):
+def snn_train_eval(Xtr, ytr, Xvb, Xtb, Xta, seed, reset="subtract"):
     import numpy as np
     import torch
     import torch.nn as nn
-    Net = _net_class()
+    Net = _net_class(reset)
     torch.manual_seed(seed)
     sc = Xtr.reshape(-1, 10).std(0) + 1e-6
     T = lambda a: torch.tensor(a / sc)
@@ -130,16 +134,20 @@ def main(argv=None):
     ap.add_argument("--out", default=DEFAULT_OUT)
     ap.add_argument("--k", type=int, default=100, help="streams per split per class (default 100)")
     ap.add_argument("--seeds", default="1,2,3,4,5")
+    ap.add_argument("--reset", default="subtract", choices=["subtract", "none", "zero"],
+                    help="hidden-layer reset: subtract=SEALED CONTROL; none=Amendment A1 don't-cancel treatment")
     a = ap.parse_args(argv)
     seeds = [int(x) for x in a.seeds.split(",")]
+    print("reset mechanism: %s (%s)\n"
+          % (a.reset, "SEALED CONTROL" if a.reset == "subtract" else "Amendment A1 TREATMENT (don't-cancel)"))
 
-    res = {"per_family": {}, "bar": {}, "k": a.k, "seeds": seeds}
+    res = {"per_family": {}, "bar": {}, "k": a.k, "seeds": seeds, "reset": a.reset}
     for fam in B2.TRAIN_FAMILIES:
         snn_det, snn_fa, bl_det, bl_fa, diffs = [], [], [], [], []
         bl_names = []
         for s in seeds:
             Xtr, ytr, Xvb, Xtb, Xta = family_data(B2, fam, s, a.k)
-            d, f = snn_train_eval(Xtr, ytr, Xvb, Xtb, Xta, s)
+            d, f = snn_train_eval(Xtr, ytr, Xvb, Xtb, Xta, s, reset=a.reset)
             bd, bf, bn = baseline_eval(B2, fam, s, a.k)
             snn_det.append(d); snn_fa.append(f); bl_det.append(bd); bl_fa.append(bf)
             diffs.append(d - bd); bl_names.append(bn)
@@ -173,7 +181,7 @@ def main(argv=None):
             Xs.append(X); ys.append(y)
         Xtr = np.concatenate(Xs); ytr = np.concatenate(ys)
         _, _, Evb, Etb, Eta = family_data(B2, "E", s, a.k)
-        d, f = snn_train_eval(Xtr, ytr, Evb, Etb, Eta, s + 90)
+        d, f = snn_train_eval(Xtr, ytr, Evb, Etb, Eta, s + 90, reset=a.reset)
         bd, bf, bn = baseline_eval(B2, "E", s, a.k)
         e_snn_det.append(d); e_snn_fa.append(f); e_bl_det.append(bd); e_diffs.append(d - bd)
         print("held-out E seed %d: SNN det %.2f (FA %.3f) | baseline %s det %.2f (FA %.3f)"
