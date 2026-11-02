@@ -43,7 +43,7 @@ Registry key (in `covenant_failover.SERVICES`) is given in backticks.
 |---|---|---|---|---|
 | **headscale control** (`headscale`) | our Tailscale control plane; the mesh coordinator | laptop **WSL/Ubuntu only** (127.0.0.1:8080) | none | **SPOF** |
 | **git host** (`git_host`) | self-hosted smart-HTTP git (clone/push over the mesh) | laptop **WSL/Ubuntu** primary (127.0.0.1:8088; own_git :8400) | **Windows cold read-only standby** (same host, different OS; :8089) | **PAIRED (cold)** |
-| **unison feed** (`unison_feed`) | fleet sync feed (`:8800/unison`) + own_git (`:8400`) | laptop (one host) | none | **SPOF** |
+| **unison feed** (`unison_feed`) | fleet sync feed (`:8800/unison`) + own_git (`:8400`) | **tailnet node (TETSU)** — not the laptop (measured: :8800 dead on Windows and WSL); laptop is a consumer | none | **SPOF** |
 | **PC covenant node** (`pc_node`) | judge/API node (5000/5020/5060; P2P 5001) | laptop Windows | TETSU node (when up); phone node (intermittent) | PAIRED* |
 | **model / consult limbs** (`model`) | Tetsu's model + LIMB SMOL/PHI consult limbs | TETSU (laptop 7B retired) | none that answers for TETSU | **SPOF** |
 | **teacher / learning channel** (`teacher`) | practice loop + teacher queue feeding students | laptop | none (single feed) | **SPOF** |
@@ -55,14 +55,23 @@ is intermittent. So the node layer degrades to single-host whenever TETSU sleeps
 
 ### The remaining hard SPOFs (git host now resolved)
 
-1. **headscale control — laptop WSL only.** If this one Ubuntu (or the laptop,
-   or WSL itself) goes down, the mesh loses its coordinator. Existing tunnels
-   keep flowing, but no node can (re)join or re-key. `detect_headscale_down`
-   already restarts it *on the same host*; that does nothing for host/OS loss.
-   **The redundant instance must live on TETSU (a different host).** PROPOSE-only
-   (install + config). See `ops/PARALLEL_OS_PROPOSE_2026-11-02.md` #1.
-2. **unison feed + own_git — one host.** The sync fabric's source. A second
-   feed on TETSU makes the fabric survive the laptop. PROPOSE #4.
+1. **headscale control — laptop WSL only, AND key-bound.** If this one Ubuntu
+   (or the laptop, or WSL itself) goes down, the mesh loses its coordinator.
+   `restart_headscale` covers process death; it does nothing for host/OS loss.
+   The redundant instance must live on **TETSU (a different host)** — but
+   headscale carries a **private key** (`noise_private.key`) and a live DB, and
+   **keys never cross OS environments** (the operator's standing rule). So a
+   second control plane is not a copy job: it needs the operator's **key/cert
+   decision** (its own key + a documented client cutover, or a shared-state HA
+   model). This is the one genuine operator decision left — a security boundary,
+   not a task to hack around. Then the TETSU session stands it up (install + its
+   own key + DB replication). Being done on TETSU/phone, not here.
+2. **unison feed + own_git — served from TETSU, no second feed.** The sync
+   fabric's source runs on a tailnet node (TETSU), not the laptop. Redundancy is
+   a **second feed on a different host** — the laptop can host one (it has the
+   repos); owned by the sync-fabric session. `covenant_failover` now MONITORS the
+   real remote feed (via the private `ops/local_unison_feed.txt`) so the laptop
+   SEES it go down. Being stood up with the sync-fabric / TETSU sessions.
 
 **git host — RESOLVED (2026-11-02, no install).** `covenant_githost_standby.py`
 is a READ-ONLY Windows standby of the same git-http-backend (found portably via

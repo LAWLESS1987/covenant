@@ -185,7 +185,24 @@ def _probe_instance(inst, probe=None):
     p = inst.get("probe") or {}
     if p.get("type") == "http":
         return _http_probe(p["url"])
+    if p.get("type") == "feed":
+        url = _feed_url()
+        return _http_probe(url) if url else None      # no private feed URL configured here -> UNKNOWN
     return None                           # cannot probe here -> UNKNOWN for this instance
+
+
+def _feed_url():
+    """The unison feed's real URL -- env COVENANT_UNISON_FEED, else the first line of the
+    gitignored ops/local_unison_feed.txt (his addresses live in a private file, never in this
+    public repo). None where neither is set."""
+    url = os.environ.get("COVENANT_UNISON_FEED", "").strip()
+    if url:
+        return url
+    try:
+        with open(os.path.join(HERE, "ops", "local_unison_feed.txt"), encoding="utf-8") as fh:
+            return fh.readline().strip() or None
+    except OSError:
+        return None
 
 
 def _inst_id(inst):
@@ -219,11 +236,17 @@ SERVICES = {
         ],
     },
     "unison_feed": {
-        "desc": "fleet sync feed (:8800/unison) + own_git (:8400)",
+        # CORRECTED 2026-11-02: the feed is NOT a laptop service -- measured, :8800/:8400 answer
+        # neither on Windows nor in the laptop's WSL. It is served from a tailnet node (TETSU,
+        # 100.67.x) and the laptop is a CONSUMER; its URL lives in the gitignored
+        # ops/local_unison_feed.txt. Redundancy is a SECOND feed on a different host -- the laptop
+        # can host one (it has the repos), owned by the sync-fabric session. Probe resolves the
+        # real private feed URL at detect time (type "feed"); unprobeable where none is configured.
+        "desc": "fleet sync feed (:8800/unison) + own_git (:8400) -- served from a tailnet node (TETSU)",
         "require_redundant": True, "min_environments": 2, "failover_class": PROPOSE_ONLY,
         "instances": [
-            {"name": "unison_feed", "kind": "primary", "env": "windows", "host": "laptop",
-             "provisioned": True, "probe": {"type": "http", "url": "http://127.0.0.1:8800/unison"}},
+            {"name": "unison_feed", "kind": "primary", "env": "tetsu", "host": "tetsu",
+             "provisioned": True, "hot": True, "probe": {"type": "feed"}},
         ],
     },
     "pc_node": {
