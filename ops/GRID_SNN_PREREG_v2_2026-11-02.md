@@ -213,4 +213,76 @@ the v2 seal (commit 49e9163). The DEFAULTS reproduce the sealed control exactly
 (GS1 16/16 unchanged); this amendment is itself sealed before any treatment weights
 or numbers exist, so the treatment result cannot be chosen post-hoc.
 
-<!-- VERDICT APPENDED BELOW AFTER THE SEALED RUN -->
+## VERDICT — sealed run 2026-11-02: **NO-GO / UNDETERMINED (both CONTROL and Amendment A1)**
+
+Run in the spiking-lab venv (torch 2.14.1+cpu, snntorch 1.0.0), 5 seeds, k=100
+streams/split/class. Apparatus at n=200 (real gateway): in-bounds premise holds
+**40/40 for both classes on every one of the 5 families**, matched marginals
+**MATCHED-EXACT** on every family (KS p=1, Holm-ok) — so, unlike v1, every family is a
+VALID test of the claim.
+
+**CONTROL (reset=subtract — the net the sealed bar is defined on):**
+
+| family | SNN det | SNN FA | best SEALED baseline | baseline det | margin | 2×pooled | bar1 | bar2 | SNN FA≤1% |
+|---|---|---|---|---|---|---|---|---|---|
+| A | 1.00 ± 0.00 | 0.006 | B3b shed-slope | 0.60 | 0.396 | 0.490 | ✗ | ✓ | ✓ |
+| B | 1.00 ± 0.00 | 0.006 | B6 alternation | 1.00 | 0.000 | 0.000 | ✗ | ✗ | ✓ |
+| C | 1.00 ± 0.00 | 0.008 | B5 value-slope | 1.00 | 0.000 | 0.000 | ✗ | ✗ | ✓ |
+| D | 1.00 ± 0.00 | 0.020 | B4 cross-zone | 1.00 | 0.000 | 0.000 | ✗ | ✗ | ✗ |
+| **E (held-out, bar #3)** | 1.00 | 0.010 | B5 value-slope | 1.00 | 0.000 | 0.000 | — | — | ✓ |
+
+No family clears bars #1 AND #2 AND #3. **CONTROL = NO-GO.**
+
+**Amendment A1 TREATMENT (reset=none — the operator's don't-cancel / amplify, ONE change):**
+
+| family | SNN det | SNN FA | best SEALED baseline | baseline det | margin | 2×pooled | bar1 | bar2 | SNN FA≤1% |
+|---|---|---|---|---|---|---|---|---|---|
+| A | 1.00 ± 0.00 | 0.010 | B3b shed-slope | 0.60 | 0.396 | 0.490 | ✗ | ✓ | ✓ |
+| B | 1.00 ± 0.00 | 0.016 | B6 alternation | 1.00 | 0.000 | 0.000 | ✗ | ✗ | ✗ |
+| C | 1.00 ± 0.00 | 0.008 | B5 value-slope | 1.00 | 0.000 | 0.000 | ✗ | ✗ | ✓ |
+| D | 1.00 ± 0.00 | 0.014 | B4 cross-zone | 1.00 | 0.000 | 0.000 | ✗ | ✗ | ✗ |
+| **E (held-out, bar #3)** | **0.80** | 0.016 | B5 value-slope | 1.00 | **−0.200** | 0.283 | ✗ | ✗ | ✓ |
+
+**A1 = NO-GO**, and it does NOT beat control: it ties control on the already-ceilinged
+families (B, C, D) and on A, and it is **strictly worse on the held-out family E** (0.80
+vs control's 1.00; one seed collapsed to 0.00; margin to the baseline −0.200). Removing
+the reset let the accumulating membrane overfit the trained families and generalize worse
+to the unseen one. **The operator's "amplify the amount we're allowing" hypothesis is NOT
+borne out on this matched-marginal synthetic benchmark** — not because cancellation is
+good, but because the trivial baselines already ceiling every family, so there is no
+suppressed signal for a no-cancel net to recover, and the change costs stability on the
+held-out family. Reported both ways, as asked. (The graded `run_lif` path stays opt-in
+and unshipped; `--reset subtract` reproduces the sealed control byte-for-byte.)
+
+### Fallback taken (prereg option b): the witness stays PARKED (UNKNOWN)
+
+No weights were written to `ops/grid_snn_weights.npz`; `covenant_grid_snn.pattern_anomaly_state`
+returns UNKNOWN (never a silent ABSENT). Neither the control net nor the A1 treatment
+earns a place as a witness, so none ships. GS1 (boundary + UNKNOWN discipline) and GS2
+(v2 apparatus + alarm-only boundary) stay green; the gate's sole authority remains the
+deterministic C1–C7.
+
+### The one genuine lead, recorded (not a GO)
+
+On family **A** (the slow shed ramp) the trained net reaches 1.00 detection where the
+best SEALED baseline (B3b shed-slope) reaches only ~0.60 at the ≤1% FA point — a real
+edge. It still fails the ship bar: the margin (0.396) is below 2×pooled-std (0.490)
+because B3b is noisy, bar #2 passes but bar #3 cannot (family E's baseline already
+ceilings at 1.00, so the A-edge has nowhere to transfer and the net does not generalize
+the ramp advantage to the staircase). This is exactly the "close but NO-GO" the seal
+exists to surface: a within-family win that does not survive the held-out condition is
+not a shippable witness. It is a lead for a future sealed prereg (a benign family whose
+in-bounds ramp a one-line slope detector genuinely cannot catch), not evidence here.
+
+### Caveats (recorded, not deleted — tombstone-everything)
+
+1. **Synthetic separability at matched marginals, NOT a field claim** (patterns-not-proof).
+   Real within-bounds attacks are unseen; no pattern witness ships live on synthetic
+   data alone.
+2. The scored net is the snntorch training net, not the shipped `run_lif` (the Equivalence
+   port was never needed — NO-GO). A future GO must do that port within tolerance first.
+3. Matched marginals are EXACT by construction here; the KS/Holm check is belt-and-braces
+   and does not test the TIMING structure (that is the whole point of the families, which
+   the baselines read directly). Measured, stated.
+
+Recorded, not deleted. Witness remains UNKNOWN; the sealed bar stands for any future run.
