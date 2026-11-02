@@ -789,6 +789,10 @@ SUITES = [
     # pre-merge review found both unregistered, so nothing ran them; every GG1 fix is mutation-checked.
     ("test_gg1_grid_guard.py", 180, "SECURITY"),
     ("test_gs1_grid_snn.py", 120, "SECURITY"),
+    # GS2 (2026-11-02, A406): the v2 SNN measurement apparatus (sealed prereg v2) driven both
+    # ways -- cumulative-window premise, matched-marginal EXACT, Holm correction, sealed-baseline
+    # set -- and a re-affirmation that a screaming witness never flips a gateway decision.
+    ("test_gs2_grid_snn_v2.py", 120, "SECURITY"),
     # CC1/HC1/HC2/HW1 (2026-10-31): the consent chain, the signed HEAD-commitment ledger and its verifier,
     # stale-vs-tamper, and the two takeover detectors. They shipped unregistered, so public CI on 943b809 read
     # "orphaned on disk" and INCOMPLETE. Measured before adding, clean Linux copy and this PC: 7/7, 7/7, 10/10, 12/12.
