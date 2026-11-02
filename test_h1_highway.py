@@ -981,7 +981,14 @@ def main():
     # stub info/refs server and stub launcher markers, so no live git host is needed.
     _ghdir = tempfile.mkdtemp(prefix="h1gh_")
     _ghmark = os.path.join(_ghdir, "CovenantGitHost.vbs")
-    open(_ghmark, "w").write("x")
+    # A realistic launcher: it names the serve.sh the git host is started from, so
+    # _githost_server_path() can MEASURE the server's absolute WSL script path from it
+    # (A160: kill by absolute path, never the bare filename). The detector only checks that
+    # this marker exists, so the richer content changes nothing for H1gh.
+    _gh_serve = "/home/tester/githost/serve.sh"
+    _gh_script = "/home/tester/githost/git_http_server.py"
+    open(_ghmark, "w").write(
+        'CreateObject("WScript.Shell").Run "wsl.exe -d Ubuntu -- %s", 0, False\n' % _gh_serve)
 
     class _GhOK(_hsrv.BaseHTTPRequestHandler):
         def do_GET(self):                                         # noqa: N802
@@ -1055,6 +1062,9 @@ def main():
 
     def _gr_spy_run(argv, *a, **k):
         _gr_argv.append(list(argv))
+        if list(argv)[:5] == ["wsl.exe", "-d", "Ubuntu", "--", "cat"]:   # serve.sh read
+            return _gsub.CompletedProcess(argv, 0,
+                "exec python3 %s >> /home/tester/githost/server.log 2>&1\n" % _gh_script, "")
         return _gsub.CompletedProcess(argv, 0, "", "")
 
     def _gr_restart(url):
@@ -1080,10 +1090,35 @@ def main():
     check("H1gr a restarted git host answering 404 is a SUCCESSFUL remedy -- the same 'alive' the detector "
           "reads ABSENT, not a failure ledgered against a live server",
           _gr_d["state"] == H.ABSENT and _gr_ok is True, "detector=%s remedy=%r" % (_gr_d["state"], (_gr_ok, _gr_msg)))
-    check("H1gr ...and the remedy is otherwise unchanged: it ended the server by its script and relaunched "
-          "via the launcher (both STUBBED -- nothing real ran)",
-          _gr_argv == [["wsl.exe", "-d", "Ubuntu", "--", "pkill", "-f", "git_http_server.py"],
+    check("H1gr ...and the remedy is otherwise unchanged: it MEASURED the server's path from the "
+          "launcher (cat serve.sh), ended it by that ABSOLUTE path, then relaunched via the "
+          "launcher (all STUBBED -- nothing real ran)",
+          _gr_argv == [["wsl.exe", "-d", "Ubuntu", "--", "cat", _gh_serve],
+                       ["wsl.exe", "-d", "Ubuntu", "--", "pkill", "-f", _gh_script],
                        ["wscript.exe", _ghmark]], _gr_argv)
+    check("H1gr A160: the stop targets the server's ABSOLUTE path, never the bare "
+          "'git_http_server.py' that would broad-match every tree's copy on the box",
+          ["wsl.exe", "-d", "Ubuntu", "--", "pkill", "-f", "git_http_server.py"] not in _gr_argv
+          and _gh_script.startswith("/")
+          and [a[-1] for a in _gr_argv if "pkill" in a] == [_gh_script])
+
+    # H1gr fail-safe both-ways: a launcher that names NO serve.sh -> the path is unmeasurable,
+    # and the remedy must kill NOTHING (never fall back to a bare 'git_http_server.py').
+    _ghbad = os.path.join(_ghdir, "CovenantGitHost_bad.vbs")
+    open(_ghbad, "w").write("x")                       # no 'wsl ... serve.sh' line to measure
+    _gr_argv.clear()
+    _gr_saved2 = (H._githost_launcher, H.GITHOST_HEALTH, _gsub.run, H.time.sleep)
+    H._githost_launcher = lambda: _ghbad
+    H.GITHOST_HEALTH = "http://127.0.0.1:%d/info/refs" % _gdp    # closed: no answer at all
+    _gsub.run = _gr_spy_run
+    H.time.sleep = lambda *_a, **_k: None
+    try:
+        H.remedy_restart_git_host({}, dry_run=False)
+    finally:
+        (H._githost_launcher, H.GITHOST_HEALTH, _gsub.run, H.time.sleep) = _gr_saved2
+    check("H1gr fail-safe: an unmeasurable server path kills NOTHING -- no pkill at all, never a "
+          "bare-filename broad match as a fallback (the relaunch still runs and fails honestly)",
+          not any("pkill" in a for a in _gr_argv) and ["wscript.exe", _ghbad] in _gr_argv, _gr_argv)
 
     _gr_ok2, _gr_msg2 = _gr_restart("http://127.0.0.1:%d/info/refs" % _gdp)     # closed port: no answer at all
     _gr_d2 = H.detect_git_host_down(url="http://127.0.0.1:%d/info/refs" % _gdp, marker=_ghmark)
