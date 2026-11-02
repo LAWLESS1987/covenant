@@ -793,6 +793,11 @@ SUITES = [
     # ways -- cumulative-window premise, matched-marginal EXACT, Holm correction, sealed-baseline
     # set -- and a re-affirmation that a screaming witness never flips a gateway decision.
     ("test_gs2_grid_snn_v2.py", 120, "SECURITY"),
+    # GS3 (2026-11-02): the in-tree ledger re-verify (reverify_ledger_decisions) that re-runs
+    # C1..C7 over the honored ledger IN ORDER -- closes the A392 open item. Driven both ways: a
+    # recorded PERMIT the record proves over-cap is INTEGRITY; a since-revoked signer is POLICY,
+    # not a verdict; halt/latched rows are not replayed; the standalone verifier stays uncoupled.
+    ("test_gs3_ledger_reverify.py", 120, "SECURITY"),
     # CC1/HC1/HC2/HW1 (2026-10-31): the consent chain, the signed HEAD-commitment ledger and its verifier,
     # stale-vs-tamper, and the two takeover detectors. They shipped unregistered, so public CI on 943b809 read
     # "orphaned on disk" and INCOMPLETE. Measured before adding, clean Linux copy and this PC: 7/7, 7/7, 10/10, 12/12.
