@@ -30,6 +30,9 @@ it should and is silent when it should not.
         declared-not-counted until the phone actually runs it, reads UNKNOWN (never
         'down') while asleep or unprovisioned, is NEVER started from the laptop, and
         is a real third env that carries 'healthy' once provisioned and awake.
+  FO1r  more INDEPENDENT HOSTS (TETSU, the new PC): separate physical machines, so
+        the beacon stands even when the whole laptop box is lost. Same declared-not-
+        counted shape as the phone, driven both ways for each host.
   FO1h  (live, gated) the real cross-OS beacon pair fails over both ways on the
         control host. Skipped where there is no reachable WSL -- NO RESULT is
         not a pass (rule 9), so the skip is printed, never counted green.
@@ -294,6 +297,67 @@ def main():
     d_deg = F.detect_redundancy_degraded(services=_beacon3(True), probe=_probe({"windows"}))
     check("FO1p a laptop OS down AND the phone asleep reads degraded (the phone hides no real loss)",
           d_deg["state"] == F.PRESENT, d_deg)
+
+    # ---- FO1r: more INDEPENDENT HOSTS (TETSU, the new PC) -------------------
+    # The operator, 2026-11-03: "both, all three really." The live pair shares ONE box
+    # ("Sales"); TETSU (already on the mesh) and the new PC are separate machines -- the layer
+    # that makes "one stands without the other" true against losing the whole box. Same
+    # declared-not-counted shape as the phone: declared until the host runs the beacon, absence
+    # reads UNKNOWN (never 'down'), never started from the laptop, a real env only once awake.
+    remotes = {i["name"]: i for i in F.SERVICES["beacon"]["instances"]
+               if (i.get("probe") or {}).get("type") == "remote"}
+    check("FO1r two more independent hosts declared: beacon-tetsu (tetsu) + beacon-pc2 (pc2)",
+          set(remotes) == {"beacon-tetsu", "beacon-pc2"}
+          and remotes["beacon-tetsu"]["env"] == "tetsu" and remotes["beacon-tetsu"]["host"] == "tetsu"
+          and remotes["beacon-pc2"]["env"] == "pc2" and remotes["beacon-pc2"]["host"] == "pc2",
+          sorted(remotes))
+    for nm in ("beacon-tetsu", "beacon-pc2"):
+        bi = remotes[nm]
+        check("FO1r %s declared-not-counted: intermittent, launch remote, NOT provisioned, env+file set" % nm,
+              bi.get("intermittent") is True and bi.get("launch") == "remote"
+              and bi.get("provisioned") is False
+              and bool((bi.get("probe") or {}).get("env")) and bool((bi.get("probe") or {}).get("file")), bi)
+        # the private-address resolver: UNKNOWN with nothing configured, alive once it is (both ways)
+        real_url, real_http = F._remote_beacon_url, F._http_probe
+        try:
+            F._remote_beacon_url = lambda env_var, fname: None
+            unk = F._probe_instance(bi)
+            F._remote_beacon_url = lambda env_var, fname: "http://100.64.0.1:9/beacon"
+            F._http_probe = lambda url, timeout=3: True
+            aliv = F._probe_instance(bi)
+        finally:
+            F._remote_beacon_url, F._http_probe = real_url, real_http
+        check("FO1r %s probe: UNKNOWN with no address, alive once it is (both ways)" % nm,
+              unk is None and aliv is True, (unk, aliv))
+        # NEVER started from the laptop -- launch 'remote' is declined, naming the host
+        dec = F._start_instance(bi, dry_run=True)
+        check("FO1r %s is never started from the laptop (declined -- provisioned on its own host)" % nm,
+              dec[0] is False and bi["host"] in dec[1], dec)
+
+    # declared-not-counted vs. a real host. Synthetic beacon: two laptop OSes + one separate host.
+    def _beaconH(host_env, provisioned):
+        return {"beacon": {"require_redundant": True, "min_environments": 2, "arm_gated": False,
+                           "failover_class": F.AUTO_REVERSIBLE, "instances": [
+            {"name": "w", "kind": "primary", "env": "windows", "host": "laptop", "provisioned": True,
+             "probe": {"type": "http", "url": "w"}},
+            {"name": "u", "kind": "redundant", "env": "wsl-ubuntu", "host": "laptop", "provisioned": True,
+             "probe": {"type": "http", "url": "u"}},
+            {"name": "r", "kind": "redundant", "env": host_env, "host": host_env,
+             "provisioned": provisioned, "intermittent": True, "probe": {"type": "remote"}}]}}
+    for host_env in ("tetsu", "pc2"):
+        d_unprov = F.detect_redundancy_degraded(services=_beaconH(host_env, False), probe=_probe({"windows", "wsl-ubuntu"}))
+        check("FO1r an UNPROVISIONED %s is declared-not-counted (healthy on the two laptop OSes)" % host_env,
+              d_unprov["state"] == F.ABSENT, d_unprov)
+        d_sleep = F.detect_redundancy_degraded(services=_beaconH(host_env, True), probe=_probe({"windows", "wsl-ubuntu"}))
+        check("FO1r a provisioned %s ASLEEP never alarms while both laptop OSes are up" % host_env,
+              d_sleep["state"] == F.ABSENT, d_sleep)
+        d_carry = F.detect_redundancy_degraded(services=_beaconH(host_env, True), probe=_probe({"windows", host_env}))
+        check("FO1r an AWAKE %s is a real env -- it carries 'healthy' when a laptop OS is down" % host_env,
+              d_carry["state"] == F.ABSENT
+              and host_env in d_carry["measured"]["healthy"][0]["live_environments"], d_carry)
+        d_deg = F.detect_redundancy_degraded(services=_beaconH(host_env, True), probe=_probe({"windows"}))
+        check("FO1r a laptop OS down AND %s asleep reads degraded (the host hides no real loss)" % host_env,
+              d_deg["state"] == F.PRESENT, d_deg)
 
     # ---- FO1h: live cross-OS proof (gated) ----------------------------------
     if os.name == "nt" and F._wsl_alive() is True:

@@ -188,3 +188,51 @@ beacon ships DARK.
 A **real `git clone` ran against a read-only git server on Windows** while the
 primary was treated as down — the git host survives the loss of the WSL/Linux
 userland. Push is refused, so the Windows mirror is never a second master.
+
+---
+
+## Three independent HOSTS (2026-11-03): "one stands without the other"
+
+The operator, 2026-11-03: *"it should on Windows, it should be parallel to
+Windows, and they can interact, but one should stand without the other"*, then
+*"both, all three really."*
+
+The live beacon pair (`beacon-win` + `beacon-wsl`) satisfies **on Windows**,
+**parallel to Windows** (Linux kernel, not Windows), and **they interact**
+(each probes the other, failover proven both ways). But measured against *stands
+without the other* it only holds at the **process/OS** level: both report
+`host=Sales` — the **same physical machine**. WSL2 is a VM that Windows hosts, so
+a power loss, hardware fault, or Windows kernel panic takes **both** laptop OSes
+together. The pair is the first layer, not the last.
+
+The layer that makes *stands without the box* true is a **separate host**. The
+mesh (`headscale nodes list`, measured 2026-11-03) already has one besides the
+laptop — `tetsu-hs` (100.64.0.1) — with the new PC (hookup ~11-01) and the phone
+(join pending) to follow. So the beacon now **declares three more independent
+hosts**, each its own machine:
+
+| env     | host    | status (2026-11-03)                                  | counts when |
+|---------|---------|------------------------------------------------------|-------------|
+| `phone` | phone   | declared; headscale join pending the operator's tap  | awake + URL published |
+| `tetsu` | tetsu   | **on the mesh now** (100.64.0.1); beacon not yet run  | awake + URL published |
+| `pc2`   | pc2     | new PC, imminent; not on the mesh yet                 | awake + URL published |
+
+All three use the **declared-not-counted** shape proven for the phone
+(`provisioned: False`, `intermittent: True`): absence reads **UNKNOWN**, never
+"down" and never phantom redundancy (rule 9); each is **never started from the
+laptop** (`launch: "remote"` is declined — nothing pushes across hosts; each host
+provisions its own beacon and publishes its private tailnet URL to
+`COVENANT_TETSU_BEACON` / `ops/local_tetsu_beacon.txt`,
+`COVENANT_PC2_BEACON` / `ops/local_pc2_beacon.txt`, exactly like the phone).
+`min_environments` stays **2** — the two laptop OSes carry "healthy"; each extra
+host, once awake, removes the box as a single point of failure. A real third host
+awake carries "healthy" when a laptop OS dies; an unprovisioned or asleep host
+hides no real loss (both directions driven in `test_fo1_failover.py` → FO1r,
+FO1: 50/50).
+
+**Not yet done (named, not hidden):** no third host is *armed* — `tetsu`, `pc2`
+and `phone` are all declared, none is answering. Arming each needs that host to
+(1) be on the mesh and (2) run `covenant_beacon.py` and publish its URL — an
+action on that host, by the operator or the partner, not from here. Provisioning a
+new host stays **PROPOSE_ONLY** (keys/private never cross envs). The map is ready;
+the hosts light up when they answer.
