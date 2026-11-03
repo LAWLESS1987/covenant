@@ -619,10 +619,22 @@ SUITES = [
     # mutation-tested. Hermetic: fixture conditions, temp ledgers, no node and
     # no network, so it measures the rules rather than the machine.
     ("test_h1_highway.py", 180, "DAILY + GUARDS"),
+    # SF1 (2026-11-02, A405): the highway's sync-fabric detectors and remedies, each driven both ways. The
+    # unison feed's staleness, a sync task that fails or stops firing (re-run, AUTO_REVERSIBLE), a task gone
+    # entirely (config, PROPOSE_ONLY), and HF/website vs github mirror lag -- github never auto-pushed. Hermetic:
+    # feed and scheduler are fixtures, the cache a temp file, no node and no network.
+    ("test_sf1_sync_fabric.py", 120, "DAILY + GUARDS"),
     # NA1 (2026-10-20): H1i names six protected subjects; the engine's NEVER_AUTOMATIC tuple had fourteen
     # (twenty-four since 2026-10-30: the grid/ICS-OT actuation words, A392).
     # NA1 drives every one through apply_remedy so the money/seat/rule/consent/key list cannot silently shrink.
     ("test_na1_never_automatic.py", 120, "DAILY + GUARDS"),
+    # OG1 (2026-11-02, "loosen autonomy ... create its own lane"): the highway's AUTO_GATED auto-onboard lane
+    # (covenant_onboard.py) -- a third class between AUTO_REVERSIBLE and PROPOSE_ONLY. Every gate driven both
+    # ways: a model trigger refused, an off-roster node never onboarded, an absent/unsigned/bad-signature roster
+    # dark, a failed whois refused, a verified node auto-peered AND un-peered, a system-setting action refused on
+    # a flagged node, an outward action never AUTO_GATED. Hermetic: an in-process key signs a fixture roster,
+    # identity is stubbed, every path is a temp file. Ships DARK and NOT ARMED.
+    ("test_og1_onboard.py", 120, "DAILY + GUARDS"),
     # PB1 (2026-09-26, A231): the highway's two phone-build signals measure what they name -- a look that finds
     # nothing newer counts as a look (fetch_build was quarantined for it), and "behind" means behind in the
     # files the APK ships, not in every docs commit.
@@ -824,6 +836,12 @@ SUITES = [
     # HM1 (2026-10-31, his "fix hf_mirror.py"): the HF mirror pushes fast-forward only, behind his opsec scan, and
     # snapshot-only repos never send history -- it used to force-push full history from a hook-less clone (A396).
     ("test_hm1_hf_mirror.py", 120, "SECURITY"),
+    # AP1/HD1 (2026-11-02, A404, his "Enable auto-push" + "as much redundancy as possible"): the laptop pusher
+    # off TETSU's unison feed (ff-only vs current GitHub main, open-PR guard, no --force/tags/unify-branch, never
+    # a snapshot repo's history) and hf_mirror's fail-closed holds-drift guard (refuse a history push when the
+    # feed can't confirm a repo was not marked HF-snapshot elsewhere). Both ways; each guard mutated -> suite RED.
+    ("test_ap1_repo_autopush.py", 120, "SECURITY"),
+    ("test_hd1_hf_mirror_holds.py", 60, "SECURITY"),
     ("test_sw1_study_web.py", 120, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
     # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every

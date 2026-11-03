@@ -2378,6 +2378,373 @@ def detect_git_host_down(health=None, url=None, marker=None, **kwargs):
             "url": url, "error": "%s: %s" % (type(e).__name__, str(e)[:120])}}
 
 
+# ----------------------------------------------------------------- the sync fabric (A405, 2026-11-02)
+#
+# His words, 2026-11-02: "continue growing the mycelial highway. Make it pave itself." The highway already
+# self-paves what it has always owned; today a new SYNC FABRIC was built around it and nothing in this file
+# could see it. The fabric is: a UNISON FEED served on TETSU (:8800/unison), one reading every `interval_s`,
+# that says for each repo whether its github / hf / website copies have reached a common `target`; and two
+# operator-armed scheduled tasks that act on that feed -- CovenantHFMirror (repo history -> Hugging Face,
+# fast-forward-only, opsec-gated, visibility-preserving) and CovenantSiteAutoDeploy (GitHub -> the website's
+# repo mirror, opsec-gated, never a half-sync). A GitHub pusher, CovenantRepoAutopush (open-PR / opsec / ff
+# gated), is being built in a sibling session and may not be armed yet.
+#
+# These detectors let the loop SENSE that fabric, and -- only in the one narrow case that is strictly
+# reversible: re-running an already-armed, guarded, idempotent task -- reversibly HEAL it. The line the
+# operator is holding does NOT move here. Nothing auto-ONBOARDS, auto-INSTALLS or auto-ARMS a node or a task
+# (arming a task is config, PROPOSE_ONLY by construction). A public GitHub push is NEVER AUTO_REVERSIBLE here;
+# it belongs to repo_autopush, itself gated. Keys, private holdings and the portfolio never ride the fabric
+# and are not read by anything below.
+#
+# SAFE WHEN THE LOOP RUNS DRY (A244, highway_may_act). The detectors only READ (a feed GET, a scheduler read);
+# reading is safe in a staged/worktree copy. The remedies execute nothing when dry_run is True (the
+# remedy_restart_nodes pattern), so a staged pass that senses the live fabric still touches nothing.
+#
+# WHERE THE FEED'S ADDRESS LIVES. His network addresses never go in this public repo (the rule ops/local_peers.txt
+# and tools/site_autodeploy.py already follow). The feed URL is read from COVENANT_UNISON_FEED or the first line
+# of the gitignored ops/local_unison_feed.txt; with neither set the feed is "not configured here" and the feed
+# detectors read UNKNOWN -- never OK (rule 9, P20).
+
+UNISON_FEED_LOCAL = os.path.join(HERE, "ops", "local_unison_feed.txt")
+UNISON_FEED_CACHE_S = 120           # the three feed detectors in one sense() pass share one GET; the feed moves every interval_s
+UNISON_COPIES = ("github", "hf", "website")
+# The tasks that act on the fabric, and the copy each one keeps in step (so a lagging copy is re-synced by the
+# task that owns it). RepoAutopush owns the github copy and is OPTIONAL -- checked only if it is armed.
+SYNC_TASKS_EXPECTED = ("CovenantHFMirror", "CovenantSiteAutoDeploy")
+SYNC_TASKS_OPTIONAL = ("CovenantRepoAutopush",)
+COPY_TASK = {"hf": "CovenantHFMirror", "website": "CovenantSiteAutoDeploy", "github": "CovenantRepoAutopush"}
+STALE_RUN_INTERVALS = 3             # a task whose last run is older than this many of its OWN intervals is not firing
+MIRROR_LAG_CYCLES = 3               # a copy behind the target across more than this many DISTINCT feed readings
+UNISON_LAG_CACHE = os.path.join(HERE, "ops", "unison_lag_witness.json")   # gitignored: first-seen lag and cycle counts
+# LastTaskResult codes that are NOT a failed run: 0 is success; 0x4130x are Windows task-STATE codes (ready,
+# running, not-yet-run, terminated, ...) that a scheduler can report in place of an exit code. Treating them as
+# non-failures keeps a task mid-run or freshly armed from reading as a failure (a false positive that would
+# re-run a task that is already running).
+_TASK_OK_RESULTS = frozenset({0, 0x41300, 0x41301, 0x41302, 0x41303, 0x41304, 0x41305, 0x41306})
+
+_sync_task_cache = {"at": 0.0, "tasks": None}
+_unison_feed_cache = {"at": 0.0, "feed": None, "note": ""}
+
+
+def _naive_local_ts(s):
+    """Epoch for a naive ISO stamp like '2026-11-02T13:38:15', read as local time (the feed writes TETSU-local)."""
+    import datetime
+    return datetime.datetime.strptime(str(s)[:19], "%Y-%m-%dT%H:%M:%S").timestamp()
+
+
+def _iso8601_dur_s(s):
+    """Seconds in an ISO-8601 duration's TIME part, e.g. 'PT2H'->7200, 'PT15M'->900, 'PT1H30M'->5400; None when
+    there is no readable time part. Discovered from a task's own trigger so a cadence the operator changes is
+    judged by the new cadence, not a number hardcoded here (rule 2)."""
+    import re as _re
+    if not s or not isinstance(s, str):
+        return None
+    m = _re.match(r"^P(?:\d+W)?(?:\d+D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$", s.strip())
+    if not m or not any(m.groups()):
+        return None
+    h, mi, se = (int(x) if x else 0 for x in m.groups())
+    return (h * 3600 + mi * 60 + se) or None
+
+
+def _unison_feed_url():
+    """The feed's URL -- env COVENANT_UNISON_FEED, else the first line of gitignored ops/local_unison_feed.txt,
+    else None. His addresses never sit in this public repo (the ops/local_peers.txt rule)."""
+    url = (os.environ.get("COVENANT_UNISON_FEED") or "").strip()
+    if url:
+        return url
+    try:
+        with io.open(UNISON_FEED_LOCAL, encoding="utf-8") as fh:
+            return fh.readline().strip() or None
+    except OSError:
+        return None
+
+
+def _unison_feed(url=None, get=None):
+    """(feed|None, note). `get`, when given, is a callable(url)->dict the suite uses in place of the network.
+    note is '' on a clean read, else WHY it could not be read; the 'no feed URL configured' note is how the
+    caller tells 'unconfigured here' (UNKNOWN) apart from 'configured and down' (a finding)."""
+    if get is not None:
+        try:
+            return get(url), ""
+        except Exception as e:                                    # noqa: BLE001
+            return None, "%s: %s" % (type(e).__name__, str(e)[:80])
+    u = url or _unison_feed_url()
+    if not u:
+        return None, "no feed URL configured here (COVENANT_UNISON_FEED / ops/local_unison_feed.txt)"
+    try:
+        return _get(u, timeout=10), ""
+    except Exception as e:                                        # noqa: BLE001
+        return None, "%s: %s" % (type(e).__name__, str(e)[:80])
+
+
+def _cached_feed():
+    """The feed, cached for UNISON_FEED_CACHE_S so the three feed detectors in one pass make one GET, not three."""
+    now = time.time()
+    if _unison_feed_cache["feed"] is None or now - _unison_feed_cache["at"] > UNISON_FEED_CACHE_S:
+        feed, note = _unison_feed()
+        _unison_feed_cache.update(at=now, feed=feed, note=note)
+    return _unison_feed_cache["feed"], _unison_feed_cache["note"]
+
+
+def _resolve_feed(feed, url, get):
+    """A detector's feed: an explicit `feed` (the suite), else a `url`/`get` read (the suite), else the cache."""
+    if feed is not None:
+        return feed, ""
+    if url is not None or get is not None:
+        return _unison_feed(url, get)
+    return _cached_feed()
+
+
+def detect_unison_feed_stale(health=None, feed=None, url=None, get=None, now=None):
+    """The unison feed -- the one reading the whole sync fabric agrees on -- is unreachable, not OK, or old.
+
+    THE GAP THIS CLOSES (2026-11-02). CovenantHFMirror and CovenantSiteAutoDeploy act ONLY on what the feed says
+    is due; site_autodeploy 'never deploys blind' and does nothing when the feed is unready. So a feed that has
+    stopped answering, or is stuck on an old reading, silently freezes the whole fabric: every downstream task
+    reads 'nothing due' and the road reads quiet. This asks the one question none of the others can -- is the
+    feed itself alive and fresh?
+
+    PRESENT when the feed is unreachable, its `status` is not 'ok', or its own `checked` stamp is older than
+    ~2x its `interval_s` (a reading it owed and did not refresh). UNKNOWN -- never OK -- when no feed URL is
+    configured here or the read failed in a way that is the reader's blindness, not the feed's fault.
+
+    NO AUTO REMEDY. The feed runs on TETSU; nothing on this machine can restart it, and reaching across to his
+    machine to restart a service is not reversible from here. The remedy is PROPOSE_ONLY (propose_unison_feed):
+    the condition, the covenant's reading, and the cost beside the gain, for a person to act on."""
+    now = time.time() if now is None else now
+    feed, note = _resolve_feed(feed, url, get)
+    if feed is None:
+        # Unconfigured here is the reader's blindness (UNKNOWN); a configured feed that will not answer is the
+        # finding (PRESENT). The two are told apart by whether a URL was set.
+        if "no feed URL configured" in note:
+            return {"state": UNKNOWN, "measured": {"why": note}}
+        return {"state": PRESENT, "measured": {"reachable": False, "why": note or "unreachable"}}
+    if not isinstance(feed, dict):
+        return {"state": PRESENT, "measured": {"reachable": True, "why": "feed is not a JSON object"}}
+    status, interval, checked = feed.get("status"), feed.get("interval_s"), feed.get("checked")
+    age_s = None
+    try:
+        if checked:
+            age_s = now - _naive_local_ts(checked)
+    except Exception:                                            # noqa: BLE001
+        age_s = None
+    stale_after = (2.0 * float(interval)) if isinstance(interval, (int, float)) and interval else None
+    reasons = []
+    if status != "ok":
+        reasons.append("status is %r, not 'ok'" % status)
+    if stale_after is not None and age_s is not None and age_s > stale_after:
+        reasons.append("last checked %.0fs ago, over 2x interval (%.0fs)" % (age_s, stale_after))
+    measured = {"reachable": True, "status": status, "interval_s": interval, "checked": checked,
+                "age_s": None if age_s is None else round(age_s, 1), "reasons": reasons}
+    if stale_after is None:
+        measured["note"] = "no usable interval_s on the feed; staleness not judged, status only"
+    return {"state": PRESENT if reasons else ABSENT, "measured": measured}
+
+
+def _read_sync_tasks(names, run=None):
+    """{name: {present, state, last_run(epoch|None), result(int|None), interval_s(|None), next_run(epoch|None)}} for
+    each requested task. None (the whole dict) when the scheduler cannot be read here (not Windows / read failed).
+    `run` is the seam the suite replaces: a callable()->the parsed JSON (list|dict|None), so no PowerShell runs
+    in a test."""
+    if run is None and os.name != "nt":
+        return None
+    if run is not None:
+        data = run()
+    else:
+        quoted = ",".join("'%s'" % n.replace("'", "''") for n in names)
+        ps = ("Get-ScheduledTask -TaskName %s -ErrorAction SilentlyContinue | ForEach-Object { "
+              "$i = $_ | Get-ScheduledTaskInfo; [pscustomobject]@{name=$_.TaskName; state=[string]$_.State; "
+              "last=$(if ($i.LastRunTime -and $i.LastRunTime.Year -gt 2000) {([DateTimeOffset]$i.LastRunTime).ToUnixTimeSeconds()} else {$null}); "
+              "result=$i.LastTaskResult; "
+              "next=$(if ($i.NextRunTime) {([DateTimeOffset]$i.NextRunTime).ToUnixTimeSeconds()} else {$null}); "
+              "interval=[string]($_.Triggers | ForEach-Object { $_.Repetition.Interval } | Where-Object { $_ } | Select-Object -First 1)} } "
+              "| ConvertTo-Json -Compress") % quoted
+        import subprocess
+        try:
+            r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True,
+                               timeout=60, creationflags=_NOWIN)
+            data = json.loads(r.stdout or "null")
+        except Exception:                                        # noqa: BLE001
+            return None
+    data = [] if data is None else (data if isinstance(data, list) else [data])
+    out = {}
+    for d in data:
+        nm = d.get("name")
+        if not nm:
+            continue
+        out[nm] = {"present": True, "state": d.get("state"),
+                   "last_run": (float(d["last"]) if d.get("last") is not None else None),
+                   "result": (int(d["result"]) if d.get("result") is not None else None),
+                   "interval_s": _iso8601_dur_s(d.get("interval")),
+                   "next_run": (float(d["next"]) if d.get("next") is not None else None)}
+    for nm in names:
+        out.setdefault(nm, {"present": False})
+    return out
+
+
+def _cached_sync_tasks():
+    """The sync tasks' scheduler state, cached for SCHEDULE_EVERY_S (as detect_schedule_stalled caches its read)."""
+    now = time.time()
+    if _sync_task_cache["tasks"] is None or now - _sync_task_cache["at"] > SCHEDULE_EVERY_S:
+        _sync_task_cache.update(at=now, tasks=_read_sync_tasks(SYNC_TASKS_EXPECTED + SYNC_TASKS_OPTIONAL))
+    return _sync_task_cache["tasks"]
+
+
+def detect_sync_task_not_firing(health=None, tasks=None, now=None):
+    """An armed sync task that is present and NOT doing its job: its last run FAILED (a nonzero exit that is not a
+    task-state code), or it has not run in ~3x its OWN interval. The one condition the loop may reversibly heal
+    here -- by re-running the same already-armed, guarded, idempotent task (rerun_sync_task, AUTO_REVERSIBLE).
+
+    SEPARATE FROM detect_sync_task_missing, the split detect_build_stale_on_pc was carved out for: a remedy must
+    be graded against the condition it can CLEAR. Re-running a task cannot conjure a task that is not armed;
+    pairing the re-run with 'a task is missing' would grade it 'did not fix' every pass a task stayed unarmed and
+    quarantine the one remedy that heals the tasks that DO exist. Missing-ness is a config gap, the operator's
+    call (PROPOSE_ONLY); detect_sync_task_missing carries it, with no remedy of its own.
+
+    SEPARATE FROM detect_schedule_stalled too: that reads next-run/missed for EVERY Covenant* task and never
+    reads the LAST RESULT, so a task that fires on time and exits nonzero every time reads healthy to it. This
+    reads the exit code, for the sync tasks only, and pairs a remedy. A disabled task is a person's choice and is
+    skipped (its rule). A never-run task with a known interval is not-firing; with no readable interval it is
+    judged on its exit code alone."""
+    now = time.time() if now is None else now
+    tasks = _cached_sync_tasks() if tasks is None else tasks
+    if tasks is None:
+        return {"state": UNKNOWN, "measured": {"why": "the scheduler could not be read here (not Windows, or the read failed)"}}
+    not_firing, why = [], {}
+    for name in SYNC_TASKS_EXPECTED + SYNC_TASKS_OPTIONAL:
+        t = tasks.get(name) or {}
+        if not t.get("present") or str(t.get("state")) == "Disabled":
+            continue
+        res = t.get("result")
+        reason = None
+        if res is not None and res not in _TASK_OK_RESULTS:
+            reason = "last run exited %s (0x%X)" % (res, res & 0xFFFFFFFF)
+        else:
+            interval, last = t.get("interval_s"), t.get("last_run")
+            if interval:
+                if last is None:
+                    reason = "has a %.0fs interval but has never run" % interval
+                elif now - last > STALE_RUN_INTERVALS * interval:
+                    reason = "last ran %.0fs ago, over %dx its %.0fs interval" % (now - last, STALE_RUN_INTERVALS, interval)
+        if reason:
+            not_firing.append(name)
+            why[name] = reason
+    return {"state": PRESENT if not_firing else ABSENT,
+            "measured": {"checked": list(SYNC_TASKS_EXPECTED + SYNC_TASKS_OPTIONAL), "not_firing": not_firing, "why": why}}
+
+
+def detect_sync_task_missing(health=None, tasks=None):
+    """An armed sync task that should be present is gone entirely. ARMING IS CONFIG, so there is NO remedy here:
+    re-arming a task is PROPOSE_ONLY by construction (the operator is holding that decision), and
+    detect_schedule_stalled cannot see an ABSENT task -- it grades only tasks the scheduler still lists. Only the
+    two tasks armed as part of the fabric are expected; CovenantRepoAutopush is optional (it may not be armed yet)
+    and its absence is never flagged."""
+    tasks = _read_sync_tasks(SYNC_TASKS_EXPECTED) if tasks is None else tasks
+    if tasks is None:
+        return {"state": UNKNOWN, "measured": {"why": "the scheduler could not be read here (not Windows, or the read failed)"}}
+    missing = [n for n in SYNC_TASKS_EXPECTED if not (tasks.get(n) or {}).get("present")]
+    return {"state": PRESENT if missing else ABSENT,
+            "measured": {"expected": list(SYNC_TASKS_EXPECTED), "missing": missing,
+                         "note": "re-arming a scheduled task is config -- a person's call, never auto (A244 line held)"}}
+
+
+def _load_lag_cache(path=None):
+    try:
+        with io.open(path or UNISON_LAG_CACHE, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_lag_cache(d, path=None):
+    p = path or UNISON_LAG_CACHE
+    try:
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with io.open(p, "w", encoding="utf-8") as fh:
+            json.dump(d, fh, indent=1)
+    except OSError:
+        pass
+
+
+def _mirror_lag_cycles(feed, now=None, cache_path=None, save=True):
+    """Update and return the per-(repo/copy) lag cycle counts from the feed. A 'cycle' is one DISTINCT feed
+    reading (`checked`) during which a copy's head != the repo's target. The highway passes many times per feed
+    reading; only a NEW `checked` advances a count, so N cycles is ~N feed intervals behind, not N highway passes
+    (the A20/M34 trap: an alert whose threshold is really 'the loop ran again' goes off for nothing). Returns
+    {"<repo>/<copy>": {cycles, since, last_checked, target}} for every copy currently behind; copies now caught up
+    are dropped, and a changed target restarts the count (a fresh lag instance). Writes the cache unless save=False
+    (the suite). Within one feed reading the update is idempotent, so the two lag detectors calling it in one pass
+    cannot double-count."""
+    cache = _load_lag_cache(cache_path)
+    cur = str((feed or {}).get("checked") or "")
+    repos = (feed or {}).get("repos") or {}
+    if isinstance(repos, list):
+        repos = {r.get("name"): r for r in repos if isinstance(r, dict) and r.get("name")}
+    behind_now = {}
+    for name, entry in (repos.items() if isinstance(repos, dict) else []):
+        if not isinstance(entry, dict):
+            continue
+        target = str(entry.get("target") or "")
+        heads = entry.get("heads") or {}
+        if not target:
+            continue
+        for copy in UNISON_COPIES:
+            head = str(heads.get(copy) or "")
+            if not head or head == target:
+                continue
+            key = "%s/%s" % (name, copy)
+            prev = cache.get(key) or {}
+            if not prev or prev.get("target") != target:
+                behind_now[key] = {"cycles": 1, "since": cur, "last_checked": cur, "target": target}
+            elif cur and prev.get("last_checked") != cur:
+                behind_now[key] = {"cycles": int(prev.get("cycles", 0)) + 1, "since": prev.get("since", cur),
+                                   "last_checked": cur, "target": target}
+            else:
+                behind_now[key] = dict(prev)      # same feed reading (or no `checked`) -> no new cycle
+    if save:
+        _save_lag_cache(behind_now, cache_path)
+    return behind_now
+
+
+def detect_mirror_lag(health=None, feed=None, url=None, get=None, now=None, cache_path=None, save=True):
+    """A mirror copy the loop CAN reversibly re-sync -- Hugging Face or the website -- has stayed behind the unison
+    target across more than MIRROR_LAG_CYCLES distinct feed readings: the task that owns it is firing, yet the copy
+    is not catching up. Remedy AUTO_REVERSIBLE (trigger_mirror_sync): re-run the guarded, idempotent task that owns
+    the lagging copy (CovenantHFMirror for hf, CovenantSiteAutoDeploy for the website). The GitHub copy is NOT here:
+    a public push belongs to repo_autopush and is PROPOSE_ONLY (detect_github_push_lag).
+
+    PERSISTENCE, NOT A BLIP. A copy one reading behind is a mirror mid-catch-up, not a fault; only a copy behind
+    across >N readings -- the owning task has had N chances and the copy still trails -- is the finding. UNKNOWN
+    (never OK) when the feed is not ready, so a feed outage reads as unison_feed_stale's finding, not as 'no lag'."""
+    feed, note = _resolve_feed(feed, url, get)
+    if not isinstance(feed, dict) or feed.get("status") != "ok":
+        return {"state": UNKNOWN, "measured": {"why": note or "feed not ready (no status ok)"}}
+    lag = _mirror_lag_cycles(feed, now=now, cache_path=cache_path, save=save)
+    laggards = {k: v for k, v in lag.items()
+                if k.rsplit("/", 1)[-1] in ("hf", "website") and int(v.get("cycles", 0)) > MIRROR_LAG_CYCLES}
+    rerun = sorted({COPY_TASK[k.rsplit("/", 1)[-1]] for k in laggards})
+    return {"state": PRESENT if laggards else ABSENT,
+            "measured": {"over_%d_cycles" % MIRROR_LAG_CYCLES: {k: v.get("cycles") for k, v in laggards.items()},
+                         "rerun_tasks": rerun, "cycles_needed": MIRROR_LAG_CYCLES}}
+
+
+def detect_github_push_lag(health=None, feed=None, url=None, get=None, now=None, cache_path=None, save=True):
+    """The GitHub copy of a repo has stayed behind the unison target across more than MIRROR_LAG_CYCLES feed
+    readings. NO AUTO REMEDY HERE: pushing to a public GitHub repo is never AUTO_REVERSIBLE. It belongs to the
+    repo_autopush pusher (CovenantRepoAutopush), itself gated on open-PRs, opsec and fast-forward, and whose
+    arming is the operator's call. This SENSES the lag and names who owns the push; it never performs one."""
+    feed, note = _resolve_feed(feed, url, get)
+    if not isinstance(feed, dict) or feed.get("status") != "ok":
+        return {"state": UNKNOWN, "measured": {"why": note or "feed not ready (no status ok)"}}
+    lag = _mirror_lag_cycles(feed, now=now, cache_path=cache_path, save=save)
+    behind = {k: int(v.get("cycles", 0)) for k, v in lag.items()
+              if k.rsplit("/", 1)[-1] == "github" and int(v.get("cycles", 0)) > MIRROR_LAG_CYCLES}
+    return {"state": PRESENT if behind else ABSENT,
+            "measured": {"github_behind_over_%d_cycles" % MIRROR_LAG_CYCLES: behind,
+                         "owner": "repo_autopush (CovenantRepoAutopush) -- gated public push, PROPOSE_ONLY; never run here"}}
+
+
 DETECTORS = {
     "node_down": detect_node_down,
     "tetsu_cannot_answer": detect_tetsu_cannot_answer,
@@ -2401,6 +2768,14 @@ DETECTORS = {
     "sweep_not_current": detect_sweep_not_current,
     "ambassador_stalled": detect_ambassador_stalled,
     "schedule_stalled": detect_schedule_stalled,
+    # The sync fabric (A405, 2026-11-02): the unison feed and the operator-armed tasks that keep the repo
+    # mirrors in step. Feed-stale and github-lag propose only; a present-but-stalled task and HF/website lag
+    # are reversibly healed by re-running the already-armed, guarded, idempotent task that owns them.
+    "unison_feed_stale": detect_unison_feed_stale,
+    "sync_task_not_firing": detect_sync_task_not_firing,
+    "sync_task_missing": detect_sync_task_missing,
+    "mirror_lag": detect_mirror_lag,
+    "github_push_lag": detect_github_push_lag,
     "moltbook_strikes": detect_moltbook_strikes,
     "threefold_witness": detect_threefold_witness,
     # "public_email_exposure" RETIRED the day it was added (A306), his words 2026-10-07: "they aren't issues idgaf".
@@ -3051,7 +3426,86 @@ def remedy_refresh_defender(measured, dry_run=True):
                                                   scanned, "; ".join(mendable))
 
 
+def _run_scheduled_task(name):
+    """(ok, detail) -- ask Windows to run an already-armed task NOW (schtasks /run). This starts the SAME guarded,
+    idempotent run the operator's schedule already makes on its timer; it changes no task config and no file here."""
+    import subprocess
+    try:
+        p = subprocess.run(["schtasks", "/run", "/tn", name], capture_output=True, text=True, timeout=60,
+                           creationflags=_NOWIN)
+        return p.returncode == 0, ((p.stdout or "") + (p.stderr or "")).strip()[:200]
+    except Exception as e:                                        # noqa: BLE001
+        return False, "%s: %s" % (type(e).__name__, e)
+
+
+def _rerun_named(names, dry_run):
+    """(ok, detail) for re-running a list of armed sync tasks. ok=False ('held', never counted as a failure) when
+    there is nothing to re-run or every /run was refused; ok=True when at least one started."""
+    names = list(names or [])
+    if not names:
+        return False, "no armed sync task to re-run"
+    if dry_run:
+        return True, "would re-run: " + ", ".join(names)
+    ran, failed = [], []
+    for n in names:
+        ok, detail = _run_scheduled_task(n)
+        (ran if ok else failed).append(n if ok else "%s (%s)" % (n, detail))
+    if not ran:
+        return False, "schtasks /run refused: " + "; ".join(failed)
+    return True, "re-ran " + ", ".join(ran) + ("; failed: " + "; ".join(failed) if failed else "")
+
+
+def remedy_rerun_sync_task(measured, dry_run=True):
+    """STATELESS: re-run the armed, guarded, idempotent sync task(s) the detector found present-and-not-firing.
+    This does only what the operator-armed schedule already does on its own timer -- it changes no config and no
+    file here, and under a DRY/staged pass (A244) it runs nothing."""
+    return _rerun_named((measured or {}).get("not_firing"), dry_run)
+
+
+def remedy_trigger_mirror_sync(measured, dry_run=True):
+    """STATELESS: re-run the guarded, idempotent task that owns a lagging HF/website mirror copy -- the same run
+    its schedule makes. A public GitHub push is never here; that is repo_autopush's, and PROPOSE_ONLY."""
+    return _rerun_named((measured or {}).get("rerun_tasks"), dry_run)
+
+
+def remedy_propose_unison_feed(measured, dry_run=True):
+    """PROPOSE_ONLY, never executed by the engine. The feed runs on TETSU; this machine cannot restart it, and
+    reaching across to his machine to restart a service is not reversible from here. apply_remedy refuses the
+    class and turns this into a proposal carrying the covenant's reading and the cost beside the gain."""
+    return False, "the unison feed runs on TETSU; a person restarts or unsticks it there"
+
+
 REMEDIES = {
+    "rerun_sync_task": {"fn": remedy_rerun_sync_task, "klass": AUTO_REVERSIBLE,
+                        "for": ["sync_task_not_firing"], "kind": "stateless",
+                        # Async, and graded by a later pass: schtasks /run returns at once while the task runs on,
+                        # and a run in flight reports result 0x41301 ('currently running'), which a synchronous
+                        # re-sense would read as still-not-firing and quarantine a remedy that works -- the exact
+                        # fetch_build / restart_nodes trap. The day's budget keeps a persistently-failing task
+                        # from being hammered every pass; a task the re-run cannot revive is graded 'did not fix'
+                        # and quarantined for a person, which is correct.
+                        "async_for": ["sync_task_not_firing"], "grade_after_s": 900.0, "cooldown_s": 1800,
+                        "touches": ["an already-armed, guarded sync task's next run (re-run only; the schedule and its config are untouched)"],
+                        "benefit": {"gains": ["a mirror task that stalled or last failed runs again without waiting for its timer or a person",
+                                              "the sync fabric keeps moving"],
+                                    "cost": ["one extra guarded, idempotent run (the task's own ff-only / opsec gates still apply); a task that keeps failing is quarantined for a person"],
+                                    "irreversible": []}},
+    "trigger_mirror_sync": {"fn": remedy_trigger_mirror_sync, "klass": AUTO_REVERSIBLE,
+                            "for": ["mirror_lag"], "kind": "stateless",
+                            # Two feed readings to catch up before grading (the feed moves every interval_s), same
+                            # async reasoning as rerun_sync_task.
+                            "async_for": ["mirror_lag"], "grade_after_s": 1800.0, "cooldown_s": 1800,
+                            "touches": ["the guarded sync task that owns a lagging HF/website copy (re-run only; no config change, no GitHub push)"],
+                            "benefit": {"gains": ["an HF or website copy stuck behind the unison target is re-synced by its own task, without a person"],
+                                        "cost": ["one extra guarded, idempotent run; the github copy is never touched here"],
+                                        "irreversible": []}},
+    "propose_unison_feed": {"fn": remedy_propose_unison_feed, "klass": PROPOSE_ONLY,
+                            "for": ["unison_feed_stale"], "kind": "needs a person",
+                            "touches": ["the unison feed on TETSU"],
+                            "benefit": {"gains": ["the whole sync fabric stops being frozen by a stuck or dead feed",
+                                                  "downstream tasks stop reading a stale 'nothing due' as quiet"],
+                                        "cost": ["a person's attention on TETSU to restart or unstick the feed"],
+                                        "irreversible": []}},
     "refresh_defender": {"fn": remedy_refresh_defender, "klass": AUTO_REVERSIBLE,
                          "for": ["defense_lapse"], "kind": "stateless",
                          "touches": ["Defender's signature update, judged by covenant_immune.update(), and a scan of our own tree; never its settings"],
@@ -4084,6 +4538,22 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
                 # repairs it" without that is a nudge, not a finding.
                 alerts.append("highway: %s is present and nothing here repairs it -- %s"
                               % (name, json.dumps(c["measured"])[:400]))
+    # A405 (2026-11-02, "loosen autonomy ... create its own lane"): the AUTO_GATED
+    # auto-onboard lane runs as its OWN pass in covenant_onboard.py -- a third class
+    # between AUTO_REVERSIBLE and PROPOSE_ONLY, gated on an operator-rooted roster and
+    # a verified node identity. This hook is the whole of its footprint here: it does
+    # not touch apply_remedy or the existing remedies. dry_run carries A244 (the
+    # watchdog passes dry_run=not highway_may_act(), so a staged copy runs it DRY), and
+    # a paused highway has already returned above, so the lane never acts when paused.
+    # It SHIPS DARK: no roster and not armed, so this adds one "DARK" info line and
+    # repairs nothing. Guarded -- a notice from a new lane must never fell the road.
+    try:
+        import covenant_onboard as _ob
+        ob_alerts, ob_infos = _ob.run_once(dry_run=dry_run, ledger=ledger)
+        alerts.extend(ob_alerts)
+        infos.extend(ob_infos)
+    except Exception as _e:                                      # noqa: BLE001
+        infos.append("highway: auto-onboard lane unavailable -- %s: %s" % (type(_e).__name__, _e))
     return alerts, infos
 
 

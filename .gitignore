@@ -274,6 +274,8 @@ ops/distill_rejected_live.jsonl
 ops/heal.jsonl
 ops/immune.jsonl
 ops/own_work_state.json
+# laptop auto-push pass log (tools/repo_autopush.py): a local operational record, not corpus state
+ops/repo_autopush.jsonl
 # grid guard runtime state (config files grid_signers/interlocks/policy ARE tracked)
 ops/grid_commands.jsonl
 ops/grid_commands.chain.jsonl
@@ -285,6 +287,13 @@ ops/pause/
 # Node A's off-box peers (the phone's tailnet address), read by covenant_watchdog.py
 # and covenant_prod.bat alike, so neither public file carries the address.
 ops/local_peers.txt
+# the AUTO_GATED auto-onboard lane's LOCAL state (covenant_onboard.py): the operator's
+# arm/trust-root switch and the tasks the lane has armed. Both machine-local decisions,
+# not repo content -- the lane ships DARK (no arm file) and writes armed_tasks only once
+# armed. NODE_ROSTER.json and node_refusals.json ARE tracked (the whois trust root needs
+# the roster committed; a refusal only tightens).
+ops/AUTO_ONBOARD_ARMED
+ops/armed_tasks.json
 # the laptop site auto-deploy job's per-pass record (tools/site_autodeploy.py), machine-local
 ops/site_autodeploy.jsonl
 ops/local_unison_feed.txt
@@ -435,6 +444,8 @@ ops/model_asks.jsonl
 ops/model_asks.jsonl.prev
 # A294 (2026-10-07): the threefold witness's readings and its first-seen gaps
 ops/threefold_witness.json
+# A405 (2026-11-02): the highway's per-copy mirror-lag cycle counts (first-seen lag, cycles behind the unison target)
+ops/unison_lag_witness.json
 # A375 (2026-10-27): the spiking witness's negatives-accrual pipeline -- runtime state, accrues over months
 ops/witness_state.json
 ops/witness_negatives.jsonl
