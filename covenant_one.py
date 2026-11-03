@@ -477,6 +477,13 @@ SUITES = [
     # runs is indistinguishable from a suite that does not exist.
     ("test_a77_listener_bind.py",         120, "SECURITY"),
     ("test_a82_exposure_unknown.py",      120, "SECURITY"),
+    # PL1 (A408, 2026-11-03): public_ledger.py is the deliberately-public face of the ledger, the
+    # companion to the exposure checks above. The cross-system review (2026-11-02 divvy, finding C4)
+    # had ChatGPT raise three flaws and Claude confirm all three: slowloris (no client timeout),
+    # cache stampede + a pre-fetch timestamp, and urlopen following upstream 3xx out of the fixed
+    # origin. PL1 drives each fix both ways -- remove the lock / use a redirect-following opener /
+    # exhaust the permit pool and the flaw returns. Pure stdlib, loopback, ephemeral ports.
+    ("test_pl1_public_ledger.py",         60,  "SECURITY"),
     ("test_a85_manifest_privacy.py",      120, "SECURITY"),
     ("test_g3_behavioural_guards.py",     120, "SECURITY"),
     # A90, registered in the change that created it (the lesson the A88

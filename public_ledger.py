@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -67,39 +68,71 @@ from typing import Dict, Optional, Tuple
 MAX_BYTES = 8 * 1024 * 1024      # refuse to relay more than this
 CACHE_SECONDS = 5.0              # a public reader cannot hammer the node
 UPSTREAM_TIMEOUT = 10.0
+CLIENT_TIMEOUT = 15.0            # drop a slow/half-open client (anti-slowloris)
+MAX_INFLIGHT = 64               # cap concurrent requests actually being served
 
 # Fixed allowlist. Nothing in a request can add to it or alter it.
 UPSTREAM = {"chain": "/chain"}
 
 _cache: Dict[str, Tuple[float, int, bytes]] = {}
+# Single-flight: one thread refreshes a stale entry while the rest wait for its
+# result. Without it, a burst of concurrent misses opens N upstream connections
+# and buffers N x MAX_BYTES -- the amplification a 5s cache was meant to prevent.
+_cache_lock = threading.Lock()
+# Bounds how many requests are served at once (defence in depth beside the
+# client timeout): a flood of fast connections cannot grow work without bound.
+_inflight = threading.BoundedSemaphore(MAX_INFLIGHT)
 NODE_PORT = 5000
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    # A public face must keep its own promise: fetch ONLY the literal configured
+    # origin on 127.0.0.1. urlopen() follows 3xx by default, which would let an
+    # upstream redirect steer this relay at another loopback port or an external
+    # host -- the one move the fixed-allowlist design exists to forbid. Returning
+    # None here means the 3xx is NOT followed; it surfaces as an HTTPError below.
+    def redirect_request(self, *a, **k):            # noqa: D401
+        return None
+
+
+# Built once. No redirects, and no environment proxies (direct loopback only).
+_OPENER = urllib.request.build_opener(_NoRedirect, urllib.request.ProxyHandler({}))
+
+
 def _fetch_chain() -> Tuple[int, bytes]:
-    hit = _cache.get("chain")
     now = time.time()
+    hit = _cache.get("chain")
     if hit and now - hit[0] < CACHE_SECONDS:
         return hit[1], hit[2]
-    url = "http://127.0.0.1:%d%s" % (NODE_PORT, UPSTREAM["chain"])
-    try:
-        req = urllib.request.Request(url, method="GET",
-                                     headers={"User-Agent": "public-ledger/1"})
-        with urllib.request.urlopen(req, timeout=UPSTREAM_TIMEOUT) as r:
-            body = r.read(MAX_BYTES + 1)
-            if len(body) > MAX_BYTES:
-                out = (502, json.dumps(
-                    {"error": "ledger exceeds the relay cap",
-                     "cap_bytes": MAX_BYTES}).encode())
-            else:
-                out = (200, body)
-    except urllib.error.HTTPError as e:
-        out = (502, json.dumps({"error": "node returned %s" % e.code}).encode())
-    except Exception:                                        # noqa: BLE001
-        # Deliberately not relaying the exception text: upstream error strings
-        # can carry paths and internal detail, and this face is public.
-        out = (503, json.dumps({"error": "node unreachable"}).encode())
-    _cache["chain"] = (now, out[0], out[1])
-    return out
+    with _cache_lock:
+        # Re-check under the lock: another thread may have refreshed it while we
+        # waited, in which case we share its result rather than fetching again.
+        now = time.time()
+        hit = _cache.get("chain")
+        if hit and now - hit[0] < CACHE_SECONDS:
+            return hit[1], hit[2]
+        url = "http://127.0.0.1:%d%s" % (NODE_PORT, UPSTREAM["chain"])
+        try:
+            req = urllib.request.Request(url, method="GET",
+                                         headers={"User-Agent": "public-ledger/1"})
+            with _OPENER.open(req, timeout=UPSTREAM_TIMEOUT) as r:
+                body = r.read(MAX_BYTES + 1)
+                if len(body) > MAX_BYTES:
+                    out = (502, json.dumps(
+                        {"error": "ledger exceeds the relay cap",
+                         "cap_bytes": MAX_BYTES}).encode())
+                else:
+                    out = (200, body)
+        except urllib.error.HTTPError as e:
+            out = (502, json.dumps({"error": "node returned %s" % e.code}).encode())
+        except Exception:                                        # noqa: BLE001
+            # Deliberately not relaying the exception text: upstream error strings
+            # can carry paths and internal detail, and this face is public.
+            out = (503, json.dumps({"error": "node unreachable"}).encode())
+        # Timestamp AFTER the fetch, not before: a fetch slower than CACHE_SECONDS
+        # must not land in the cache already expired.
+        _cache["chain"] = (time.time(), out[0], out[1])
+        return out
 
 
 def _head() -> Tuple[int, bytes]:
@@ -144,6 +177,8 @@ than GET is 405. This relay never forwards a path supplied in a request.</p>
 class Handler(BaseHTTPRequestHandler):
     server_version = "public-ledger/1"
     sys_version = ""                       # do not advertise the Python version
+    timeout = CLIENT_TIMEOUT               # StreamRequestHandler drops a client
+                                           # that stalls mid-request (slowloris)
 
     def _send(self, code: int, body: bytes, ctype: str) -> None:
         self.send_response(code)
@@ -158,21 +193,27 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def do_GET(self) -> None:                                # noqa: N802
-        path = self.path.split("?", 1)[0].rstrip("/") or "/"
-        if path == "/":
-            return self._send(200, INDEX, "text/html; charset=utf-8")
-        if path == "/chain":
-            code, body = _fetch_chain()
-            return self._send(code, body, "application/json")
-        if path == "/root":
-            code, body = _head()
-            return self._send(code, body, "application/json")
-        if path == "/health":
-            code, _ = _fetch_chain()
-            body = json.dumps({"relay": "ok",
-                               "node_reachable": code == 200}).encode()
-            return self._send(200, body, "application/json")
-        self._send(404, b'{"error":"not found"}', "application/json")
+        # Shed load past the concurrency cap rather than grow work without bound.
+        if not _inflight.acquire(blocking=False):
+            return self._send(503, b'{"error":"busy"}', "application/json")
+        try:
+            path = self.path.split("?", 1)[0].rstrip("/") or "/"
+            if path == "/":
+                return self._send(200, INDEX, "text/html; charset=utf-8")
+            if path == "/chain":
+                code, body = _fetch_chain()
+                return self._send(code, body, "application/json")
+            if path == "/root":
+                code, body = _head()
+                return self._send(code, body, "application/json")
+            if path == "/health":
+                code, _ = _fetch_chain()
+                body = json.dumps({"relay": "ok",
+                                   "node_reachable": code == 200}).encode()
+                return self._send(200, body, "application/json")
+            self._send(404, b'{"error":"not found"}', "application/json")
+        finally:
+            _inflight.release()
 
     do_HEAD = do_GET                                          # noqa: N815
 
