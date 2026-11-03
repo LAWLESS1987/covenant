@@ -215,8 +215,65 @@ Adversarial read of the reachable security-critical surface:
 Measured result: the in-house (Claude) review finds the reachable critical code hardened.
 This is exactly why the cross-system round matters — fresh seats may see what we don't.
 
+## Areas 10–12 (lower-risk public repos) — Claude ground-truth pass, 2026-11-03
+Divvy had these as external-primary (Conscious Ledger / Chat Smith / Codex), Claude cross-check.
+This is the Claude ground-truth pass only; external-primary NOT run (rule 9 — see "what was NOT done").
+
+Populations read (enumerate-by-discovery, rule 2): per-repo .py count, full top-level import set,
+and a dangerous-primitive grep (pickle/torch.load/yaml.load/eval/exec/shell=True/subprocess/os.system/
+0.0.0.0/verify=False/marshal/__import__) + a network-surface grep (HTTPServer/BaseHTTPRequestHandler/
+Flask/@app.route/socketserver/bind/urllib.request/requests.get|post/send_file).
+- spiking-experiments (LAWLESS1987/spiking-experiments, 9 files): numpy/matplotlib/torch/torchvision/
+  brian2/snntorch. Offline MNIST SNN sim. No net, no server, no untrusted deserialization. CLEAN.
+- flinch-observability (LAWLESS1987/flinch-observability, 11 files): stdlib (uuid/re/os/json/heapq/
+  hashlib/bisect/threading/tempfile/shutil) + its own `flinch` pkg. No net framework, no pickle/yaml/
+  torch. The integrity-bearing gate is FAIL-CLOSED: flinch/gate.py:79-103 _decide runs the judge in a
+  daemon thread with t.join(timeout_s); timeout / exception / any non-explicit-"allow" → "hold", and
+  _egress_refusal (:62-77) is offline/allowlist/broker fail-closed (broker exception → refuse). The one
+  nit is a leaked daemon thread if the judge hangs repeatedly — a resource concern in offline code, not
+  a reachable security flaw. CLEAN.
+- threefold (LAWLESS1987/threefold, 7 own files; the 9.7k py count is a bundled .venv of sympy/torch/
+  hf, not our code): torch + huggingface_hub + transformers.from_pretrained (model id from operator
+  env/args, not untrusted input), subprocess in LIST form (jlens_snapshot.py:92, no shell=True).
+  Deserialization is DELIBERATELY HARDENED — np.load(path, allow_pickle=False) (llens.py:101) and the
+  lens loader is torch.load(..., weights_only=True) (jacobian-lens upstream lens.py:69); everything else
+  is json.load. The opposite of a flaw. CLEAN.
+- contradiction-probe (LAWLESS1987/contradiction-probe, 5 files): stdlib (sys/os/itertools/json/random/
+  re/hashlib) + own `score`. Offline scoring. No net, no deserialization, no eval. CLEAN.
+
+VISIBILITY FLAG (opsec / do-not-paste): the local `mbc-flinch-8` clone (sibling of the repo, in the home
+dir) — which the divvy area-10 "flinch repos" row could be read to include — has remote
+LAWLESS1987/**mutual-benefit-collective**
+(a PRIVATE repo, memory [[mutual-benefit-collective]]). Its code must NOT go to any external seat. The
+PUBLIC flinch repos are flinch-observability (read above) and flinch-record. `jacobian-lens-upstream` is
+anthropics/jacobian-lens (Anthropic's upstream, not ours — out of scope; its torch.load is weights_only).
+gh is unauthenticated in this app, so GitHub-API visibility could not be confirmed here (git remote URLs
+only); before ANY external paste of 10–12 code, confirm public status with the operator.
+
+Measured result (10–12): NO security findings. These are offline research/ML and scoring scripts with no
+network-facing attack surface; the deserialization that exists is in its safe form, and the one
+integrity-bearing component (flinch gate) is fail-closed. The "different mechanism" cross-check for this
+NEGATIVE is the import+primitive existence-oracle grep, which agrees with the reasoning read.
+What was NOT done (rule 9): external-seat PRIMARY review (Conscious Ledger/Chat Smith/Codex) was NOT run
+for 10–12 — a Claude-only read is not the cross-SYSTEM check for a POSITIVE claim, but there are no
+positive findings to cross-check, and driving flaky browser seats over a near-empty surface is token
+theater (memory [[no-agent-fleets-browser-not-api]], [[browser-token-economy]]) that CLAUDE.md rule 9
+forbids as manufactured confidence. If the operator wants an external eye on 10–12 regardless, it is teed
+up — but gated on confirming each repo's public status first (see VISIBILITY FLAG).
+Semantic blind spot (CLAUDE.md end-pass caveat): grep is an existence oracle — it proves no server/
+unsafe-primitive STRING is present (strong for 5–11-file repos), not that the ML/scoring LOGIC is
+correct; correctness of the SNN/scoring math was out of this review's security scope.
+
 ## Status
 - 2026-11-02: backbone + Claude-side pass done. RAM 4.05 GB free, model away → UNDER the 5.1 GB
   floor, so the external-seat rounds (areas 3,4,6,7,9–12 primaries + all cross-checks) WAIT for
   headroom (his tabs / model state) or his browser. They are teed up; the moment RAM frees,
   fan out in batches of 3, paste-then-Enter, text reads only.
+- 2026-11-03: area 9 CLOSED — ChatGPT (C4) raised the round's first real findings (3 DoS/origin
+  gaps in public_ledger.py), Claude confirmed all three independently, FIXED + both-ways guard
+  (A408, test_pl1_public_ledger.py 8/8), on PR #14 (commits 9acb7ce + bb64b2b). Areas 10–12
+  Claude ground-truth pass done (section above): NO findings, near-empty surface, hardened
+  deserialization, fail-closed flinch gate; external-primary for 10–12 not run (low value +
+  visibility-gated, reasoning recorded). Still OPEN for external seats when RAM/his-browser frees:
+  area 9 primary (Tien, fresh eyes), area 5 Grok re-drive (C6), area 6 Gemini re-drive, areas
+  3/4/7 primaries. mbc-flinch-8 = PRIVATE (mutual-benefit-collective) — never paste externally.
