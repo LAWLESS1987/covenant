@@ -829,6 +829,12 @@ SUITES = [
     # HM1 (2026-10-31, his "fix hf_mirror.py"): the HF mirror pushes fast-forward only, behind his opsec scan, and
     # snapshot-only repos never send history -- it used to force-push full history from a hook-less clone (A396).
     ("test_hm1_hf_mirror.py", 120, "SECURITY"),
+    # AP1/HD1 (2026-11-02, A404, his "Enable auto-push" + "as much redundancy as possible"): the laptop pusher
+    # off TETSU's unison feed (ff-only vs current GitHub main, open-PR guard, no --force/tags/unify-branch, never
+    # a snapshot repo's history) and hf_mirror's fail-closed holds-drift guard (refuse a history push when the
+    # feed can't confirm a repo was not marked HF-snapshot elsewhere). Both ways; each guard mutated -> suite RED.
+    ("test_ap1_repo_autopush.py", 120, "SECURITY"),
+    ("test_hd1_hf_mirror_holds.py", 60, "SECURITY"),
     ("test_sw1_study_web.py", 120, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
     # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every

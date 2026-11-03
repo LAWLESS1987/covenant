@@ -123,6 +123,62 @@ SNAPSHOT_ONLY = {"covenant", "threefold-memory"}
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# TETSU's unison hold feed. SNAPSHOT_ONLY above is hardcoded in this file; a hold added on TETSU only (its
+# unison/holds.json) would be invisible here, so hf_mirror could history-push a repo another node has since
+# marked HF-snapshot. The feed closes that drift: holds_mode() reads it before deciding snapshot vs push, and
+# FAILS CLOSED -- a repo that would be history-pushed is HELD whenever the feed cannot be read (A396, 2026-11-02).
+FEED_FILE = os.path.join(HERE, "ops", "local_unison_feed.txt")
+
+
+def feed_url():
+    """The unison hold feed URL: env COVENANT_UNISON_FEED, else gitignored ops/local_unison_feed.txt ('' if
+    neither -- his network addresses never go in a tracked file)."""
+    u = os.environ.get("COVENANT_UNISON_FEED", "").strip()
+    if u:
+        return u
+    try:
+        return open(FEED_FILE, encoding="utf-8").read().strip()
+    except OSError:
+        return ""
+
+
+def read_feed(url=None, opener=urllib.request.urlopen):
+    """(feed_dict, error). A feed that cannot be read is an error, never an empty 'nothing to do' -- the holds
+    guard reads this, and 'unreadable' must resolve to 'refuse a history push', not 'nothing is held'."""
+    url = feed_url() if url is None else url
+    if not url:
+        return None, "no feed URL (ops/local_unison_feed.txt or COVENANT_UNISON_FEED)"
+    try:
+        with opener(url, timeout=10) as r:
+            return json.loads(r.read().decode("utf-8")), ""
+    except Exception as e:                                       # noqa: BLE001
+        return None, "%s: %s" % (type(e).__name__, str(e)[:160])
+
+
+def holds_mode(name, feed, feed_err=""):
+    """How repo `name` may be mirrored to HF, consulting TETSU's unison feed so a hold added on TETSU only cannot
+    be missed. Returns (mode, note), mode in {"snapshot", "push", "refuse"}.
+
+    A repo is snapshot-mode if it is in SNAPSHOT_ONLY (hardcoded here) OR the feed lists "hf" in its
+    snapshot_copies (the live source). FAIL-CLOSED: a repo that would be HISTORY-pushed is REFUSED whenever the
+    hold source cannot be read -- the feed is unreachable / its status != "ok", or the repo is missing from it --
+    because then we cannot confirm it was not marked HF-snapshot on another node. A SNAPSHOT_ONLY repo the feed
+    omits is the safe direction (it already never sends history): it stays snapshot, logged, not refused."""
+    in_only = name in SNAPSHOT_ONLY
+    if feed is not None and feed.get("status") == "ok":
+        meta = (feed.get("repos") or {}).get(name)
+        if meta is None:
+            if in_only:
+                return "snapshot", "SNAPSHOT_ONLY; feed omits it (safe: stays snapshot)"
+            return "refuse", "missing from feed -- hold source cannot confirm it is not snapshot-mode elsewhere"
+        if in_only or "hf" in (meta.get("snapshot_copies") or []):
+            return "snapshot", "snapshot-mode (%s)" % ("SNAPSHOT_ONLY" if in_only else "feed snapshot_copies lists hf")
+        return "push", "feed clean (not snapshot-mode)"
+    why = feed_err or ("feed status %r != ok" % (feed.get("status") if feed is not None else None))
+    if in_only:
+        return "snapshot", "SNAPSHOT_ONLY; %s (safe: stays snapshot)" % why
+    return "refuse", "%s -- never history-push when the hold source can't be read" % why
+
 
 def _git(args, cfg=()):
     p = subprocess.run(["git"] + list(cfg) + list(args), capture_output=True, text=True)
@@ -244,13 +300,23 @@ def main(argv=None):
         hf_user = HfApi(token=hft).whoami().get("name")
         say("HF account: %s" % hf_user)
 
+    # Read TETSU's hold feed once. A repo that would be history-pushed is HELD when this cannot be read.
+    feed, feed_err = read_feed()
+    if feed_err:
+        say("unison hold feed: %s" % feed_err)
+        say("  -> any repo that would be HISTORY-pushed is HELD (fail-closed): the hold source cannot confirm it "
+            "was not marked HF-snapshot on another node. Snapshot-only repos continue.")
+
     say("%-30s %-9s -> HF" % ("REPO (%d owned, forks excluded)" % len(repos), "GITHUB"))
     done = 0
     for r in repos:
         vis = "private" if r["private"] else "public"
-        how = "snapshot (files only)" if r["name"] in SNAPSHOT_ONLY else "fast-forward push"
-        say("%-30s %-9s -> HF private=%s, %s" % (r["name"], vis, r["private"], how))
+        mode, note = holds_mode(r["name"], feed, feed_err)
+        say("%-30s %-9s -> HF private=%s, %s -- %s" % (r["name"], vis, r["private"], mode, note))
         if dry:
+            continue
+        if mode == "refuse":
+            say("    HELD %s/%s: %s" % (hf_user, r["name"], note))
             continue
         from huggingface_hub import create_repo
         hf_id = "%s/%s" % (hf_user, r["name"])
@@ -262,7 +328,7 @@ def main(argv=None):
         staging = tempfile.mkdtemp(prefix="hfmirror-")
         try:
             auth_gh = "http.extraHeader=" + _auth_header("x-access-token", ght)
-            if r["name"] in SNAPSHOT_ONLY:
+            if mode == "snapshot":
                 work = os.path.join(staging, r["name"])
                 okc, errc = _run(["git", "-c", auth_gh, "clone", "--depth", "1", r["clone_url"], work], redact=ght)
                 if not okc:
