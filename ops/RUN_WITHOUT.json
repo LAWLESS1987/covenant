@@ -1,8 +1,8 @@
 {
- "when": "2026-10-03T08:05:46Z",
+ "when": "2026-11-03T08:25:40Z",
  "digests": {
-  "ora": "26569e1824d2",
-  "sena": "d5a2582b3bbf"
+  "ora": "f245e9076146",
+  "sena": "9dbb0d6137b8"
  },
  "conditions": {
   "exam_met_streak": {
@@ -16,22 +16,22 @@
    "met": true
   },
   "holdout_decided_min": {
-   "measured": 0.7736,
+   "measured": 0.7547,
    "bar": 0.75,
    "met": true
   },
   "panel_coverage_min": {
-   "measured": 0.4866,
+   "measured": 0.9912,
    "bar": 0.9,
-   "met": false
+   "met": true
   },
   "own_traffic_hold_max": {
-   "measured": 0.7,
+   "measured": 0.855,
    "bar": 0.05,
    "met": false
   }
  },
- "met_count": 2,
+ "met_count": 3,
  "of": 5,
  "exam_streak": 0,
  "streak": 0,
@@ -144,6 +144,161 @@
   {
    "when": "2026-10-03T08:05:46Z",
    "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-04T08:52:20Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-05T08:24:05Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-06T08:03:06Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-07T08:26:29Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-08T08:20:31Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-09T08:43:08Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-10T08:36:37Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-11T08:25:35Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-12T08:44:21Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-13T08:28:27Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-14T08:28:55Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-15T08:27:46Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-16T08:29:25Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-17T08:26:23Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-18T08:26:39Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-19T08:28:22Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-20T08:28:25Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-21T08:14:39Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-22T08:35:05Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-23T08:43:06Z",
+   "met_count": 2,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-24T08:32:31Z",
+   "met_count": 3,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-25T08:31:59Z",
+   "met_count": 3,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-26T08:28:48Z",
+   "met_count": 3,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-27T08:30:53Z",
+   "met_count": 3,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-28T08:28:38Z",
+   "met_count": 3,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-29T08:30:33Z",
+   "met_count": 3,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-30T08:35:12Z",
+   "met_count": 3,
+   "streak": 0
+  },
+  {
+   "when": "2026-10-31T08:30:44Z",
+   "met_count": 3,
+   "streak": 0
+  },
+  {
+   "when": "2026-11-01T08:32:14Z",
+   "met_count": 3,
+   "streak": 0
+  },
+  {
+   "when": "2026-11-02T08:26:32Z",
+   "met_count": 3,
+   "streak": 0
+  },
+  {
+   "when": "2026-11-03T08:25:40Z",
+   "met_count": 3,
    "streak": 0
   }
  ]
