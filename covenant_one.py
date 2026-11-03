@@ -639,6 +639,13 @@ SUITES = [
     # nothing newer counts as a look (fetch_build was quarantined for it), and "behind" means behind in the
     # files the APK ships, not in every docs commit.
     ("test_pb1_phone_build_signals.py", 120, "DAILY + GUARDS"),
+    # FO1 (2026-11-02, A407, his words: "we need our own operating systems running parallel ...
+    # RESILIENCE/REDUNDANCY"): the parallel-OS layer (covenant_failover). Does a critical service have a
+    # LIVE redundant instance on a DIFFERENT OS/host, and is an OS environment down? Resolver, three senses
+    # and two repairs driven BOTH WAYS with injected probes (hermetic); a gated live block stands up the real
+    # Windows+WSL beacon pair and shows cross-OS failover on the control host, skipped (never counted green)
+    # elsewhere. Failover to a provisioned standby is AUTO_REVERSIBLE; provisioning a new env is PROPOSE_ONLY.
+    ("test_fo1_failover.py", 240, "DAILY + GUARDS"),
     # TD1 (2026-09-28, his directive to Tetsu): the daily maintenance cycle's verdicts, driven both
     # ways with stubbed readings -- a disagreeing tip is failed, a height-only phone is unverified, stale
     # sweep results are never a pass, an old failure back is "reappeared", the one automatic rollback
@@ -829,6 +836,12 @@ SUITES = [
     # HM1 (2026-10-31, his "fix hf_mirror.py"): the HF mirror pushes fast-forward only, behind his opsec scan, and
     # snapshot-only repos never send history -- it used to force-push full history from a hook-less clone (A396).
     ("test_hm1_hf_mirror.py", 120, "SECURITY"),
+    # AP1/HD1 (2026-11-02, A404, his "Enable auto-push" + "as much redundancy as possible"): the laptop pusher
+    # off TETSU's unison feed (ff-only vs current GitHub main, open-PR guard, no --force/tags/unify-branch, never
+    # a snapshot repo's history) and hf_mirror's fail-closed holds-drift guard (refuse a history push when the
+    # feed can't confirm a repo was not marked HF-snapshot elsewhere). Both ways; each guard mutated -> suite RED.
+    ("test_ap1_repo_autopush.py", 120, "SECURITY"),
+    ("test_hd1_hf_mirror_holds.py", 60, "SECURITY"),
     ("test_sw1_study_web.py", 120, "JUDGE"),
     ("test_r2v_frames.py", 240, "JUDGE"),
     # PC2 (2026-10-03, the core's pin; 2026-10-06, A315, the other four through tools/pin_deploy.py): every
