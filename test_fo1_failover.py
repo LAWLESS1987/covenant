@@ -26,6 +26,10 @@ it should and is silent when it should not.
         PROPOSE_ONLY, and the ENGINE refuses it before the body runs.
   FO1g  the map and the registry agree: every service in the doc is in
         SERVICES and every service in SERVICES is in the doc.
+  FO1p  redundancy on the PHONE: a third, intermittent beacon environment that is
+        declared-not-counted until the phone actually runs it, reads UNKNOWN (never
+        'down') while asleep or unprovisioned, is NEVER started from the laptop, and
+        is a real third env that carries 'healthy' once provisioned and awake.
   FO1h  (live, gated) the real cross-OS beacon pair fails over both ways on the
         control host. Skipped where there is no reachable WSL -- NO RESULT is
         not a pass (rule 9), so the skip is printed, never counted green.
@@ -237,6 +241,59 @@ def main():
     missing_in_doc = [k for k in F.SERVICES if "`%s`" % k not in txt]
     check("FO1g every service in SERVICES is named in the redundancy map",
           os.path.exists(doc) and not missing_in_doc, missing_in_doc or "map doc missing")
+
+    # ---- FO1p: redundancy on the PHONE (a third, intermittent environment) --
+    # The operator, 2026-11-03: "make redundancies on the phone too." The beacon gains a phone
+    # instance -- but the phone is intermittent and nothing pushes to it, so what must hold is:
+    # DECLARED-not-counted until actually provisioned, absence reads UNKNOWN (never 'down' or
+    # 'redundant'), NEVER auto-started from the laptop, and a real third env once provisioned+awake.
+    bp = next((i for i in F.SERVICES["beacon"]["instances"] if i["name"] == "beacon-phone"), None)
+    check("FO1p beacon-phone declared: env/host phone, intermittent, launch phone, NOT provisioned yet",
+          bool(bp) and bp["env"] == "phone" and bp["host"] == "phone" and bp.get("intermittent") is True
+          and bp.get("launch") == "phone" and bp.get("provisioned") is False
+          and (bp.get("probe") or {}).get("type") == "phone", bp)
+
+    # the private-address resolver: UNKNOWN when no address is configured, alive when it is (both ways)
+    real_url, real_http = F._phone_beacon_url, F._http_probe
+    try:
+        F._phone_beacon_url = lambda: None
+        unk = F._probe_instance(bp)
+        F._phone_beacon_url = lambda: "http://100.64.0.9:%d/beacon" % F.BEACON_PHONE_PORT
+        F._http_probe = lambda url, timeout=3: True
+        aliv = F._probe_instance(bp)
+    finally:
+        F._phone_beacon_url, F._http_probe = real_url, real_http
+    check("FO1p phone probe: UNKNOWN with no address configured, alive once it is (both ways)",
+          unk is None and aliv is True, (unk, aliv))
+
+    # NEVER auto-started from the laptop -- launch 'phone' is declined with a clear reason
+    ph_decline = F._start_instance(bp, dry_run=True)
+    check("FO1p the phone beacon is never started from the laptop (declined -- provisioned by app install)",
+          ph_decline[0] is False and "phone" in ph_decline[1].lower(), ph_decline)
+
+    # declared-not-counted vs. a real third env. Synthetic beacon: two laptop OSes + the phone.
+    def _beacon3(phone_provisioned):
+        return {"beacon": {"require_redundant": True, "min_environments": 2, "arm_gated": False,
+                           "failover_class": F.AUTO_REVERSIBLE, "instances": [
+            {"name": "w", "kind": "primary", "env": "windows", "host": "laptop", "provisioned": True,
+             "probe": {"type": "http", "url": "w"}},
+            {"name": "u", "kind": "redundant", "env": "wsl-ubuntu", "host": "laptop", "provisioned": True,
+             "probe": {"type": "http", "url": "u"}},
+            {"name": "ph", "kind": "redundant", "env": "phone", "host": "phone",
+             "provisioned": phone_provisioned, "intermittent": True, "probe": {"type": "phone"}}]}}
+    d_unprov = F.detect_redundancy_degraded(services=_beacon3(False), probe=_probe({"windows", "wsl-ubuntu"}))
+    check("FO1p an UNPROVISIONED phone is declared-not-counted (healthy on the two laptop OSes)",
+          d_unprov["state"] == F.ABSENT, d_unprov)
+    d_sleep = F.detect_redundancy_degraded(services=_beacon3(True), probe=_probe({"windows", "wsl-ubuntu"}))
+    check("FO1p a provisioned phone ASLEEP never alarms while both laptop OSes are up",
+          d_sleep["state"] == F.ABSENT, d_sleep)
+    d_carry = F.detect_redundancy_degraded(services=_beacon3(True), probe=_probe({"windows", "phone"}))
+    check("FO1p an AWAKE phone is a real third env -- it carries 'healthy' when a laptop OS is down",
+          d_carry["state"] == F.ABSENT
+          and "phone" in d_carry["measured"]["healthy"][0]["live_environments"], d_carry)
+    d_deg = F.detect_redundancy_degraded(services=_beacon3(True), probe=_probe({"windows"}))
+    check("FO1p a laptop OS down AND the phone asleep reads degraded (the phone hides no real loss)",
+          d_deg["state"] == F.PRESENT, d_deg)
 
     # ---- FO1h: live cross-OS proof (gated) ----------------------------------
     if os.name == "nt" and F._wsl_alive() is True:

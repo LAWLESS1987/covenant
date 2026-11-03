@@ -47,7 +47,7 @@ Registry key (in `covenant_failover.SERVICES`) is given in backticks.
 | **PC covenant node** (`pc_node`) | judge/API node (5000/5020/5060; P2P 5001) | laptop Windows | TETSU node (when up); phone node (intermittent) | PAIRED* |
 | **model / consult limbs** (`model`) | Tetsu's model + LIMB SMOL/PHI consult limbs | TETSU (laptop 7B retired) | none that answers for TETSU | **SPOF** |
 | **teacher / learning channel** (`teacher`) | practice loop + teacher queue feeding students | laptop | none (single feed) | **SPOF** |
-| **redundancy beacon** (`beacon`) | the resilience read-API itself (fleet/redundancy state) | **Windows + WSL/Ubuntu pair** (provisioned, DARK until armed) | **yes — cross-OS, same host** | **PAIRED** |
+| **redundancy beacon** (`beacon`) | the resilience read-API itself (fleet/redundancy state) | **Windows + WSL/Ubuntu pair** (provisioned, DARK until armed) **+ a phone third env** (`beacon-phone`, declared, intermittent, provisioned by app install) | **yes — cross-OS, same host; + cross-DEVICE on the phone** | **PAIRED (+phone)** |
 
 \* PAIRED only while TETSU is awake; TETSU sleep drops `tetsu-hs`, and the phone
 is intermittent. So the node layer degrades to single-host whenever TETSU sleeps
@@ -101,6 +101,27 @@ leaves a 0.5 GB operational floor — a heavier one is refused by size and route
 to **TETSU** (`heavy-ok`, 32 GB); the **phone** is lightest (≤128 MB). A **cold**
 standby (git host) is space-free until a failover needs it. So the engine never
 starves the model, and heavy, always-on redundancy lands on TETSU by construction.
+
+### Redundancy on the phone (A407, 2026-11-03 — the operator: "make redundancies on the phone too")
+
+The beacon gains a **third environment on the phone's own device** (`beacon-phone`,
+env `phone`), so the liveness read-API survives the loss of **both laptop OSes**.
+It is modelled honestly for an intermittent, un-pushable host:
+
+- **Witness-class / intermittent.** The phone sleeps, so `beacon-phone`'s probe is a
+  private-address type (`{"type":"phone"}`) that resolves the phone's tailnet URL from
+  `COVENANT_PHONE_BEACON` / the gitignored `ops/local_phone_beacon.txt`, and reads
+  **UNKNOWN (never "down")** when unset or asleep. `min_environments` stays **2** — the
+  two laptop OSes carry "healthy"; the phone is a bonus third env when awake.
+- **Declared, not counted, until it actually runs.** `provisioned: False` until the
+  phone node runs the beacon AND its URL is configured, so it is neither a false SPOF
+  nor a phantom standby. It rides on the headscale join (phone-app-join); the PC-side
+  registration is the operator's per `ops/mycelium_policy.json`, and only the phone's
+  own key/address are involved — no key crosses.
+- **Never started from the laptop.** `launch: "phone"` is declined by the remedy
+  (nothing pushes to the phone); it is provisioned by an **app install** on the device.
+- Proven by FO1p in `test_fo1_failover.py`, both ways (asleep → healthy on the two
+  laptop OSes; a laptop OS down + phone asleep → genuinely degraded, no papering over).
 
 ## What is live now vs. proposed
 

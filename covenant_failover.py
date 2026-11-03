@@ -84,6 +84,7 @@ SPOF_REMIND_MARKER = os.path.join(HERE, "ops", "REDUNDANCY_SPOF_REMIND")
 BEACON = os.path.join(HERE, "covenant_beacon.py")
 BEACON_WIN_PORT = 8771
 BEACON_WSL_PORT = 8772
+BEACON_PHONE_PORT = 8773
 GITHOST_STANDBY = os.path.join(HERE, "covenant_githost_standby.py")
 GITHOST_STANDBY_PORT = 8089
 
@@ -188,6 +189,9 @@ def _probe_instance(inst, probe=None):
     if p.get("type") == "feed":
         url = _feed_url()
         return _http_probe(url) if url else None      # no private feed URL configured here -> UNKNOWN
+    if p.get("type") == "phone":
+        url = _phone_beacon_url()
+        return _http_probe(url) if url else None      # no phone address configured here -> UNKNOWN (rule 9)
     return None                           # cannot probe here -> UNKNOWN for this instance
 
 
@@ -200,6 +204,22 @@ def _feed_url():
         return url
     try:
         with open(os.path.join(HERE, "ops", "local_unison_feed.txt"), encoding="utf-8") as fh:
+            return fh.readline().strip() or None
+    except OSError:
+        return None
+
+
+def _phone_beacon_url():
+    """The phone beacon's real URL -- env COVENANT_PHONE_BEACON, else the first line of the
+    gitignored ops/local_phone_beacon.txt (the phone's tailnet address lives in a private file,
+    never in this public repo, exactly like the unison feed). None where neither is set, so an
+    intermittent phone that is asleep -- or has never been provisioned -- reads UNKNOWN here,
+    never 'down' (rule 9): its absence must not masquerade as a failure OR as redundancy."""
+    url = os.environ.get("COVENANT_PHONE_BEACON", "").strip()
+    if url:
+        return url
+    try:
+        with open(os.path.join(HERE, "ops", "local_phone_beacon.txt"), encoding="utf-8") as fh:
             return fh.readline().strip() or None
     except OSError:
         return None
@@ -278,7 +298,7 @@ SERVICES = {
     # The one service this module actually provisions as a live cross-OS pair.
     # DARK until ops/REDUNDANCY_ARMED exists (RAM budget).
     "beacon": {
-        "desc": "the redundancy read-API itself -- a provisioned cross-OS pair",
+        "desc": "the redundancy read-API itself -- a provisioned cross-OS pair (+ an intermittent phone third env)",
         "require_redundant": True, "min_environments": 2, "redundancy_model": "hot",
         "failover_class": AUTO_REVERSIBLE, "arm_gated": True,
         "instances": [
@@ -288,6 +308,19 @@ SERVICES = {
             {"name": "beacon-wsl", "kind": "redundant", "env": "wsl-ubuntu", "host": "laptop",
              "provisioned": True, "hot": True, "ram_mb": 15, "launch": "wsl-ubuntu", "port": BEACON_WSL_PORT,
              "probe": {"type": "http", "url": "http://127.0.0.1:%d/beacon" % BEACON_WSL_PORT}},
+            # A THIRD environment, on the phone's own device (Galaxy S25+) -- survives the loss of BOTH
+            # laptop OSes (the operator, 2026-11-03: "make redundancies on the phone too"). Witness-class:
+            # the phone is INTERMITTENT (it sleeps) and is provisioned ONLY by an APP INSTALL on the phone,
+            # never started from the laptop (nothing pushes to the phone -- launch "phone" is declined).
+            # provisioned=False until the phone node actually runs the beacon AND its tailnet URL is in
+            # COVENANT_PHONE_BEACON / ops/local_phone_beacon.txt; until then it is DECLARED, not counted
+            # (so it is neither a false SPOF nor a phantom standby). It rides on the headscale join
+            # (phone-app-join). min_environments stays 2 -- the two laptop OSes carry "healthy"; the phone
+            # is a bonus third env when awake, and when it is provisioned+awake a laptop env dying while the
+            # phone is asleep correctly reads degraded.
+            {"name": "beacon-phone", "kind": "redundant", "env": "phone", "host": "phone",
+             "provisioned": False, "hot": True, "ram_mb": 15, "intermittent": True,
+             "launch": "phone", "port": BEACON_PHONE_PORT, "probe": {"type": "phone"}},
         ],
     },
 }
@@ -530,6 +563,9 @@ def _start_instance(inst, dry_run):
         return _launch_windows_beacon(inst, dry_run)
     if launch == "wsl-ubuntu":
         return _launch_wsl_beacon(inst, dry_run)
+    if launch == "phone":
+        return False, ("the phone beacon is provisioned by an APP INSTALL on the phone and never started "
+                       "from the laptop (nothing pushes to the phone) -- coordinate with the phone node")
     return False, "no known launcher for %s (provision it first -- PROPOSE_ONLY)" % inst.get("name")
 
 
