@@ -85,6 +85,8 @@ BEACON = os.path.join(HERE, "covenant_beacon.py")
 BEACON_WIN_PORT = 8771
 BEACON_WSL_PORT = 8772
 BEACON_PHONE_PORT = 8773
+BEACON_TETSU_PORT = 8774           # the beacon port TETSU runs on its own host (reached over the mesh)
+BEACON_PC2_PORT = 8775            # the beacon port the new PC runs on its own host (reached over the mesh)
 GITHOST_STANDBY = os.path.join(HERE, "covenant_githost_standby.py")
 GITHOST_STANDBY_PORT = 8089
 
@@ -109,6 +111,9 @@ HOSTS = {
                "note": "32 GB, RTX 5060 Ti -- the home for heavy, always-on redundant instances and VMs"},
     "phone":  {"policy": "light-only", "light_cap_mb": 128, "op_floor_gb": 0.2,
                "note": "Galaxy S25+ (Termux), intermittent -- lightest, witness-class only"},
+    "pc2":    {"policy": "heavy-ok",
+               "note": "the new PC (2026-10-31, hookup ~11-01) -- a genuinely separate machine; a true "
+                       "'stands without the box' host once it joins the mesh and runs the beacon"},
 }
 LOCAL_HOST = "laptop"              # this machine (Sales / covenant-pc)
 
@@ -192,6 +197,12 @@ def _probe_instance(inst, probe=None):
     if p.get("type") == "phone":
         url = _phone_beacon_url()
         return _http_probe(url) if url else None      # no phone address configured here -> UNKNOWN (rule 9)
+    if p.get("type") == "remote":
+        # a beacon on another independent HOST (TETSU, the new PC) -- its private tailnet
+        # address lives in a gitignored file / env var, resolved per-instance. Not set ->
+        # UNKNOWN (rule 9): a host that is asleep or not yet provisioned is never 'down'.
+        url = _remote_beacon_url(p.get("env", ""), p.get("file", ""))
+        return _http_probe(url) if url else None
     return None                           # cannot probe here -> UNKNOWN for this instance
 
 
@@ -209,20 +220,30 @@ def _feed_url():
         return None
 
 
-def _phone_beacon_url():
-    """The phone beacon's real URL -- env COVENANT_PHONE_BEACON, else the first line of the
-    gitignored ops/local_phone_beacon.txt (the phone's tailnet address lives in a private file,
-    never in this public repo, exactly like the unison feed). None where neither is set, so an
-    intermittent phone that is asleep -- or has never been provisioned -- reads UNKNOWN here,
-    never 'down' (rule 9): its absence must not masquerade as a failure OR as redundancy."""
-    url = os.environ.get("COVENANT_PHONE_BEACON", "").strip()
-    if url:
-        return url
+def _remote_beacon_url(env_var, fname):
+    """A beacon URL on another independent HOST -- env var first, else the first line of the
+    gitignored ops/<fname>. Private tailnet addresses (100.64.0.x) live in private files, never
+    in this public repo, exactly like the unison feed. None where neither is set, so a host that
+    is asleep -- or has never been provisioned -- reads UNKNOWN (rule 9), never 'down': its
+    absence must not masquerade as a failure OR as redundancy."""
+    if env_var:
+        val = (os.environ.get(env_var, "") or "").strip()
+        if val:
+            return val
+    if not fname:
+        return None
     try:
-        with open(os.path.join(HERE, "ops", "local_phone_beacon.txt"), encoding="utf-8") as fh:
+        with open(os.path.join(HERE, "ops", fname), encoding="utf-8") as fh:
             return fh.readline().strip() or None
     except OSError:
         return None
+
+
+def _phone_beacon_url():
+    """The phone beacon's real URL (env COVENANT_PHONE_BEACON, else ops/local_phone_beacon.txt).
+    The phone's tailnet address lives in a private file, never in this public repo. None where
+    neither is set, so an intermittent phone that is asleep reads UNKNOWN (rule 9), never 'down'."""
+    return _remote_beacon_url("COVENANT_PHONE_BEACON", "local_phone_beacon.txt")
 
 
 def _inst_id(inst):
@@ -298,7 +319,7 @@ SERVICES = {
     # The one service this module actually provisions as a live cross-OS pair.
     # DARK until ops/REDUNDANCY_ARMED exists (RAM budget).
     "beacon": {
-        "desc": "the redundancy read-API itself -- a provisioned cross-OS pair (+ an intermittent phone third env)",
+        "desc": "the redundancy read-API itself -- a provisioned cross-OS pair (+ intermittent third HOSTS: phone, TETSU, new PC)",
         "require_redundant": True, "min_environments": 2, "redundancy_model": "hot",
         "failover_class": AUTO_REVERSIBLE, "arm_gated": True,
         "instances": [
@@ -321,6 +342,28 @@ SERVICES = {
             {"name": "beacon-phone", "kind": "redundant", "env": "phone", "host": "phone",
              "provisioned": False, "hot": True, "ram_mb": 15, "intermittent": True,
              "launch": "phone", "port": BEACON_PHONE_PORT, "probe": {"type": "phone"}},
+            # Two more INDEPENDENT HOSTS -- each its own physical machine. This is the layer that
+            # makes "one stands without the other" true against losing the whole BOX (the operator,
+            # 2026-11-03: "both, all three really"): the live beacon pair above shares one machine
+            # ("Sales"), so a power/hardware/kernel loss takes both laptop OSes together. TETSU
+            # (already on the mesh, 100.64.0.1) and the new PC (hookup ~11-01) are separate boxes
+            # that survive that. Same witness-class, declared-not-counted shape as beacon-phone:
+            # provisioned=False until that host actually runs the beacon AND publishes its private
+            # tailnet URL (COVENANT_TETSU_BEACON / ops/local_tetsu_beacon.txt, COVENANT_PC2_BEACON /
+            # ops/local_pc2_beacon.txt). intermittent=True -- TETSU sleeps and a fresh host is not
+            # yet proven always-on, so absence reads UNKNOWN, never 'down'. launch "remote" is
+            # DECLINED from the laptop: nothing pushes across hosts; each is provisioned on its own
+            # machine and lights up as a real env only when it answers. min_environments stays 2 --
+            # the two laptop OSes carry "healthy"; these are bonus hosts that each remove the box as
+            # a single point of failure once awake.
+            {"name": "beacon-tetsu", "kind": "redundant", "env": "tetsu", "host": "tetsu",
+             "provisioned": False, "hot": True, "ram_mb": 15, "intermittent": True,
+             "launch": "remote", "port": BEACON_TETSU_PORT,
+             "probe": {"type": "remote", "env": "COVENANT_TETSU_BEACON", "file": "local_tetsu_beacon.txt"}},
+            {"name": "beacon-pc2", "kind": "redundant", "env": "pc2", "host": "pc2",
+             "provisioned": False, "hot": True, "ram_mb": 15, "intermittent": True,
+             "launch": "remote", "port": BEACON_PC2_PORT,
+             "probe": {"type": "remote", "env": "COVENANT_PC2_BEACON", "file": "local_pc2_beacon.txt"}},
         ],
     },
 }
@@ -566,6 +609,10 @@ def _start_instance(inst, dry_run):
     if launch == "phone":
         return False, ("the phone beacon is provisioned by an APP INSTALL on the phone and never started "
                        "from the laptop (nothing pushes to the phone) -- coordinate with the phone node")
+    if launch == "remote":
+        return False, ("the %s beacon runs on another independent host (%s) and is never started from the "
+                       "laptop (nothing pushes across hosts) -- provision it on that host and publish its "
+                       "tailnet URL" % (inst.get("name"), inst.get("host")))
     return False, "no known launcher for %s (provision it first -- PROPOSE_ONLY)" % inst.get("name")
 
 

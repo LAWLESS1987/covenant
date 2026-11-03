@@ -288,12 +288,17 @@ ops/pause/
 # and covenant_prod.bat alike, so neither public file carries the address.
 ops/local_peers.txt
 # the AUTO_GATED auto-onboard lane's LOCAL state (covenant_onboard.py): the operator's
-# arm/trust-root switch and the tasks the lane has armed. Both machine-local decisions,
-# not repo content -- the lane ships DARK (no arm file) and writes armed_tasks only once
-# armed. NODE_ROSTER.json and node_refusals.json ARE tracked (the whois trust root needs
-# the roster committed; a refusal only tightens).
+# arm/trust-root switch, the tasks the lane has armed, and -- on the chosen SIGNATURE
+# trust root -- the signed node roster. All machine-local decisions, not repo content:
+# the lane ships DARK (no arm file) and writes armed_tasks only once armed. NODE_ROSTER.json
+# carries device names + tailnet IPs the opsec push guard refuses, so it is ignored here to
+# make an accidental commit impossible (fail-at-commit, not only fail-at-push). If the WHOIS
+# trust root is ever chosen instead -- that path needs the roster repo-committed -- add it
+# deliberately with `git add -f ops/NODE_ROSTER.json`. node_refusals.json stays TRACKED
+# (a refusal only tightens, and is meant to ride the repo).
 ops/AUTO_ONBOARD_ARMED
 ops/armed_tasks.json
+ops/NODE_ROSTER.json
 # the laptop site auto-deploy job's per-pass record (tools/site_autodeploy.py), machine-local
 ops/site_autodeploy.jsonl
 ops/local_unison_feed.txt
