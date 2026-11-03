@@ -2295,6 +2295,88 @@ def main():
     check("H1nr a detector whose docstring says it has no remedy has none registered (A348g)",
           _says_none and not _contradicted, (_contradicted, _says_none))
 
+    # ---- A407: the parallel-OS redundancy senses/repairs, driven both ways -----
+    # redundancy_degraded, environment_down and spof_unremediated come from
+    # covenant_failover (registered into H.DETECTORS by covenant_highway's one hook),
+    # with start_redundant_instance (AUTO_REVERSIBLE) and propose_provision_redundancy
+    # (PROPOSE_ONLY). They are driven here with injected services/probes so every state
+    # is observed -- a registered sense nobody drives is the gap H1v exists to catch.
+    import covenant_failover as _F
+    _pair = {"b": {"require_redundant": True, "min_environments": 2, "arm_gated": False,
+                   "failover_class": H.AUTO_REVERSIBLE,
+                   "instances": [
+                       {"name": "w", "env": "windows", "host": "h", "provisioned": True,
+                        "launch": "windows", "port": 1, "probe": {"type": "http", "url": "x"}},
+                       {"name": "l", "env": "wsl-ubuntu", "host": "h", "provisioned": True,
+                        "launch": "wsl-ubuntu", "port": 2, "probe": {"type": "http", "url": "y"}}]}}
+    _up = _F.detect_redundancy_degraded(services=_pair, probe=lambda i: True)
+    _one = _F.detect_redundancy_degraded(services=_pair, probe=lambda i: i["env"] != "windows")
+    _dark = _F.detect_redundancy_degraded(services=_pair, probe=lambda i: None)
+    check("H1-fo redundancy_degraded: ABSENT paired, PRESENT one env down, UNKNOWN when unreadable",
+          _up["state"] == H.ABSENT and _one["state"] == H.PRESENT and _dark["state"] == H.UNKNOWN,
+          (_up["state"], _one["state"], _dark["state"]))
+
+    _ed_down = _F.detect_environment_down(environments=[{"name": "wsl-ubuntu", "up": False}])
+    _ed_up = _F.detect_environment_down(environments=[{"name": "wsl-ubuntu", "up": True}])
+    _ed_unk = _F.detect_environment_down(marker="/no/such/marker")
+    check("H1-fo environment_down: PRESENT when an expected env is down, ABSENT up, UNKNOWN off-host",
+          _ed_down["state"] == H.PRESENT and _ed_up["state"] == H.ABSENT and _ed_unk["state"] == H.UNKNOWN,
+          (_ed_down["state"], _ed_up["state"], _ed_unk["state"]))
+
+    _sp_on = _F.detect_spof_unremediated(services=_pair, remind=True)   # _pair is configured -> no spof
+    _spoofed = {"h": {"require_redundant": True, "instances": [{"name": "x", "env": "wsl-ubuntu",
+                                                                "provisioned": True}]}}
+    _sp_hit = _F.detect_spof_unremediated(services=_spoofed, remind=True)
+    _sp_off = _F.detect_spof_unremediated(services=_spoofed, remind=False)
+    check("H1-fo spof_unremediated: PRESENT only with a real SPOF and the reminder armed; else ABSENT",
+          _sp_on["state"] == H.ABSENT and _sp_hit["state"] == H.PRESENT and _sp_off["state"] == H.ABSENT,
+          (_sp_on["state"], _sp_hit["state"], _sp_off["state"]))
+
+    # start_redundant_instance: AUTO_REVERSIBLE, dry only here (never launches a real process).
+    # It acts for an AUTO_REVERSIBLE service (the beacon) and DECLINES a PROPOSE-only one.
+    _rsi = H.REMEDIES["start_redundant_instance"]
+    _dry_beacon = _rsi["fn"]({"degraded": [{"service": "beacon",
+                              "down": [{"name": "beacon-win", "env": "windows"}]}]}, dry_run=True)
+    _dry_hs = _rsi["fn"]({"degraded": [{"service": "headscale",
+                          "down": [{"name": "headscale", "env": "wsl-ubuntu"}]}]}, dry_run=True)
+    check("H1-fo start_redundant_instance: AUTO_REVERSIBLE/stateless; dry would start the beacon; "
+          "declines a PROPOSE-only service",
+          _rsi["klass"] == H.AUTO_REVERSIBLE and _rsi["kind"] == "stateless"
+          and _dry_beacon[0] is True and "would start" in _dry_beacon[1]
+          and _dry_hs[0] is False and "PROPOSE" in _dry_hs[1], (_dry_beacon, _dry_hs))
+
+    # propose_provision_redundancy: PROPOSE_ONLY -- the ENGINE refuses it before the body runs.
+    import tempfile as _tf
+    _tl = os.path.join(_tf.gettempdir(), "h1_fo_ledger.jsonl")
+    _ppr = H.apply_remedy("propose_provision_redundancy",
+                          {"state": H.PRESENT, "measured": {"spof": [{"service": "headscale"}]}},
+                          "spof_unremediated", dry_run=False, ledger=_tl)
+    check("H1-fo propose_provision_redundancy is PROPOSE_ONLY and the engine proposes, never runs it",
+          H.REMEDIES["propose_provision_redundancy"]["klass"] == H.PROPOSE_ONLY
+          and _ppr.get("outcome") == "proposed", _ppr.get("outcome"))
+
+    # start_githost_standby: AUTO_REVERSIBLE cold cross-OS read fallback for git_host_down. It
+    # DECLINES while WSL is up (that is restart_git_host's job) and would start the Windows read
+    # standby only when WSL is unreachable. Driven both ways with the WSL/serving probes stubbed.
+    _gs = H.REMEDIES["start_githost_standby"]
+    _w, _s = _F._wsl_alive, _F._githost_standby_serving
+    try:
+        _F._githost_standby_serving = lambda *a, **k: False
+        _F._wsl_alive = lambda *a, **k: True
+        _gs_decline = _gs["fn"]({}, dry_run=True)                 # WSL up -> declines
+        _F._wsl_alive = lambda *a, **k: False
+        _gs_would = _gs["fn"]({}, dry_run=True)                   # WSL unreachable -> would start
+        _F._githost_standby_serving = lambda *a, **k: True
+        _gs_already = _gs["fn"]({}, dry_run=True)                 # already serving -> declines
+    finally:
+        _F._wsl_alive, _F._githost_standby_serving = _w, _s
+    check("H1-fo start_githost_standby: AUTO_REVERSIBLE/stateless; declines while WSL up or already "
+          "serving; would start the read-only standby when WSL is unreachable",
+          _gs["klass"] == H.AUTO_REVERSIBLE and _gs["kind"] == "stateless" and "git_host_down" in _gs["for"]
+          and _gs_decline[0] is False and _gs_already[0] is False
+          and _gs_would[0] is True and "would start" in _gs_would[1],
+          (_gs_decline, _gs_would, _gs_already))
+
     undriven_d = [k for k in H.DETECTORS if k not in src]
     undriven_r = [k for k in H.REMEDIES if k not in src]
     check("H1v every registered detector is named somewhere in this suite",
@@ -2317,10 +2399,17 @@ def main():
     check("H1v every detector runs and returns a state with its measurement",
           not bad, str(bad))
 
+    # A407: read the detector's OWN source, wherever it is defined -- some detectors now
+    # come from covenant_failover (the parallel-OS redundancy layer), and reading only
+    # covenant_highway.py would check the wrong file and pass them by accident (UNKNOWN
+    # happens to sit in that file's header). inspect.getsource(fn) is the function's real
+    # body, in whatever module registered it, so the invariant is earned, not lucky.
     unknown_capable = []
     for name, fn in sorted(H.DETECTORS.items()):
-        srcfn = _io.open(os.path.join(HERE, "covenant_highway.py"), encoding="utf-8").read()
-        body = srcfn.split("def %s(" % fn.__name__, 1)[-1].split("\ndef ", 1)[0]
+        try:
+            body = inspect.getsource(fn)
+        except (OSError, TypeError):
+            body = ""
         if "UNKNOWN" not in body:
             unknown_capable.append(name)
     check("H1v every detector has a path that says UNKNOWN rather than ABSENT",

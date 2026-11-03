@@ -3437,6 +3437,23 @@ REMEDIES["break_stall"] = {"fn": remedy_break_stall, "klass": AUTO_REVERSIBLE,
                                        "irreversible": []}}
 
 
+# ----------------------------------------------------------------- A407: parallel-OS redundancy
+#
+# RESILIENCE / REDUNDANCY (2026-11-02, the operator: "we need our own operating systems running
+# parallel ... Windows, Python, Linux, the whole 9"). covenant_failover senses whether a critical
+# fleet service has a LIVE REDUNDANT INSTANCE on a DIFFERENT OS/host, and whether an OS environment
+# the fleet depends on is down. Kept in its OWN module so this file is not clobbered while the
+# sync-fabric and auto-onboard branches also grow it; the whole integration is ONE hook -- at import,
+# merge its three senses and two repairs into the registries above, so sense(), run_once(), the orb
+# (highway_detail reads list(DETECTORS)) and H1 all see them with no other change here. Failover to an
+# ALREADY-provisioned standby is AUTO_REVERSIBLE; provisioning a NEW environment stays PROPOSE_ONLY.
+try:
+    import covenant_failover as _failover
+    _failover.register(DETECTORS, REMEDIES)
+except Exception:                                            # noqa: BLE001 -- a missing module never stops the road
+    pass
+
+
 def _recent_identical(name, detector, ledger=None, within_s=None, include_dry=True):
     """The last row for this (remedy, detector) if it is younger than the cooldown.
 
