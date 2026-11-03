@@ -70,11 +70,17 @@ CACHE_SECONDS = 5.0              # a public reader cannot hammer the node
 UPSTREAM_TIMEOUT = 10.0
 CLIENT_TIMEOUT = 15.0            # drop a slow/half-open client (anti-slowloris)
 MAX_INFLIGHT = 64               # cap concurrent requests actually being served
+MAX_CONN = 128                  # hard cap on concurrent connections/threads, so
+                                # idle / slow-drip clients cannot grow threads
+                                # without bound (cross-review F1, 2026-11-03)
 
 # Fixed allowlist. Nothing in a request can add to it or alter it.
 UPSTREAM = {"chain": "/chain"}
 
 _cache: Dict[str, Tuple[float, int, bytes]] = {}
+# Derived head (height / index / head hash), cached per chain fill so /root does
+# not re-parse the whole ledger on every request (cross-review F2, 2026-11-03).
+_head_cache: Optional[Tuple[float, int, bytes]] = None
 # Single-flight: one thread refreshes a stale entry while the rest wait for its
 # result. Without it, a burst of concurrent misses opens N upstream connections
 # and buffers N x MAX_BYTES -- the amplification a 5s cache was meant to prevent.
@@ -123,8 +129,10 @@ def _fetch_chain() -> Tuple[int, bytes]:
                          "cap_bytes": MAX_BYTES}).encode())
                 else:
                     out = (200, body)
-        except urllib.error.HTTPError as e:
-            out = (502, json.dumps({"error": "node returned %s" % e.code}).encode())
+        except urllib.error.HTTPError:
+            # Do not echo the upstream status code to a public caller (cross-review
+            # F3, 2026-11-03): a generic 502 is enough; the code is internal detail.
+            out = (502, json.dumps({"error": "node returned an error status"}).encode())
         except Exception:                                        # noqa: BLE001
             # Deliberately not relaying the exception text: upstream error strings
             # can carry paths and internal detail, and this face is public.
@@ -136,22 +144,34 @@ def _fetch_chain() -> Tuple[int, bytes]:
 
 
 def _head() -> Tuple[int, bytes]:
+    global _head_cache
     code, body = _fetch_chain()
     if code != 200:
         return code, body
+    # Derive once per cache fill. /root is hit per request, but an un-amortised
+    # json.loads of the whole (up to MAX_BYTES) ledger per request is a CPU/memory
+    # amplifier (cross-review F2, 2026-11-03). Key the derived head on the chain
+    # entry's own timestamp, so it is recomputed only when _fetch_chain refreshes.
+    ts = _cache["chain"][0]
+    hc = _head_cache
+    if hc is not None and hc[0] == ts:
+        return hc[1], hc[2]
     try:
         d = json.loads(body.decode("utf-8"))
         chain = d.get("chain", d)
         if not isinstance(chain, list) or not chain:
-            return 200, json.dumps({"height": 0, "head": None}).encode()
-        last = chain[-1]
-        return 200, json.dumps({
-            "height": len(chain),
-            "index": last.get("index"),
-            "head": last.get("hash"),
-        }).encode()
+            out = (200, json.dumps({"height": 0, "head": None}).encode())
+        else:
+            last = chain[-1]
+            out = (200, json.dumps({
+                "height": len(chain),
+                "index": last.get("index"),
+                "head": last.get("hash"),
+            }).encode())
     except Exception:                                        # noqa: BLE001
-        return 502, json.dumps({"error": "ledger did not parse"}).encode()
+        out = (502, json.dumps({"error": "ledger did not parse"}).encode())
+    _head_cache = (ts, out[0], out[1])
+    return out
 
 
 INDEX = b"""<!doctype html><meta charset=utf-8>
@@ -227,6 +247,37 @@ class Handler(BaseHTTPRequestHandler):
         return                                                # no request logs
 
 
+class _BoundedServer(ThreadingHTTPServer):
+    # ThreadingHTTPServer spawns one thread per connection with no cap, and the
+    # per-request _inflight gate (do_GET) is taken only AFTER the request line and
+    # headers are read. So a flood of idle or slow-drip connections -- each one
+    # resetting the per-operation socket timeout by dribbling a byte -- could grow
+    # threads and memory without bound, defeating "concurrency is bounded"
+    # (cross-review F1, 2026-11-03: the residual of the A408 slowloris fix). Cap
+    # the connections themselves: take a permit in the accept loop BEFORE a worker
+    # is spawned, refuse (close) when full, release when the worker finishes. At
+    # most MAX_CONN threads can ever exist, so slow clients cause bounded
+    # degradation, never exhaustion. A hostile public exposure should still sit
+    # behind a real reverse proxy; this makes the bare server safe to fail.
+    daemon_threads = True
+
+    def __init__(self, *a, **k) -> None:
+        super().__init__(*a, **k)
+        self._conns = threading.BoundedSemaphore(MAX_CONN)
+
+    def process_request(self, request, client_address) -> None:
+        if not self._conns.acquire(blocking=False):
+            self.shutdown_request(request)        # at capacity: refuse and close
+            return
+        super().process_request(request, client_address)
+
+    def process_request_thread(self, request, client_address) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._conns.release()
+
+
 def main() -> int:
     global NODE_PORT
     p = argparse.ArgumentParser(description="Read-only public view of a node's ledger.")
@@ -238,7 +289,7 @@ def main() -> int:
     NODE_PORT = a.node_port
 
     host = "0.0.0.0" if a.public else "127.0.0.1"
-    srv = ThreadingHTTPServer((host, a.port), Handler)
+    srv = _BoundedServer((host, a.port), Handler)
     print("  serving %s:%d  ->  node on 127.0.0.1:%d"
           % (host, a.port, a.node_port))
     if a.public:

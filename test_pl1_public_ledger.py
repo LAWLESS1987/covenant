@@ -14,6 +14,13 @@ and the flaw returns. A green that was never observed turning red is not a check
   C4b  cache stampede + stale timestamp    -> single-flight lock; timestamp after fetch
   C4c  upstream redirect escapes the origin -> _NoRedirect opener refuses to follow 3xx
 
+A second cross-system round (DeepSeek, 2026-11-03; Claude confirmed against the
+code) found that the C4a fix was partial and two more amplifiers remained:
+
+  F1   unbounded threads / slow-drip        -> _BoundedServer caps live connections
+  F2   /root re-parses up to 8 MiB each hit -> derived head cached per chain fill
+  F3   upstream status echoed to the public -> generic 502, code not relayed
+
 Pure stdlib, loopback only, ephemeral ports. No node required.
 """
 from __future__ import annotations
@@ -82,6 +89,7 @@ class _Upstream:
 
 def _clear_cache():
     pl._cache.clear()
+    pl._head_cache = None
 
 
 # --- C4c: redirects must not escape the fixed origin --------------------------
@@ -256,6 +264,107 @@ def test_concurrency_cap_sheds_load():
         srv.server_close()
 
 
+# --- F1: connection cap bounds threads (slow-drip / fan-out) ------------------
+
+def test_connection_cap_refuses_past_limit():
+    """_BoundedServer refuses connections past its cap instead of spawning an
+    unbounded number of threads: with the cap filled by idle connections, the
+    next connection is closed promptly by the server."""
+    srv = pl._BoundedServer(("127.0.0.1", 0), pl.Handler)
+    srv._conns = threading.BoundedSemaphore(2)       # small cap for the test
+    port = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    held = []
+    try:
+        for _ in range(2):                           # fill both permits, idle
+            held.append(socket.create_connection(("127.0.0.1", port), timeout=5))
+        time.sleep(0.4)                              # let the accept loop take them
+        s3 = socket.create_connection(("127.0.0.1", port), timeout=5)
+        s3.settimeout(3)
+        start = time.time()
+        data = s3.recv(65536)                        # refused -> prompt clean close
+        elapsed = time.time() - start
+        s3.close()
+        assert data == b"" and elapsed < 2.0, \
+            "a connection past the cap should be closed promptly (got %r in %.1fs)" % (data, elapsed)
+    finally:
+        for s in held:
+            s.close()
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_WITHOUT_cap_connection_not_refused():
+    """RED direction: a plain ThreadingHTTPServer does NOT refuse the extra
+    connection -- it spawns another thread and the socket stays open, which is the
+    unbounded-threads flaw. Proves the connection cap is load-bearing, not the
+    per-request _inflight gate."""
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), pl.Handler)
+    port = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    held = []
+    try:
+        for _ in range(2):
+            held.append(socket.create_connection(("127.0.0.1", port), timeout=5))
+        time.sleep(0.4)
+        s3 = socket.create_connection(("127.0.0.1", port), timeout=5)
+        s3.settimeout(1.5)
+        start = time.time()
+        try:
+            data = s3.recv(65536)                    # stays open -> recv blocks
+            closed = (data == b"")
+        except socket.timeout:
+            closed = False
+        elapsed = time.time() - start
+        s3.close()
+        assert not closed and elapsed >= 1.4, \
+            "plain server should leave the extra connection open, not refuse it"
+    finally:
+        for s in held:
+            s.close()
+        srv.shutdown()
+        srv.server_close()
+
+
+# --- F2: /root derives the head once per cache fill, not per request ----------
+
+def _count_head_parses(reset_each_call):
+    up = _Upstream(mode="ok", body=b'{"chain":[{"index":1,"hash":"h"}]}')
+    saved_loads = pl.json.loads
+    calls = {"n": 0}
+
+    def counting(*a, **k):
+        calls["n"] += 1
+        return saved_loads(*a, **k)
+    try:
+        pl.NODE_PORT = up.port
+        _clear_cache()
+        pl.json.loads = counting
+        for _ in range(10):
+            if reset_each_call:
+                pl._head_cache = None                # defeat the cache (pre-fix)
+            code, _ = pl._head()
+            assert code == 200
+        return calls["n"]
+    finally:
+        pl.json.loads = saved_loads
+        pl._head_cache = None
+        up.stop()
+
+
+def test_root_parses_once_per_window():
+    """With the derived-head cache, 10 /root calls in one cache window parse once."""
+    n = _count_head_parses(reset_each_call=False)
+    assert n == 1, "head parsed %d times; expected once per cache window" % n
+
+
+def test_WITHOUT_head_cache_reparses_every_call():
+    """RED direction: without a persistent head cache, each /root re-parses the
+    whole ledger -- the F2 amplifier. Proves the cache is load-bearing."""
+    n = _count_head_parses(reset_each_call=True)
+    assert n == 10, "without the head cache each call should parse; got %d" % n
+
+
 TESTS = [
     test_redirect_not_followed,
     test_redirect_WOULD_follow_without_guard,
@@ -265,6 +374,10 @@ TESTS = [
     test_production_handler_has_timeout,
     test_slow_client_is_dropped,
     test_concurrency_cap_sheds_load,
+    test_connection_cap_refuses_past_limit,
+    test_WITHOUT_cap_connection_not_refused,
+    test_root_parses_once_per_window,
+    test_WITHOUT_head_cache_reparses_every_call,
 ]
 
 

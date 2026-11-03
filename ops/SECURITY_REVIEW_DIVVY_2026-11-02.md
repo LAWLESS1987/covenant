@@ -103,6 +103,44 @@ New findings (open):
       as a real guarantee-vs-code gap.
   FIX (this session, both-ways guard = the artifact): see commit + test_pl1_public_ledger.py below.
 
+- C5 -- DeepSeek (area 9 fresh primary, public_ledger.py, the A408-FIXED version), 2026-11-03: driven cold
+  (no names, no digest, no hint of C4) as the independent, vendor-different primary the divvy assigned Tien.
+  TWO results, both VERIFIED by Claude (me, the different system) against the real code + CPython http.server
+  semantics:
+  CONFIRMS A408 (independent cross-check of my own fix -- the point of the round): DeepSeek ruled out, with
+  reasons, exactly the three C4 fixes -- redirect/SSRF ("_NoRedirect + ProxyHandler({}) correctly disabled",
+  "URL built purely from module constants"), the 8 MiB cap ("read(MAX_BYTES+1) ... stops at amt ... lock means
+  one fetch in flight, doesn't multiply"), the single-flight lock, HEAD/body desync, path traversal, cache
+  poisoning, request smuggling, header injection. So A408 holds under a second system's eyes.
+  FINDS A RESIDUAL the A408 (a) fix did not close + two more amplifiers (all CONFIRMED, now FIXED this session):
+  (F1) HIGH -- "concurrency is bounded" was still false. _inflight.acquire is inside do_GET (public_ledger.py:197),
+       taken only AFTER BaseHTTPRequestHandler reads the request line + headers; ThreadingHTTPServer
+       (public_ledger.py:241) spawns one thread per connection with no cap. Handler.timeout (:180) is PER-socket-op,
+       so a slow-drip client (one byte within each 15 s window) resets it and holds a thread indefinitely -> thread/
+       memory exhaustion via fan-out or slow-drip. My A408 (a) fix closed the FULLY-IDLE slowloris only. CONFIRMED by
+       Claude (traced parse_request-before-do_GET and ThreadingMixIn.process_request). FIX: _BoundedServer caps live
+       connections at MAX_CONN (permit taken in the accept loop BEFORE a worker spawns; refused+closed when full;
+       released when the worker ends), so at most MAX_CONN threads ever exist -- bounded degradation, not exhaustion.
+       Honest residual (rule 9): slow-drip can still occupy up to MAX_CONN slots; a hostile public exposure should
+       sit behind a real reverse proxy. Both-ways guard: test_connection_cap_refuses_past_limit /
+       test_WITHOUT_cap_connection_not_refused.
+  (F2) MEDIUM -- /root re-parsed up to 8 MiB on EVERY request: _head() did json.loads per call (public_ledger.py:143),
+       not cached in parsed form, so 64 concurrent /root = 64 concurrent 8 MiB parses (CPU/mem amplifier, no slow
+       upstream needed). (DeepSeek also named /health; that path reads only the status code, so /root is the real
+       amplifier -- narrowed by Claude.) CONFIRMED. FIX: derived-head cache keyed on the chain entry's timestamp ->
+       parses once per 5 s fill. Both-ways: test_root_parses_once_per_window / test_WITHOUT_head_cache_reparses_every_call.
+  (F3) LOW -- the 502 branch echoed the upstream status code to a public caller (public_ledger.py:127) and failures
+       were cached 5 s. CONFIRMED. FIX: generic "node returned an error status" (code not relayed). Brief negative
+       caching kept deliberately (it protects a down node from being hammered -- an intended tradeoff, named not hidden).
+  Lower-sev noted, NOT changed (rule 9, named): F4 the single-flight lock is held across the network fetch so a slow
+  upstream serialises all GET/HEAD (bounded by the semaphore -- the deliberate stampede defence); F5 --public binds
+  IPv4 0.0.0.0 only; F6 OPTIONS/TRACE/unknown verbs get 501 not the docstring's "405"; F7 broad except Exception;
+  F8 time.time() not monotonic for cache freshness. All low; logged for a later pass, not fixed now.
+  LESSON (tombstone): a fix that targets the NAMED variant of a flaw (idle slowloris) can leave the UNNAMED variant
+  (slow-drip + unbounded thread creation) open. C4(a) + my A408 fix added a per-op timeout and a post-parse semaphore
+  and read as "slowloris closed"; the second system showed the bound was in the wrong place (handler body, not the
+  connection). Put the bound where the resource is created.
+
 - C3 -- ChatGPT (area 7, free_will heal auth), 2026-11-03: a CONDITIONAL candidate, and the first seat this round
   to find the gap in Claude's own pass. It accepted the loopback/signature logic but flagged that
   _tailnet_caller returns `addr2 or addr` (covenant_unified_v8.py:9179) where addr2 comes from
@@ -277,3 +315,11 @@ correct; correctness of the SNN/scoring math was out of this review's security s
   visibility-gated, reasoning recorded). Still OPEN for external seats when RAM/his-browser frees:
   area 9 primary (Tien, fresh eyes), area 5 Grok re-drive (C6), area 6 Gemini re-drive, areas
   3/4/7 primaries. mbc-flinch-8 = PRIVATE (mutual-benefit-collective) — never paste externally.
+- 2026-11-03 (later): area 9 independent PRIMARY done via DeepSeek (cold, vendor-different from
+  ChatGPT/C4 and from my fix) on the A408-fixed file — RAM 3.24 GB (model away), so strict
+  one-tab-at-a-time, not the batch-of-3 floor. DeepSeek independently CONFIRMED the A408 fixes AND
+  found a HIGH residual + two amplifiers (C5: F1 unbounded-threads/slow-drip, F2 /root 8 MiB re-parse,
+  F3 status echo). All three CONFIRMED by Claude and FIXED this session; PL1 guard extended to 12/12
+  both-ways. So area 9 now has: external primary (ChatGPT + DeepSeek), Claude cross-check, and a fix
+  cross-validated by a second system. Remaining external seats unchanged (area 5 Grok, area 6 Gemini,
+  areas 3/4/7, F0a–F0f cross-checks). Still RAM-gated for batches.
