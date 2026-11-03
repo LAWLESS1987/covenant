@@ -619,6 +619,11 @@ SUITES = [
     # mutation-tested. Hermetic: fixture conditions, temp ledgers, no node and
     # no network, so it measures the rules rather than the machine.
     ("test_h1_highway.py", 180, "DAILY + GUARDS"),
+    # SF1 (2026-11-02, A405): the highway's sync-fabric detectors and remedies, each driven both ways. The
+    # unison feed's staleness, a sync task that fails or stops firing (re-run, AUTO_REVERSIBLE), a task gone
+    # entirely (config, PROPOSE_ONLY), and HF/website vs github mirror lag -- github never auto-pushed. Hermetic:
+    # feed and scheduler are fixtures, the cache a temp file, no node and no network.
+    ("test_sf1_sync_fabric.py", 120, "DAILY + GUARDS"),
     # NA1 (2026-10-20): H1i names six protected subjects; the engine's NEVER_AUTOMATIC tuple had fourteen
     # (twenty-four since 2026-10-30: the grid/ICS-OT actuation words, A392).
     # NA1 drives every one through apply_remedy so the money/seat/rule/consent/key list cannot silently shrink.
