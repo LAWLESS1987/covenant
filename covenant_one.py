@@ -627,6 +627,13 @@ SUITES = [
     # nothing newer counts as a look (fetch_build was quarantined for it), and "behind" means behind in the
     # files the APK ships, not in every docs commit.
     ("test_pb1_phone_build_signals.py", 120, "DAILY + GUARDS"),
+    # FO1 (2026-11-02, A407, his words: "we need our own operating systems running parallel ...
+    # RESILIENCE/REDUNDANCY"): the parallel-OS layer (covenant_failover). Does a critical service have a
+    # LIVE redundant instance on a DIFFERENT OS/host, and is an OS environment down? Resolver, three senses
+    # and two repairs driven BOTH WAYS with injected probes (hermetic); a gated live block stands up the real
+    # Windows+WSL beacon pair and shows cross-OS failover on the control host, skipped (never counted green)
+    # elsewhere. Failover to a provisioned standby is AUTO_REVERSIBLE; provisioning a new env is PROPOSE_ONLY.
+    ("test_fo1_failover.py", 240, "DAILY + GUARDS"),
     # TD1 (2026-09-28, his directive to Tetsu): the daily maintenance cycle's verdicts, driven both
     # ways with stubbed readings -- a disagreeing tip is failed, a height-only phone is unverified, stale
     # sweep results are never a pass, an old failure back is "reappeared", the one automatic rollback
