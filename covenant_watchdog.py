@@ -1921,6 +1921,10 @@ def one_pass(strict=False):
         es = tend_earn_service()
         if es not in ("up", "no grant"):
             log("INFO", "earn service: %s" % es)
+        # A407 (2026-11-03): the TETSU-plane node + forwarder, laptop-gated, same cadence.
+        tp = tend_tetsu_plane()
+        if tp not in ("up", "no plane node here"):
+            log("INFO", "tetsu plane: %s" % tp)
         mp = tend_pending()
         if mp != "nothing pending":
             log("INFO", "pool: %s" % mp)
@@ -2323,6 +2327,73 @@ def tend_earn_service(spawn=None, port=None):
         else:
             spawn()
         return "started"
+    except Exception as e:                                   # noqa: BLE001
+        return "failed: %s: %s" % (type(e).__name__, e)
+
+
+# --- the TETSU-plane node (100.96.0.2) + its loopback forwarder --------------
+# His "all redundancy ... get it done" (2026-11-03). The laptop joins TETSU's OWN
+# headscale (an independent parallel control plane) over a loopback forwarder --
+# see ~/.tetsu-plane-node/plane_forward.py and ensure_plane.ps1. A Startup launcher
+# brings it back at logon; THIS tend is the unelevated 2-minute self-heal the TETSU
+# node-setup session recommended (same shape as hs-own there), the layer that heals
+# a mid-session death without an admin scheduled task.
+TETSU_PLANE_DIR = os.path.join(os.path.expanduser("~"), ".tetsu-plane-node")
+TETSU_PLANE_ENSURE = os.path.join(TETSU_PLANE_DIR, "ensure_plane.ps1")
+TETSU_PLANE_PIPE = r"\\.\pipe\tetsu-plane"
+TETSU_PLANE_FWD_PORT = 18085
+_TAILSCALE_EXE = r"C:\Program Files\Tailscale\tailscale.exe"
+
+
+def _tetsu_plane_node_running():
+    """True if the plane node reports BackendState==Running on its pipe, False if
+    it answers but is not Running, None where it cannot be queried (not Windows, no
+    tailscale binary, daemon not up). Uses subprocess.run (a read), never Popen."""
+    if os.name != "nt" or not os.path.exists(_TAILSCALE_EXE):
+        return None
+    try:
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        p = subprocess.run([_TAILSCALE_EXE, "--socket=" + TETSU_PLANE_PIPE, "status", "--json"],
+                           capture_output=True, text=True, timeout=10, creationflags=flags)
+        if not (p.stdout or "").strip():
+            return None
+        import json as _json
+        return _json.loads(p.stdout).get("BackendState") == "Running"
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+
+def tend_tetsu_plane(spawn=None):
+    """Keep the laptop's TETSU-plane node and its loopback forwarder alive on the
+    guard's two-minute cadence. LAPTOP-ONLY: 'no plane node here' where
+    ensure_plane.ps1 is absent (phone, Linux, any other host), so it is a clean
+    no-op off this machine. Healthy = the forwarder answers on EXACTLY
+    127.0.0.1:18085 (a connect to that address, not a bare port scan -- the TETSU
+    side's port-only check once read the relay as headscale and never repaired)
+    AND the node's BackendState is Running. Repair runs the idempotent
+    ensure_plane.ps1 (forwarder + userspace tailscaled + up --unattended),
+    windowless, and is fenced by the SAME A370 gate as the other tends (only the
+    real daemon, in a tree that can relaunch its nodes). Returns 'up',
+    'no plane node here', 'started: ...', 'not started: ...' or 'failed: ...'."""
+    if not os.path.exists(TETSU_PLANE_ENSURE):
+        return "no plane node here"
+    fwd_up = _port_listening(TETSU_PLANE_FWD_PORT, "127.0.0.1")
+    node_running = _tetsu_plane_node_running()
+    if fwd_up and node_running is True:
+        return "up"
+    reason = "forwarder down" if not fwd_up else ("node not Running" if node_running is not True else "degraded")
+    try:
+        if spawn is None:
+            ok, why = _tend_may_act()                        # A370
+            if not ok:
+                return "not started: " + why
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
+            subprocess.Popen(["powershell", "-NoProfile", "-WindowStyle", "Hidden",
+                              "-ExecutionPolicy", "Bypass", "-File", TETSU_PLANE_ENSURE],
+                             cwd=TETSU_PLANE_DIR, creationflags=flags)
+        else:
+            spawn()
+        return "started: " + reason
     except Exception as e:                                   # noqa: BLE001
         return "failed: %s: %s" % (type(e).__name__, e)
 
