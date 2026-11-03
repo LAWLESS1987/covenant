@@ -287,6 +287,13 @@ ops/pause/
 # Node A's off-box peers (the phone's tailnet address), read by covenant_watchdog.py
 # and covenant_prod.bat alike, so neither public file carries the address.
 ops/local_peers.txt
+# the AUTO_GATED auto-onboard lane's LOCAL state (covenant_onboard.py): the operator's
+# arm/trust-root switch and the tasks the lane has armed. Both machine-local decisions,
+# not repo content -- the lane ships DARK (no arm file) and writes armed_tasks only once
+# armed. NODE_ROSTER.json and node_refusals.json ARE tracked (the whois trust root needs
+# the roster committed; a refusal only tightens).
+ops/AUTO_ONBOARD_ARMED
+ops/armed_tasks.json
 # the laptop site auto-deploy job's per-pass record (tools/site_autodeploy.py), machine-local
 ops/site_autodeploy.jsonl
 ops/local_unison_feed.txt
