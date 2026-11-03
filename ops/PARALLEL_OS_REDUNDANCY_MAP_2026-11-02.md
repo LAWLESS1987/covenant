@@ -66,6 +66,18 @@ is intermittent. So the node layer degrades to single-host whenever TETSU sleeps
    model). This is the one genuine operator decision left — a security boundary,
    not a task to hack around. Then the TETSU session stands it up (install + its
    own key + DB replication). Being done on TETSU/phone, not here.
+   **Phone alternate — MEASURED 2026-11-03 (A407), report-only.** Asked whether
+   the phone could carry a cold standby *today* to skip the TETSU reboot, the
+   phone-app-join session measured it against its join (covenant-phone PR #6): the
+   phone *can* host headscale via the same native `lib*.so` mechanism as its
+   tailscale join (a `libheadscale.so` twin, mesh-only reach via `tailscale
+   serve`), but it is **not an install-free shortcut**. It is a new feature ~the
+   size of the join — needing an operator **rebuild+install** (nothing pushes to
+   the phone), the client join **proven live first** (making an unverified host
+   the fallback authority is backwards), and the phone's **own** on-device noise
+   key plus a filtered PC-side export (operator decision; touches keys). So BOTH
+   paths need an operator action; TETSU (32 GB, always-on) stays the better home
+   and the phone is a last-resort third host. Not stood up — reported.
 2. **unison feed + own_git — served from TETSU, no second feed.** The sync
    fabric's source runs on a tailnet node (TETSU), not the laptop. Redundancy is
    a **second feed on a different host** — the laptop can host one (it has the

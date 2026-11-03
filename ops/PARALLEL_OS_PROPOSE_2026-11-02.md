@@ -80,6 +80,23 @@ TETSU and re-authenticate. Document it; it is manual by construction.
 operator has enabled WSL at TETSU. **Resilience:** the mesh regains a coordinator
 after the laptop/WSL dies (manual cutover). **Undo:** stop + remove on TETSU.
 
+**Phone alternate — MEASURED 2026-11-03 (A407), report-only (NOT an install-free
+shortcut).** To close this SPOF without the TETSU reboot, the phone-app-join
+session measured a phone cold standby (against covenant-phone PR #6). Verdict:
+mechanically feasible — the phone runs native arm64 `lib*.so` binaries from its
+`:node` process, so a `libheadscale.so` twin of `libtailscaled.so` works, reachable
+mesh-only via `tailscale serve` at `100.64.0.<phone>`, no cert. But it is a **new
+feature ~the size of the join**, not a flag flip, and needs: an operator
+**rebuild+install** (nothing pushes to the phone — standing it up from a session is
+physically impossible); the client join **proven live first** (an unverified host
+must not be the mesh's fallback authority); the phone's **own** noise key generated
+on-device + a filtered PC-side export (no keys, never `db.sqlite`) → **operator
+decision, touches keys**. Order: verify the join live → then, if wanted, build the
+standby capability gated exactly like the join → then arm + register in
+`covenant_failover.SERVICES`. The phone session will spec/build on the operator's
+word; it will not arm on a sibling request or before the join is proven. **TETSU
+stays the better home** (32 GB, always-on); the phone is a last-resort third host.
+
 ---
 
 ## 2. git-host standby — Windows-side, cross-OS — ✅ DONE (no install)
