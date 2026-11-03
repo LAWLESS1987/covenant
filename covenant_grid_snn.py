@@ -108,13 +108,24 @@ def encode_window(rows, now=None, window_s=WINDOW_S, t_bins=T_BINS):
 
 
 # --------------------------------------------------------------- pure-numpy LIF
-def run_lif(enc, weights):
+def run_lif(enc, weights, graded=None):
     """Pure-numpy leaky-integrate-and-fire forward pass. V[t+1]=beta*V[t]+I[t];
     spike when V>=thresh; subtractive reset. A small recurrent hidden layer + one
     'alarm' readout with cross-zone lateral inhibition (the coincidence detector).
     Score = alarm spike count. No torch at runtime, so inference is reproducible
-    and auditable. `weights` is the frozen checkpoint dict."""
+    and auditable. `weights` is the frozen checkpoint dict.
+
+    `graded` (opt-in, A406 / prereg v2 Amendment A1 -- the operator's don't-cancel /
+    "amplify the amount we're allowing" test). Default (None -> read weights["graded"],
+    else False) is the CONTROL binary cap, unchanged and load-bearing for the shipped
+    witness + GS1. When True, a bin emits MULTIPLE spikes k=floor(V/thresh) and the
+    membrane subtracts k*thresh (so strong/frequent drive is NOT flattened to one spike),
+    and the alarm readout counts floor(Va/th_a) rather than a single fire -- so clustered
+    or repeated in-bounds attack spikes accumulate instead of cancelling. Shipped only if
+    it clears the SEALED bar on a held-out family (prereg Amendment A1); else recorded."""
     import numpy as np
+    if graded is None:
+        graded = bool(weights.get("graded", False))
     chan_order = ("breaker", "shed", "setpoint_delta", "interval", "zones_active")
     # feature vector per time-bin: per-channel sum over zones + cross-zone coincidence
     t_bins = enc["breaker"].shape[0]
@@ -138,11 +149,20 @@ def run_lif(enc, weights):
     for t in range(t_bins):
         I = X[t] @ W_in + sh @ W_rec
         Vh = beta * Vh + I
-        sh = (Vh >= th_h).astype(float)
-        Vh = Vh - sh * th_h
+        if graded:                                        # multi-spike: strong drive is NOT capped at 1
+            sh = np.floor(np.maximum(Vh, 0.0) / th_h)
+            Vh = Vh - sh * th_h
+        else:                                             # CONTROL: one spike per bin, subtractive reset
+            sh = (Vh >= th_h).astype(float)
+            Vh = Vh - sh * th_h
         Ia = sh @ W_out
         Va = beta * Va + Ia
-        if Va >= th_a:
+        if graded:
+            inc = int(np.floor(max(Va, 0.0) / th_a))      # count the excess, don't flatten to 1
+            if inc > 0:
+                alarm += inc
+                Va -= inc * th_a
+        elif Va >= th_a:
             alarm += 1
             Va -= th_a
     return float(alarm)

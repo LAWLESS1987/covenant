@@ -441,6 +441,26 @@ def _post(port, path, body, timeout=60):
 PAGE = None   # filled at import from covenant_app_page.html if present
 
 
+def _host_allowed(host_header):
+    """True iff the HTTP Host header names this loopback console, not a rebound DNS name.
+    The per-request peer check (_guard) proves the CONNECTION came from loopback, but a
+    browser pointed at a domain whose DNS was rebound to 127.0.0.1 ALSO connects from
+    loopback, carrying the attacker's Host -- so a page on any website could drive this
+    console through the user's browser (restart nodes, sign a tx, run an armed action).
+    Requiring the Host's hostname to be a loopback literal defeats DNS rebinding: the
+    rebound request still says `Host: evil.example`. Empty Host is rejected -- a real client
+    reaching a loopback URL always sends one. (2026-11-02 security hunt.)"""
+    h = (host_header or "").strip()
+    if not h:
+        return False
+    host = h
+    if host.startswith("["):                 # [::1]:5199 -> ::1
+        host = host[1:].split("]", 1)[0]
+    elif host.count(":") == 1:               # 127.0.0.1:5199 -> 127.0.0.1
+        host = host.split(":", 1)[0]
+    return host.lower() in ("127.0.0.1", "localhost", "::1")
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "covenant-app"
 
@@ -466,6 +486,12 @@ class Handler(BaseHTTPRequestHandler):
         host = self.client_address[0]
         if host not in ("127.0.0.1", "::1"):
             self._send(403, json.dumps({"error": "loopback only"}))
+            return False
+        # A loopback CONNECTION is not enough: a page on any site, via DNS rebinding, makes
+        # the browser connect here from loopback carrying its own Host. Require the Host to
+        # name this console, so a rebound request (Host: evil.example) is refused.
+        if not _host_allowed(self.headers.get("Host")):
+            self._send(403, json.dumps({"error": "bad Host header (DNS-rebind guard)"}))
             return False
         return True
 

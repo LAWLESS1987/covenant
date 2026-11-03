@@ -2600,6 +2600,44 @@ def remedy_restart_headscale(measured, dry_run=True):
     return False, "relaunched but headscale did not answer /health within ~12 s"
 
 
+def _githost_server_path():
+    """The ABSOLUTE WSL path of the git-host script THIS machine's launcher runs, measured
+    from the launcher (the deployed-here marker), never hardcoded. The stop below must match
+    this one process by its full path, not the bare filename 'git_http_server.py' -- a bare
+    `pkill -f git_http_server.py` is the A160 shape: it hits EVERY process on the box whose
+    command line contains that string (a second checkout, a staged/scratch copy, a manual
+    run), not just ours. (2026-11-02, closing the open item in docs/KNOWN_ISSUES.md A392 and
+    the grid-guard note.)
+
+    The vbs runs `wsl.exe -d Ubuntu -- /abs/serve.sh`; serve.sh `exec`s
+    `python3 /abs/git_http_server.py`, so after exec the live cmdline carries that absolute
+    path. Returns "" when the path cannot be measured -- the caller then issues NO kill at
+    all (fail-safe) rather than fall back to a bare-name match."""
+    import re
+    import subprocess
+    vbs = _githost_launcher()
+    if not vbs or not os.path.exists(vbs):
+        return ""
+    try:
+        txt = open(vbs, "r", errors="replace").read()
+    except OSError:
+        return ""
+    m = re.search(r"--\s+(/\S+?\.sh)\b", txt)     # the serve.sh the launcher runs
+    if not m:
+        return ""
+    serve = m.group(1)
+    try:                                           # measured: serve.sh's own exec line
+        p = subprocess.run(["wsl.exe", "-d", "Ubuntu", "--", "cat", serve],
+                           creationflags=_NOWIN, capture_output=True, text=True, timeout=15)
+        m2 = re.search(r"(/\S+?/git_http_server\.py)\b", p.stdout or "")
+        if m2:
+            return m2.group(1)
+    except Exception:                              # noqa: BLE001
+        pass
+    d = serve.rsplit("/", 1)[0]                     # co-deployed with serve.sh: dir + script
+    return d + "/git_http_server.py" if d.startswith("/") else ""
+
+
 def remedy_restart_git_host(measured, dry_run=True):
     """STATELESS: relaunch our own smart-HTTP git host via the SAME hidden Startup launcher
     logon uses. Reversible; touches nothing in NEVER_AUTOMATIC. The sibling of
@@ -2610,10 +2648,14 @@ def remedy_restart_git_host(measured, dry_run=True):
         return False, "no git-host launcher on this machine to restart"
     if dry_run:
         return True, "would relaunch the git host via the Startup launcher (wscript, hidden)"
-    # end a stuck server by its unique script name (the process is plain 'python3', so -f on
-    # the script path, never -x python3, which would hit unrelated interpreters)
-    subprocess.run(["wsl.exe", "-d", "Ubuntu", "--", "pkill", "-f", "git_http_server.py"],
-                   creationflags=_NOWIN, capture_output=True, timeout=30)
+    # end a stuck server by its ABSOLUTE script path (the process is plain 'python3', so -f on
+    # the full path -- never -x python3, which would hit unrelated interpreters, and never a
+    # bare 'git_http_server.py', the A160 shape that hits every tree's copy). If the path is
+    # not measurable, kill NOTHING and let the relaunch attempt stand or fail honestly.
+    server_path = _githost_server_path()
+    if server_path:
+        subprocess.run(["wsl.exe", "-d", "Ubuntu", "--", "pkill", "-f", server_path],
+                       creationflags=_NOWIN, capture_output=True, timeout=30)
     time.sleep(1)
     subprocess.run(["wscript.exe", vbs], creationflags=_NOWIN, capture_output=True, timeout=30)
     # "It came back" is the DETECTOR's definition of alive, read by calling the detector

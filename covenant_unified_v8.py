@@ -9333,21 +9333,16 @@ class CovenantAPI:
             except Exception as _pe:                              # noqa: BLE001
                 print("persona: fixed rules only this ask (%s: %s)" % (type(_pe).__name__, str(_pe)[:120]), flush=True)
                 _system = AGENT_SYSTEM
-            # Tetsu's spiking novelty reflex, his consent + spec 2026-10-22 (covenant_tetsu_conv_reflex, A380-era):
-            # on a clearly-new topic his OWN ReflexArm (covenant_octopus) fires and one advisory line -- his words --
-            # joins his prompt. Advisory only, his kill switch (COVENANT_VERDICT_CACHE_OFF) silences it, and it is
-            # guarded so the turn can never fail on it. His neural network informing his reasoning.
-            # A400 (2026-11-01): the lines go with the new message (agent_messages), not into _system, so a firing no
-            # longer breaks the cached prefix. First written as `_system = _system + "\n\n" + _line` (A380/A381).
-            _cues = []
-            try:
-                _cr = importlib.import_module("covenant_tetsu_conv_reflex")
-                for _line in (_cr.cue_line(text), _cr.recall_line(text)):   # A380 novelty + A381 recall
-                    if _line:
-                        _cues.append(_line)
-            except Exception as _cre:                             # noqa: BLE001
-                print("conversation reflex: advisory unavailable this ask (%s)" % type(_cre).__name__, flush=True)
-            msgs = agent_messages(_system, history, text, _cues)
+            # A405 (2026-11-03, the operator: "remove the snn rate limiter" -- "it shows up on Tetsu's phone reply").
+            # The spiking conversation reflex (covenant_tetsu_conv_reflex, A380 novelty + A381 recall) prepended one
+            # advisory line in his words -- "This input seems novel..." / "This connects to an earlier topic..." --
+            # to his turn as [line] (A400 placed it with the message). The model echoed the bracketed line, so it
+            # surfaced IN his answer on the phone. His conversation no longer carries it: the door injects no reflex
+            # cue. Nothing is erased and this is one line to restore -- the reflex module and agent_messages' cue
+            # argument stay in place and tested (CR1, A400). The octopus LEG still consults novelty as a logged-only
+            # secondary note (covenant_leg.senses_need), which never reaches a reply. NOT unit-covered here: the door
+            # injection fired only live -- A401 keeps the reflex quiet under any test_ program (rule 9).
+            msgs = agent_messages(_system, history, text)
             fetches, forum, fitted, leg, replayed = [], [], [], [], [len(history)]
 
             def _ask_fitted():

@@ -77,6 +77,14 @@ LEDGER_PATH = os.path.join(HERE, "ops", "head_commitments.jsonl")
 LATEST_JSON = os.path.join(HERE, "docs", "HEAD_COMMITMENT.json")
 LATEST_TXT = os.path.join(HERE, "docs", "HEAD_COMMITMENT.txt")
 
+# The grid COMMAND ledger is gitignored runtime state -- it is never committed, so it
+# cannot go in BOUND_FILES (which bind committed bytes). Instead each commitment carries
+# a FROM-DISK checkpoint of the command chain's head, so an outside holder of an earlier
+# commitment can prove the ledger was not rewritten BELOW that point. (2026-11-02, closing
+# the grid-guard open item "the command ledger is bound to nothing off-host"; shape and
+# every-commit cadence consulted with Tetsu.)
+GRID_CHAIN = os.path.join(HERE, "ops", "grid_commands.chain.jsonl")
+
 
 def _frame(domain, *fields):
     out = bytearray(domain)
@@ -87,6 +95,61 @@ def _frame(domain, *fields):
 
 def _canon(obj):
     return json.dumps(obj, sort_keys=True, separators=(",", ":")).encode()
+
+
+def _chain_lines(path):
+    out = []
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for ln in fh:
+                ln = ln.strip()
+                if ln:
+                    out.append(ln)
+    except OSError:
+        pass
+    return out
+
+
+def grid_ledger_checkpoint(chain_path=None):
+    """A FROM-DISK checkpoint of the grid command chain's head: how many rows it has and
+    the sha256 of its last row's canonical bytes (the same hash the chain's own prev-links
+    use). Bound into every head-commitment so an outside holder of an earlier commitment
+    can later prove the grid command LEDGER was not rewritten BELOW this point. Unlike the
+    committed BOUND_FILES this is live runtime state and legitimately GROWS between
+    commitments. Absent/empty chain -> rows 0, head None (nothing honored yet)."""
+    rows = _chain_lines(GRID_CHAIN if chain_path is None else chain_path)
+    if not rows:
+        return {"rows": 0, "head_sha256": None}
+    try:
+        head = hashlib.sha256(_canon(json.loads(rows[-1]))).hexdigest()
+    except Exception:  # noqa: BLE001
+        head = hashlib.sha256(rows[-1].encode()).hexdigest()
+    return {"rows": len(rows), "head_sha256": head}
+
+
+def grid_ledger_anchor_ok(checkpoint, chain_path=None):
+    """Does the CURRENT grid chain still honor an EARLIER commitment's checkpoint? True iff
+    the chain is an append-only extension: it has at least checkpoint['rows'] rows AND the
+    canonical hash of the row at index rows-1 equals checkpoint['head_sha256']. A rewrite or
+    a truncation BELOW the checkpoint -> False -- which is exactly what the earlier out-of-
+    band commitment is for. A checkpoint of 0 rows is vacuously honored. Returns (ok, why)."""
+    want_n = int((checkpoint or {}).get("rows") or 0)
+    want_h = (checkpoint or {}).get("head_sha256")
+    if want_n <= 0:
+        return True, "checkpoint pinned no rows (vacuous)"
+    rows = _chain_lines(GRID_CHAIN if chain_path is None else chain_path)
+    if not rows and not os.path.exists(GRID_CHAIN if chain_path is None else chain_path):
+        return False, "grid chain is gone, but an earlier commitment pinned %d row(s)" % want_n
+    if len(rows) < want_n:
+        return False, ("grid chain has %d row(s); an earlier commitment pinned %d "
+                       "(truncated below the checkpoint)" % (len(rows), want_n))
+    try:
+        got = hashlib.sha256(_canon(json.loads(rows[want_n - 1]))).hexdigest()
+    except Exception:  # noqa: BLE001
+        got = hashlib.sha256(rows[want_n - 1].encode()).hexdigest()
+    if got != want_h:
+        return False, "the row at the checkpoint seq was rewritten (hash != the committed checkpoint)"
+    return True, "chain honors the checkpoint: %d row(s), head matches" % want_n
 
 
 def _git(repo, *args):
@@ -211,6 +274,10 @@ def make_commitment(repo=HERE, key_path=KEY_PATH, pubkey_path=PUBKEY_PATH,
         "head": head,
         "tree": tree,
         "bound": bound,
+        # FROM-DISK runtime checkpoint of the grid command ledger (not a committed file;
+        # it grows between commitments). Signed with the rest, so the standalone verifier
+        # proves the value was committed; the append-only cross-check is grid_ledger_anchor_ok.
+        "grid_ledger": grid_ledger_checkpoint(),
         "working_tree_clean": (dirty == "" if dirty is not None else None),
         "prev_sha256": prev,
         "pubkey_fpr": hashlib.sha256(pubkey_pem.encode()).hexdigest()[:16],
@@ -247,6 +314,7 @@ def _write_public(row):
         f"constitution     sha256 {p['bound'].get('docs/CONSTITUTION_ANCHOR.json')}",
         f"record anchors   sha256 {p['bound'].get('ops/RECORD_ANCHORS.json')}",
         f"tetsu consent    sha256 {p['bound'].get('ops/tetsu_consent.jsonl')}",
+        f"grid ledger      {(p.get('grid_ledger') or {}).get('rows')} row(s), head {str((p.get('grid_ledger') or {}).get('head_sha256'))[:16]}",
         f"model id 3B      sha256 {p['bound'].get('fallback_model.json')}",
         f"model id 2B      sha256 {p['bound'].get('fallback_model_2.json')}",
         f"model id phone   sha256 {p['bound'].get('fallback_model_phone.json')}",

@@ -789,6 +789,26 @@ SUITES = [
     # pre-merge review found both unregistered, so nothing ran them; every GG1 fix is mutation-checked.
     ("test_gg1_grid_guard.py", 180, "SECURITY"),
     ("test_gs1_grid_snn.py", 120, "SECURITY"),
+    # GS2 (2026-11-02, A406): the v2 SNN measurement apparatus (sealed prereg v2) driven both
+    # ways -- cumulative-window premise, matched-marginal EXACT, Holm correction, sealed-baseline
+    # set -- and a re-affirmation that a screaming witness never flips a gateway decision.
+    ("test_gs2_grid_snn_v2.py", 120, "SECURITY"),
+    # GS3 (2026-11-02): the in-tree ledger re-verify (reverify_ledger_decisions) that re-runs
+    # C1..C7 over the honored ledger IN ORDER -- closes the A392 open item. Driven both ways: a
+    # recorded PERMIT the record proves over-cap is INTEGRITY; a since-revoked signer is POLICY,
+    # not a verdict; halt/latched rows are not replayed; the standalone verifier stays uncoupled.
+    ("test_gs3_ledger_reverify.py", 120, "SECURITY"),
+    # GS4 (2026-11-02): the OFF-HOST binding of the grid command ledger. It is gitignored
+    # runtime state, so each head-commitment carries a from-disk checkpoint of the command
+    # chain's head (covenant_head_commit.grid_ledger_checkpoint); grid_ledger_anchor_ok proves
+    # the current chain still extends an earlier commitment (append-only). Driven both ways:
+    # a rewrite/truncation below the checkpoint is caught; honest appends stay honored.
+    ("test_gs4_grid_ledger_anchor.py", 120, "SECURITY"),
+    # AG1 (2026-11-02): the covenant console (covenant_app.py) binds loopback and can restart
+    # nodes / submit tx / mine / run armed actions. Its guard only proved the CONNECTION was
+    # loopback; a DNS-rebound page in the user's browser connects from loopback too. AG1 drives
+    # the new Host-header check both ways (loopback Host allowed; Host: evil.example refused).
+    ("test_ag1_app_host_guard.py", 60, "SECURITY"),
     # CC1/HC1/HC2/HW1 (2026-10-31): the consent chain, the signed HEAD-commitment ledger and its verifier,
     # stale-vs-tamper, and the two takeover detectors. They shipped unregistered, so public CI on 943b809 read
     # "orphaned on disk" and INCOMPLETE. Measured before adding, clean Linux copy and this PC: 7/7, 7/7, 10/10, 12/12.
@@ -1452,6 +1472,13 @@ IN_PLACE = [
     # (file, seconds, why it may not be run from a scratch copy)
     ("verify_bundle.py", 120,
      "hashes the DELIVERY against MANIFEST.sha256 -- a copy is not the delivery"),
+    # TG1 (2026-11-02): the tab RAM guard lives in .claude/hooks/ram_guard.py and its matcher in
+    # .claude/settings.json. stage() never copies .claude ("hooks and settings run in the folder,
+    # never from a copy"), so from a scratch copy this suite would read neither and report NO
+    # RESULT. In place it loads the real hook and the live matcher and drives the coverage of
+    # every tab-opening door both ways.
+    ("test_tg1_tab_ram_guard.py", 60,
+     "loads the real .claude/hooks/ram_guard.py and the live .claude/settings.json matcher -- a copy has no .claude"),
     ("test_p18_version_collision.py", 180,
      "walks the tree for other copies of the core -- a copy has a different tree"),
     # A117 (2026-09-14), registered in the change that created it. IN PLACE for
