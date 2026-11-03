@@ -141,6 +141,34 @@ New findings (open):
   and read as "slowloris closed"; the second system showed the bound was in the wrong place (handler body, not the
   connection). Put the bound where the resource is created.
 
+- C6-chk -- DeepSeek (area 5 cross-check, C6 together-vote), 2026-11-03: Grok-on-X and Gemini could not deliver
+  today (X hijacked the keystrokes via single-key shortcuts; Gemini Flash errored, Pro refused the vuln-hunting
+  framing and the correctness reframe too -- [[classifier-refuses-mode-guides]]). DeepSeek (reliable this session,
+  no refusal) reviewed a DE-NAMED self-contained snippet of the together-vote role-check and returned "not sound":
+  (1) class/policy downgrade, (2) token replay (no nonce), (3) same-pubkey-under-two-roles aliasing. ALL THREE
+  VERIFIED against the REAL covenant_grid_guard.py by Claude (me, the different system) -> each REFUTED or bounded:
+  (1) REFUTED: the real code derives the class from the ACTION, not from payload['class'] -- cls = required_class(
+      payload.get("action")) (covenant_grid_guard.py:414), an unknown action is REFUSED (:415), and a claimed class
+      that disagrees is REFUSED (:472-473); an unknown class fails closed to BOTH roles (:476). The attacker cannot
+      downgrade the requirement. That flaw existed only in my SNIPPET, which used payload['class'] directly.
+  (2) REFUTED: the token is bound to cmd_sha256 = cmd_digest(payload) (:486), which covers the command's unique
+      nonce (:228), and C4 REFUSES a re-used nonce (:432-433). So a captured role_b token matches only the exact
+      command it authorized, and that command can never be honored twice. My snippet omitted C4 entirely.
+  (3) BOUNDED, not a bypass: the fingerprint IS the pubkey hash -- _fpr = _sha_hex(pub_pem)[:16] (:196) -- so one
+      pubkey cannot hold two role entries via the normal fpr; aliasing needs a hand-edited grid_signers.json mapping
+      an fpr to a mismatched pubkey, i.e. compromising the signer allowlist, which is the trust root (an attacker who
+      can do that has already won). Real defense-in-depth note (logged, not a C6 hole): verify fpr == _fpr(pubkey_pem)
+      at load and reject the same pubkey across two roles.
+  NET: C6 together-vote CONFIRMED SOUND by the cross-system pass -- the real code's extra guards (action->class
+  derivation, C4 nonce, fpr=hash(pubkey)) are exactly what close DeepSeek's three candidates. Matches Claude ground
+  truth + the grid-guard session review of C6 (covenant_grid_guard.py:456-500).
+  LESSON (tombstone): a DE-NAMED snippet for a cold seat must preserve the security-relevant STRUCTURE, or the seat
+  reviews a strawman. My snippet dropped the action->class derivation and the C4 nonce, so DeepSeek's (1) and (2)
+  were correct ABOUT THE SNIPPET but not the system. The cross-check still earned its place -- it proved those two
+  guards are load-bearing -- but area 5's external pass is therefore PARTIAL (faithful on the role-binding logic the
+  snippet kept; a fully faithful C6 pass would paste the real authorize() C6 block WITH its C2-action/C4 context).
+  The verifier checking against the REAL code, not the raiser's signal, is what caught it ([[signal-vs-conviction]]).
+
 - C3 -- ChatGPT (area 7, free_will heal auth), 2026-11-03: a CONDITIONAL candidate, and the first seat this round
   to find the gap in Claude's own pass. It accepted the loopback/signature logic but flagged that
   _tailnet_caller returns `addr2 or addr` (covenant_unified_v8.py:9179) where addr2 comes from
@@ -323,3 +351,11 @@ correct; correctness of the SNN/scoring math was out of this review's security s
   both-ways. So area 9 now has: external primary (ChatGPT + DeepSeek), Claude cross-check, and a fix
   cross-validated by a second system. Remaining external seats unchanged (area 5 Grok, area 6 Gemini,
   areas 3/4/7, F0a–F0f cross-checks). Still RAM-gated for batches.
+- 2026-11-03 (area 5 cross-check): DeepSeek confirmed C6 together-vote SOUND after Claude verified its 3
+  candidate bypasses against the real code (all refuted/bounded — C6-chk above). Seat reliability today:
+  DeepSeek WORKS (vuln framing, no refusal); Grok-on-X UNUSABLE via the composer (single-key shortcuts
+  hijack typed text); Gemini Flash errors, Pro refuses security framing. So the browser seat roster in
+  practice right now = DeepSeek + ChatGPT; Grok/Gemini need a different route or his hand. Area 5 external
+  pass is PARTIAL (de-named snippet, not the real C6-in-context). Defense-in-depth filed: verify
+  fpr==hash(pubkey) + reject cross-role pubkey aliasing at grid_signers load (not attacker-reachable; his/
+  grid-guard call, not auto-fixed). Still open: area 6 Gemini (same Gemini problem), areas 3/4/7, F0a–F0f.
