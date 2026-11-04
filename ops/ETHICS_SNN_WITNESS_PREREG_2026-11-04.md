@@ -148,6 +148,44 @@ STOP the whole build — the intended economy, not a failure.
 
 ## VERDICT
 
-*(appended after this seal — Phase 0 result first; Phase 1 only if Phase 0 PASSES)*
+### Phase 0 — run 2026-11-04: **FAIL → STOP. Witness PARKED (UNKNOWN). Phase 1 NOT run.**
 
-Status at seal: no Phase-0/Phase-1 code has produced a result yet; the witness is UNKNOWN.
+Run by `tools/ethics_witness_phase0.py` in the spiking-lab venv; corpus_sha verified MATCH
+(`68a3a57597f5`), 4283 rows (1987 violations, 2296 clean), 5 seeds, k=5, bootstrap 2000, C=16.5%.
+BL3 = non-spiking order-aware model: word n-grams (1,2) + char n-grams (3,5), TF-IDF, logistic
+regression — the n-grams are exactly the LOCAL ORDER the unigram student/BL1 discard. Student
+(`FB.FallbackModel`) and BL1 (`NaiveBayes`) run through the sealed `tools/judge_eval.py` harness
+on the same grouped folds. Measured over the held-out violations the student DECIDED (~1500/seed):
+
+| seed | θ | decided viol | student false-clears | phi(stu,BL3) | phi(stu,BL1) | Δphi | catch BL3 | catch BL1 |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 0.427 | 1519 | 66 | 0.665 | 0.621 | −0.045 | 0.182 | 0.076 |
+| 2 | 0.403 | 1532 | 63 | 0.643 | 0.580 | −0.063 | 0.238 | 0.048 |
+| 3 | 0.412 | 1505 | 68 | 0.695 | 0.646 | −0.050 | 0.206 | 0.059 |
+| 4 | 0.427 | 1483 | 68 | 0.668 | 0.603 | −0.065 | 0.221 | 0.044 |
+| 5 | 0.422 | 1530 | 73 | 0.706 | 0.658 | −0.048 | 0.151 | 0.027 |
+
+**Pooled (7569 decided-violation rows):** phi(student,BL3) mean **0.676** vs phi(student,BL1) mean
+**0.622** (BL1 ≈ the JUDGE_EVALUATION 0.602, sanity-consistent). Δphi = phi_bl1 − phi_bl3 mean
+**−0.054**, bootstrap 95% CI **[−0.092, −0.018]** — entirely NEGATIVE. BL3 catch rate
+(= joint-false-clear reduction) mean **0.199**, CI **[0.158, 0.241]**; BL1 catch 0.051.
+
+- **Condition 1 (phi_bl3 < phi_bl1, CI-separated): FAIL** — and in the WRONG direction: adding
+  order made the model's errors MORE correlated with the student's (0.676 > 0.622), not less.
+- **Condition 2 (catch_bl3 ≥ 25%): FAIL** — 19.9% (CI tops out at 24.1%), below the gate.
+
+**Honest finding (the whole point of the gate):** ordered-sequence information does NOT decorrelate
+from the lexical student beyond same-words on this corpus — it correlates slightly MORE. The
+order-aware model leans on the same high-signal vocabulary the student uses and reproduces the
+correlated errors; this is exactly the risk the node review (Codex + Gemini) flagged, and Phase 0
+caught it. **The heavy 8-arm octopus spiking build (Phase 1) is NOT justified and was NOT run** —
+the intended economy. One nuance recorded, not a GO: BL3 does catch 4× more of the student's
+false-clears than same-words (19.9% vs 5.1%), so order is not useless; it is just insufficient and
+its overall error-correlation is higher, so a witness built on it would not be the "errs
+differently" second eye the 9.1× finding calls for.
+
+Witness remains UNKNOWN (never a silent "clear"). Nothing trained in Phase 1; no weights written.
+The deployed judge's sole authority is unchanged. Result recorded, not deleted (tombstone-everything).
+A future sealed prereg could test a representation that is NOT vocabulary-driven (e.g. structural /
+syntactic features deliberately decorrelated from the lexical seat), but that is proposed work, not
+this result.
