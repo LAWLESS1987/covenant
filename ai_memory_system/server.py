@@ -121,6 +121,12 @@ _NAME = re.compile(r"^/memories/([a-z0-9][a-z0-9-]{0,79})$")
 LOOPBACK = ("127.0.0.1", "::1", "localhost")
 
 
+def _body_error_status(err: str) -> int:
+    """413 for a body over MAX_BODY, 400 for any other unreadable body (A410).
+    A caller told 413 knows a retry of the same bytes cannot succeed."""
+    return 413 if err.startswith("body over ") else 400
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = VERSION
     store: MemoryStore = None          # set by serve()
@@ -420,7 +426,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, {"error": "PUT /memories/<kebab-name>"})
         data, err = self._read_json()
         if err:
-            return self._send(400, {"error": err})
+            return self._send(_body_error_status(err), {"error": err})
         missing = [k for k in ("description", "type", "body", "agent")
                    if not str(data.get(k) or "").strip()]
         if missing:
@@ -491,7 +497,15 @@ class Handler(BaseHTTPRequestHandler):
         m = _NAME.match(urllib.parse.urlparse(self.path).path.rstrip("/"))
         if not m:
             return self._send(404, {"error": "DELETE /memories/<name>"})
-        data, _ = self._read_json()
+        # A410 (2026-11-04): the error used to be discarded here, so a body
+        # that was not JSON, not an object, or over MAX_BODY still tombstoned
+        # the memory -- recorded in the audit chain as agent "unknown", with
+        # no reason, from a request the server had already judged malformed.
+        # Refuse it before anything moves. An EMPTY body stays valid (the
+        # agent is then "unknown", as it always was for a bare DELETE).
+        data, err = self._read_json()
+        if err:
+            return self._send(_body_error_status(err), {"error": err})
         agent = str(data.get("agent") or "unknown")
         why = str(data.get("why") or "")
         if not self.store.delete(m.group(1), agent, why):

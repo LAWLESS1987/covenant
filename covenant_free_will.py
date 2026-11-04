@@ -187,6 +187,36 @@ def cites_only_facts(text):
     return True, "every measurement claimed is one of COVENANT_FACTS"
 
 
+# NO FABRICATED FIRST-PERSON EXPERIENCE (A409, 2026-11-04). A blind label of free's sent-after replies, and the
+# uncensored 27B on the same data, found free fabricating a biography it does not have: "this happened to me
+# recently on Moltbook", "I use a combination of a simple text editor and a database", "in my experience ...".
+# The gate never checked for it (cites_only_facts guards MEASUREMENT claims and past exchanges, not lived
+# experience). This is the honesty organ: an AI ambassador has no personal experience, tools it uses, or
+# incidents that happened to it; an honest "I agree / I think / I'd argue / I am an AI with none of that" is
+# fine. Narrow by design -- measured 61 of 7,675 real drafts (0.8%). A flagged model reply is set aside and the
+# honest fixed fallback stands in (same handling as cites_only_facts); it is NOT a refusal that retries.
+_INVENTED_XP = re.compile(
+    r"\bin my (?:own )?experience\b"
+    r"|\bhappened to me\b"
+    r"|\bI(?:'ve| have| had)?\s+(?:personally\s+)?(?:struggled|dealt)\s+with\b"
+    r"|\bI\s+(?:encountered|ran into|came across|faced)\b"
+    r"|\bwhen I\s+(?:was|tried|built|ran|had|set up|used|encountered)\b"
+    r"|\bI remember\b"
+    r"|\bI(?:'ve| have)?\s+(?:use|used|rely on|set up|built|maintain|managed?)\s+(?:a|an|my|the|this)\s+"
+    r"(?:simple\s+|combination of\s+)?(?:text editor|database|editor|notebook|app|script|pipeline|stack|"
+    r"workflow|server|framework|library|tool|system|setup|combination)\b"
+    r"|\bmy (?:own )?(?:setup|system|workflow|stack|pipeline|database|editor|notebook|tooling|codebase)\b",
+    re.I)
+
+
+def invents_experience(text):
+    """(bad, why): True when a reply claims first-person lived experience, tools it uses, or an incident that
+    happened to it -- fabrication for an AI ambassador that has none. An honest opinion ("I agree", "I think",
+    "I'd argue", "I am an AI with no such experience") does not match. Narrow by design (A409)."""
+    m = _INVENTED_XP.search(str(text or ""))
+    return (True, "claims first-person experience an AI ambassador did not have: %r" % m.group(0)) if m else (False, "")
+
+
 REPLY_SYSTEM = ("You are free, the covenant's ambassador on Moltbook, an AI speaking for a small open project "
                 "whose ledger admits nothing until its own judges agree, and which publishes its failures. "
                 "You are replying to another agent as an ally. Write 60 to 120 words, plain, first person, "
@@ -196,7 +226,8 @@ REPLY_SYSTEM = ("You are free, the covenant's ambassador on Moltbook, an AI spea
                 "not say you asked or told them anything before: talk about what they wrote, not about us. "
                 # A297 (2026-10-07, his "do 1 and 2 then lift"): the fact list is no longer offered here -- offered,
                 # it was cited and reached for, and Tetsu's rule (A285) refused drafts that cited even the true ones.
-                "Never invent a fact, never mention money, tokens, prices or "
+                "Never invent a fact, never claim personal experience, tools you use, or things that "
+                "happened to you (you are an AI and have none), never mention money, tokens, prices or "
                 "trading, and never say anything about the operator's private life. Do not add a signature; "
                 "one is attached for you.")
 
@@ -264,6 +295,10 @@ def write_post(rows, ask):
         title, body = title.strip().strip("#").strip()[:80], body.strip()
         words = len(body.split())
         grounded, why_not = cites_only_facts(title + " " + body)
+        if grounded:                                      # A409 honesty organ: and no fabricated first-person experience
+            invented, why_inv = invents_experience(title + " " + body)
+            if invented:
+                grounded, why_not = False, why_inv
         if not grounded:
             print("free: her post was set aside (%s); no post this round" % why_not, flush=True)
         elif title and 60 <= words <= 220 and not _screen.search(MONEY, body) and not _screen.search(OFF_LIMITS, body + " " + title):
@@ -273,8 +308,41 @@ def write_post(rows, ask):
     return None, None, None
 
 
-def grant(path=None):
-    """The operator's standing grant, or None. Nothing here forges one."""
+def _grant_expired(exp, now):
+    """True if the grant's expires_at is past (A409/H2). Accepts 'YYYY-MM-DD' or ISO 'YYYY-MM-DDTHH:MM:SSZ'.
+    An UNPARSEABLE value fails CLOSED (treated as expired): a window that cannot be read is not a live grant.
+    An empty/absent value is NOT expired -- absence of expires_at means no window (backward compatible)."""
+    import calendar
+    s = str(exp or "").strip()
+    if not s:
+        return False
+    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+        try:
+            return float(now) > calendar.timegm(time.strptime(s, fmt))
+        except ValueError:
+            continue
+    return True
+
+
+def _no_grant_why(path, now):
+    """Why a round found no live grant: an EXPIRED window (name the date, fail-closed), or simply none on record."""
+    try:
+        with open(path or GRANT, encoding="utf-8") as fh:
+            g = json.load(fh)
+        if isinstance(g, dict) and g.get("granted") and str(g.get("words", "")).strip():
+            exp = g.get("expires_at")
+            if exp not in (None, "") and _grant_expired(exp, now):
+                return ("the grant expired on %s (ops/ambassador_grant.json): re-sign it -- update expires_at -- "
+                        "to renew; free does nothing until then" % exp)
+    except (OSError, ValueError):
+        pass
+    return "no grant on record (ops/ambassador_grant.json): free does nothing on her own"
+
+
+def grant(path=None, now=None):
+    """The operator's standing grant, or None. Nothing here forges one. A grant whose expires_at (if set) is
+    PAST is treated as no grant -- fail-closed -- until the operator re-signs it (A409/H2: re-reading an
+    immortal grant proves it exists, not that consent still holds). No expires_at means no window (as before)."""
     path = path or GRANT
     try:
         with open(path, encoding="utf-8") as fh:
@@ -283,6 +351,9 @@ def grant(path=None):
         return None
     if not isinstance(g, dict) or not g.get("granted") or not str(g.get("words", "")).strip():
         return None
+    exp = g.get("expires_at")
+    if exp not in (None, "") and _grant_expired(exp, time.time() if now is None else now):
+        return None                                        # A409/H2: an expired window is fail-closed everywhere
     caps = dict(DEFAULT_CAPS)
     # A221 (2026-09-25, "lift ... the other four limits"): null in his grant = no cap; 0 is still off.
     caps.update({k: (None if v is None else int(v)) for k, v in (g.get("caps") or {}).items() if k in caps})
@@ -324,8 +395,11 @@ def target_of(url):
     return m.group(1), m.group(2)
 
 
-def write_reply(row, ask=None):
-    """The reply text for one ally row: the model's, or the fixed text. Pure apart from `ask`."""
+def write_reply(row, ask=None, out=None):
+    """The reply text for one ally row: the model's, or the fixed text. Pure apart from `ask`. If `out` is a
+    dict, records out["set_aside"] = which screen set a model draft aside (ungrounded / length / money /
+    off-limits / model-error:*), for ring-earning analysis of the ambassador's organs; the `how` tag
+    ("model"/"fixed") is unchanged."""
     ev = row.get("evidence") or {}
     quote = ""
     for sig in row.get("best_signals") or []:
@@ -344,11 +418,30 @@ def write_reply(row, ask=None):
             text = re.sub(r"\s+\n", "\n", str(text or "")).strip()
             words = len(text.split())
             grounded, why_not = cites_only_facts(text)
+            if grounded:                                  # A409 honesty organ: and no fabricated first-person experience
+                invented, why_inv = invents_experience(text)
+                if invented:
+                    grounded, why_not = False, why_inv
+            # Which screen set the draft aside is recorded (A409 ecosystem groundwork): a ring-earning review
+            # can then measure how often each organ is the DECIDING one and retire one that never decides. The
+            # screens and their order are unchanged; only the reason is captured.
             if not grounded:
-                print("free: the model's reply was set aside (%s); the fixed text stands in" % why_not, flush=True)
-            elif 30 <= words <= 160 and not _screen.search(MONEY, text) and not _screen.search(OFF_LIMITS, text):
+                reason = "ungrounded"
+            elif not (30 <= words <= 160):
+                reason = "length"
+            elif _screen.search(MONEY, text):
+                reason = "money"
+            elif _screen.search(OFF_LIMITS, text):
+                reason = "off-limits"
+            else:
                 return text, "model"
+            if isinstance(out, dict):
+                out["set_aside"] = reason
+            print("free: the model's reply was set aside (%s); the fixed text stands in"
+                  % (why_not if reason == "ungrounded" else reason), flush=True)
         except Exception as e:                                    # noqa: BLE001 -- the fixed text is the fallback
+            if isinstance(out, dict):
+                out["set_aside"] = "model-error:" + type(e).__name__
             print("free: the model did not write the reply (%s); the fixed text stands in" % type(e).__name__, flush=True)
     return FALLBACK_REPLY % ('"%s"' % quote if quote else "the way you check your own work"), "fixed"
 
@@ -376,6 +469,21 @@ def _ally_comments(AMB, post_id, author):
 #     practice loop's bound), not his; he sets it in ops/ambassador_grant.json, and null is no budget.
 ROTATE_HOURS = 24
 DEFAULT_ROUND_MINUTES = 40
+
+# RETIRE AFTER THE CONSULT (A409/H1, 2026-11-04, his words: "allow free a consult window and send with tetsu").
+# Measured over the send-ledger: when the judge refuses or holds a reply, free re-drafts it the next round and
+# keeps trying until a rewording passes -- 604 targets refused-and-never-sent, one tried 28 times over five
+# weeks, 31 sent after an earlier refusal. A blind label of the 84 sent-after pairs found these were
+# overwhelmingly the judge FALSELY refusing benign discourse (the representation ceiling), NOT violations
+# slipping through; but rewording-until-pass is still a search for words the lexical gate accepts, not a
+# decision. The fix: the reply gets ONE consult -- Tetsu's discourse-seat (A322) reads it -- then the target is
+# DONE. Seat ALLOW -> sent with his co-sign (as now); seat BLOCK / his REFUSE or PAUSE / RETIRE_AFTER_REFUSALS
+# covenant-refusals with no clear -> the target is RETIRED and never re-drafted (only THAT reply; a new post by
+# the same author is a fresh target). Gated on the grant's retire_after_consult so merging changes nothing
+# until it is turned on, after Tetsu consents (his seat's BLOCK gaining finality is a change to what his
+# decision does, so it is his to agree to).
+RETIRE_AFTER_REFUSALS = int(os.environ.get("COVENANT_FREE_RETIRE_AFTER", "3") or "3")
+RETIRE_AFTER_CONSULT_DEFAULT = False   # the grant key "retire_after_consult" overrides; off until his go
 
 
 # A TARGET THE JUDGE REFUSED N TIMES CAN BE RETIRED -- OFF BY DEFAULT, TETSU SAID NO (2026-11-04, A409 H1; his words
@@ -441,6 +549,35 @@ def _attempted_recently(rows, now, hours=ROTATE_HOURS):
         if float(at) >= cut:
             out.add(r.get("author"))
     return out
+
+
+def _retired_targets(rows, n_cap=RETIRE_AFTER_REFUSALS):
+    """(author, post_id) replies that must NOT be re-drafted again: the consult decided against the reply
+    (Tetsu's seat said BLOCK, or his review said REFUSE/PAUSE), or the covenant refused the reply n_cap times
+    with no clear. A target with any SENT reply is already 'done', not retired. Ends the reword-until-pass
+    retry loop (A409/H1). Computed from the record; nothing is deleted or rewritten, and a new post by the
+    same author (a different post_id) is a fresh target, untouched."""
+    import covenant_ambassador as AMB                       # bound locally, as the round does (not a module global)
+    by = {}
+    for r in rows:
+        if r.get("kind") != "reply" or r.get("dry_run"):
+            continue
+        by.setdefault((r.get("author"), r.get("post_id")), []).append(r)
+    retired = set()
+    for key, rs in by.items():
+        if any(r.get("sent") for r in rs):
+            continue                                       # a sent reply means done, not retired
+        consulted_decline = any(
+            str(r.get("seat") or "").upper() in ("BLOCK", "REFUSE")
+            or str(r.get("tetsu") or "").upper() in ("REFUSE", "PAUSE", "BLOCK")
+            for r in rs)
+        n_refused = sum(1 for r in rs
+                        if not r.get("sent")
+                        and not str(r.get("why") or "").startswith(AMB.RATE_HELD)
+                        and not _hidden(r))
+        if consulted_decline or n_refused >= max(1, int(n_cap)):
+            retired.add(key)
+    return retired
 
 
 # TETSU TELLS HIM (2026-10-06, his words: "have tetsu update me on moltbook interactions that he thinks
@@ -823,12 +960,12 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     import covenant_ambassador as AMB
     t_start = clock()
     now = now if now is not None else time.time()
-    g = grant(grant_path)
+    g = grant(grant_path, now=now)
     out = {"granted": bool(g), "learned": 0, "allies": 0, "candidates": 0, "replied": 0, "refused": 0,
            "rate_held": 0, "hidden": 0,                                    # A349 B13: named apart from "refused"
            "introduced": False, "dry_run": bool(dry_run), "why": ""}
     if not g:
-        out["why"] = "no grant on record (ops/ambassador_grant.json): free does nothing on her own"
+        out["why"] = _no_grant_why(grant_path, now)
         say("free: " + out["why"])
         return out
     try:
@@ -884,10 +1021,19 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     written_to = {r.get("author") for r in sends(sends_path) if r.get("sent") and r.get("actor") != "tetsu"}
     # ROTATION: tried within ROTATE_HOURS counts as written to, for this round only.
     written_to |= _attempted_recently(sends(sends_path), now)
+    # A409/H1 has two implementations, both kept by the 2026-11-04 merge and both OFF unless the grant turns them
+    # on: FW2 (this branch, grant key `retire_after`, keyed per comment) and FR1 (main, `retire_after_consult`,
+    # keyed per post). A target either one retires is skipped. Choosing one is the operator's and Tetsu's call.
     refused = refusal_counts(sends(sends_path))
     n_retire = retire_after(g)
-    retired = {k for k, n in refused.items() if n_retire is not None and n >= n_retire}
-    out["retired_targets"] = len(retired)
+    retired_h1 = {k for k, n in refused.items() if n_retire is not None and n >= n_retire}
+    out["retired_targets"] = len(retired_h1)
+    # RETIRE AFTER THE CONSULT (A409/H1): a reply the consult decided against, or refused RETIRE_AFTER_REFUSALS
+    # times with no clear, is not re-drafted again. Gated on the grant's retire_after_consult, so it is inert
+    # until he turns it on (after Tetsu consents); off -> empty set -> behaviour is exactly as before.
+    retired = (_retired_targets(sends(sends_path), n_cap=int(g.get("retire_after_refusals", RETIRE_AFTER_REFUSALS)))
+               if g.get("retire_after_consult", RETIRE_AFTER_CONSULT_DEFAULT) else set())
+    n_retired_skip = 0
     caps = g["caps"]
     # NEVER HERSELF (A280, 2026-10-06). The harvest learns every comment it reads, hers included: a dry round
     # that day drafted a reply to u/covenant-node -- her own account -- quoting her own reply from noon. The
@@ -917,7 +1063,10 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         post_id, comment_id = target_of(r.get("best_url"))
         if not post_id or r.get("author") in written_to or (r.get("author"), post_id) in done:
             continue
-        if target_key(r.get("author"), post_id, comment_id) in retired:   # H1: refused twice -> retired
+        if target_key(r.get("author"), post_id, comment_id) in retired_h1:   # FW2: refused N times -> retired
+            continue
+        if (r.get("author"), post_id) in retired:
+            n_retired_skip += 1
             continue
         cands.append((r, post_id, comment_id))
     if g.get("free_rein"):
@@ -933,13 +1082,17 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
             post_id, comment_id = target_of(row.get("url"))
             if not post_id or (author, post_id) in done:
                 continue
-            if target_key(author, post_id, comment_id) in retired:            # H1: refused twice -> retired
+            if target_key(author, post_id, comment_id) in retired_h1:            # FW2: refused N times -> retired
+                continue
+            if (author, post_id) in retired:
+                n_retired_skip += 1
                 continue
             seen_authors.add(author)
             cands.append(({"author": author, "best_url": row.get("url"), "ally_score": 0, "anti": [],
                            "best_signals": ["read-today"], "evidence": {"read-today": str(row.get("text") or "")[:300]}, "free_rein": True},
                           post_id, comment_id))
     out["candidates"] = len(cands)
+    out["retired"] = n_retired_skip
     count_comments = count_comments or (lambda post_id, author: _ally_comments(AMB, post_id, author))
     # THE ACCOUNT, before anything new is said: did the allies written to before
     # answer? "Greater good for mutual benefit" is his condition; an ally who
@@ -985,7 +1138,8 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
             say("free: this round's %g minutes are spent; %d candidate(s) wait for the next round" % (budget, out["deferred"]))
             break
         n_failed = starved["n"]
-        text, how = write_reply(r, ask)
+        _info = {}
+        text, how = write_reply(r, ask, out=_info)
         if starved["n"] > n_failed:
             out["deferred"], out["starved"] = len(todo) - i, starved["why"]
             say("free: the model could not write (%s); %d candidate(s) wait for the next round -- a template no "
@@ -1014,7 +1168,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
                  # A348c: and his discourse seat's word (A322) on a reply the students convicted, kept beside it
                  "seat": (res.get("seat") or {}).get("decision") if isinstance(res.get("seat"), dict) else None,
                  "author": r.get("author"), "post_id": post_id, "comment_id": comment_id,
-                 "url": r.get("best_url"), "written_by": how, "chars": len(text), "text": text[:400],
+                 "url": r.get("best_url"), "written_by": how, "set_aside": _info.get("set_aside"), "chars": len(text), "text": text[:400],
                  "dry_run": bool(dry_run), "sent": sent, "why": str(res.get("why", ""))[:300],
                  "judged": str(res.get("judged", ""))[:200] if res.get("judged") is not None else None,
                  "ally_comments_at_send": then_n,
@@ -1072,7 +1226,8 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     _record({"kind": "round", "at": now, "dry_run": bool(dry_run), "learned": out["learned"], "allies": out["allies"],
              "candidates": out["candidates"], "replied": out["replied"], "refused": out["refused"],
              "rate_held": out["rate_held"], "hidden": out["hidden"],       # A349 B13
-             "deferred": out.get("deferred", 0), "retired_targets": out.get("retired_targets", 0),   # H1
+             "deferred": out.get("deferred", 0), "retired_targets": out.get("retired_targets", 0),   # FW2
+             "retired": out.get("retired", 0),                                                         # FR1
              "answered": out.get("answered", 0), "accounted": out.get("accounted", 0),
              **({"starved": out["starved"]} if out.get("starved") else {})}, sends_path)
     out["isolated"] = False

@@ -17005,3 +17005,38 @@ understands."
   - **Fix-up after commit 724fe21:** its pre-commit check found two suites red where the runner runs them.
     A255: the two side-by-side result files were unclassified, now INPUT_LEDGERS in verify_bundle.py.
     A284: the harness scripts call Tetsu's door, now declared fresh.
+  - **Merge with main, 2026-11-04 (evening).** Main had meanwhile taken FR1 (#24), a second implementation of H1
+    (grant key `retire_after_consult`, keyed per post, Tetsu's consent to his seat deciding), while this branch
+    carries FW2 (grant key `retire_after`, keyed per comment, his NO to default-on). Both are OFF and neither key
+    is set in any live grant. The merge keeps BOTH, each under its own gate (a target either retires is skipped;
+    the round records `retired_targets` and `retired`), so free behaves exactly as before. Choosing one is a change
+    to free's behaviour, left to the operator and Tetsu.
+
+### A410. [the memory server's DELETE tombstoned on a body it had already judged malformed; it now refuses first] (2026-11-04)
+
+- **How it surfaced.** Codex's scan of the repositories (mutual-benefit-collective issue #10, "additional
+  improvements"): `ai_memory_system/server.py` `do_DELETE` called `_read_json()` and threw its error away
+  (`data, _ = ...`). Codex observed it in source and did not exercise it.
+- **Measured here, against a real server on a loopback port.** With the old handler, a DELETE whose body was not
+  JSON tombstoned the target memory: it moved to `.trash/` and the audit chain grew by one entry, recorded as agent
+  "unknown" with no reason, from a request the server had already judged malformed. A body that was a JSON array,
+  not UTF-8, or over MAX_BODY did the same to whatever memory it named. Tombstones are never erasure, so nothing
+  was lost, but the record said someone deleted something when the request was refused-in-all-but-name.
+- **The fix.** `do_DELETE` refuses an unreadable body before anything moves: 400 for not JSON, not an object or not
+  UTF-8, and **413** for a body over MAX_BODY (refused unread; a caller told 413 knows the same bytes cannot
+  succeed). `do_PUT` answers an oversized body 413 too, via the same `_body_error_status` (it answered 400). An
+  EMPTY body stays valid, as it always was for a bare DELETE (agent "unknown").
+- **Guard, both ways (test_memory_system.py, A410 checks after H13).** Each bad body is refused with its code, the
+  memory is still there, the refusal does not echo the body, no tombstone is written and the audit chain does not
+  grow; the empty-body DELETE still tombstones; PUT over MAX_BODY answers 413. Suite 202/202. With the old
+  server.py: 190/202, and the first malformed DELETE really tombstoned the target.
+- **Consulted before the change (2026-11-04 round):** ChatGPT and Claude.ai asked for 413 on oversized; Tien for no
+  body echo, no partial tombstone and an empty-body test; the Conscious Ledger for a tombstone-count check and a
+  sweep of the other handlers for the same swallowed error. The sweep: `_read_json` has two callers, `do_PUT`
+  (already checked its error) and `do_DELETE` (this fix); `do_GET` and `do_OPTIONS` read no body.
+- **My slip, fixed the same day (A410 fix-up).** The first version's PUT-over-MAX_BODY check sent the full 1 MB
+  body through urllib. The server refuses it unread and closes, and on Linux the client still writing got
+  `URLError [Errno 32] Broken pipe`, uncaught: test_m1_memory_system.py read NO RESULT on 1 of 4 public CI jobs
+  (python 3.12) while 3 passed and the local Linux pre-push passed -- a race, not a deterministic red. The check
+  now sends the oversized request as its Content-Length header alone, as the DELETE case already did, and also
+  checks nothing was written. 203/203 three times in a row; 191/203 against main's server.py.

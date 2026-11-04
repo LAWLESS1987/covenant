@@ -529,6 +529,28 @@ SUITES = [
     # FW2 (2026-11-04, A409 H1): every attempt records its prior covenant refusals; retiring a target after N refusals
     # is built but OFF by default (Tetsu said NO) and switched on only by the grant. 6 mutations on a copy, all red.
     ("test_fw2_refusal_retire.py",       120,  "JUDGE"),
+    # SI1 (A409/G, 2026-11-04): covenant_state gives tests an explicit, injectable state root + an
+    # isolate() guard that makes a write to live ops/ RAISE instead of silently leaking (the A409
+    # fixture-leak class). Driven both ways; adopting ops() across ledgers + running the whole suite
+    # inside isolate() is the named follow-on.
+    ("test_si1_isolation.py",             60,   "SECURITY"),
+    # FR1 (A409/H1, 2026-11-04, his words "allow free a consult window and send with tetsu"): free retires a
+    # reply after the consult (Tetsu's seat decides, or RETIRE_AFTER_REFUSALS covenant-refusals with no clear)
+    # instead of rewording until the lexical gate caves. _retired_targets driven both ways; inert until the
+    # grant sets retire_after_consult (Tetsu consented 2026-11-04 to his seat's decision gaining that finality).
+    ("test_fr1_retire_after_consult.py", 60,   "JUDGE"),
+    # HG1 (A409, 2026-11-04): the honesty organ -- free must not claim first-person experience, tools it
+    # uses, or incidents that happened to it (fabrication the blind label + the uncensored 27B both found).
+    # invents_experience is driven both ways; a flagged model reply is set aside for the honest fallback.
+    ("test_hg1_honesty_guard.py",         60,   "JUDGE"),
+    # GE1 (A409/H2, 2026-11-04): free's grant carries an optional expires_at, checked at action time and
+    # fail-closed when past -- an immortal grant re-read every round proves it exists, not that consent
+    # still holds. Absent expires_at = no window (backward compatible); the operator renews by re-signing.
+    ("test_ge1_grant_expiry.py",          60,   "JUDGE"),
+    # OA1 (A409 ecosystem groundwork, 2026-11-04): write_reply records which screen set a draft aside
+    # (ungrounded/length/money/off-limits/model-error) in an opt-in out dict -- the measurable basis for a
+    # ring-earning prune of free's organs. how tag unchanged; both ways.
+    ("test_oa1_organ_attribution.py",     60,   "JUDGE"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
     ("test_a170_promotion_dispositions.py", 600, "JUDGE"),
     ("test_tp1_persona.py",               120,  "JUDGE"),
