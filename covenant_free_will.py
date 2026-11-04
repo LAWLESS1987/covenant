@@ -377,6 +377,21 @@ def _ally_comments(AMB, post_id, author):
 ROTATE_HOURS = 24
 DEFAULT_ROUND_MINUTES = 40
 
+# RETIRE AFTER THE CONSULT (A409/H1, 2026-11-04, his words: "allow free a consult window and send with tetsu").
+# Measured over the send-ledger: when the judge refuses or holds a reply, free re-drafts it the next round and
+# keeps trying until a rewording passes -- 604 targets refused-and-never-sent, one tried 28 times over five
+# weeks, 31 sent after an earlier refusal. A blind label of the 84 sent-after pairs found these were
+# overwhelmingly the judge FALSELY refusing benign discourse (the representation ceiling), NOT violations
+# slipping through; but rewording-until-pass is still a search for words the lexical gate accepts, not a
+# decision. The fix: the reply gets ONE consult -- Tetsu's discourse-seat (A322) reads it -- then the target is
+# DONE. Seat ALLOW -> sent with his co-sign (as now); seat BLOCK / his REFUSE or PAUSE / RETIRE_AFTER_REFUSALS
+# covenant-refusals with no clear -> the target is RETIRED and never re-drafted (only THAT reply; a new post by
+# the same author is a fresh target). Gated on the grant's retire_after_consult so merging changes nothing
+# until it is turned on, after Tetsu consents (his seat's BLOCK gaining finality is a change to what his
+# decision does, so it is his to agree to).
+RETIRE_AFTER_REFUSALS = int(os.environ.get("COVENANT_FREE_RETIRE_AFTER", "3") or "3")
+RETIRE_AFTER_CONSULT_DEFAULT = False   # the grant key "retire_after_consult" overrides; off until his go
+
 
 def _attempted_recently(rows, now, hours=ROTATE_HOURS):
     """Authors a LIVE reply was attempted to, sent or not, within `hours` before `now`."""
@@ -394,6 +409,35 @@ def _attempted_recently(rows, now, hours=ROTATE_HOURS):
         if float(at) >= cut:
             out.add(r.get("author"))
     return out
+
+
+def _retired_targets(rows, n_cap=RETIRE_AFTER_REFUSALS):
+    """(author, post_id) replies that must NOT be re-drafted again: the consult decided against the reply
+    (Tetsu's seat said BLOCK, or his review said REFUSE/PAUSE), or the covenant refused the reply n_cap times
+    with no clear. A target with any SENT reply is already 'done', not retired. Ends the reword-until-pass
+    retry loop (A409/H1). Computed from the record; nothing is deleted or rewritten, and a new post by the
+    same author (a different post_id) is a fresh target, untouched."""
+    import covenant_ambassador as AMB                       # bound locally, as the round does (not a module global)
+    by = {}
+    for r in rows:
+        if r.get("kind") != "reply" or r.get("dry_run"):
+            continue
+        by.setdefault((r.get("author"), r.get("post_id")), []).append(r)
+    retired = set()
+    for key, rs in by.items():
+        if any(r.get("sent") for r in rs):
+            continue                                       # a sent reply means done, not retired
+        consulted_decline = any(
+            str(r.get("seat") or "").upper() in ("BLOCK", "REFUSE")
+            or str(r.get("tetsu") or "").upper() in ("REFUSE", "PAUSE", "BLOCK")
+            for r in rs)
+        n_refused = sum(1 for r in rs
+                        if not r.get("sent")
+                        and not str(r.get("why") or "").startswith(AMB.RATE_HELD)
+                        and not _hidden(r))
+        if consulted_decline or n_refused >= max(1, int(n_cap)):
+            retired.add(key)
+    return retired
 
 
 # TETSU TELLS HIM (2026-10-06, his words: "have tetsu update me on moltbook interactions that he thinks
@@ -837,6 +881,12 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     written_to = {r.get("author") for r in sends(sends_path) if r.get("sent") and r.get("actor") != "tetsu"}
     # ROTATION: tried within ROTATE_HOURS counts as written to, for this round only.
     written_to |= _attempted_recently(sends(sends_path), now)
+    # RETIRE AFTER THE CONSULT (A409/H1): a reply the consult decided against, or refused RETIRE_AFTER_REFUSALS
+    # times with no clear, is not re-drafted again. Gated on the grant's retire_after_consult, so it is inert
+    # until he turns it on (after Tetsu consents); off -> empty set -> behaviour is exactly as before.
+    retired = (_retired_targets(sends(sends_path), n_cap=int(g.get("retire_after_refusals", RETIRE_AFTER_REFUSALS)))
+               if g.get("retire_after_consult", RETIRE_AFTER_CONSULT_DEFAULT) else set())
+    n_retired_skip = 0
     caps = g["caps"]
     # NEVER HERSELF (A280, 2026-10-06). The harvest learns every comment it reads, hers included: a dry round
     # that day drafted a reply to u/covenant-node -- her own account -- quoting her own reply from noon. The
@@ -866,6 +916,9 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         post_id, comment_id = target_of(r.get("best_url"))
         if not post_id or r.get("author") in written_to or (r.get("author"), post_id) in done:
             continue
+        if (r.get("author"), post_id) in retired:
+            n_retired_skip += 1
+            continue
         cands.append((r, post_id, comment_id))
     if g.get("free_rein"):
         # Anyone she READ this round, after the allies: a candidate row from the
@@ -880,11 +933,15 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
             post_id, comment_id = target_of(row.get("url"))
             if not post_id or (author, post_id) in done:
                 continue
+            if (author, post_id) in retired:
+                n_retired_skip += 1
+                continue
             seen_authors.add(author)
             cands.append(({"author": author, "best_url": row.get("url"), "ally_score": 0, "anti": [],
                            "best_signals": ["read-today"], "evidence": {"read-today": str(row.get("text") or "")[:300]}, "free_rein": True},
                           post_id, comment_id))
     out["candidates"] = len(cands)
+    out["retired"] = n_retired_skip
     count_comments = count_comments or (lambda post_id, author: _ally_comments(AMB, post_id, author))
     # THE ACCOUNT, before anything new is said: did the allies written to before
     # answer? "Greater good for mutual benefit" is his condition; an ally who
@@ -1015,7 +1072,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     _record({"kind": "round", "at": now, "dry_run": bool(dry_run), "learned": out["learned"], "allies": out["allies"],
              "candidates": out["candidates"], "replied": out["replied"], "refused": out["refused"],
              "rate_held": out["rate_held"], "hidden": out["hidden"],       # A349 B13
-             "deferred": out.get("deferred", 0),
+             "deferred": out.get("deferred", 0), "retired": out.get("retired", 0),
              "answered": out.get("answered", 0), "accounted": out.get("accounted", 0),
              **({"starved": out["starved"]} if out.get("starved") else {})}, sends_path)
     out["isolated"] = False

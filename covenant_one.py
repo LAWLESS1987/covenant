@@ -522,6 +522,11 @@ SUITES = [
     # fixture-leak class). Driven both ways; adopting ops() across ledgers + running the whole suite
     # inside isolate() is the named follow-on.
     ("test_si1_isolation.py",             60,   "SECURITY"),
+    # FR1 (A409/H1, 2026-11-04, his words "allow free a consult window and send with tetsu"): free retires a
+    # reply after the consult (Tetsu's seat decides, or RETIRE_AFTER_REFUSALS covenant-refusals with no clear)
+    # instead of rewording until the lexical gate caves. _retired_targets driven both ways; inert until the
+    # grant sets retire_after_consult (Tetsu consented 2026-11-04 to his seat's decision gaining that finality).
+    ("test_fr1_retire_after_consult.py", 60,   "JUDGE"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
     ("test_a170_promotion_dispositions.py", 600, "JUDGE"),
     ("test_tp1_persona.py",               120,  "JUDGE"),
