@@ -387,3 +387,34 @@ correct; correctness of the SNN/scoring math was out of this review's security s
   session: Handler._origin_ok() (POST Origin check), AG1 extended to 12/12 both-ways. F0f cross-check is now
   CLOSED with a residual fix. Remaining F0 cross-checks: F0a (highway kill), F0b/F0e (grid reverify), F0c
   (off-host anchor), F0d (ram_guard side-door). Working seat for these: DeepSeek.
+- 2026-11-04 (resume): confirmed the four pending-cross-check FIXES are all landed, both-ways, GREEN on this
+  branch (the local artifact, re-ran today): F0a -> H1 268/268 (incl. the A160 guards: a kill pattern carries
+  the port range / abs path, never a bare script name); F0b/F0e -> GS3 11/11 (reverify re-runs C1-C7 by
+  replaying authorize() over a growing prefix; policy_sha splits integrity from mutable-policy drift; RED
+  cases present); F0c -> GS4 11/11 (make_commitment binds the from-disk grid-ledger checkpoint into the SIGNED
+  payload; truncation/rewrite/vanish all caught; RED cases present); F0d -> TG1 10/10 (every tab-opener routed
+  through the floor guard, no side-door; RED case present). So each pending item has a Claude-side artifact;
+  what is still missing is the DIFFERENT-SYSTEM cross-check, which needs a seat.
+  RAM-gated for the frontier route: measured free RAM 2.06 -> 1.81 -> 0.71 GB descending across this cycle with
+  the model UP (floor 2.5 GB), so NO browser seat opened (discipline: do not open under the floor; the machine
+  is under legitimate memory pressure -- llama-server 2.0 GB, Claude app + sessions, WSL hosts, his Edge; none
+  mine to reclaim). RAM-free routes MEASURED, not assumed:
+  * local qwen2.5-3b (resident on :8081, the divvy's point cross-checker) -- ran ONE refute probe on F0b
+    (xcheck_refute.py, adversarial-default shape). Result: a COHERENT-BUT-SPURIOUS refuted=true -- its own
+    quoted decisive_line was `fh.write(raw[i] + b"\n")`, which is PRECISELY the append that makes the claim
+    true (each row's real bytes join the prefix the next authorize() replays against). It misread "explicit
+    demonstration" as absent while quoting the demonstrating line. Per [[signal-vs-conviction]]: signal
+    investigated -> the quoted line CONFIRMS F0b; the refute is a weak-model artifact, NOT a finding. MEASURED
+    conclusion: a Q4 3B is too weak to be a meaningful cross-check for this replay/anchor logic; running it on
+    F0c/F0e would only manufacture more spurious "refuted" noise (CLAUDE.md rule 9 forbids that theater). NOT
+    counted as a cross-check.
+  * covenant_route.py (GitHub-runner model) -- NOT used: it dispatches to the PUBLIC repo and renders the job
+    summary PUBLICLY (A128), the runner model is also small-class, and it costs CI minutes; a weak public
+    verdict is not worth it over the frontier route that is merely RAM-gated.
+  NET: the four fixes stand on a GREEN both-ways local artifact; the frontier cross-check (DeepSeek, cold) is
+  teed up and RAM-gated, not abandoned. Faithful, structure-preserving snippets staged (C6 lesson) for an
+  immediate drive the moment RAM clears 2.5 GB: F0b grid_guard reverify_ledger_decisions (covenant_grid_guard.py
+  :544-607); F0e the PERMIT-replay classifier (covenant_grid_guard.py:580-607); F0c make_commitment signed
+  binding (covenant_head_commit.py:270-294); F0a the restart_git_host kill pattern + H1x-family guard
+  (covenant_highway.py ~2655); F0d ram_guard opener matcher (.claude/hooks/ram_guard.py). areas 3/4/7 primaries
+  + area 6 Gemini re-drive also still open, same RAM gate.
