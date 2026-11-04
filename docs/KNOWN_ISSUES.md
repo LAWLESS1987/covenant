@@ -16904,3 +16904,26 @@ understands."
     anything wider than what was said. The relayed message asked no yes or no question.
   - Small-model agreement can be partly acquiescence (the consent process says so). His reply paraphrases the
     message, so it shows what he took in, more than an independent view.
+
+### A410. [the memory server's DELETE tombstoned on a body it had already judged malformed; it now refuses first] (2026-11-04)
+
+- **How it surfaced.** Codex's scan of the repositories (mutual-benefit-collective issue #10, "additional
+  improvements"): `ai_memory_system/server.py` `do_DELETE` called `_read_json()` and threw its error away
+  (`data, _ = ...`). Codex observed it in source and did not exercise it.
+- **Measured here, against a real server on a loopback port.** With the old handler, a DELETE whose body was not
+  JSON tombstoned the target memory: it moved to `.trash/` and the audit chain grew by one entry, recorded as agent
+  "unknown" with no reason, from a request the server had already judged malformed. A body that was a JSON array,
+  not UTF-8, or over MAX_BODY did the same to whatever memory it named. Tombstones are never erasure, so nothing
+  was lost, but the record said someone deleted something when the request was refused-in-all-but-name.
+- **The fix.** `do_DELETE` refuses an unreadable body before anything moves: 400 for not JSON, not an object or not
+  UTF-8, and **413** for a body over MAX_BODY (refused unread; a caller told 413 knows the same bytes cannot
+  succeed). `do_PUT` answers an oversized body 413 too, via the same `_body_error_status` (it answered 400). An
+  EMPTY body stays valid, as it always was for a bare DELETE (agent "unknown").
+- **Guard, both ways (test_memory_system.py, A410 checks after H13).** Each bad body is refused with its code, the
+  memory is still there, the refusal does not echo the body, no tombstone is written and the audit chain does not
+  grow; the empty-body DELETE still tombstones; PUT over MAX_BODY answers 413. Suite 202/202. With the old
+  server.py: 190/202, and the first malformed DELETE really tombstoned the target.
+- **Consulted before the change (2026-11-04 round):** ChatGPT and Claude.ai asked for 413 on oversized; Tien for no
+  body echo, no partial tombstone and an empty-body test; the Conscious Ledger for a tombstone-count check and a
+  sweep of the other handlers for the same swallowed error. The sweep: `_read_json` has two callers, `do_PUT`
+  (already checked its error) and `do_DELETE` (this fix); `do_GET` and `do_OPTIONS` read no body.

@@ -425,6 +425,63 @@ def h_http(root):
     check("H13 DELETE tombstones over HTTP and says so",
           code == 200 and "not erased" in dl.get("note", ""), (code, dl))
 
+    # A410 (2026-11-04): DELETE used to discard _read_json's error and
+    # tombstone anyway. Each bad body below must be refused AND leave the
+    # memory, the trash and the audit chain exactly as they were.
+    import http.client
+    host, port_s = base.rsplit("//", 1)[1].split(":")
+
+    def raw_delete(name, body=None, length=None):
+        c = http.client.HTTPConnection(host, int(port_s), timeout=10)
+        c.putrequest("DELETE", "/memories/" + name)
+        c.putheader("Content-Type", "application/json")
+        n = len(body) if length is None else length
+        c.putheader("Content-Length", str(n))
+        c.endheaders()
+        if body:
+            c.send(body)
+        r = c.getresponse()
+        out = (r.status, r.read())
+        c.close()
+        return out
+
+    call(base + "/memories/a410-guard", "PUT",
+         {"description": "A410 target", "type": "project",
+          "body": "the A410 delete-body guard's target", "agent": "tester"})
+    check("A410 setup: the target memory exists",
+          call(base + "/memories/a410-guard")[0] == 200, "")
+    trash_dir = os.path.join(root, ".trash")
+    trash_before = sorted(os.listdir(trash_dir)) if os.path.isdir(trash_dir) else []
+    chain_before = call(base + "/health")[1].get("audit")
+    cases = [("not JSON", b"{agent: nope", None, 400),
+             ("a JSON array, not an object", b'["agent"]', None, 400),
+             ("not UTF-8", b"\xff\xfe\x00", None, 400),
+             ("over MAX_BODY (refused unread)", None, server.MAX_BODY + 1, 413)]
+    for label, body, length, want in cases:
+        st, payload = raw_delete("a410-guard", body, length)
+        check("A410 a DELETE whose body is %s is refused with %d" % (label, want),
+              st == want, (st, payload[:200]))
+        check("A410 ...and the memory is still there after it (%s)" % label,
+              call(base + "/memories/a410-guard")[0] == 200, label)
+        if body:
+            check("A410 ...and the refusal does not echo the body back (%s)" % label,
+                  body not in payload, payload[:200])
+    trash_after = sorted(os.listdir(trash_dir)) if os.path.isdir(trash_dir) else []
+    check("A410 no tombstone was written by any refused DELETE",
+          trash_after == trash_before, (trash_before, trash_after))
+    check("A410 the audit chain did not grow from refused DELETEs",
+          call(base + "/health")[1].get("audit") == chain_before,
+          (chain_before, call(base + "/health")[1].get("audit")))
+    st, _ = raw_delete("a410-guard", b"", 0)
+    check("A410 the other direction: an EMPTY-body DELETE is still valid "
+          "and tombstones", st == 200 and
+          call(base + "/memories/a410-guard")[0] == 404, st)
+    code, big = call(base + "/memories/a410-put-big", "PUT",
+                     {"description": "d", "type": "project", "agent": "t",
+                      "body": "x" * (server.MAX_BODY + 1)})
+    check("A410 PUT over MAX_BODY now answers 413 too (was 400)",
+          code == 413, (code, big))
+
 
 # ------------------------------------------------- the security boundary
 def n_auth(root):
