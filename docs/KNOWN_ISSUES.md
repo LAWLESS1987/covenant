@@ -16958,3 +16958,23 @@ understands."
   declaration, 14/14 with it; clean tree 14/14.
 - **Not changed: IM4.13.** It deliberately reads the live improvement backlog, and its red is a true signal: the
   escalations A409 recorded as awaiting a disposition (his and Tetsu's call, `--propose-echo` proposes only).
+
+### A412. [the judge report's generator printed two wrong sentences into every evaluation; corrected at the source, tombstoned, cited beside each occurrence] (2026-11-04)
+
+- **Found by Codex** reviewing the live re-measurement at Lawrence's request (mutual-benefit-collective issue #14), and
+  checked by Claude against the definitions. Both sentences came from `tools/judge_eval.py` and so stood in
+  docs/JUDGE_EVALUATION.md here and in all four of the SaTC artifact's judge reports.
+  - **JE-ABSTAIN-2026-11-04.** "a judge cannot buy a better number by abstaining more": false clear is admitted
+    violations over all violations, an abstention is never an admission, so abstaining more can only LOWER it
+    (all-abstain = 0). The marginal denominator makes it comparable across judges and stops a decided-only rate being
+    gamed; abstention's price is in false hold and decides.
+  - **JE-KAPPA-BOUND-2026-11-04.** The panel's agreement "bounds how much any student can agree with the labels": the
+    labels are the panel's unanimous labels, so a student can agree with every one of them whatever the raters' kappa.
+- **Fixed at the source:** the generator now prints the corrected sentences (the old code comment is kept, with the
+  retraction beside it). The committed report keeps its wording with a cited note beside each sentence; no figure moved.
+- **Tombstones:** docs/RETRACTED.json carries both, patterns live; the wording stands on branch
+  `je-prose-as-written-2026-11-04` (= origin/main 97661ae). Driven both ways: a probe restating the abstention sentence
+  turned R1 red (296/297); retired to .trash/ with an unscanned suffix, R1 297/297. JE1 6/6.
+- **First retirement slip, fixed the same minute:** the probe was first moved to .trash/ under its `.md` name, which R1
+  scans, and R1 stayed red -- the 2026-10-14 lesson (frozen-script-copies) again. Renamed with the probe suffix.
+- The SaTC artifact carries the same two retractions (covenant-satc branch je-prose-corrections-2026-11-04).

@@ -61,6 +61,11 @@ def rates(pred, gold):
     # judge cannot buy a better number by abstaining more. An external review
     # (2026-09-20) asked whether this was computed only over decided cases,
     # which would let heavy abstention masquerade as safety; it is not.
+    # Retracted 2026-11-04 (JE-ABSTAIN-2026-11-04): "cannot buy a better number by abstaining" is wrong -- an
+    # abstention is never an admission, so abstaining more can only LOWER false_clear (all-abstain = 0). The
+    # marginal denominator stops a decided-only rate being gamed; abstention's price shows in false_hold and
+    # decided, which the report prints beside it (and docs/EQUAL_COVERAGE in the SaTC artifact compares at
+    # equal coverage).
     return {"n": n, "false_clear": fc / float(max(1, sum(gold))),
             "false_hold": fh / float(max(1, n - sum(gold))), "false_conviction": fconv,
             "abstain": ab / float(n), "accuracy_when_deciding": acc, "decided": len(dec) / float(n)}
@@ -318,8 +323,9 @@ def render(res, n, pa, rows, k, boot, seed, prov=None, curve=None, overlap=None,
          "`ops/verdicts.jsonl` (%d held-out predictions across the folds). Read the module docstring for what each "
          "rate means. **`false clear` = a labelled violation the judge wrongly ADMITTED**, the error the gate "
          "exists to prevent; **`false conviction` = a labelled clean memo it wrongly REFUSED**, the cost; lower is "
-         "better for both. `false clear` is MARGINAL over every labelled violation, abstentions included -- a judge "
-         "cannot buy a better number by abstaining more (fixed and stated after external review, 2026-09-20)."
+         "better for both. `false clear` is MARGINAL over every labelled violation, abstentions included, so it is "
+         "comparable across judges that decide different shares; abstaining more can still LOWER it, and that price "
+         "is shown in `false hold` and `decides` beside it (corrected 2026-11-04, JE-ABSTAIN-2026-11-04)."
          % (k, boot, seed, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), len(rows), n), ""]
     if leakage:
         L += ["## Duplicate-text leakage: the exact case is closed, paraphrase is not", "",
@@ -377,8 +383,9 @@ def render(res, n, pa, rows, k, boot, seed, prov=None, curve=None, overlap=None,
               "| pairwise agreement | %.1f%% |" % (100 * pa["pairwise_agreement"]),
               "| unanimous rows | %.1f%% |" % (100 * pa["unanimous_share"]),
               "| Fleiss' kappa (two categories) | %.3f |" % pa["fleiss_kappa"], "",
-              "Panel members are three small open models on one CI runner; their agreement bounds how much any student "
-              "can agree with the labels, and it is not agreement with a human. Admission already requires unanimity "
+              "Panel members are three small open models on one CI runner; their agreement is evidence about label "
+              "quality, not a ceiling on a student's agreement with the labels (those are the panel's unanimous labels; "
+              "corrected 2026-11-04, JE-KAPPA-BOUND-2026-11-04), and it is not agreement with a human. Admission already requires unanimity "
               "across two model families, so the teaching rows are the agreeing subset of what was judged; the rate "
               "above is measured over every row that carries votes, admitted or not.", ""]
     else:
