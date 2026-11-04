@@ -182,7 +182,7 @@ def _parse(answer):
 # is kept (raw and all, nothing deleted) but its kind becomes "echo", which the vet skips like any non-gap.
 # Blind spot (rule 9): an echo in words the reply also happens to use reads as grounded; a genuine idea the
 # commenter phrased in our preamble's own words without using them in the reply cannot occur by construction.
-_PREAMBLE = PROMPT.split("Reply from", 1)[0]
+_PREAMBLE = SELF_DESC      # the same text; the name stays because ops/ECHO_AB_2026-11-04/ngram_vs_overlap.py reads it
 ECHO_FRAC = 0.5
 # Words are compared on their first STEM letters, so an inflection does not hide an echo. Stress-tested 2026-11-04
 # on the same 119 rows: exact words missed "Ethical ledger with retraction tests", "Ethical ledger for transactions"
