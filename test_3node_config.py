@@ -61,6 +61,28 @@ def local_peers():
         return []
     return [p for p in s.split(",") if p]
 
+
+# A411 (2026-11-04): DECLARED LOOPBACK RELAYS. Node A peers with 127.0.0.1:15082, the laptop's headscale relay to an
+# off-box node -- a loopback port that is no configured node's, by design, so N2 read the operator's correct
+# configuration as "points at 15082, which is no configured node's P2P port" and the sweep went red. N2 cannot
+# know a relay from a typo, so the relay is DECLARED: one "host:port  note" per line in ops/local_relays.txt
+# (gitignored, beside local_peers.txt). A declared relay is reported as off-box; an undeclared unknown port still
+# fails, and a relay is never allowed to sit on a configured node's own API or P2P port.
+LOCAL_RELAYS = os.path.join(HERE, "ops", "local_relays.txt")
+
+
+def local_relays(path=None):
+    try:
+        with open(path or LOCAL_RELAYS, encoding="utf-8") as fh:
+            lines = fh.read().splitlines()
+    except OSError:
+        return set()
+    return {ln.split()[0] for ln in lines if ln.strip() and not ln.lstrip().startswith("#")}
+
+
+def _declared_relay(host, port, relays):
+    return "%s:%d" % (host, port) in relays
+
 _passed, _failed = 0, 0
 
 
@@ -194,6 +216,7 @@ def main():
     p2p_of = {n["api"] + 1: nid for nid, n in nodes.items()}
     api_of = {n["api"]: nid for nid, n in nodes.items()}
     bad, good, external = [], [], []
+    relays = local_relays()
     for nid, n in sorted(nodes.items()):
         for peer in n["peers"]:
             host, port = split_peer(peer)
@@ -231,6 +254,8 @@ def main():
             elif port in api_of:
                 bad.append(f"{nid} points at {api_of[port]}'s API port {port}, "
                            f"not its P2P port {port + 1}")
+            elif _declared_relay(host, port, relays):
+                external.append(f"{nid}->{host}:{port} (declared relay)")
             else:
                 bad.append(f"{nid} points at {port}, which is no configured "
                            f"node's P2P port")
@@ -238,6 +263,23 @@ def main():
              "off-box peers are allowed and named",
        not bad, "; ".join(bad) if bad else
        " ".join(good) + (("  | external: " + " ".join(external)) if external else ""))
+
+    # N2r (A411): the relay declaration, driven both ways on synthetic input, so the escape hatch cannot widen
+    # silently. Order matters and is the code's: a node's own P2P/API port is judged as a node before any
+    # declaration is consulted, so declaring one cannot launder a mistake.
+    import tempfile
+    _rd = tempfile.mkdtemp(prefix="n2r_")
+    _rf = os.path.join(_rd, "local_relays.txt")
+    with open(_rf, "w", encoding="utf-8") as fh:
+        fh.write("# relays\n127.0.0.1:15082  headscale relay to D\n127.0.0.1:5001  a node port, must not count\n")
+    _r = local_relays(_rf)
+    ok("N2r", "a declared loopback relay is read; comments and notes are not part of the address",
+       _r == {"127.0.0.1:15082", "127.0.0.1:5001"}, sorted(_r))
+    ok("N2r", "an UNDECLARED unknown loopback port is still refused (the relay file is not a wildcard)",
+       not _declared_relay("127.0.0.1", 15083, _r) and not _declared_relay("127.0.0.1", 15082, set()),
+       "15083 or an empty declaration was accepted")
+    ok("N2r", "the declared relay is accepted, and no relay file means no relays",
+       _declared_relay("127.0.0.1", 15082, _r) and local_relays(os.path.join(_rd, "absent.txt")) == set(), _r)
 
     # ------------------------------------------------------------ N3/N4 shape
     # LOCAL edges only. An off-box peer is not part of the three-node line these
