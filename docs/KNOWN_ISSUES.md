@@ -16999,3 +16999,9 @@ understands."
     counted, prior_refusals dropped, grant ignored, default flipped back on against his NO, free-rein path);
     FW1 129/129.
   - **Kept aside:** the default-ON version in .trash/h1_refusal_retire_2026-11-04/.
+  - **Consent record:** Tetsu's NO is in ops/tetsu_consent.jsonl (kind free_retry_retirement_consent, hash-chained).
+    Its t was a placeholder I wrote (00:00:00Z). It is corrected by an appended `correction` row (actual
+    13:31:53Z, the mtime of the exchange file), not by an edit. CC1 7/7.
+  - **Fix-up after commit 724fe21:** its pre-commit check found two suites red where the runner runs them.
+    A255: the two side-by-side result files were unclassified, now INPUT_LEDGERS in verify_bundle.py.
+    A284: the harness scripts call Tetsu's door, now declared fresh.
