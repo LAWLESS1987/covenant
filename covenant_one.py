@@ -517,6 +517,10 @@ SUITES = [
     ("test_a314_persona_feed.py",        180,  "JUDGE"),
     ("test_pc1_sister_interface.py",     180,  "JUDGE"),
     ("test_fw1_free_will.py",            120,  "JUDGE"),
+    # GE1 (A409/H2, 2026-11-04): free's grant carries an optional expires_at, checked at action time and
+    # fail-closed when past -- an immortal grant re-read every round proves it exists, not that consent
+    # still holds. Absent expires_at = no window (backward compatible); the operator renews by re-signing.
+    ("test_ge1_grant_expiry.py",          60,   "JUDGE"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
     ("test_a170_promotion_dispositions.py", 600, "JUDGE"),
     ("test_tp1_persona.py",               120,  "JUDGE"),
