@@ -15,9 +15,10 @@ The fix here is two things that do NOT depend on the test's filename:
      instead of silently appending to the live ledger. It catches writes that never adopted `ops()` at all.
 
 Adopting `ops()` across every ledger, and running the whole suite inside `isolate()`, is the follow-on; this
-module is the mechanism and the guard, with a both-ways test (test_si1_isolation.py). Known blind spot: the
-guard wraps builtins.open (the dominant write path, incl. json.dump into an opened file); a write via os.open
-or a C extension is not seen -- named here, not hidden (rule 9)."""
+module is the mechanism and the guard, with a both-ways test (test_si1_isolation.py). The guard wraps BOTH
+builtins.open (json.dump into an opened file) AND os.open (the atomic-write path -- tempfile.mkstemp +
+os.replace -- that the improve-miner's seen-set write, the A409 ledger shape, actually uses). Remaining blind
+spot: a write by a C extension that bypasses both -- named here, not hidden (rule 9)."""
 import os
 import contextlib
 
@@ -69,25 +70,42 @@ def isolate(tmp_root):
     tmp_root = os.path.realpath(tmp_root)
     os.makedirs(os.path.join(tmp_root, "ops"), exist_ok=True)
     _open = builtins.open
+    _os_open = os.open
+    _WRITE_FLAGS = os.O_WRONLY | os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_TRUNC
+
+    def _blocked(p):
+        return _under(p, real_ops) and not _under(p, tmp_root)
 
     def _guarded(file, mode="r", *a, **k):
         try:
             writing = any(c in str(mode) for c in ("w", "a", "x", "+"))
         except Exception:                                      # noqa: BLE001 -- a weird mode is not our business
             writing = False
-        if writing and _under(file, real_ops) and not _under(file, tmp_root):
+        if writing and _blocked(file):
             raise IsolationError(
                 "test wrote to live state: %s (outside the test root %s). Resolve the path through "
                 "covenant_state.ops(), or point it under the test root." % (file, tmp_root))
         return _open(file, mode, *a, **k)
 
+    def _guarded_os_open(path, flags, *a, **k):
+        # the atomic-write path (tempfile.mkstemp / os.fdopen / os.replace) goes through os.open, not
+        # builtins.open, so it is guarded here too -- this is what catches the improve-miner's mkstemp
+        # seen-set write (the A409 ledger shape). A read (O_RDONLY == 0) sets no write flag and is allowed.
+        if (flags & _WRITE_FLAGS) and _blocked(path):
+            raise IsolationError(
+                "test wrote to live state via os.open: %s (outside the test root %s). Resolve the path "
+                "through covenant_state.ops(), or point it under the test root." % (path, tmp_root))
+        return _os_open(path, flags, *a, **k)
+
     old = os.environ.get(ROOT_ENV)
     os.environ[ROOT_ENV] = tmp_root
     builtins.open = _guarded
+    os.open = _guarded_os_open
     try:
         yield tmp_root
     finally:
         builtins.open = _open
+        os.open = _os_open
         if old is None:
             os.environ.pop(ROOT_ENV, None)
         else:

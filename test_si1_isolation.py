@@ -87,6 +87,46 @@ def test_ops_follows_root():
         assert os.path.realpath(cs.ops("a.jsonl")) == os.path.realpath(os.path.join(tr, "ops", "a.jsonl"))
 
 
+def test_os_open_write_to_live_raises():
+    # tempfile.mkstemp into live ops/ goes through os.open -- the atomic-write path -- and must be caught
+    import tempfile
+    with cs.isolate(_tmp()):
+        try:
+            tempfile.mkstemp(dir=REAL_OPS, suffix=".si1.tmp")
+            assert False, "mkstemp into live ops/ (os.open) did not raise"
+        except cs.IsolationError:
+            pass
+
+
+def test_os_open_read_and_under_root_allowed():
+    import tempfile
+    with cs.isolate(_tmp()) as tr:
+        fd, p = tempfile.mkstemp(dir=os.path.join(tr, "ops"))      # under the root -> fine
+        os.close(fd)
+        assert os.path.exists(p)
+        try:                                                        # a READ via os.open of a live path is allowed
+            os.open(os.path.join(REAL_OPS, "si1_nonexistent_osopen.txt"), os.O_RDONLY)
+            assert False, "expected FileNotFoundError"
+        except cs.IsolationError:
+            assert False, "an os.open READ of a live path was blocked"
+        except FileNotFoundError:
+            pass
+
+
+def test_catches_the_miner_mkstemp_write():
+    # the real A409 shape: the improve-miner's atomic seen-set write to its live default path, under isolate()
+    try:
+        import covenant_improve_mine as _M
+    except Exception:                                               # noqa: BLE001 -- not importable here; mechanism covered above
+        return
+    with cs.isolate(_tmp()):
+        try:
+            _M._save_seen(_M.SEEN, {"x"})                           # mkstemp + os.replace into live ops/
+            assert False, "the miner's live seen-set write was not caught"
+        except cs.IsolationError:
+            pass
+
+
 def _main():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     passed = 0
