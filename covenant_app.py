@@ -495,6 +495,24 @@ class Handler(BaseHTTPRequestHandler):
             return False
         return True
 
+    def _origin_ok(self):
+        """CSRF defense for state-changing (POST) requests. _guard's loopback-peer
+        and Host checks stop DNS rebinding, but a page on ANY origin can still POST
+        to the literal 127.0.0.1:PORT -- its Host IS 127.0.0.1, which _host_allowed
+        accepts -- as a CORS 'simple' request, and drive an armed action; the browser
+        sends it, only the RESPONSE is cross-origin-blocked. (2026-11-03 cross-review:
+        DeepSeek raised, Claude confirmed -- the Host check closed rebinding, not CSRF.)
+        A browser always attaches Origin to a cross-origin POST and a page cannot forge
+        it, so refuse a POST whose Origin is PRESENT and is not this console's own
+        loopback origin. A missing Origin (a non-browser local client, e.g. curl) is
+        allowed -- it carries no ambient authority and is not a CSRF vector."""
+        origin = self.headers.get("Origin")
+        if origin is None:
+            return True
+        allowed = {f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}",
+                   f"http://[::1]:{PORT}"}
+        return origin in allowed
+
     def do_GET(self):
         if not self._guard():
             return
@@ -512,6 +530,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self._guard():
             return
+        if not self._origin_ok():
+            # CSRF: a cross-origin page POSTing to the literal 127.0.0.1 passes the
+            # loopback + Host checks (its Host IS 127.0.0.1); the Origin check is what
+            # refuses it. (2026-11-03 cross-review: DeepSeek raised, Claude confirmed.)
+            return self._send(403, json.dumps({"error": "bad Origin (CSRF guard)"}))
         p = self.path.split("?")[0]
         n = int(self.headers.get("Content-Length") or 0)
         try:

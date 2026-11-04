@@ -79,7 +79,8 @@ Already landed THIS session (Claude raised; both-ways guard IS the artifact; PR 
 - F0c grid ledger not bound off-host — covenant_head_commit.py checkpoint — 403b5b9, GS4. CROSS-CHECK PENDING.
 - F0d ram_guard tab side-door — .claude/hooks/ram_guard.py — a6e235e, TG1. CROSS-CHECK PENDING.
 - F0e reverify policy-vs-integrity ambiguity — covenant_grid_guard.py policy_sha — 50896ee, GS3. CROSS-CHECK PENDING.
-- F0f console DNS-rebind/CSRF — covenant_app.py:_guard — 384bce2, AG1. CROSS-CHECK PENDING.
+- F0f console DNS-rebind/CSRF — covenant_app.py:_guard — 384bce2, AG1. CROSS-CHECKED (DeepSeek, C7): the Host
+  check closed REBINDING only; a real CSRF residual remained and is now ALSO fixed (_origin_ok, AG1 12/12).
 
 New findings (open):
 
@@ -168,6 +169,27 @@ New findings (open):
   guards are load-bearing -- but area 5's external pass is therefore PARTIAL (faithful on the role-binding logic the
   snippet kept; a fully faithful C6 pass would paste the real authorize() C6 block WITH its C2-action/C4 context).
   The verifier checking against the REAL code, not the raiser's signal, is what caught it ([[signal-vs-conviction]]).
+
+- C7 -- DeepSeek (F0f cross-check, covenant_app.py console guard), 2026-11-03: driven cold against the F0f
+  Host-header fix. Found a REAL RESIDUAL -- confirmed independently by Claude's own pre-read AND by DeepSeek,
+  citing the same lines (genuine two-system agreement). The F0f commit claimed "DNS-rebind / CSRF defense",
+  but the Host check closes REBINDING ONLY, not CSRF. A page on any website the user visits can
+  fetch('http://127.0.0.1:PORT/api/action/<name>', {method:'POST', mode:'no-cors'}) -- the browser sends it
+  with Host: 127.0.0.1:PORT, which _host_allowed ACCEPTS (covenant_app.py:461), from a loopback TCP peer, which
+  _guard accepts (:487); there is no Origin/Referer/token check, and the body is json.loads'd regardless of
+  Content-Type (:518), so /api/tx and /api/mine are reachable too via a text/plain simple request (no preflight).
+  Only the RESPONSE is cross-origin-blocked; the side effect already happened. Severity MEDIUM: gated by
+  ACTIONS_ON (run_action/submit_tx/mine each refuse unless the console was armed with COVENANT_APP_ACTIONS=1 --
+  :262,:351,:394), so it bites only while the user has an ARMED console running AND then visits a hostile page.
+  FIX (this session): Handler._origin_ok() on POST -- refuse a request whose Origin is PRESENT and not this
+  console's own loopback origin; a missing Origin (non-browser client like curl) is allowed (no ambient
+  authority). A browser always attaches Origin to a cross-origin POST and a page cannot forge it, so this closes
+  the CSRF while keeping the console's own same-origin page and local scripts working. Both-ways guard: AG1
+  extended to 12/12 (cross-site Origin refused; own/absent Origin allowed; null refused; RED = _guard alone still
+  passes the loopback-shaped request, so _origin_ok is the load-bearing CSRF check). F0f status: rebinding closed
+  (unchanged) AND CSRF now closed. LESSON: a commit that claims TWO defenses ("rebind / CSRF") in one line should
+  be driven against BOTH threat models separately -- the Host check was necessary for rebinding but not sufficient
+  for CSRF, and the shared label hid the gap.
 
 - C3 -- ChatGPT (area 7, free_will heal auth), 2026-11-03: a CONDITIONAL candidate, and the first seat this round
   to find the gap in Claude's own pass. It accepted the loopback/signature logic but flagged that
@@ -359,3 +381,9 @@ correct; correctness of the SNN/scoring math was out of this review's security s
   pass is PARTIAL (de-named snippet, not the real C6-in-context). Defense-in-depth filed: verify
   fpr==hash(pubkey) + reject cross-role pubkey aliasing at grid_signers load (not attacker-reachable; his/
   grid-guard call, not auto-fixed). Still open: area 6 Gemini (same Gemini problem), areas 3/4/7, F0a–F0f.
+- 2026-11-03 (F0f cross-check -> C7): DeepSeek cross-checked the F0f console Host-header fix and found a REAL
+  CSRF residual (two-system agreement; Claude's pre-read flagged it too). F0f closed DNS rebinding but a
+  cross-origin page could still POST to the literal 127.0.0.1:PORT and drive an armed action. FIXED this
+  session: Handler._origin_ok() (POST Origin check), AG1 extended to 12/12 both-ways. F0f cross-check is now
+  CLOSED with a residual fix. Remaining F0 cross-checks: F0a (highway kill), F0b/F0e (grid reverify), F0c
+  (off-host anchor), F0d (ram_guard side-door). Working seat for these: DeepSeek.
