@@ -517,6 +517,11 @@ SUITES = [
     ("test_a314_persona_feed.py",        180,  "JUDGE"),
     ("test_pc1_sister_interface.py",     180,  "JUDGE"),
     ("test_fw1_free_will.py",            120,  "JUDGE"),
+    # SI1 (A409/G, 2026-11-04): covenant_state gives tests an explicit, injectable state root + an
+    # isolate() guard that makes a write to live ops/ RAISE instead of silently leaking (the A409
+    # fixture-leak class). Driven both ways; adopting ops() across ledgers + running the whole suite
+    # inside isolate() is the named follow-on.
+    ("test_si1_isolation.py",             60,   "SECURITY"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
     ("test_a170_promotion_dispositions.py", 600, "JUDGE"),
     ("test_tp1_persona.py",               120,  "JUDGE"),
