@@ -551,6 +551,11 @@ SUITES = [
     # (ungrounded/length/money/off-limits/model-error) in an opt-in out dict -- the measurable basis for a
     # ring-earning prune of free's organs. how tag unchanged; both ways.
     ("test_oa1_organ_attribution.py",     60,   "JUDGE"),
+    # TC1 (2026-11-04, operator "We need the PCs to interact without you. There has to be redundancy."):
+    # covenant_tetsu_client reaches TETSU's model panel across three network-plane doors, falling through
+    # on timeout (door 1 direct, doors 2/3 via their headscale SOCKS proxies). Hermetic both-ways test
+    # (local stub doors), no live TETSU needed; records which door answered.
+    ("test_tc1_tetsu_client.py",          120,  "HTTP"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
     ("test_a170_promotion_dispositions.py", 600, "JUDGE"),
     ("test_tp1_persona.py",               120,  "JUDGE"),

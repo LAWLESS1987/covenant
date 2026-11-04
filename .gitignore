@@ -170,6 +170,11 @@ coinbase_balance.txt
 # the file is absent, so ignoring it fails in the safe direction.
 trader_config.json
 TRADER_HALT
+
+# TETSU model-door addresses (covenant_tetsu_client). The node IPs are the operator's
+# private tailnet identifiers and this repo is public, so the real config stays untracked;
+# ops/tetsu_doors.example.json (placeholders) is the tracked template.
+ops/tetsu_doors.json
 # The scheduled run's log: portfolio totals, position sizes, orders placed.
 # That is holdings by another name, and holdings are not published.
 trader_log.txt
@@ -287,6 +292,7 @@ ops/pause/
 # Node A's off-box peers (the phone's tailnet address), read by covenant_watchdog.py
 # and covenant_prod.bat alike, so neither public file carries the address.
 ops/local_peers.txt
+ops/local_relays.txt
 # the AUTO_GATED auto-onboard lane's LOCAL state (covenant_onboard.py): the operator's
 # arm/trust-root switch, the tasks the lane has armed, and -- on the chosen SIGNATURE
 # trust root -- the signed node roster. All machine-local decisions, not repo content:

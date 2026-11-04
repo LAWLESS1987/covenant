@@ -2288,6 +2288,48 @@
     "private/hf_threads/"
    ],
    "note_on_branch": "Published on Hugging Face, not in a tracked file: the post itself is the record as written. No draft of it exists on disk; the snapshot in private/hf_threads/183807.json holds it verbatim."
+  },
+  {
+   "id": "JE-ABSTAIN-2026-11-04",
+   "claim": "That because false clear is counted over every labelled violation, abstentions included, a judge cannot buy a better false-clear number by abstaining more.",
+   "refuted_by": "Codex's review, 2026-11-04 (mutual-benefit-collective issue #14), checked by Claude: an abstention is never an admission, so abstaining more can only lower false clear; all-abstain makes it 0.",
+   "truth": "The marginal denominator makes false clear comparable across judges that decide different shares and stops a decided-only rate being gamed; it does not stop abstention lowering false clear. The price is in false hold and decides, printed beside it. tools/judge_eval.py now generates the corrected sentence.",
+   "verbatim": [
+    "a judge cannot buy a better number by abstaining more"
+   ],
+   "patterns": [
+    "cannot\\s+buy\\s+a\\s+better\\s+number\\s+by\\s+abstaining"
+   ],
+   "note_on_patterns": "As generated into docs/JUDGE_EVALUATION.md and the SaTC artifact's four reports.",
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "private/",
+    "test_r1_retracted.py"
+   ],
+   "note_on_allow": "The record files hold the wording on purpose; the report cites the id beside it."
+  },
+  {
+   "id": "JE-KAPPA-BOUND-2026-11-04",
+   "claim": "That the label panel's agreement bounds how much any student can agree with the labels.",
+   "refuted_by": "Codex's review, 2026-11-04 (issue #14), checked by Claude: the labels are the panel's unanimous labels, so a student can agree with all of them whatever the raters' kappa.",
+   "truth": "Kappa is evidence about label quality and bounds agreement with a single noisy rater, not with the consensus labels. tools/judge_eval.py now generates the corrected sentence.",
+   "verbatim": [
+    "their agreement bounds how much any student can agree with the labels"
+   ],
+   "patterns": [
+    "agreement\\s+bounds\\s+how\\s+much\\s+any\\s+student"
+   ],
+   "note_on_patterns": "As generated into docs/JUDGE_EVALUATION.md and the SaTC artifact's four reports.",
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "private/",
+    "test_r1_retracted.py"
+   ],
+   "note_on_allow": "The record files hold the wording on purpose; the report cites the id beside it."
   }
  ]
 }
