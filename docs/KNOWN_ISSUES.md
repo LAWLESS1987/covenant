@@ -16927,3 +16927,9 @@ understands."
   body echo, no partial tombstone and an empty-body test; the Conscious Ledger for a tombstone-count check and a
   sweep of the other handlers for the same swallowed error. The sweep: `_read_json` has two callers, `do_PUT`
   (already checked its error) and `do_DELETE` (this fix); `do_GET` and `do_OPTIONS` read no body.
+- **My slip, fixed the same day (A410 fix-up).** The first version's PUT-over-MAX_BODY check sent the full 1 MB
+  body through urllib. The server refuses it unread and closes, and on Linux the client still writing got
+  `URLError [Errno 32] Broken pipe`, uncaught: test_m1_memory_system.py read NO RESULT on 1 of 4 public CI jobs
+  (python 3.12) while 3 passed and the local Linux pre-push passed -- a race, not a deterministic red. The check
+  now sends the oversized request as its Content-Length header alone, as the DELETE case already did, and also
+  checks nothing was written. 203/203 three times in a row; 191/203 against main's server.py.

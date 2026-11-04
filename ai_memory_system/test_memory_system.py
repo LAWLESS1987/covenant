@@ -431,9 +431,12 @@ def h_http(root):
     import http.client
     host, port_s = base.rsplit("//", 1)[1].split(":")
 
-    def raw_delete(name, body=None, length=None):
+    def raw_delete(name, body=None, length=None, method="DELETE"):
+        # An oversized request is sent as its Content-Length header ALONE: the server refuses it unread, and a
+        # client still pushing a megabyte into a socket the server has closed gets EPIPE on Linux (A410 fix-up:
+        # the first version sent the PUT body through urllib and crashed the suite on 1 of 4 CI jobs).
         c = http.client.HTTPConnection(host, int(port_s), timeout=10)
-        c.putrequest("DELETE", "/memories/" + name)
+        c.putrequest(method, "/memories/" + name)
         c.putheader("Content-Type", "application/json")
         n = len(body) if length is None else length
         c.putheader("Content-Length", str(n))
@@ -476,11 +479,11 @@ def h_http(root):
     check("A410 the other direction: an EMPTY-body DELETE is still valid "
           "and tombstones", st == 200 and
           call(base + "/memories/a410-guard")[0] == 404, st)
-    code, big = call(base + "/memories/a410-put-big", "PUT",
-                     {"description": "d", "type": "project", "agent": "t",
-                      "body": "x" * (server.MAX_BODY + 1)})
+    code, big = raw_delete("a410-put-big", None, server.MAX_BODY + 1, method="PUT")
     check("A410 PUT over MAX_BODY now answers 413 too (was 400)",
-          code == 413, (code, big))
+          code == 413, (code, big[:200]))
+    check("A410 ...and nothing was written by it",
+          call(base + "/memories/a410-put-big")[0] == 404, "")
 
 
 # ------------------------------------------------- the security boundary
