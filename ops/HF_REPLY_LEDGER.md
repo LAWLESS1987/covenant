@@ -28,6 +28,8 @@ Account: forum user **Lawless1987**, profile https://huggingface.co/Lawless1987.
 
 ## Drafts in flight
 
+**190727 (midterms) → Harry, v1.** `ops/HF_MIDTERMS_REPLY_DRAFT_2026-11-04.md`, with the evaluation in `ops/MIDTERMS_EVAL_2026-11-04.md`. It carries his busy note and the public correction for our scorer claim, tombstoned as HF190727-SCORER-SUM-NOT-MEAN. Not reviewed, not posted.
+
 **Posted 2026-11-04 at about 17:54 UTC, on his word ("Publish and post"): the two owed items.**
 - **183807 #27**, replying to Jang-woo #25 (4,029 characters). It delivers the second set.
   - Gist `117e08135744b6f79c95005744bcb2a7`, commit 9a90f4b, authored with the noreply address.

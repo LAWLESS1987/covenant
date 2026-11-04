@@ -2330,6 +2330,29 @@
     "test_r1_retracted.py"
    ],
    "note_on_allow": "The record files hold the wording on purpose; the report cites the id beside it."
+  },
+  {
+   "id": "HF190727-SCORER-SUM-NOT-MEAN",
+   "claim": "That the multiclass Brier scorer we posted to Harry430 computes exactly the rule in his post #25 -- said in Hugging Face thread 190727, posts 29 and 37 (2026-10-21).",
+   "verbatim": [
+    "Scoring: the script computes exactly your rule — multiclass Brier per race (sum over candidates of (p − outcome)², outcome 1 for the winner and 0 otherwise), averaged across the 15, lower is better",
+    "The scorer below is the corrected multiclass one that implements rule 4 as written — flagging the change openly."
+   ],
+   "truth": "Post #25 defines the per-race score as the MEAN squared difference over the candidates; our scorer (multiclass_brier in #37) takes the SUM. With the thread's three outcome buckets (D/R/Other) in every race the two differ by exactly a factor of 3, so no comparison or ranking changes, but the numbers are on a different scale from the rule as written. nootxlm's 0.27 -> 0.16 in #57 is the sum convention, matching our scorer; under #25 it is 0.089 -> 0.053 (measured 2026-11-04, ops/MIDTERMS_EVAL_2026-11-04.md).",
+   "refuted_by": "Reading post #25's scoring sentence against multiclass_brier in our post #37, 2026-11-04.",
+   "patterns": [
+    "the script computes exactly your rule",
+    "implements rule 4 as written"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "private/hf_threads/",
+    "ops/HF_REPLIES_DRAFT_2026-10-21.md",
+    "ops/HF_HARRY_DELIVERABLE_2026-10-21.md"
+   ],
+   "note_on_branch": "Published on Hugging Face (190727 #29, #37). The post is the record as written; the 10-21 drafts that carry it are allowed here unedited. The correction goes back to the same thread."
   }
  ]
 }
