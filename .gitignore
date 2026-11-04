@@ -287,6 +287,7 @@ ops/pause/
 # Node A's off-box peers (the phone's tailnet address), read by covenant_watchdog.py
 # and covenant_prod.bat alike, so neither public file carries the address.
 ops/local_peers.txt
+ops/local_relays.txt
 # the AUTO_GATED auto-onboard lane's LOCAL state (covenant_onboard.py): the operator's
 # arm/trust-root switch, the tasks the lane has armed, and -- on the chosen SIGNATURE
 # trust root -- the signed node roster. All machine-local decisions, not repo content:

@@ -111,8 +111,21 @@ def main():
 
     # ---- FO1c: the arm gate keeps the beacon DARK ---------------------------
     gated = {"beacon": dict(PAIR["svc"], arm_gated=True)}
-    # not armed -> inactive -> ABSENT even with a member down
-    disarmed = F.detect_redundancy_degraded(services=gated, probe=_probe({"wsl-ubuntu"}))
+    # not armed -> inactive -> ABSENT even with a member down.
+    # A411 (2026-11-04): this used to read the LIVE marker ops/REDUNDANCY_ARMED, so on the operator's machine,
+    # where the pair IS armed, "the default disarmed path" read PRESENT and FO1 went red on correct code. The real
+    # armed() still runs here -- against a marker path the test owns, absent and then present.
+    import tempfile
+    _mk_dir = tempfile.mkdtemp(prefix="fo1c_")
+    _was_marker = F.ARM_MARKER
+    try:
+        F.ARM_MARKER = os.path.join(_mk_dir, "REDUNDANCY_ARMED")
+        disarmed = F.detect_redundancy_degraded(services=gated, probe=_probe({"wsl-ubuntu"}))
+        with open(F.ARM_MARKER, "w", encoding="utf-8") as fh:
+            fh.write("armed for FO1c\n")
+        marker_armed = F.detect_redundancy_degraded(services=gated, probe=_probe({"wsl-ubuntu"}))
+    finally:
+        F.ARM_MARKER = _was_marker
     was = F.armed
     try:
         F.armed = lambda: False
@@ -128,6 +141,8 @@ def main():
           d_live["state"] == F.PRESENT, d_live)
     # sanity: the default-marker path and the explicit path agree when unarmed
     check("FO1c default disarmed path is ABSENT too", disarmed["state"] == F.ABSENT, disarmed)
+    check("FO1c ...and the real marker path, once the marker exists, reads PRESENT (armed() reads the file)",
+          marker_armed["state"] == F.PRESENT, marker_armed)
 
     # ---- FO1d: environment_down ---------------------------------------------
     e_down = F.detect_environment_down(environments=[{"name": "wsl-ubuntu", "up": False}])
