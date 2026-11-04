@@ -517,6 +517,10 @@ SUITES = [
     ("test_a314_persona_feed.py",        180,  "JUDGE"),
     ("test_pc1_sister_interface.py",     180,  "JUDGE"),
     ("test_fw1_free_will.py",            120,  "JUDGE"),
+    # OA1 (A409 ecosystem groundwork, 2026-11-04): write_reply records which screen set a draft aside
+    # (ungrounded/length/money/off-limits/model-error) in an opt-in out dict -- the measurable basis for a
+    # ring-earning prune of free's organs. how tag unchanged; both ways.
+    ("test_oa1_organ_attribution.py",     60,   "JUDGE"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
     ("test_a170_promotion_dispositions.py", 600, "JUDGE"),
     ("test_tp1_persona.py",               120,  "JUDGE"),
