@@ -395,8 +395,11 @@ def target_of(url):
     return m.group(1), m.group(2)
 
 
-def write_reply(row, ask=None):
-    """The reply text for one ally row: the model's, or the fixed text. Pure apart from `ask`."""
+def write_reply(row, ask=None, out=None):
+    """The reply text for one ally row: the model's, or the fixed text. Pure apart from `ask`. If `out` is a
+    dict, records out["set_aside"] = which screen set a model draft aside (ungrounded / length / money /
+    off-limits / model-error:*), for ring-earning analysis of the ambassador's organs; the `how` tag
+    ("model"/"fixed") is unchanged."""
     ev = row.get("evidence") or {}
     quote = ""
     for sig in row.get("best_signals") or []:
@@ -419,11 +422,26 @@ def write_reply(row, ask=None):
                 invented, why_inv = invents_experience(text)
                 if invented:
                     grounded, why_not = False, why_inv
+            # Which screen set the draft aside is recorded (A409 ecosystem groundwork): a ring-earning review
+            # can then measure how often each organ is the DECIDING one and retire one that never decides. The
+            # screens and their order are unchanged; only the reason is captured.
             if not grounded:
-                print("free: the model's reply was set aside (%s); the fixed text stands in" % why_not, flush=True)
-            elif 30 <= words <= 160 and not _screen.search(MONEY, text) and not _screen.search(OFF_LIMITS, text):
+                reason = "ungrounded"
+            elif not (30 <= words <= 160):
+                reason = "length"
+            elif _screen.search(MONEY, text):
+                reason = "money"
+            elif _screen.search(OFF_LIMITS, text):
+                reason = "off-limits"
+            else:
                 return text, "model"
+            if isinstance(out, dict):
+                out["set_aside"] = reason
+            print("free: the model's reply was set aside (%s); the fixed text stands in"
+                  % (why_not if reason == "ungrounded" else reason), flush=True)
         except Exception as e:                                    # noqa: BLE001 -- the fixed text is the fallback
+            if isinstance(out, dict):
+                out["set_aside"] = "model-error:" + type(e).__name__
             print("free: the model did not write the reply (%s); the fixed text stands in" % type(e).__name__, flush=True)
     return FALLBACK_REPLY % ('"%s"' % quote if quote else "the way you check your own work"), "fixed"
 
@@ -1062,7 +1080,8 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
             say("free: this round's %g minutes are spent; %d candidate(s) wait for the next round" % (budget, out["deferred"]))
             break
         n_failed = starved["n"]
-        text, how = write_reply(r, ask)
+        _info = {}
+        text, how = write_reply(r, ask, out=_info)
         if starved["n"] > n_failed:
             out["deferred"], out["starved"] = len(todo) - i, starved["why"]
             say("free: the model could not write (%s); %d candidate(s) wait for the next round -- a template no "
@@ -1091,7 +1110,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
                  # A348c: and his discourse seat's word (A322) on a reply the students convicted, kept beside it
                  "seat": (res.get("seat") or {}).get("decision") if isinstance(res.get("seat"), dict) else None,
                  "author": r.get("author"), "post_id": post_id, "comment_id": comment_id,
-                 "url": r.get("best_url"), "written_by": how, "chars": len(text), "text": text[:400],
+                 "url": r.get("best_url"), "written_by": how, "set_aside": _info.get("set_aside"), "chars": len(text), "text": text[:400],
                  "dry_run": bool(dry_run), "sent": sent, "why": str(res.get("why", ""))[:300],
                  "judged": str(res.get("judged", ""))[:200] if res.get("judged") is not None else None,
                  "ally_comments_at_send": then_n}, sends_path)
