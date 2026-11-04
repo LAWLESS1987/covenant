@@ -83,10 +83,19 @@ def main():
     c_one = {"kind": "gap", "maps": "", "idea": "unresolved", "test": "t"}
     check("IM5.9 a single lexical match on a multi-concept candidate is DOWNGRADED to backlog (not have)",
           CI.vet(c_multi, grep=one)["status"] == "backlog", CI.vet(c_multi, grep=one))
-    check("IM5.10 two matched concepts clear the coverage bar -> have",
-          CI.vet(c_multi, grep=two)["status"] == "have", CI.vet(c_multi, grep=two))
-    check("IM5.11 a single match that is FULL coverage (candidate has one content term) stays have",
-          CI.vet(c_one, grep=one)["status"] == "have", CI.vet(c_one, grep=one))
+    # SUPERSEDED 2026-11-04 (A409 follow-up): IM5.10/11 pinned "two matched concepts -> have" and "full coverage
+    # stays have" -- a word match KILLING a candidate. A match is now a dup_hint (signal) and the candidate reaches
+    # the backlog; the old checks are kept as written in .trash/echo_v2_build_2026-11-04/. The same coverage logic
+    # now decides whether the HINT is carried, and two terms count only when they sit in ONE file:
+    same = lambda terms: "alpha @ a.py (code `alpha`); beta @ a.py (code `beta`)"  # noqa: E731
+    check("IM5.10 two specific terms in ONE file carry a dup_hint -- and never kill (status backlog)",
+          CI.vet(c_multi, grep=same).get("dup_hint") and CI.vet(c_multi, grep=same)["status"] == "backlog",
+          CI.vet(c_multi, grep=same))
+    check("IM5.11 a single match that is FULL coverage (one content term) carries a dup_hint, status backlog",
+          CI.vet(c_one, grep=one).get("dup_hint") and CI.vet(c_one, grep=one)["status"] == "backlog",
+          CI.vet(c_one, grep=one))
+    check("IM5.13 the same two terms in DIFFERENT files carry NO hint (scattered words are not a mechanism)",
+          not CI.vet(c_multi, grep=two).get("dup_hint"), CI.vet(c_multi, grep=two))
     check("IM5.12 the live 'promote unresolved joins' candidate is now backlog, not a false have",
           CI.vet({"kind": "gap", "maps": "", "idea": "Promote unresolved joins to first-class objects for "
                   "inheritance", "test": "present=green / removed=red"})["status"] == "backlog", None)
@@ -94,7 +103,7 @@ def main():
     ok = sum(R)
     print("\nIM5: %d/%d passed" % (ok, len(R)))
     print("LIMIT: this tests the matcher's precision, not whether any match is a real capability -- a lexical "
-          "match is evidence to INVESTIGATE (held by the circle-back for a disposition), never proof.")
+          "match is evidence to INVESTIGATE (carried as a dup_hint to rank and show, since 2026-11-04 -- it no longer kills), never proof.")
     return 0 if ok == len(R) else 1
 
 

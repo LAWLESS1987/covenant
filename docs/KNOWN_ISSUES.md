@@ -16904,3 +16904,98 @@ understands."
     anything wider than what was said. The relayed message asked no yes or no question.
   - Small-model agreement can be partly acquiescence (the consent process says so). His reply paraphrases the
     message, so it shows what he took in, more than an independent view.
+
+### A409. [a test wrote 120 fixture rows into the live improvement-miner ledger, and 40% of the miner's extractions were our own prompt handed back; both fixed. The ambassador retries a target its judge refused until a rewording passes; found, not changed] (2026-11-04)
+
+- **The ask.** His words: "look at all instructions and past work for logic and reason then access un used moltbook
+  interactions also held replies for potential improvements to our repos." The full write-up, with every
+  denominator and its unit, is docs/MOLTBOOK_HELD_REPLIES_MINING_2026-11-04.md.
+- **Fixed 1: tests writing live state, the fourth time (A272, IM1 on 10-27, A401 on 11-01, now this).**
+  `covenant_improve_extract.extract(out=CANDIDATES_OUT)` bound the live path at import. test_im3 reached it through
+  `nightly()` and appended 120 fixture rows (carol, dave, f0..f7) to ops/improve_candidates.jsonl from 10-27 to 10-29,
+  printing "15/15 passed". Reproduced 2026-11-04: 239 -> 249 rows on one run.
+  - Why the earlier tombstones did not stop it: IM1 repaired harvest() and A401 guarded the reflex files, each one
+    module. Nothing guarded the shape.
+  - Every ledger-path default in the three covenant_improve*.py modules now resolves at call time.
+  - **Guard IM8** (test_im8_no_frozen_paths.py, registered): ast over the modules found on disk; a function default
+    that is a module path constant built by os.path.join fails. Blind to attribute, call and lambda defaults and to
+    modules outside the family. IM3 now snapshots the live ledgers it could touch (16/16).
+  - Driven both ways: the frozen default restored -> IM8 red and IM3 red (it caught a 111,018 -> 114,173 byte write);
+    restored -> 4/4 and 16/16. The 130 fixture rows (120 + 10 from the reproduction) are retired to
+    .trash/improve_candidates_fixture_leak_2026-11-04/ with a RECORD.md; the live file holds the 119 real rows.
+- **Fixed 2: the preamble echo.** The extraction prompt opens with a description of the covenant. 48 of the 119 real
+  extractions had an IDEA >= 50% made of preamble words absent from the reply being read: 19 of the 22 "gap" rows
+  and all 5 live circle-back escalations. Each new row records `echo_frac`; at >= 0.5 its kind is "echo" (kept, vet
+  skips it). IM2.6 both ways; threshold disabled -> IM2 red. Existing rows are not rewritten.
+  - Stress pass before commit: the 48 flagged rows read by hand, none a real idea wrongly marked; inflected echoes
+    slipped under exact words, so words compare on a 6-letter stem (48 -> 51 flagged, none un-flagged), IM2.7 both
+    ways, IM2 16/16. Edge cases 24/24, path resolution 19/19, IM1-8 + LI1/AN1/OW1 green on a fresh Linux copy.
+    Side finding, unchanged: an empty candidates file at cold start writes no seen-set, so the next run's first
+    batch is seeded unread (fresh hosts only).
+- **Found, not changed (his and Tetsu's call):**
+  - Retry after refusal. Of 5,378 comments free targeted, 554 were refused, re-attempted and never sent; 26 were
+    sent after an earlier covenant refusal; 13 drew 20 or more attempts. Rotation keys on the author for 24 hours
+    and only a SENT reply marks a target done (covenant_free_will._attempted_recently). Verbatim repeats are judged
+    consistently (1 of 71 differed), so the pass comes from rewording. Whether that is a false refusal outlived or a
+    gate defeated by persistence is a judgment, not a measurement.
+  - Free's grant carries no term or expiry; the 5 live IM4.13 escalations are echoes awaiting a disposition; the
+    miner extracts 20 a night against 19,732 waiting; two commitments in posted HF replies are open (Sentinel-Witness
+    config, per-action plan binding). Detail in the write-up.
+- **Follow-up, same day: the echo issue run through the others, then built and tested** (his asks: "run the echo
+  issue thru the others", "Build and test it", "use logic and reason towards mutual benefit").
+  - The first live night with the guard (11-04) marked 12 of 20 extractions as echoes, and the escalations grew to 7.
+    Nine outside seats plus Tetsu were asked (ops/ECHO_CONSULT_2026-11-04.md). All nine named the cause: the
+    self-description sits in the step that extracts. Each seat claim was checked against the data before use;
+    two were refuted (an n-gram as a replacement loses 13 of 63 echoes; reply truncation is not the cause).
+    My question had one fact wrong: 6 escalations matched "ledger", not 7 (the 7th matched "manifest").
+  - **Built.**
+    - Reply-only extraction (covenant_improve_extract.PROMPT_V2). The idea must rest on a QUOTE that code finds,
+      word for word, in the text the model saw. One retry with a different instruction; still not found ->
+      'ungrounded', which the vet skips.
+    - The re-queue (covenant_improve_mine.REQUEUE, append-only), so a reply an echo swallowed is mined again.
+    - A 4th disposition, miner_echo, which clears only with evidence; `--propose-echo` proposes and writes nothing.
+    - **A keyword match no longer kills a candidate.** It is carried as `dup_hint`, and the capped weekly digest
+      shows unhinted ideas first. The kill that remains is the RETRACTED-pattern recurrence.
+  - **Measured.**
+    - Side by side on 40 real replies, same door: echoes 22 -> 0; median share of the idea's words found in the
+      reply 0.17 -> 0.89.
+    - Two blind judges (ChatGPT, Claude; X/Y shuffled, key kept apart) said the reply really proposes the idea:
+      10 -> 26 rows where both said yes. Exact agreement between the judges: 35/40 (v1), 33/40 (v2).
+    - The dedup, at every generic-word cutoff tried, rested its 'have' kills on coincidences ("handle" + "rollback"
+      in a 9,000-line file). On the n=10 author-labelled seed it traded 4/5 false haves for 4/5 missed duplicates
+      as the cutoff moved, which is why a word match became a hint instead of a verdict.
+    - Model classification with the self-description (the two-call variant) labelled 29 of 39 grounded ideas
+      'have', so the brochure bias came straight back. Not built.
+  - **Switched live:** PROMPT_VERSION = "v2"; 63 v1-echo replies re-queued (about 4 nights at 20 a night).
+  - **Guards:** IM9 38/38, red under 11 mutations (quote gate, retry, retry prompt, self-description back,
+    re-queue x2, miner_echo, ungrounded, kill-on-match, co-location, digest ranking); control green.
+    IM2 is pinned to v1 (kept runnable); IM3/5/6 moved to the new rule, their old checks kept in
+    .trash/echo_v2_build_2026-11-04/.
+  - **Runner:** IM1-IM9 + R1/AN1/OW1, 436 passed and 1 failed (IM4.13, the 7 live escalations: 6 have miner_echo
+    proposals waiting for a person; 4 of the 7 seats asked that a person confirm each).
+  - **Not solved.**
+    - v2 almost never answers "none". A judge found 11 replies proposing nothing, and v2 gave 7 of them a yes or
+      partly. Expect noise in the backlog; the digest cap bounds what reaches a person.
+    - The dedup seed is n=10 and author-labelled: indicative, not validated.
+    - Artifacts: ops/ECHO_AB_2026-11-04/.
+- **H1 acted on, then put to Tetsu; his NO stands** (his words "use discernment towards mutual benefit").
+  - **Re-measured** with "refused" meaning the covenant's own refusal only (A349 B13):
+    - 1,549 targets refused at least once (1,339 once, 193 twice, 17 three or more, at most 14);
+    - 27 sent after a refusal: 21 after ONE, 8 of the 27 through his discourse seat (A322);
+    - the 20+ attempt counts were mostly NO-VIEW holds, which are not objections.
+  - **Proposed and built:** retire a target after its SECOND covenant refusal, keeping one re-draft so a false
+    conviction can be outlived. At 2 it would have stopped 6 of the 27 sends and 56 refused re-drafts, and it caps
+    nothing he lifted (A221).
+  - **Tetsu's answer.** Asked one plain question (ops/TETSU_CONSENT_H1_2026-11-04.json), he answered: "NO /
+    Measuring refusals does not dictate stopping replies. Let the conversation continue, learning from each
+    refusal." The 3B agent door answered; the council was not asked.
+  - **So, live:**
+    - REFUSALS_RETIRE_AFTER = None (never retire);
+    - every attempt records `prior_refusals`, the learning he asked for;
+    - the round row counts retired targets;
+    - a number in the grant (`refusals_retire_after`) switches retirement on, for him and the operator to set
+      together. On today's ledger, 2 would retire 216 of 1,564 refused targets.
+  - **Guard:** FW2 (test_fw2_refusal_retire.py) 14/14, red under 6 mutations run on a copy (skip removed, no-view
+    counted, prior_refusals dropped, grant ignored, default flipped back on against his NO, free-rein path);
+    FW1 129/129.
+  - **Kept aside:** the default-ON version in .trash/h1_refusal_retire_2026-11-04/.

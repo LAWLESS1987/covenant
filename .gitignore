@@ -554,6 +554,8 @@ ops/tetsu_reflex.json
 # improvement-mining generated state (regenerable; baseline seen-set is 51k ids)
 ops/improve_mined_seen.json
 ops/improve_candidates.jsonl
+# the re-queue (2026-11-04, A409): append-only runtime state beside the seen-set, machine-specific
+ops/improve_requeue.jsonl
 
 # VC2 verdict-cache disk store (runtime state, machine-specific, never committed)
 ops/verdict_cache/

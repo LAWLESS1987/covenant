@@ -36,6 +36,11 @@ def main():
     fails = []
     long = "x" * 250
     orig_cand, orig_seen = IM.CANDIDATES, IM.SEEN
+    # IM2 pins the v1 extractor's contract (kept runnable: the record of what ran 10-27..11-04, and the arm the
+    # 11-04 side-by-side compared against). The live default became v2 on 2026-11-04; IM9 covers v2, including
+    # the door-failure property below.
+    orig_ver = EX.PROMPT_VERSION
+    EX.PROMPT_VERSION = "v1"
     try:
         with tempfile.TemporaryDirectory() as d:
             IM.CANDIDATES = os.path.join(d, "candidates.jsonl")
@@ -103,16 +108,48 @@ def main():
                 fails.append("echo guard wrongly blanked a genuine IDEA: %r" % echoed)
             if echoed["test"] != "present=green / removed=red":
                 fails.append("echo guard wrongly blanked a genuine both-ways TEST: %r" % echoed)
+
+            # 6. PREAMBLE ECHO, BOTH WAYS, end to end (2026-11-04). The live 3B answered 48 of 119 real replies
+            #    with a paraphrase of OUR preamble ("a ledger with an ethics gate in the transaction path") that the
+            #    reply never said. Same IDEA, two replies: one that never uses those words -> kind "echo" (the vet
+            #    skips it); one that really does -> stays "gap". The row is kept either way (nothing deleted).
+            parrot = "a ledger with an ethics gate in the transaction path"
+            _write(IM.CANDIDATES, [_row("dora", "DORA talks about retries and idempotency keys " + long, "d4"),
+                                   _row("eve", "EVE: put the ethics gate in the transaction path of the ledger "
+                                        + long, "e5")])
+            IM.SEEN = os.path.join(d, "seen6.json")
+            out6 = os.path.join(d, "out6.jsonl")
+            same = lambda text: (200, {"answer": "KIND: gap\nMAPS: gate\nIDEA: %s\nTEST: present=green / removed=red"  # noqa: E731
+                                              % parrot})
+            got = {x["id"]: x for x in EX.extract(limit=20, ask=same, out=out6, say=lambda *a: None)}
+            if got.get("d4", {}).get("kind") != "echo":
+                fails.append("a preamble paraphrase the reply never said must be kind 'echo', got %r" % got.get("d4"))
+            if got.get("e5", {}).get("kind") != "gap":
+                fails.append("the same idea grounded in the reply's own words must stay 'gap', got %r" % got.get("e5"))
+            if _out_ids(out6) != ["d4", "e5"]:
+                fails.append("both rows must be written (an echo is marked, never dropped), got %r" % _out_ids(out6))
+
+            # 7. An INFLECTION must not hide an echo ("Ethical ledger with retraction tests" slipped past exact
+            #    words in the 11-04 stress test), and the stem must not ground a word the reply does not share.
+            infl = EX.preamble_echo_frac("Ethical ledgers with retraction tests", "a reply about retries")
+            if infl < EX.ECHO_FRAC:
+                fails.append("an inflected preamble echo must still read as echo, got %r" % infl)
+            grounded = EX.preamble_echo_frac("Ethical ledgers with retraction tests",
+                                             "the ethics of ledger retractions, tested")
+            if grounded >= EX.ECHO_FRAC:
+                fails.append("the same idea whose inflected words ARE in the reply must stay grounded, got %r" % grounded)
     finally:
         IM.CANDIDATES, IM.SEEN = orig_cand, orig_seen
+        EX.PROMPT_VERSION = orig_ver
 
     if fails:
         print("IM2 FAIL:")
         for x in fails:
             print("  -", x)
         return 1
-    print("IM2: 11/11 passed -- door stubbed (offline); a reply is extracted once, only after the door answered; "
-          "a door failure is retried not dropped; empty-seen control re-surfaces all; labelled parse pinned.")
+    print("IM2: 16/16 passed -- door stubbed (offline); a reply is extracted once, only after the door answered; "
+          "a door failure is retried not dropped; empty-seen control re-surfaces all; labelled parse pinned; "
+          "a preamble echo is marked 'echo' (inflections included) and the same idea grounded in the reply stays 'gap'.")
     return 0
 
 

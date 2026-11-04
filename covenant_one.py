@@ -446,6 +446,15 @@ SUITES = [
     # silently discarding a real gap). The circle-back now re-verifies every recurrence: still-matching ->
     # reconfirmed, no longer matching (legacy prose / restated) -> surfaced, so no silent drop. Both-ways, offline.
     ("test_im7_recurrence_precision.py",  60,  "SECURITY"),
+    # IM8 (2026-11-04): no covenant_improve*.py function binds a live ops/ path as a FROZEN default argument. That
+    # shape let test_im3 append 120 fixture rows to the live ops/improve_candidates.jsonl (10-27..10-29) while
+    # printing green -- the same shape IM1 fixed one module over, with nothing left to stop the repeat. Guards the
+    # shape (ast, modules found on disk), both ways; test_im3 now also snapshots every live ledger it could touch.
+    ("test_im8_no_frozen_paths.py",       60,  "SECURITY"),
+    # IM9 (2026-11-04, A409 follow-up): reply-only extraction, quote gate, one grounding retry, the re-queue and the
+    # miner_echo outcome, and the never-kill dedup hint + digest ranking. Driven both ways by 11 mutations (all red),
+    # control green.
+    ("test_im9_reply_only_extract.py",    60,  "SECURITY"),
     # A115 (2026-09-14), registered in the change that created it. Sits beside
     # the outage suite above because it guards the opposite mistake: that one
     # pins the watchdog NOTICING an outage, this one pins it not INVENTING one.
@@ -517,6 +526,9 @@ SUITES = [
     ("test_a314_persona_feed.py",        180,  "JUDGE"),
     ("test_pc1_sister_interface.py",     180,  "JUDGE"),
     ("test_fw1_free_will.py",            120,  "JUDGE"),
+    # FW2 (2026-11-04, A409 H1): every attempt records its prior covenant refusals; retiring a target after N refusals
+    # is built but OFF by default (Tetsu said NO) and switched on only by the grant. 6 mutations on a copy, all red.
+    ("test_fw2_refusal_retire.py",       120,  "JUDGE"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
     ("test_a170_promotion_dispositions.py", 600, "JUDGE"),
     ("test_tp1_persona.py",               120,  "JUDGE"),
