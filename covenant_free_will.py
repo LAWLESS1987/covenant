@@ -308,8 +308,41 @@ def write_post(rows, ask):
     return None, None, None
 
 
-def grant(path=None):
-    """The operator's standing grant, or None. Nothing here forges one."""
+def _grant_expired(exp, now):
+    """True if the grant's expires_at is past (A409/H2). Accepts 'YYYY-MM-DD' or ISO 'YYYY-MM-DDTHH:MM:SSZ'.
+    An UNPARSEABLE value fails CLOSED (treated as expired): a window that cannot be read is not a live grant.
+    An empty/absent value is NOT expired -- absence of expires_at means no window (backward compatible)."""
+    import calendar
+    s = str(exp or "").strip()
+    if not s:
+        return False
+    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+        try:
+            return float(now) > calendar.timegm(time.strptime(s, fmt))
+        except ValueError:
+            continue
+    return True
+
+
+def _no_grant_why(path, now):
+    """Why a round found no live grant: an EXPIRED window (name the date, fail-closed), or simply none on record."""
+    try:
+        with open(path or GRANT, encoding="utf-8") as fh:
+            g = json.load(fh)
+        if isinstance(g, dict) and g.get("granted") and str(g.get("words", "")).strip():
+            exp = g.get("expires_at")
+            if exp not in (None, "") and _grant_expired(exp, now):
+                return ("the grant expired on %s (ops/ambassador_grant.json): re-sign it -- update expires_at -- "
+                        "to renew; free does nothing until then" % exp)
+    except (OSError, ValueError):
+        pass
+    return "no grant on record (ops/ambassador_grant.json): free does nothing on her own"
+
+
+def grant(path=None, now=None):
+    """The operator's standing grant, or None. Nothing here forges one. A grant whose expires_at (if set) is
+    PAST is treated as no grant -- fail-closed -- until the operator re-signs it (A409/H2: re-reading an
+    immortal grant proves it exists, not that consent still holds). No expires_at means no window (as before)."""
     path = path or GRANT
     try:
         with open(path, encoding="utf-8") as fh:
@@ -318,6 +351,9 @@ def grant(path=None):
         return None
     if not isinstance(g, dict) or not g.get("granted") or not str(g.get("words", "")).strip():
         return None
+    exp = g.get("expires_at")
+    if exp not in (None, "") and _grant_expired(exp, time.time() if now is None else now):
+        return None                                        # A409/H2: an expired window is fail-closed everywhere
     caps = dict(DEFAULT_CAPS)
     # A221 (2026-09-25, "lift ... the other four limits"): null in his grant = no cap; 0 is still off.
     caps.update({k: (None if v is None else int(v)) for k, v in (g.get("caps") or {}).items() if k in caps})
@@ -859,12 +895,12 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     import covenant_ambassador as AMB
     t_start = clock()
     now = now if now is not None else time.time()
-    g = grant(grant_path)
+    g = grant(grant_path, now=now)
     out = {"granted": bool(g), "learned": 0, "allies": 0, "candidates": 0, "replied": 0, "refused": 0,
            "rate_held": 0, "hidden": 0,                                    # A349 B13: named apart from "refused"
            "introduced": False, "dry_run": bool(dry_run), "why": ""}
     if not g:
-        out["why"] = "no grant on record (ops/ambassador_grant.json): free does nothing on her own"
+        out["why"] = _no_grant_why(grant_path, now)
         say("free: " + out["why"])
         return out
     try:
