@@ -517,6 +517,10 @@ SUITES = [
     ("test_a314_persona_feed.py",        180,  "JUDGE"),
     ("test_pc1_sister_interface.py",     180,  "JUDGE"),
     ("test_fw1_free_will.py",            120,  "JUDGE"),
+    # HG1 (A409, 2026-11-04): the honesty organ -- free must not claim first-person experience, tools it
+    # uses, or incidents that happened to it (fabrication the blind label + the uncensored 27B both found).
+    # invents_experience is driven both ways; a flagged model reply is set aside for the honest fallback.
+    ("test_hg1_honesty_guard.py",         60,   "JUDGE"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
     ("test_a170_promotion_dispositions.py", 600, "JUDGE"),
     ("test_tp1_persona.py",               120,  "JUDGE"),
