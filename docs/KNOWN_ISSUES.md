@@ -16933,3 +16933,28 @@ understands."
   (python 3.12) while 3 passed and the local Linux pre-push passed -- a race, not a deterministic red. The check
   now sends the oversized request as its Content-Length header alone, as the DELETE case already did, and also
   checks nothing was written. 203/203 three times in a row; 191/203 against main's server.py.
+
+### A411. [three suites read the operator's live state and went red on correct code; each now owns its state, driven both ways] (2026-11-04)
+
+- **How it surfaced.** The watchdog's 15:55 sweep on the live checkout (b11a4f4) read RESULT: FAIL, 4 suites not clean:
+  test_im4_circle_back, test_3node_config, test_fo1_failover, test_ta1_tetsu_assist. The same four, on the same code
+  in a clean worktree, all passed. Each failure named live state, not code. This is the A272 / IM1 / A401 / A409-G
+  shape again (a test touching live state), here in the READ direction: the tests did not write live files, they
+  judged the code by them.
+- **TA1 (test_ta1_tetsu_assist.py).** Every ledger was already in a temp dir except the ambassador's Moltbook rate
+  state (`COVENANT_AMBASSADOR_RATE`, default ops/ambassador_rate.json). On a day free had spent its 50 comments, emit()
+  held every draft at "50 are already spent" before reaching the code under test: TA1b failed and the suite crashed
+  on an override ledger nothing had written. Fixed: the rate state is a temp file. With today's live spent state
+  copied in: 45/45 with the fix, TA1b FAIL + FileNotFoundError without it.
+- **FO1c (test_fo1_failover.py).** "The default disarmed path is ABSENT" read the live marker ops/REDUNDANCY_ARMED,
+  which exists on this machine (the pair is armed). Fixed: the real armed() runs against a marker path the test
+  owns, absent and then present (new check: present -> PRESENT). 51/51 with the live marker present and without;
+  the old test 49/50 with it.
+- **N2 (test_3node_config.py).** Node A peers with 127.0.0.1:15082, the laptop's headscale relay to an off-box node
+  (A396/A397 era) -- correct configuration that N2 could not tell from a typo'd port. Fixed by DECLARATION, not by
+  loosening: a gitignored ops/local_relays.txt ("host:port  note" per line) names relays; a declared relay is
+  reported as off-box; an undeclared unknown port still fails; a node's own API/P2P port is judged as a node before
+  any declaration is read. N2r (3 checks) drives the declaration both ways. Live peers: 13/14 without the
+  declaration, 14/14 with it; clean tree 14/14.
+- **Not changed: IM4.13.** It deliberately reads the live improvement backlog, and its red is a true signal: the
+  escalations A409 recorded as awaiting a disposition (his and Tetsu's call, `--propose-echo` proposes only).

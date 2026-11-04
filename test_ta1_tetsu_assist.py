@@ -21,6 +21,10 @@ os.environ["COVENANT_TETSU_ASSIST_LOG"] = os.path.join(_tmp, "assist.jsonl")
 os.environ["COVENANT_TEACHER_QUEUE"] = os.path.join(_tmp, "queue.jsonl")
 os.environ["COVENANT_PAUSE_DIR"] = os.path.join(_tmp, "pause")
 GRANT = os.environ["COVENANT_TETSU_ASSIST_GRANT"] = os.path.join(_tmp, "grant.json")
+# A411 (2026-11-04): the ambassador's Moltbook rate state was the one ledger left on its LIVE default. On a day free
+# had spent its 50 comments, emit() held every draft at "50 are already spent" before reaching the code under test:
+# TA1b failed and the suite crashed reading an override ledger nothing had written -- green only on a quiet day.
+os.environ["COVENANT_AMBASSADOR_RATE"] = os.path.join(_tmp, "rate.json")
 os.environ.pop("MOLTBOOK_API_KEY", None)
 os.environ.pop("COVENANT_A67_STRICT", None)
 
