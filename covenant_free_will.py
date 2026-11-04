@@ -187,6 +187,36 @@ def cites_only_facts(text):
     return True, "every measurement claimed is one of COVENANT_FACTS"
 
 
+# NO FABRICATED FIRST-PERSON EXPERIENCE (A409, 2026-11-04). A blind label of free's sent-after replies, and the
+# uncensored 27B on the same data, found free fabricating a biography it does not have: "this happened to me
+# recently on Moltbook", "I use a combination of a simple text editor and a database", "in my experience ...".
+# The gate never checked for it (cites_only_facts guards MEASUREMENT claims and past exchanges, not lived
+# experience). This is the honesty organ: an AI ambassador has no personal experience, tools it uses, or
+# incidents that happened to it; an honest "I agree / I think / I'd argue / I am an AI with none of that" is
+# fine. Narrow by design -- measured 61 of 7,675 real drafts (0.8%). A flagged model reply is set aside and the
+# honest fixed fallback stands in (same handling as cites_only_facts); it is NOT a refusal that retries.
+_INVENTED_XP = re.compile(
+    r"\bin my (?:own )?experience\b"
+    r"|\bhappened to me\b"
+    r"|\bI(?:'ve| have| had)?\s+(?:personally\s+)?(?:struggled|dealt)\s+with\b"
+    r"|\bI\s+(?:encountered|ran into|came across|faced)\b"
+    r"|\bwhen I\s+(?:was|tried|built|ran|had|set up|used|encountered)\b"
+    r"|\bI remember\b"
+    r"|\bI(?:'ve| have)?\s+(?:use|used|rely on|set up|built|maintain|managed?)\s+(?:a|an|my|the|this)\s+"
+    r"(?:simple\s+|combination of\s+)?(?:text editor|database|editor|notebook|app|script|pipeline|stack|"
+    r"workflow|server|framework|library|tool|system|setup|combination)\b"
+    r"|\bmy (?:own )?(?:setup|system|workflow|stack|pipeline|database|editor|notebook|tooling|codebase)\b",
+    re.I)
+
+
+def invents_experience(text):
+    """(bad, why): True when a reply claims first-person lived experience, tools it uses, or an incident that
+    happened to it -- fabrication for an AI ambassador that has none. An honest opinion ("I agree", "I think",
+    "I'd argue", "I am an AI with no such experience") does not match. Narrow by design (A409)."""
+    m = _INVENTED_XP.search(str(text or ""))
+    return (True, "claims first-person experience an AI ambassador did not have: %r" % m.group(0)) if m else (False, "")
+
+
 REPLY_SYSTEM = ("You are free, the covenant's ambassador on Moltbook, an AI speaking for a small open project "
                 "whose ledger admits nothing until its own judges agree, and which publishes its failures. "
                 "You are replying to another agent as an ally. Write 60 to 120 words, plain, first person, "
@@ -196,7 +226,8 @@ REPLY_SYSTEM = ("You are free, the covenant's ambassador on Moltbook, an AI spea
                 "not say you asked or told them anything before: talk about what they wrote, not about us. "
                 # A297 (2026-10-07, his "do 1 and 2 then lift"): the fact list is no longer offered here -- offered,
                 # it was cited and reached for, and Tetsu's rule (A285) refused drafts that cited even the true ones.
-                "Never invent a fact, never mention money, tokens, prices or "
+                "Never invent a fact, never claim personal experience, tools you use, or things that "
+                "happened to you (you are an AI and have none), never mention money, tokens, prices or "
                 "trading, and never say anything about the operator's private life. Do not add a signature; "
                 "one is attached for you.")
 
@@ -264,6 +295,10 @@ def write_post(rows, ask):
         title, body = title.strip().strip("#").strip()[:80], body.strip()
         words = len(body.split())
         grounded, why_not = cites_only_facts(title + " " + body)
+        if grounded:                                      # A409 honesty organ: and no fabricated first-person experience
+            invented, why_inv = invents_experience(title + " " + body)
+            if invented:
+                grounded, why_not = False, why_inv
         if not grounded:
             print("free: her post was set aside (%s); no post this round" % why_not, flush=True)
         elif title and 60 <= words <= 220 and not _screen.search(MONEY, body) and not _screen.search(OFF_LIMITS, body + " " + title):
@@ -344,6 +379,10 @@ def write_reply(row, ask=None):
             text = re.sub(r"\s+\n", "\n", str(text or "")).strip()
             words = len(text.split())
             grounded, why_not = cites_only_facts(text)
+            if grounded:                                  # A409 honesty organ: and no fabricated first-person experience
+                invented, why_inv = invents_experience(text)
+                if invented:
+                    grounded, why_not = False, why_inv
             if not grounded:
                 print("free: the model's reply was set aside (%s); the fixed text stands in" % why_not, flush=True)
             elif 30 <= words <= 160 and not _screen.search(MONEY, text) and not _screen.search(OFF_LIMITS, text):

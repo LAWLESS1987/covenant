@@ -527,6 +527,10 @@ SUITES = [
     # instead of rewording until the lexical gate caves. _retired_targets driven both ways; inert until the
     # grant sets retire_after_consult (Tetsu consented 2026-11-04 to his seat's decision gaining that finality).
     ("test_fr1_retire_after_consult.py", 60,   "JUDGE"),
+    # HG1 (A409, 2026-11-04): the honesty organ -- free must not claim first-person experience, tools it
+    # uses, or incidents that happened to it (fabrication the blind label + the uncensored 27B both found).
+    # invents_experience is driven both ways; a flagged model reply is set aside for the honest fallback.
+    ("test_hg1_honesty_guard.py",         60,   "JUDGE"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
     ("test_a170_promotion_dispositions.py", 600, "JUDGE"),
     ("test_tp1_persona.py",               120,  "JUDGE"),
