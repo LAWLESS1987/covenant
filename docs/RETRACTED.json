@@ -2201,7 +2201,8 @@
     "docs/KNOWN_ISSUES.md",
     "docs/CORRECTIONS.md",
     "ops/HF_PEER_REVIEW_v2_CONSENSUS_2026-10-30.md",
-    "ops/HF_PEER_REVIEW_CANDIDATES_2026-10-30.md"
+    "ops/HF_PEER_REVIEW_CANDIDATES_2026-10-30.md",
+    "private/hf_threads/"
    ],
    "note_on_branch": "Published on Hugging Face, not in a tracked file: the post itself is the record as written, and the untracked ops drafts that carry it are allowed here unedited."
   },
@@ -2227,7 +2228,8 @@
     "docs/CORRECTIONS.md",
     "ops/HF_JANGWOO_REPLY_DRAFT_2026-10-31.md",
     "ops/ESP_COMPARISON_2026-10-31.md",
-    "ops/CONSULT_CONSENT_CLAIM_2026-10-31.md"
+    "ops/CONSULT_CONSENT_CLAIM_2026-10-31.md",
+    "private/hf_threads/"
    ],
    "note_on_branch": "Branch consent-no-release-as-written-2026-10-31 holds the code and docs as written (dcecc56). The KNOWN_ISSUES entry, the posted reply's drafts and the comparison are dated records of that day and are allowed here unedited; A394 restates beside them."
   },
@@ -2266,6 +2268,26 @@
     "docs/CORRECTIONS.md"
    ],
    "note_on_branch": "The wrong line stays in KNOWN_ISSUES A396 as written, with the correction directly beneath it; the messages are the record as sent."
+  },
+  {
+   "id": "HF183807-P24-DIAG-FIELD-ON-CANDIDATE-PATH",
+   "claim": "That our port's reading of gate.issues (where Jang-woo's skeleton keeps the intent gate's issues in gate._diag.issues) is the one place the narrowed-candidate path would differ, and that the port needed a fix for it -- posted to Jang-woo on Hugging Face thread 183807, post 24 (2026-11-03).",
+   "verbatim": [
+    "As you note, it changes nothing in this file, because no case here narrows the candidate set – so the 253 stand for what the harness tests, the gate’s decision given the claims, and the one place the difference would show is the path no case here exercises. We’ll fix the port to read the canonical field."
+   ],
+   "truth": "The two are unrelated. gate._diag.issues holds the intent gate's C1/C2 diagnostics, which the skeleton marks as logs only, not part of the decision; the narrowed-candidate case is a value-gate path. The runner reads either field, so the port needs no fix. Jang-woo's post 23 had made two separate points -- where the issues live, and that the pre-fix skeleton gives the same 253 because no case narrows the candidate set -- and post 24 joined them.",
+   "refuted_by": "Jang-woo, Hugging Face thread 183807 post 25 (2026-11-04), from his skeleton's source; the correction goes back to the same thread (ops/HF_REPLIES_DRAFT_2026-11-04.md, draft A).",
+   "patterns": [
+    "the one place the difference would show is the path no case here exercises",
+    "fix the port to read the canonical field"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "private/hf_threads/"
+   ],
+   "note_on_branch": "Published on Hugging Face, not in a tracked file: the post itself is the record as written. No draft of it exists on disk; the snapshot in private/hf_threads/183807.json holds it verbatim."
   }
  ]
 }
