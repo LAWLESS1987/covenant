@@ -556,6 +556,9 @@ SUITES = [
     # on timeout (door 1 direct, doors 2/3 via their headscale SOCKS proxies). Hermetic both-ways test
     # (local stub doors), no live TETSU needed; records which door answered.
     ("test_tc1_tetsu_client.py",          120,  "HTTP"),
+    # tools/tetsu_work.ask marks an answer that copies its question ("echoed", "echo_share"), so a copied
+    # review packet is never counted as a review (2026-11-05: three were, nearly). Hermetic stub door.
+    ("test_tw1_tetsu_echo.py",            60,   "HTTP"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
     ("test_a170_promotion_dispositions.py", 600, "JUDGE"),
     ("test_tp1_persona.py",               120,  "JUDGE"),
