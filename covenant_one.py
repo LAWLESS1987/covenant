@@ -544,6 +544,9 @@ SUITES = [
     # on timeout (door 1 direct, doors 2/3 via their headscale SOCKS proxies). Hermetic both-ways test
     # (local stub doors), no live TETSU needed; records which door answered.
     ("test_tc1_tetsu_client.py",          120,  "HTTP"),
+    # VC1 (2026-11-05): the version is single-sourced -- COVENANT_VERSION is the one truth and
+    # HANDOFF.md must match it, so preflight/banner/hand-off cannot drift again (readiness #4).
+    ("test_vc1_version_consistency.py",   60,   "DEPLOYMENT"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
     ("test_a170_promotion_dispositions.py", 600, "JUDGE"),
     ("test_tp1_persona.py",               120,  "JUDGE"),

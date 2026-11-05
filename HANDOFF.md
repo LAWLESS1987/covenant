@@ -3,7 +3,10 @@
 **Read this first.** It is the bridge between the recorded conversations (which
 predate this work and are now partly wrong) and the current code.
 
-Current version: **v8.18**. Verified: **266 checks passing**, all green.
+Current version: **v8.40**. The single source of truth is `COVENANT_VERSION` in
+`covenant_unified_v8.py`; the VC1 guard (`test_vc1_version_consistency.py`) fails the build
+if this line ever drifts from it. For the current check count, run `./run_all_tests.sh` --
+a hardcoded number here only goes stale (it read "266" at v8.18 while the code was v8.40).
 
 | suite | checks |
 |---|---|
