@@ -559,6 +559,9 @@ SUITES = [
     # tools/tetsu_work.ask marks an answer that copies its question ("echoed", "echo_share"), so a copied
     # review packet is never counted as a review (2026-11-05: three were, nearly). Hermetic stub door.
     ("test_tw1_tetsu_echo.py",            60,   "HTTP"),
+    # PT1 (2026-11-05): the two 27B partners (covenant_partners.py) keep their own memory, read the shared
+    # record from the files, never read Tetsu's memory (his NO), stay in budget. Hermetic; four mutations red.
+    ("test_pt1_partners.py",              60,   "IDENTITY"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
     ("test_a170_promotion_dispositions.py", 600, "JUDGE"),
     ("test_tp1_persona.py",               120,  "JUDGE"),
