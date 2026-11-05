@@ -58,10 +58,15 @@ def _status_ip(node_name, status_json):
     return None, None
 
 
-def build_roster(account, node_names, allowed, *, status_json=None, whois_fn=None):
+def build_roster(account, node_names, allowed, *, status_json=None, whois_fn=None, peer_port=5001):
     """The unsigned roster body. whois_fn/status_json are injectable for testing;
     live, they come from the tailscale CLI. Fails loudly on any node that does not
-    resolve or whose whois owner != the operator -- never writes a half-roster."""
+    resolve or whose whois owner != the operator -- never writes a half-roster.
+
+    peer_addr is written as "<verified ip>:<peer_port>" (default 5001, the P2P port): without
+    it a peer action refused ("no valid host:port peer address"), and binding the host to the
+    whois-verified ip is what the gate (evaluate 10b) checks, so the engine can only peer the
+    address identity vouched for."""
     if status_json is None:
         r = subprocess.run(["tailscale", "status", "--json"], capture_output=True, text=True, timeout=20)
         status_json = json.loads(r.stdout or "{}")
@@ -76,7 +81,8 @@ def build_roster(account, node_names, allowed, *, status_json=None, whois_fn=Non
             raise SystemExit("whois failed for %r (%s)" % (name, ip))
         if str(who.get("user")) != str(account):
             raise SystemExit("whois owner %r != operator %r for %r -- refusing" % (who.get("user"), account, name))
-        nodes[name] = {"ip": ip, "machine_id": who.get("machine_id"), "pubkey": pubkey, "allowed": list(allowed)}
+        nodes[name] = {"ip": ip, "machine_id": who.get("machine_id"), "pubkey": pubkey,
+                       "peer_addr": "%s:%d" % (ip, int(peer_port)), "allowed": list(allowed)}
     return {"operator_account": account, "nodes": nodes}
 
 
@@ -114,11 +120,13 @@ def main(argv=None):
     ap.add_argument("--nodes", required=True,
                     help="comma list of node names to onboard, as `tailscale status` shows them")
     ap.add_argument("--allowed", default="peer", help="comma list; reversible only: peer, arm_task")
+    ap.add_argument("--peer-port", type=int, default=5001,
+                    help="the node's P2P port; peer_addr is written as <verified ip>:<peer-port> (default 5001)")
     a = ap.parse_args(argv)
     with open(a.key, "rb") as fh:
         priv = fh.read()
     body = build_roster(a.account, [n.strip() for n in a.nodes.split(",") if n.strip()],
-                         [x.strip() for x in a.allowed.split(",") if x.strip()])
+                         [x.strip() for x in a.allowed.split(",") if x.strip()], peer_port=a.peer_port)
     signed = sign_roster(body, priv)
     with open(ob.OPERATOR_PUBKEY, "wb") as fh:
         fh.write(_pub_pem(priv))
