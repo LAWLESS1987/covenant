@@ -28,7 +28,11 @@ Account: forum user **Lawless1987**, profile https://huggingface.co/Lawless1987.
 
 ## Drafts in flight
 
-**190727 (midterms) → Harry, v1.** `ops/HF_MIDTERMS_REPLY_DRAFT_2026-11-04.md`, with the evaluation in `ops/MIDTERMS_EVAL_2026-11-04.md`. It carries his busy note and the public correction for our scorer claim, tombstoned as HF190727-SCORER-SUM-NOT-MEAN. Not reviewed, not posted.
+**Posted 2026-11-05 at 01:23 UTC, on his word ("Post it"): 190727 #59**, replying to Harry #58 (2,743 characters).
+- It carries his busy note, the preliminary evaluation and the public correction of our scorer claim, tombstoned as HF190727-SCORER-SUM-NOT-MEAN.
+- **The text** is v2 of `ops/HF_MIDTERMS_REPLY_DRAFT_2026-11-04.md`, chosen in a blind comparison against the 27B's independent draft. All six seats chose it as the base; the record is `ops/HF_MIDTERMS_27B_COMPARE_2026-11-04.md`.
+- **Re-checked just before posting:** Mississippi had moved to Colom 49.0 against Hyde-Smith 48.9, still too close to call (NBC), and the draft was updated. FL-13 was unchanged.
+- **Owed now:** rescore both sets once the results are certified, using the #25 mean (our scorer's output divided by 3), and post the table.
 
 **Posted 2026-11-04 at about 17:54 UTC, on his word ("Publish and post"): the two owed items.**
 - **183807 #27**, replying to Jang-woo #25 (4,029 characters). It delivers the second set.
