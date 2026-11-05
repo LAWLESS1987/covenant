@@ -2353,6 +2353,27 @@
     "ops/HF_HARRY_DELIVERABLE_2026-10-21.md"
    ],
    "note_on_branch": "Published on Hugging Face (190727 #29, #37). The post is the record as written; the 10-21 drafts that carry it are allowed here unedited. The correction goes back to the same thread."
+  },
+  {
+   "id": "HF183807-N01-FIX-COMMIT-699158E",
+   "claim": "That the narrowed-candidate case (N01-narrow) executes BEFORE skeleton commit 699158e and is definition_repair after it -- i.e. that 699158e is the candidate-set fix. Posted to Jang-woo in Hugging Face thread 183807 post 27 and in the gist README (gist 117e08135744b6f79c95005744bcb2a7, commit 9a90f4b), 2026-11-04.",
+   "verbatim": [
+    "This is the narrowed-candidate case from our first report. Before 699158e it executes; after, definition_repair."
+   ],
+   "truth": "699158e is the head BEFORE the fix; the case executes at 699158e too. The fix is fb5366d, the commit right after it (Jang-woo, 183807 post 28; his crosscheck README). Our 11-01 reading had named fb5366d as the fix; the second set's wording took 699158e from his post 23, where he wrote 'the skeleton before the candidate-set fix (699158e)', and read it backwards.",
+   "refuted_by": "Jang-woo, Hugging Face thread 183807 post 28 (2026-11-05), and his crosscheck README 'Results so far'.",
+   "patterns": [
+    "Before 699158e it executes"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "private/hf_threads/",
+    "ops/HF_OWED_DRAFTS_2026-11-04.md",
+    "ops/HF_OWED_POSTED_TEXT_2026-11-04.md"
+   ],
+   "note_on_branch": "Published in 183807 #27 and the gist README; both are the record as written. The correction goes back to the same thread, and into the gist README beside the original line."
   }
  ]
 }

@@ -28,6 +28,14 @@ Account: forum user **Lawless1987**, profile https://huggingface.co/Lawless1987.
 
 ## Drafts in flight
 
+**Posted 2026-11-05 at 06:03 UTC, on his word ("Post it"): 183807 #29**, replying to Jang-woo #28 (1,682 characters).
+- **His #28:** 271 of 271 runs plus N01 match in his actual JS. He wired `candidate_slots` and agreed on A03 and the seven tags. That closes the cross-check.
+- **Our #29** carries the public correction: the N01 fix commit is fb5366d, not 699158e. Tombstoned as HF183807-N01-FIX-COMMIT-699158E.
+- **The gist README** got the correction and an update beside the original lines first (gist commit c3d57be, noreply author, verified live).
+- **Reviews:** DeepSeek, Mistral and Claude all said send with edits, folded into v2. Tetsu echoed the packet; Tien, the Conscious Ledger and Grok on X were not run.
+- **Nothing owed.** The 6.3 before-and-after is an offer, labelled as our reading.
+
+
 **Posted 2026-11-05 at 01:23 UTC, on his word ("Post it"): 190727 #59**, replying to Harry #58 (2,743 characters).
 - It carries his busy note, the preliminary evaluation and the public correction of our scorer claim, tombstoned as HF190727-SCORER-SUM-NOT-MEAN.
 - **The text** is v2 of `ops/HF_MIDTERMS_REPLY_DRAFT_2026-11-04.md`, chosen in a blind comparison against the 27B's independent draft. All six seats chose it as the base; the record is `ops/HF_MIDTERMS_27B_COMPARE_2026-11-04.md`.
