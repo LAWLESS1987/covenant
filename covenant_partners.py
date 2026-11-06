@@ -131,7 +131,7 @@ def _fit(lines, budget):
     return list(reversed(kept))
 
 
-def build_system(pid, reg=None, root=None, mem_root=None):
+def build_system(pid, reg=None, root=None, mem_root=None, question_chars=0):
     reg = reg if reg is not None else load_registry()
     p = reg["partners"][pid]
     name = p.get("name")
@@ -147,14 +147,39 @@ def build_system(pid, reg=None, root=None, mem_root=None):
     )
     shared = shared_record(root=root)
     own = ["- " + n["note"] for n in notes(pid, mem_root)]
-    own_txt = "\n".join(_fit(own, NOTES_BUDGET)) or "(none yet)"
+    budget = system_budget(question_chars)
+    if budget < MIN_SYSTEM:
+        raise QuestionTooLong("a %d-character question leaves %d characters for the partner's own frame and the "
+                              "shared record, under the %d they need; split the question" % (question_chars, budget,
+                                                                                              MIN_SYSTEM))
+    shown = _fit(own, min(NOTES_BUDGET, budget // 6))
+    own_txt = "\n".join(shown) or "(none yet)"
+    if len(shown) < len(own):                  # never silently: say what is not shown (191272/180541 lesson)
+        own_txt += "\n(%d older note(s) not shown here; they are kept, not deleted)" % (len(own) - len(shown))
     fixed = "%s\n\nTHE PROJECT'S SHARED RECORD\n%s\n\nYOUR NOTES\n%s\n\nYOUR RECENT EXCHANGES\n" % (head, shared, own_txt)
-    room = max(0, SYSTEM_BUDGET - len(fixed))
+    room = max(0, budget - len(fixed) - 80)
     recent = []
     for e in exchanges(pid, mem_root):
         recent.append("Q: %s\nA: %s" % (e["q"][:600], (e.get("a") or "")[:900]))
-    rec_txt = "\n---\n".join(_fit(recent, room)) or "(none yet)"
-    return (fixed + rec_txt)[:SYSTEM_BUDGET]
+    kept = _fit(recent, room)
+    rec_txt = "\n---\n".join(kept) or "(none yet)"
+    if len(kept) < len(recent):
+        rec_txt += "\n(%d older exchange(s) not shown here; they are kept, not deleted)" % (len(recent) - len(kept))
+    return (fixed + rec_txt)[:budget]
+
+
+CONTEXT_CHARS = 21000    # the 27B's 6,144-token context at a conservative ~3.4 characters a token
+ANSWER_RESERVE = 5000    # room left for the answer (~1,500 tokens)
+MIN_SYSTEM = 5200        # the partner's own frame plus the shared record; below this it cannot be itself
+
+
+class QuestionTooLong(Exception):
+    """The question would not leave room for who the partner is. Raised, never silently truncated
+    (2026-11-06: Cipher returned an EMPTY answer to a 9.6k-character review packet on top of a full memory)."""
+
+
+def system_budget(question_chars=0):
+    return min(SYSTEM_BUDGET, CONTEXT_CHARS - ANSWER_RESERVE - int(question_chars))
 
 
 def _consult(question, model, system):
@@ -168,22 +193,31 @@ def ask(pid, question, reg=None, root=None, mem_root=None, consult=None):
     """Ask one partner. Its answer is kept in its own memory; REMEMBER: lines become its notes."""
     reg = reg if reg is not None else load_registry()
     p = reg["partners"][pid]
-    system = build_system(pid, reg, root, mem_root)
+    system = build_system(pid, reg, root, mem_root, question_chars=len(question))
     t0 = time.time()
     answer, tokens = (consult or _consult)(question, p["model"], system)
     sys.path.insert(0, os.path.join(HERE, "tools"))
     from tetsu_work import echo_share, ECHO_THRESHOLD
     share = echo_share(question, answer)
+    empty = not (answer or "").strip()         # a non-answer, recorded as one -- never as agreement
     d = _mem_dir(pid, mem_root)
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    _append(os.path.join(d, "exchanges.jsonl"), {"t": now, "q": question, "a": answer, "tokens": tokens,
-                                                  "seconds": round(time.time() - t0, 1), "echo_share": share})
-    kept = []
+    kept, refused = [], []
+    qnorm = " ".join(question.split()).lower()
     for m in REMEMBER.finditer(answer):
-        _append(os.path.join(d, "notes.jsonl"), {"t": now, "note": m.group(1)})
-        kept.append(m.group(1))
-    return {"partner": pid, "answer": answer, "tokens": tokens, "remembered": kept,
-            "echo_share": share, "echoed": share >= ECHO_THRESHOLD, "system_chars": len(system)}
+        note = m.group(1)
+        # A note copied from the QUESTION is someone else's words entering its memory (laundered import,
+        # HF 191272). It is refused and recorded, never kept as the partner's own.
+        if " ".join(note.split()).lower() in qnorm:
+            refused.append(note)
+            continue
+        _append(os.path.join(d, "notes.jsonl"), {"t": now, "note": note})
+        kept.append(note)
+    _append(os.path.join(d, "exchanges.jsonl"), {"t": now, "q": question, "a": answer, "tokens": tokens,
+                                                  "seconds": round(time.time() - t0, 1), "echo_share": share,
+                                                  "empty": empty, "remember_refused": refused})
+    return {"partner": pid, "answer": answer, "tokens": tokens, "remembered": kept, "remember_refused": refused,
+            "empty": empty, "echo_share": share, "echoed": share >= ECHO_THRESHOLD, "system_chars": len(system)}
 
 
 NAME_LINE = re.compile(r"^\s*NAME:\s*([A-Za-z][A-Za-z' -]{0,30}?)\s*$", re.M)
