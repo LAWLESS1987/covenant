@@ -168,8 +168,12 @@ def build_system(pid, reg=None, root=None, mem_root=None, question_chars=0):
     return (fixed + rec_txt)[:budget]
 
 
-CONTEXT_CHARS = 21000    # the 27B's 6,144-token context at a conservative ~3.4 characters a token
-ANSWER_RESERVE = 5000    # room left for the answer (~1,500 tokens)
+# The 27B's 6,144-token context in CHARACTERS. First set (82eb31b) at 21000, from an ASSUMED ~3.4 characters a
+# token: wrong. Measured 2026-11-06 on two review packets: a ~14.0k-character prompt left Cael 782 tokens, a
+# 14.3k one left him 246, and Cipher returned empty both times -- ~2.4-2.6 characters a token on this
+# markdown-heavy text. 14000 is ~2.3 a token, below both measurements.
+CONTEXT_CHARS = 14000
+ANSWER_RESERVE = 3600    # room left for the answer (~1,500 tokens at ~2.4 characters a token)
 MIN_SYSTEM = 5200        # the partner's own frame plus the shared record; below this it cannot be itself
 
 

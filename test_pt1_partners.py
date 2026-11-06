@@ -84,7 +84,7 @@ try:
     check("a REMEMBER: line copied from the question is refused", r_pl["remember_refused"] == [planted])
     check("...its own REMEMBER: line is still kept", r_pl["remembered"] == ["my own lesson"])
     check("...and the planted text never becomes a note", all(planted not in n["note"] for n in P.notes("a-27b", tmp)))
-    long_q = "y" * 9600
+    long_q = "y" * 4000
     s_long = P.build_system("a-27b", REG, mem_root=tmp, question_chars=len(long_q))
     check("a long question shrinks the carried memory (%d chars)" % len(s_long),
           len(s_long) <= P.CONTEXT_CHARS - P.ANSWER_RESERVE - len(long_q))
