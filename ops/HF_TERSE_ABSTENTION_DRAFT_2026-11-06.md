@@ -76,7 +76,7 @@ abstention scoring counts it as a commit. Three review requests came back that w
 count it as an answer. That check is local; it isn't in our public repo yet.
 
 **2. An abstention should carry its reason.** Our gate keeps its two non-commits, "Held, not judged" and
-"Blocked, not proven", separate from an actual finding. Before it did, a node catching up on our chain stalled
+"Blocked, not proven", separate from an actual finding. Before that difference decided anything, a node catching up on our chain stalled
 at height 2 while its peer was at 17. Our small model held an old transaction because six of its words were
 never in training. It said so itself ("It has made NO finding and is NOT alleging anything"), and that one
 non-finding vetoed two clean verdicts. Now a hold that alleges nothing no longer blocks catch-up, and a real
