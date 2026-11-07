@@ -22,6 +22,13 @@ The baselines cannot abstain. The teacher labels are the reference and are
 themselves imperfect: the last table measures how much three panel members
 agree with one another, which bounds how much any student can agree with
 them.
+
+Retracted (the sentence above is kept as written): JE-KAPPA-BOUND-2026-11-04
+and JE-KAPPA-NOISY-RATER-2026-11-07. Kappa by itself bounds no student's
+agreement with any rater or with the consensus labels, and does not establish
+that the labels are correct; a ceiling needs a stated noise model and its own
+derivation. Missed by the 2026-11-04 fix (the pattern did not reach this
+docstring); found 2026-11-07. See docs/RETRACTED.json.
 """
 import io
 import json
