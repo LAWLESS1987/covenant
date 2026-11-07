@@ -96,3 +96,7 @@ and commit attribution), as an over-refusal set beside the hold set. Two limits:
 - 9 of 769 is one rule, on our own seed cases, scored against our own labels. It is not the full gate and not
   a live execution.
 - The labels are ours. Where you disagree with one, we'd like to hear it.
+
+**Correction (2026-11-06, later):** the v2 reviewer note says Cipher's packet "likely overflowed" his context.
+It did not. His model was not being served (HTTP 503, 0.0 s; the panel shows uncensored false). Tombstone
+`PARTNERS-CIPHER-EMPTY-WAS-OVERFLOW-2026-11-06`.

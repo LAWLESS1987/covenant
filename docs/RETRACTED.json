@@ -2374,6 +2374,49 @@
     "ops/HF_OWED_POSTED_TEXT_2026-11-04.md"
    ],
    "note_on_branch": "Published in 183807 #27 and the gist README; both are the record as written. The correction goes back to the same thread, and into the gist README beside the original line."
+  },
+  {
+   "id": "PARTNERS-CIPHER-EMPTY-WAS-OVERFLOW-2026-11-06",
+   "claim": "That Cipher (the uncensored 27B partner) returned empty answers on 2026-11-06 because the review packet plus his memory overflowed his 6,144-token context. Written by Claude in ops/HF_BRANDEN_REPLY_DRAFT_2026-11-06.md (v2 reviewer list), ops/HF_SCAN_2026-11-06.md (item 3), the commit message of 82eb31b, and said to the operator in the session.",
+   "verbatim": [
+    "The packet plus his memory likely overflowed his 6,144-token context",
+    "silently truncated by the model server (Cipher's 11-06 overflow)."
+   ],
+   "truth": "Cipher's door answered HTTP 503 Service Unavailable in 0.0 s: the TETSU panel reported qwen3.8-27b-uncensored false (not served) while the stock 27B was true. The third empty came on a ~10k-character prompt that the stock 27B answered in full (1,320 tokens). The overflow was real for CAEL (truncated at 782 and 246 tokens) and the context budget fix stands on his two measurements; it was never Cipher's cause. covenant_partners dropped the door's 'error' field, so a down model read as an empty answer; fixed the same day (error recorded, never counted as empty; PT1 34/34).",
+   "refuted_by": "A direct consult to qwen3.8-27b-uncensored on 2026-11-06 returned error 'HTTPError: HTTP Error 503: Service Unavailable', seconds 0.0; covenant_tetsu_client.panel() the same hour.",
+   "patterns": [
+    "Cipher's 11-06 overflow",
+    "his memory likely overflowed his"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md",
+    "ops/HF_SCAN_2026-11-06.md",
+    "ops/HF_BRANDEN_REPLY_DRAFT_2026-11-06.md"
+   ],
+   "note_on_branch": "Never published outside this repo. The claim as written stays in commit 82eb31b and in the two ops files, each with the correction appended beside it rather than edited in place."
+  },
+  {
+   "id": "HF191438-RECENT-REFUSALS-BY-ONE-EXAM-CASE",
+   "claim": "That most of the nightly gate's recent refusals were the two-signals rule (both measures down, by one exam case). Written by Claude in draft v1 of the first post to Hugging Face thread 191438 (ops/HF_COMPASS_GATE_DRAFT_2026-11-06.md, commit 82eb31b). Never posted.",
+   "verbatim": [
+    "Most of our recent refusals are exactly that, by one exam case."
+   ],
+   "truth": "Of the 29 refusals after the last promotion (2026-10-08T08:20:28Z), 18 were 'no longer convicts N plain violation(s) the model in use convicts' (a lost conviction, e.g. a debt-bondage case from test_a119) and 11 were the two-signals rule. Counted from ops/NIGHTLY.md block by block; the v1 count came from reading only the newest two refusals.",
+   "refuted_by": "Cael (stock 27B partner) in review, 2026-11-06; confirmed by classifying every REFUSED block in ops/NIGHTLY.md.",
+   "patterns": [
+    "Most of our recent refusals are exactly that"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md",
+    "ops/HF_COMPASS_GATE_DRAFT_2026-11-06.md"
+   ],
+   "note_on_branch": "Draft only; v1 stays in the draft file and in commit 82eb31b as written, v2 beside it."
   }
  ]
 }

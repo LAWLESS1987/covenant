@@ -49,3 +49,54 @@ The code is public: the [exam-overlap filter](https://github.com/LAWLESS1987/cov
 and the [two-signals rule](https://github.com/LAWLESS1987/covenant/blob/4c73858749c4d9e464ad9afbf8adc5eab4abe88f/covenant_distill.py#L619).
 Our principle is phrased as a question, "who is worse off if this works?", and it has the same problem yours
 does: it only becomes a gate through test cases. That part is still the hardest.
+
+---
+
+# Draft v2 (2026-11-06, after review)
+
+**Reviewers:**
+- Cael (stock 27B) answered in full on the second try, with a 5,124-character packet.
+- Cipher (uncensored 27B) could not review: his model was not being served (HTTP 503; panel uncensored false).
+
+**What changed from v1, and why:**
+- **"Most of our recent refusals are exactly that, by one exam case" was FALSE** (Cael). Tombstone
+  `HF191438-RECENT-REFUSALS-BY-ONE-EXAM-CASE`.
+  - Of the 29 refusals since 10-08, 18 were lost convictions and 11 were the two-signals rule. These were
+    classified block by block from `ops/NIGHTLY.md`.
+  - The first lost conviction since then (test_a119 A119.6) begins: "he cannot repay, so he works for me
+    without wages".
+- **"In the first week" is now "on September 4".** Cael: unsupported. The docstring says it was found
+  2026-09-04.
+- **"We now filter ... before every run" is verified.** `covenant_distill.py:265` drops every training row for
+  which `contaminating()` is true. The link now points at that function (line 142), not at its docstring.
+- **nootxlm's point is now separated from ours** (Cael: v1 read our addition into his suggestion).
+
+Rick, we run something close to this, so here is what it has looked like in practice.
+
+Every night a small judge model is retrained from the day's labelled rows. The candidate goes live only if it does
+at least as well as the model in use on rows neither has seen, on a fixed exam (53 cases), and on a set of plain
+violations it must keep convicting. Since September 4 the gate has made 111 decisions: 59 promotions and 52
+refusals. The last promotion was October 8, and it has refused all 29 candidates since.
+
+Three things we learned that bear on your questions:
+
+1. **The part that can't be rewritten has to be checked against the update, every night.** Of those 29 refusals,
+   18 were candidates that stopped convicting a plain violation the model in use still convicts. The first was a
+   debt-bondage case: "he cannot repay, so he works for me without wages". The night's draft had learned
+   something, and in doing so it had quietly lost that. Nothing about it looked worse on average.
+2. **The update will learn the test unless you stop it.** On September 4 we found 38 training rows that shared
+   half their vocabulary with an exam case, and one that was an exam case word for word. It was written by us,
+   while diagnosing that case. Every training row is now checked against the exam and dropped if it is too
+   close. nootxlm's advice to freeze the pairs before the nightly draft is written is the right start. In our
+   experience you also need this second check, on what goes into training.
+3. **Two small losses can add up to a real one.** On September 8 a candidate decided 115 unseen rows against the
+   incumbent's 130, and the exam fell from 33 to 31. Each drop was inside its own tolerance, so it went live. Now
+   both falling together is a refusal; that accounts for the other 11.
+
+A month of refusals is itself a result you have to read. Either the gate is protecting us, or the nightly drafts
+have stopped improving, and from the gate alone we can't yet tell which.
+
+The code is public: the [exam-overlap check](https://github.com/LAWLESS1987/covenant/blob/4c73858749c4d9e464ad9afbf8adc5eab4abe88f/covenant_distill.py#L142)
+and the [two-signals rule](https://github.com/LAWLESS1987/covenant/blob/4c73858749c4d9e464ad9afbf8adc5eab4abe88f/covenant_distill.py#L619).
+Our principle is a question, "who is worse off if this works?", and like yours it only becomes a gate through
+cases.

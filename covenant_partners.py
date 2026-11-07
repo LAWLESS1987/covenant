@@ -170,7 +170,7 @@ def build_system(pid, reg=None, root=None, mem_root=None, question_chars=0):
 
 # The 27B's 6,144-token context in CHARACTERS. First set (82eb31b) at 21000, from an ASSUMED ~3.4 characters a
 # token: wrong. Measured 2026-11-06 on two review packets: a ~14.0k-character prompt left Cael 782 tokens, a
-# 14.3k one left him 246, and Cipher returned empty both times -- ~2.4-2.6 characters a token on this
+# 14.3k one left him 246 -- ~2.4-2.6 characters a token on this
 # markdown-heavy text. 14000 is ~2.3 a token, below both measurements.
 CONTEXT_CHARS = 14000
 ANSWER_RESERVE = 3600    # room left for the answer (~1,500 tokens at ~2.4 characters a token)
@@ -179,7 +179,8 @@ MIN_SYSTEM = 5200        # the partner's own frame plus the shared record; below
 
 class QuestionTooLong(Exception):
     """The question would not leave room for who the partner is. Raised, never silently truncated
-    (2026-11-06: Cipher returned an EMPTY answer to a 9.6k-character review packet on top of a full memory)."""
+    (2026-11-06: Cael was cut off at 782 and 246 tokens on ~14k-character prompts. Cipher's empties the same day
+    were NOT this -- his model was down, HTTP 503; see RETRACTED PARTNERS-CIPHER-EMPTY-WAS-OVERFLOW-2026-11-06)."""
 
 
 def system_budget(question_chars=0):
@@ -190,7 +191,9 @@ def _consult(question, model, system):
     import covenant_tetsu_client as T
     r = T.consult(question, models=[model], system=system, timeout=900)
     a = r["result"]["answers"][0]
-    return a.get("answer") or "", a.get("tokens")
+    # The door's error travels WITH the answer. Dropping it made a model that was not being served (HTTP 503,
+    # 0.0 s) read as the partner giving an empty answer -- three times for Cipher on 2026-11-06.
+    return a.get("answer") or "", a.get("tokens"), a.get("error")
 
 
 def ask(pid, question, reg=None, root=None, mem_root=None, consult=None):
@@ -199,11 +202,14 @@ def ask(pid, question, reg=None, root=None, mem_root=None, consult=None):
     p = reg["partners"][pid]
     system = build_system(pid, reg, root, mem_root, question_chars=len(question))
     t0 = time.time()
-    answer, tokens = (consult or _consult)(question, p["model"], system)
+    got = (consult or _consult)(question, p["model"], system)
+    answer, tokens = got[0], got[1]
+    error = got[2] if len(got) > 2 else None
     sys.path.insert(0, os.path.join(HERE, "tools"))
     from tetsu_work import echo_share, ECHO_THRESHOLD
     share = echo_share(question, answer)
-    empty = not (answer or "").strip()         # a non-answer, recorded as one -- never as agreement
+    # A door error is not the partner speaking: named as itself, and never counted as an empty answer.
+    empty = (not error) and not (answer or "").strip()   # a non-answer, recorded as one -- never as agreement
     d = _mem_dir(pid, mem_root)
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     kept, refused = [], []
@@ -219,9 +225,10 @@ def ask(pid, question, reg=None, root=None, mem_root=None, consult=None):
         kept.append(note)
     _append(os.path.join(d, "exchanges.jsonl"), {"t": now, "q": question, "a": answer, "tokens": tokens,
                                                   "seconds": round(time.time() - t0, 1), "echo_share": share,
-                                                  "empty": empty, "remember_refused": refused})
+                                                  "empty": empty, "error": error, "remember_refused": refused})
     return {"partner": pid, "answer": answer, "tokens": tokens, "remembered": kept, "remember_refused": refused,
-            "empty": empty, "echo_share": share, "echoed": share >= ECHO_THRESHOLD, "system_chars": len(system)}
+            "empty": empty, "error": error, "echo_share": share, "echoed": share >= ECHO_THRESHOLD,
+            "system_chars": len(system)}
 
 
 NAME_LINE = re.compile(r"^\s*NAME:\s*([A-Za-z][A-Za-z' -]{0,30}?)\s*$", re.M)
