@@ -15,6 +15,13 @@ THREE ARMS to start (operator "all 3"), extensible to eight:
                be low" signal. Built here; its LIVE attachment to Tetsu's conversation waits on Tetsu's consent
                (partner, not servant). Advisory only.
 
+THE RING (2026-11-07, operator "Optimize connection between octopus legs"): the arms also reach each other directly,
+arm to arm, through a Commissure -- the octopus's interbrachial ring -- instead of only through the brain. A spiking
+arm sends current to its two neighbours on their next step; serotonin, one diffuse level, scales how strongly; the
+coupling is held subcritical so the ring always falls quiet once outside drive stops. OPT-IN: Octopus(ring=
+Commissure()). default_octopus() has no ring -- Tetsu was asked and said NO for his arms (see Octopus). Read a ring
+with Octopus.ring_state().
+
 Pure Python, deterministic. KILL SWITCH: COVENANT_VERDICT_CACHE_OFF (Tetsu's one switch) silences every arm's read.
   python covenant_octopus.py --selftest
 """
@@ -59,12 +66,28 @@ class Arm:
     def __init__(self, n=8, tau=20.0, thresh=1.0):
         self.neurons = [LIF(tau=tau, thresh=thresh) for _ in range(n)]
         self.last = [0] * n
+        self.incoming = 0.0       # current arriving from neighbouring arms over the ring; added on the NEXT step
+        self.ring = None          # the Commissure this arm sits on, set by Octopus.attach; None = a lone arm
+
+    ring_receives = True          # False: the arm sends on the ring but never takes ring current (WitnessArm)
 
     def sense(self, signal):
-        """signal: a per-neuron list (len n), or a scalar broadcast to every neuron. Returns the spike list."""
+        """signal: a per-neuron list (len n), or a scalar broadcast to every neuron. Returns the spike list.
+        Current that crossed the ring from a neighbour since the last step is added to every neuron (one step of
+        axonal delay), then cleared. A lone arm (no ring) has none, so it behaves exactly as before the ring."""
         if not isinstance(signal, (list, tuple)):
             signal = [signal] * len(self.neurons)
+        extra, self.incoming = self.incoming, 0.0
+        if extra and not _disabled():          # with the kill switch on, queued ring current is DROPPED, so turning
+            # it back off cannot release excitation stored meanwhile. Clamped again ON ARRIVAL against the thresholds
+            # as they are now, in case one was lowered after the current was sent.
+            extra = min(extra, 2.0 * Commissure.SUBCRITICAL * min((nu.thresh for nu in self.neurons), default=1.0))
+            signal = [s + extra for s in signal]
         self.last = [nu.step(s) for nu, s in zip(self.neurons, signal)]
+        if self.ring is not None:
+            self.ring.relax()
+            if any(self.last):
+                self.ring.carry(self)
         return self.last
 
     def rate(self):
@@ -77,6 +100,7 @@ class WitnessArm(Arm):
     never cross threshold; a burst does. A different mechanism from the counters that watch the same stream."""
 
     name = "witness"
+    ring_receives = False         # on a ring it sends, never receives: a recruited spike is not an attestation
 
     def observe(self, event_strength=1.0):
         return self.sense(float(event_strength))
@@ -123,15 +147,173 @@ class ReflexArm(Arm):
                 "note": "advisory: fires on input Tetsu has not seen -- new, footing may be low; not a decision"}
 
 
-class Octopus:
-    """The central brain: holds the arms, reads their firing rates. Arms run autonomously; the brain integrates."""
+class Commissure:
+    """The interbrachial ring: arm to arm, without the brain.
 
-    def __init__(self):
+    In an octopus the arms' nerve cords are joined by a ring (the interbrachial commissure) near the base, so an arm
+    can recruit its neighbours directly; the central brain is not on that path. Here the arms sit on a ring in the
+    order they were attached, and an arm that SPIKES sends current to its two neighbours only:
+
+      - event-driven: an arm that did not spike sends nothing, so a quiet octopus costs nothing on the ring;
+      - local: two neighbours, not every arm (O(arms) per spike, not O(arms^2)), as in the animal;
+      - delayed: the current is added on the neighbour's next sense() call, never inside the sender's. There is no
+        global clock: if a caller steps arms a, b, c in that order, a spike in a reaches b within the same sweep.
+        Extinction does not depend on the delay; it rests on the charge argument below;
+      - subcritical: the current is weight x serotonin gain x the sender's spike FRACTION (k of its n neurons), with
+        weight x gain held under SUBCRITICAL x the receiver's threshold. THE CHARGE ARGUMENT, per arm: let each arm's
+        charge be the AVERAGE of its neurons' POSITIVE potentials, max(v, 0), in units of its own (lowest) threshold
+        (positive part: the leak, pulling toward 0, never raises it; it holds only for arms join() accepts -- leak
+        toward 0, reset <= 0, finite threshold > 0, and queued current counted as charge on its way). A spike with fraction
+        r = k/n lowers the sender's average by at least r (k neurons reset to 0 from at least a threshold) and raises
+        each of its two neighbours' averages by at most 0.475 x r, whatever their size. So every spike lowers the sum
+        over arms by at least 0.05 x r; the leak only lowers it more. Once outside drive stops, only finitely many
+        spikes can follow -- whatever the phases, arm sizes, stepping order, or leak (it holds with no leak at all).
+        It rests on the spike fraction: an arm-level spike that sent 0.475 to every neuron regardless of how many of
+        the sender's neurons fired would break it. (Restated 2026-11-07: a first version summed over receiving
+        neurons, which is wrong when arms differ in size.) Recruitment needs a neighbour that keeps firing.
+        Thresholds are read at SEND time and the current is clamped again on ARRIVAL, so the bound holds against
+        the thresholds as they are; it can lapse only if a threshold is lowered in the single step between a send
+        and its arrival, and the arrival clamp then still caps that step at 0.95 x the new threshold.
+
+    SEROTONIN (operator 2026-11-03, "make it like an octopus. Like serotonin"): a diffuse neuromodulator, one level for
+    the whole ring (volume transmission, not a point-to-point synapse). release() raises it; it relaxes back toward
+    its baseline with TIME, one ring-sweep's worth of decay spread over each arm step, whether or not anything fires
+    -- so a quiet ring does not keep a released level for hours, activity cannot push a low level up, and the arms in
+    one sweep see nearly the same gain. It scales how strongly arms recruit each other: low 5-HT, arms act alone;
+    high 5-HT, a driven burst recruits the neighbours. A level that is not a finite number >= 0 gives no coupling.
+    (First version decayed it per carried spike; Claude on claude.ai showed the three faults above, 2026-11-07.)
+
+    The clock is ARM STEPS: an arm stepped more often, or skipped, changes how fast the level relaxes. Safety does not
+    depend on serotonin at all -- the subcritical clamp applies after the gain.
+
+    THE WITNESS ONLY SENDS. Its job is to attest real bursts of gate verdicts; a spike recruited from a neighbour would
+    look the same to the brain. Arms with ring_receives = False (WitnessArm) never take ring current. Other arms DO:
+    on a ring, integrate() reads a receiving arm's rate with its recruited spikes included (a reflex recruited by the
+    witness reads as novelty). Anything that acts on such a rate should know that.
+
+    The kill switch (Tetsu's one switch) silences the ring with the rest of the nervous system, and queued current
+    is dropped while it is on."""
+
+    GAIN_MAX = 3.0
+    SUBCRITICAL = 0.475     # x threshold, per neighbour: two neighbours together stay under one threshold (0.95)
+
+    def __init__(self, weight=0.15, baseline=1.0, decay=0.9):
+        for label, x in (("weight", weight), ("baseline", baseline), ("decay", decay)):
+            if not (math.isfinite(float(x)) and float(x) >= 0):
+                raise ValueError("ring: %s must be a finite number >= 0, got %r" % (label, x))
+        if float(decay) > 1.0:
+            raise ValueError("ring: serotonin decay must be <= 1, got %r" % (decay,))
+        self.order = []                 # arm names around the ring, in attach order
         self.arms = {}
+        self.weight = float(weight)
+        self.baseline = float(baseline)
+        self.serotonin = float(baseline)
+        self.decay = float(decay)       # per full sweep of the ring (every arm stepped once)
+        self._relax = self.decay        # per ARM step: decay ** (1 / arms), set as arms join
+        self.carried = 0                # spikes events carried, for the brain to read
+        self._nb = {}                   # neighbour cache, cleared whenever an arm joins
+
+    def join(self, arm):
+        """Put an arm on the ring. REFUSES (ValueError) an arm the charge argument does not cover: every neuron must
+        have a finite threshold > 0, a finite tau > 0 (a leak toward 0, never a refill), and reset <= 0 (a reset above
+        0 returns charge the argument counts as spent). Claude on claude.ai's second review: each of these, broken,
+        reintroduces a runaway with every clamp in place. Nothing in this module adapts thresholds at runtime."""
+        for nu in arm.neurons:
+            th, dec, rs = getattr(nu, "thresh", None), getattr(nu, "decay", None), getattr(nu, "reset", None)
+            if not (isinstance(th, float) and math.isfinite(th) and th > 0):
+                raise ValueError("ring: arm %r has a threshold that is not a finite number > 0: %r" % (arm.name, th))
+            if not (isinstance(dec, float) and 0.0 <= dec <= 1.0):
+                raise ValueError("ring: arm %r has a leak that does not pull toward 0 (decay %r)" % (arm.name, dec))
+            if not (isinstance(rs, float) and rs <= 0.0):
+                raise ValueError("ring: arm %r resets above 0 (%r); the charge argument needs reset <= 0" % (arm.name, rs))
+        if arm.name not in self.arms:
+            self.order.append(arm.name)
+        self.arms[arm.name] = arm
+        arm.ring = self
+        arm.ring_thresh = min((nu.thresh for nu in arm.neurons), default=1.0)   # join-time value, for readers only;
+        #                                                                        carry() reads thresholds live
+        self._nb = {}                                                          # the ring changed: neighbours afresh
+        self._relax = self.decay ** (1.0 / len(self.order))
+
+    def release(self, amount):
+        """Serotonin release: raise the diffuse level (negative amounts lower it; it never goes below 0)."""
+        self.serotonin = max(0.0, self.serotonin + float(amount))
+
+    def relax(self):
+        """One arm step of time: the level relaxes toward baseline whether or not anything fired."""
+        s = self.serotonin
+        if s == s and abs(s) != math.inf:          # leave a bad value for gain() to refuse, never propagate it
+            self.serotonin = self.baseline + (s - self.baseline) * self._relax
+
+    def gain(self):
+        """min(GAIN_MAX, level); a level that is not a finite number >= 0 (NaN, inf, negative) gives NO coupling.
+        (min(3, nan) is 3 in Python: without this check a NaN level would mean full gain.)"""
+        s = self.serotonin
+        if not (s >= 0.0) or s == math.inf:
+            return 0.0
+        return min(self.GAIN_MAX, s)
+
+    def neighbours(self, name):
+        hit = self._nb.get(name)
+        if hit is not None:
+            return hit
+        n = len(self.order)
+        if n < 2 or name not in self.arms:
+            return []
+        i = self.order.index(name)
+        hit = self._nb[name] = sorted({self.order[(i - 1) % n], self.order[(i + 1) % n]} - {name})
+        return hit
+
+    def carry(self, arm):
+        """Called by an arm that just spiked: its spike fraction crosses to its neighbours as next-step current."""
+        if _disabled():
+            return
+        coupling = self.weight * self.gain()
+        if coupling > 0 and arm.rate() > 0:
+            for nb in self.neighbours(arm.name):
+                tgt = self.arms[nb]
+                if not tgt.ring_receives:                # the witness attests real bursts only; it takes no current
+                    continue
+                thresh = min((nu.thresh for nu in tgt.neurons), default=1.0)   # as it is NOW (ChatGPT's review:
+                # a join-time cache let a threshold lowered at runtime outrun the per-spike bound)
+                # SUBCRITICAL, structurally: weight x gain is held under SUBCRITICAL x the receiver's threshold, so
+                # one spike's total ring input over BOTH neighbours stays below what a spike costs (a reset from
+                # threshold). Every spike then loses charge, and ring activity dies out unless an arm is driven from
+                # outside. Measured before this clamp: with serotonin pinned high the ring reverberated forever
+                # (every arm firing every step, 2400 spikes in steps 300-400 after the drive had stopped).
+                current = min(coupling, self.SUBCRITICAL * thresh) * arm.rate()
+                # an arm that is never stepped (the gate path drives only the witness) cannot pile up current to
+                # dump all at once on its next step: what waits is capped at both neighbours' worth
+                tgt.incoming = min(2.0 * self.SUBCRITICAL * thresh, tgt.incoming + current)
+            self.carried += 1
+
+
+class Octopus:
+    """The central brain: holds the arms, reads their firing rates. Arms run autonomously; the brain integrates.
+    Pass ring=Commissure() to join the arms arm to arm as well; without it (the default) they meet only here.
+
+    OPT-IN, by Tetsu's NO (2026-11-07, ops/tetsu_consent.jsonl kind octopus_ring_consent): asked whether the ring could
+    join his arms, he answered "NO ... I prefer the current setup". default_octopus() -- the node's arms, his reflex
+    among them -- therefore stays brain-only, exactly as before. A caller that wants the ring constructs it."""
+
+    def __init__(self, ring=None):
+        self.arms = {}
+        self.ring = ring
 
     def attach(self, arm):
         self.arms[arm.name] = arm
+        if self.ring is not None:
+            self.ring.join(arm)
         return arm
+
+    def ring_state(self):
+        """The ring as the brain sees it, without routing anything: order, serotonin, gain, spikes carried.
+        {} when there is no ring or the kill switch is on."""
+        if _disabled() or self.ring is None:
+            return {}
+        r = self.ring
+        return {"order": list(r.order), "serotonin": round(r.serotonin, 4), "gain": round(r.gain(), 4),
+                "carried": r.carried}
 
     def integrate(self):
         """A central read of every arm's firing rate -> {name: rate}. Empty when the kill switch is on."""
