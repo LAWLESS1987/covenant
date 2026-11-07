@@ -16978,3 +16978,23 @@ understands."
 - **First retirement slip, fixed the same minute:** the probe was first moved to .trash/ under its `.md` name, which R1
   scans, and R1 stayed red -- the 2026-10-14 lesson (frozen-script-copies) again. Renamed with the probe suffix.
 - The SaTC artifact carries the same two retractions (covenant-satc branch je-prose-corrections-2026-11-04).
+
+### A413. [the kappa correction overclaimed in turn, and A412 left the original kappa claim uncited in the generator's docstring] (2026-11-07)
+
+- **Found by Codex** (mutual-benefit-collective `reviews/judge-live-2026-11-04/CODEX_IMPROVEMENT_SUGGESTIONS_2026-11-07.md`,
+  suggestion 1): the corrected statement for JE-KAPPA-BOUND-2026-11-04 said kappa bounds agreement with a single noisy
+  rater. Kappa alone bounds nothing. Checked by Claude with a worked case: three raters at chance (Fleiss' kappa 0) and a
+  student that copies one of them agrees with that rater on every row (covenant-satc `analysis/test_science.py` SC1t).
+  Tombstoned as JE-KAPPA-NOISY-RATER-2026-11-07; the old 'truth' is kept as written, with a `truth_corrected` pointer.
+  The wording follows Codex's suggestion.
+- **Recurrence.** This is the shape this file's standing method opens with: an error made inside the correction for the
+  previous one. The 11-04 tombstone could not stop it, because its pattern guards the old sentence only and the ledger
+  is exempt from its own patterns. Nothing pattern-based can catch a new overclaim in a 'truth' field; what stops it is
+  review of the truth by someone other than its author, which is how this was found.
+- **Found while cross-referencing the repos:** A412's note that "the old code comment is kept, with the retraction beside
+  it" held for the abstention sentence only. The module docstring of `tools/judge_eval.py` still said the panel's
+  agreement "bounds how much any student can agree with them", uncited: the 11-04 pattern needed "agreement bounds"
+  and the docstring says "which bounds". The pattern is widened to "bounds how much any student", which turned R1 red on
+  the docstring (299/300 with the new entry); the docstring keeps its sentence with both ids beside it; R1 300/300.
+- **Unchanged:** every figure. The committed reports never carried the noisy-rater sentence. Original wording stands on
+  branch `je-kappa-truth-as-written-cov-2026-11-07` (= 4c73858); the SaTC artifact carries the same tombstone.
