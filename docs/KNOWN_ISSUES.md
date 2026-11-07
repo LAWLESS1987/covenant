@@ -17061,3 +17061,11 @@ understands."
   clamp; nothing in the module adapts thresholds. Extinction is bounded in spikes, not in time. On a ring,
   integrate() counts recruited spikes in a receiving arm's rate. Nothing in the tree constructs a
   ring yet: wiring one into a learning SNN (the spiking lab, the witness pre-registration) is a separate step.
+- **Measured in the lab, 2026-11-07 (Lawrence: "Get it done").** The ring idea was tested where it belongs, a learning
+  spiking net, pre-registered before any code (spiking lab, local repo: PREREG_exp13_octopus_ring.md, commit 13cd0e8;
+  result 24d39d4). Four arms on MNIST quadrants, a brain reading all four, a learned ring scaled by serotonin gain, three
+  seeds. No measured advantage on clean accuracy (ring minus none: +1.10, -0.30, -0.10 points). With one arm's input
+  blanked, the ring made the drop LARGER in all three seeds (by 3.42, 3.36, 5.20 points), at +18.8% activity; at high
+  serotonin (no clamp in that learned ring) activity rose 3.5x and accuracy fell to 65.8%. So the opt-in ring here
+  has no demonstrated use yet; it stays unwired. A clamped ring, or one trained with blanked arms, would be a new
+  pre-registered experiment.
