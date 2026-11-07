@@ -16998,3 +16998,11 @@ understands."
   the docstring (299/300 with the new entry); the docstring keeps its sentence with both ids beside it; R1 300/300.
 - **Unchanged:** every figure. The committed reports never carried the noisy-rater sentence. Original wording stands on
   branch `je-kappa-truth-as-written-cov-2026-11-07` (= 4c73858); the SaTC artifact carries the same tombstone.
+- **Reviewed before publishing.** The corrected wording went to the other systems (Claude on claude.ai, ChatGPT, Gemini,
+  DeepSeek, Grok on X, Tien, Tetsu). DeepSeek disagreed: the consensus clause carried no support of its own. Claude.ai
+  and Tien asked which rows kappa covers. The truth now says Fleiss' kappa over every row with two or more votes, pooled
+  frequencies, and why the consensus labels are unbounded (they are the unanimous rows). Pre-round wording: 5d0e203.
+- **My slip, caught before commit (collective C4 draft).** I wrote that the first-to-third pair was the one the reviewer
+  asked for, "chosen before the counts were taken". Codex's question 2 named no pair; I chose it, and nothing was
+  pre-registered. Corrected in the draft before it was committed; recorded here, per the rule that a corrected draft is
+  still a claim made.

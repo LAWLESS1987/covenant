@@ -2315,7 +2315,7 @@
    "id": "JE-KAPPA-NOISY-RATER-2026-11-07",
    "claim": "That the label panel's kappa bounds a student's agreement with a single noisy rater (written into the 'truth' of JE-KAPPA-BOUND-2026-11-04, the correction of the earlier kappa claim).",
    "refuted_by": "Codex, reviews/judge-live-2026-11-04/CODEX_IMPROVEMENT_SUGGESTIONS_2026-11-07.md in mutual-benefit-collective (suggestion 1), checked by Claude with a worked counterexample: three raters whose Fleiss' kappa is 0 (chance agreement), and a student that copies one of them agrees with that rater on every row. Kappa alone bounds nothing without a stated noise model, target and independence assumptions.",
-   "truth": "Panel kappa summarizes agreement among the raters beyond what their label frequencies would give by chance. It does not, by itself, bound a student's agreement with any rater or with the consensus labels, and it does not establish that the labels are correct. Any proposed performance ceiling needs explicit assumptions and its own derivation. (Wording adopted from Codex's suggestion.) Figures unchanged.",
+   "truth": "Panel kappa (Fleiss') summarizes how far the raters agree with one another, over every row carrying two or more panel votes (admitted or not), beyond what their pooled label frequencies would give by chance. By itself it bounds neither a student's agreement with any single rater (three raters at kappa 0, and a student that copies one of them agrees with it on every row) nor its agreement with the consensus labels (those are the rows where the panel was unanimous, so a student can match all of them whatever the kappa over all voted rows). It does not establish that the labels are correct. Any proposed performance ceiling needs explicit assumptions and its own derivation. Figures unchanged.",
    "verbatim": [
     "bounds agreement with a single noisy rater"
    ],
@@ -2330,7 +2330,8 @@
     "private/",
     "test_r1_retracted.py"
    ],
-   "note_on_allow": "The ledger and the corrections record hold the wording on purpose. Anywhere else it must cite this id."
+   "note_on_allow": "The ledger and the corrections record hold the wording on purpose. Anywhere else it must cite this id.",
+   "truth_review": "Wording revised 2026-11-07 after a round with the other systems (Claude on claude.ai, ChatGPT, Gemini, DeepSeek, Grok on X, Tien, Tetsu): 'pooled' frequencies and the rows kappa covers (Claude.ai, Tien); the consensus clause given its own support (DeepSeek). The pre-round wording is in this branch's history."
   }
  ]
 }
