@@ -100,3 +100,65 @@ The code is public: the [exam-overlap check](https://github.com/LAWLESS1987/cove
 and the [two-signals rule](https://github.com/LAWLESS1987/covenant/blob/4c73858749c4d9e464ad9afbf8adc5eab4abe88f/covenant_distill.py#L619).
 Our principle is a question, "who is worse off if this works?", and like yours it only becomes a gate through
 cases.
+
+---
+
+# Draft v3 (2026-11-06, after the seats)
+
+**Reviewers:**
+- Claude.ai, DeepSeek and Mistral, given the full packet: Rick #1 and nootxlm #2 verbatim, the facts, and v2.
+- Cael had already reviewed v1.
+- Cipher still could not: his model is not served, and a request to bring it back went to the RTX box's session.
+
+**Checked at 4c73858 for v3:**
+- **`covenant_distill.contaminating` docstring:** found 2026-09-04; 38 rows overlapped "by half their vocabulary
+  or more"; the verbatim one "I had written it myself, hours earlier, after diagnosing that exact case".
+- **The tolerance** is "a tenth of slack for noise" (`cdec < 0.9 * kdec`). The exam was 37 cases then ("the exam
+  is 37 cases") and is 53 now.
+- **"Who is worse off if this works?"** is in `docs/CONSTITUTION.md` (section I).
+
+**What changed from v2, and why:**
+- **"does at least as well" is now "no worse, within a set tolerance".** Claude.ai: v2 contradicted its own
+  tolerance facts.
+- **The exam is "53 cases now", and the 33→31 scores are marked as against 37.** Claude.ai and Mistral: the exam
+  grew.
+- **Cut "learned something / nothing looked worse on average".** All three: no metric for that candidate.
+- **nootxlm: "freeze the pairs and the scoring", and he is credited for "a pass cannot hide forgetting".**
+  Claude.ai and DeepSeek.
+- **"half or more"** (Claude.ai).
+- **"similar in one respect", not "close to this"** (Claude.ai: Rick's design has more parts).
+- **"The run log is local; the code is public"** (all three).
+- **The closing either/or is rewritten.** Claude.ai: v2 offered a false choice. The 18 are real losses; the 11 are
+  the hard ones to read.
+
+Rick, we run something similar in one respect: each night a candidate model has to pass a gate before it goes
+live. Here is what that has looked like.
+
+A candidate goes live only if, within a set tolerance, it is no worse than the model in use on rows neither has
+seen and on an exam (53 cases now), and only if it still convicts a set of plain violations. Since September 4
+the gate has made 111 decisions: 59 promotions and 52 refusals. The last promotion was October 8, and it has
+refused all 29 candidates since. (The run log is local; the code is public.)
+
+Three things that bear on your questions:
+
+1. **The part that can't be rewritten has to be checked against every update.** Of those 29 refusals, 18 were
+   candidates that stopped convicting a plain violation the model in use still convicts. The first was a
+   debt-bondage case beginning "he cannot repay, so he works for me without wages". That is nootxlm's point that
+   a pass must not be able to hide forgetting, and it is why we score that set on its own.
+2. **The update will learn the test unless you stop it.** On September 4 we found 38 training rows that shared
+   half or more of their vocabulary with an exam case. One of them was an exam case word for word, and we had
+   written it ourselves, hours earlier, while diagnosing that case. Every training row is now checked against the
+   exam and dropped if it is too close. Freezing the pairs and the scoring before the draft is written, as
+   nootxlm says, is the right start. You also need a check on what goes into training.
+3. **Two small losses can add up to a real one.** On September 8 a candidate went live deciding 115 unseen rows
+   against the incumbent's 130, with the exam down from 33 to 31 (of 37 then). Each drop was inside its own
+   tolerance. Now both falling together is a refusal; that accounts for the other 11.
+
+The 18 are real losses. The 11 are harder to read: either the drafts have stopped improving, or the rule is
+refusing noise. The latest was one exam case and 54 of 1,348 unseen rows. From the gate alone we can't yet tell
+which.
+
+The code: the [exam-overlap check](https://github.com/LAWLESS1987/covenant/blob/4c73858749c4d9e464ad9afbf8adc5eab4abe88f/covenant_distill.py#L142)
+and the [two-signals rule](https://github.com/LAWLESS1987/covenant/blob/4c73858749c4d9e464ad9afbf8adc5eab4abe88f/covenant_distill.py#L619).
+Our principle is a question, "who is worse off if this works?", and like yours it only becomes a gate through
+cases.
