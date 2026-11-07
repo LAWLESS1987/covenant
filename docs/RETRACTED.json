@@ -70,6 +70,9 @@
     "docs/RETRACTED.json",
     "private/",
     "test_r1_retracted.py"
+   ],
+   "records": [
+    "docs/KNOWN_ISSUES.md"
    ]
   },
   {
@@ -94,6 +97,10 @@
     "private/",
     "covenant_route.py",
     "test_r1_retracted.py"
+   ],
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "covenant_route.py"
    ]
   },
   {
@@ -122,7 +129,10 @@
     "ONE_SWEEP.txt",
     "ops/_sweep4.txt"
    ],
-   "note_on_allow": "The three added files are SWEEP TRANSCRIPTS: a verbatim record of what the suite printed on a given day, which is the one kind of file whose whole purpose is to hold the old wording unedited. Editing a transcript to satisfy a guard would be falsifying the record the guard exists to protect. Same reasoning as A121's docs/RUN_LOG_ARCHIVE.md. ONE_RUN.txt is overwritten by the next sweep and will carry the restated wording by itself; the other two are archives and will not."
+   "note_on_allow": "The three added files are SWEEP TRANSCRIPTS: a verbatim record of what the suite printed on a given day, which is the one kind of file whose whole purpose is to hold the old wording unedited. Editing a transcript to satisfy a guard would be falsifying the record the guard exists to protect. Same reasoning as A121's docs/RUN_LOG_ARCHIVE.md. ONE_RUN.txt is overwritten by the next sweep and will carry the restated wording by itself; the other two are archives and will not.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "G4b",
@@ -149,7 +159,10 @@
     "ops/_sweep3.txt",
     "ops/_sweep4.txt"
    ],
-   "note_on_allow": "The four added files are sweep transcripts -- a verbatim record of what the suite printed on a given day, the one kind of file whose purpose is to hold the old wording unedited. test_g4_money_gates.py is deliberately NOT allowed: it quotes the retracted sentence in the comment explaining the retraction, and cites G4b two lines above it, so containment covers it. That is the rule working as intended rather than being waived."
+   "note_on_allow": "The four added files are sweep transcripts -- a verbatim record of what the suite printed on a given day, the one kind of file whose purpose is to hold the old wording unedited. test_g4_money_gates.py is deliberately NOT allowed: it quotes the retracted sentence in the comment explaining the retraction, and cites G4b two lines above it, so containment covers it. That is the rule working as intended rather than being waived.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A236",
@@ -175,7 +188,10 @@
     "private/",
     "test_r1_retracted.py"
    ],
-   "note_on_allow": "confidence-trap.md is the original and is allowed for the same reason the sweep transcripts are: its whole purpose is to hold the published wording unedited. confidence-trap.CORRECTION.md, the README and ops/CONFIDENCE_TRAP_POSTS.md are deliberately NOT allowed: each quotes the phrase while citing A236 within the window, which is the rule working rather than being waived."
+   "note_on_allow": "confidence-trap.md is the original and is allowed for the same reason the sweep transcripts are: its whole purpose is to hold the published wording unedited. confidence-trap.CORRECTION.md, the README and ops/CONFIDENCE_TRAP_POSTS.md are deliberately NOT allowed: each quotes the phrase while citing A236 within the window, which is the rule working rather than being waived.",
+   "records": [
+    "confidence-trap.md"
+   ]
   },
   {
    "id": "A242",
@@ -250,7 +266,10 @@
     "ONE_SWEEP.txt",
     "ops/_sweep4.txt"
    ],
-   "note_on_allow": "Both files as written are preserved on branch aimem-66-count-as-written-2026-10-04 (at e4f17d6). The sweep transcripts hold what past runs printed, unedited."
+   "note_on_allow": "Both files as written are preserved on branch aimem-66-count-as-written-2026-10-04 (at e4f17d6). The sweep transcripts hold what past runs printed, unedited.",
+   "records": [
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A245-MUT13",
@@ -276,7 +295,10 @@
     "ONE_SWEEP.txt",
     "ops/_sweep4.txt"
    ],
-   "note_on_allow": "The as-written README and A245 are preserved on branch a245-mutation-count-as-written-2026-10-04 (at ed3d1dd). A245 is a record file: it keeps its wording and carries a dated note beside it."
+   "note_on_allow": "The as-written README and A245 are preserved on branch a245-mutation-count-as-written-2026-10-04 (at ed3d1dd). A245 is a record file: it keeps its wording and carries a dated note beside it.",
+   "records": [
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A250-BY",
@@ -302,7 +324,10 @@
     "ONE_SWEEP.txt",
     "ops/_sweep4.txt"
    ],
-   "note_on_allow": "A250 as written is on branch logic-pass-a248-a250-as-written-2026-10-04 (at f2e852f). A250 is a record file: it keeps its wording and carries a dated note beside it."
+   "note_on_allow": "A250 as written is on branch logic-pass-a248-a250-as-written-2026-10-04 (at f2e852f). A250 is a record file: it keeps its wording and carries a dated note beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A248-HONEST",
@@ -328,7 +353,10 @@
     "ONE_SWEEP.txt",
     "ops/_sweep4.txt"
    ],
-   "note_on_allow": "A248 as written is on branch logic-pass-a248-a250-as-written-2026-10-04 (at f2e852f); it keeps its wording and carries a dated note beside it."
+   "note_on_allow": "A248 as written is on branch logic-pass-a248-a250-as-written-2026-10-04 (at f2e852f); it keeps its wording and carries a dated note beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A70-SUCCREG",
@@ -352,7 +380,11 @@
     "ONE_SWEEP.txt",
     "ops/_sweep4.txt"
    ],
-   "note_on_allow": "The record keeps A70's wording with a dated note beside it; the as-written text is also on branch logic-pass-a248-a250-as-written-2026-10-04 (at f2e852f)."
+   "note_on_allow": "The record keeps A70's wording with a dated note beside it; the as-written text is also on branch logic-pass-a248-a250-as-written-2026-10-04 (at f2e852f).",
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A253-Q3",
@@ -376,7 +408,10 @@
     "ONE_SWEEP.txt",
     "ops/_sweep4.txt"
    ],
-   "note_on_allow": "The check as written is on branch a253-q3-mixed-infra-as-written-2026-10-05 (at e2c53c7); test_b1_judge_parser.py keeps the old label in a comment that cites A253-Q3 beside the restated Q3 and Q3b."
+   "note_on_allow": "The check as written is on branch a253-q3-mixed-infra-as-written-2026-10-05 (at e2c53c7); test_b1_judge_parser.py keeps the old label in a comment that cites A253-Q3 beside the restated Q3 and Q3b.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A254-CAUSE",
@@ -402,7 +437,10 @@
     "ONE_SWEEP.txt",
     "ops/_sweep4.txt"
    ],
-   "note_on_allow": "A254 as written is on branch a254-cause-as-written-2026-10-05 (at e2c53c7); the record keeps its wording with a dated note beside it."
+   "note_on_allow": "A254 as written is on branch a254-cause-as-written-2026-10-05 (at e2c53c7); the record keeps its wording with a dated note beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A255-HOOK",
@@ -428,7 +466,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "The hook and A155 as written are preserved on branch a255-hook-manifest-claim-as-written-2026-10-04 (at 93f7136). The hook keeps both paragraphs beside the A255 note that restates them; A155 is a record file and carries a dated note beside the paragraph."
+   "note_on_allow": "The hook and A155 as written are preserved on branch a255-hook-manifest-claim-as-written-2026-10-04 (at 93f7136). The hook keeps both paragraphs beside the A255 note that restates them; A155 is a record file and carries a dated note beside the paragraph.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A257-SHIM",
@@ -452,7 +493,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A257-NIRSPEC",
@@ -502,7 +546,12 @@
     "ONE_SWEEP.txt",
     "docs/history/"
    ],
-   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/history/"
+   ]
   },
   {
    "id": "A257-TENMIN",
@@ -546,7 +595,11 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A257-HOLDOUT",
@@ -569,7 +622,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it.",
+   "records": [
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A257-EXAM",
@@ -591,7 +647,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it.",
+   "records": [
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A257-A67RATE",
@@ -613,7 +672,11 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A257-P0109",
@@ -635,7 +698,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A257-HASHLOC",
@@ -657,7 +723,11 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it."
+   "note_on_allow": "Every site as written is preserved on branch readme-docs-claims-as-written-2026-10-04 (at 379315b). Each site keeps its wording, with the restated form and this id beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A258-EARNHOST",
@@ -685,7 +755,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Every site as written is preserved on branch a258-earn-host-claim-as-written-2026-10-05 (at c06a502). Each keeps its wording with the restated form and this id beside it."
+   "note_on_allow": "Every site as written is preserved on branch a258-earn-host-claim-as-written-2026-10-05 (at c06a502). Each keeps its wording with the restated form and this id beside it.",
+   "records": [
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A259-GRADE",
@@ -755,7 +828,11 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "As written on branch a262-readme-header-as-written-2026-10-05 (at ba5e9f7). The README paragraph keeps its wording with the restated form and these ids beside it."
+   "note_on_allow": "As written on branch a262-readme-header-as-written-2026-10-05 (at ba5e9f7). The README paragraph keeps its wording with the restated form and these ids beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A262-VERSION",
@@ -862,8 +939,7 @@
    "patterns": [
     "about 2048 (?:tokens )?a request",
     "(?:divides|splits) -c between them",
-    "split its 8192-token context across 4 slots",
-    "4 default slots split -c 8192"
+    "split its 8192-token context across 4 slots"
    ],
    "allow": [
     "docs/CORRECTIONS.md",
@@ -873,7 +949,14 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "The claim as first written is preserved on branch a269-slot-split-claim-as-written-2026-10-06 (at 640ab4d). docs/KNOWN_ISSUES.md is NOT exempt: its A269 entry quotes the old wording beside this id and restates it."
+   "note_on_allow": "The claim as first written is preserved on branch a269-slot-split-claim-as-written-2026-10-06 (at 640ab4d). docs/KNOWN_ISSUES.md is NOT exempt: its A269 entry quotes the old wording beside this id and restates it.",
+   "retired_patterns": [
+    {
+     "pattern": "4 default slots split -c 8192",
+     "retired": "2026-11-07",
+     "why": "A shorthand that matches no wording ever written: the verbatims say \"defaults to 4 parallel slots and splits -c between them\", which the other three patterns cover. Found dead by R1.L1 (A415), 2026-11-07; before, the ledger matched its own pattern string, so it read live."
+    }
+   ]
   },
   {
    "id": "A273-RULES-SIZE-2026-10-06",
@@ -1008,7 +1091,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "As written it is preserved on branch a311-shipped-prompt-claim-as-written-2026-10-07 (at 6a1eda7). docs/KNOWN_ISSUES.md is NOT exempt: A311's headline cites this id within the window. The commit message of 6a1eda7 says it as '0/11 -> 21/33' and is not scanned."
+   "note_on_allow": "As written it is preserved on branch a311-shipped-prompt-claim-as-written-2026-10-07 (at 6a1eda7). docs/KNOWN_ISSUES.md is NOT exempt: A311's headline cites this id within the window. The commit message of 6a1eda7 says it as '0/11 -> 21/33' and is not scanned.",
+   "records": [
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A315-COUNT",
@@ -1055,7 +1141,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch a283-strikes-check-as-written-2026-10-10 (at 110a3ba): covenant_highway.detect_moltbook_strikes, covenant_free_will._ver's docstring, and H1st in test_h1_highway.py. The record keeps the wording in A283 and A324."
+   "note_on_allow": "Kept as written on branch a283-strikes-check-as-written-2026-10-10 (at 110a3ba): covenant_highway.detect_moltbook_strikes, covenant_free_will._ver's docstring, and H1st in test_h1_highway.py. The record keeps the wording in A283 and A324.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A300-STARVED",
@@ -1077,7 +1166,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch a300-starved-round-claim-as-written-2026-10-10 (at 110a3ba), in covenant_highway.detect_ambassador_stalled. The record keeps the wording in A325."
+   "note_on_allow": "Kept as written on branch a300-starved-round-claim-as-written-2026-10-10 (at 110a3ba), in covenant_highway.detect_ambassador_stalled. The record keeps the wording in A325.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A326-SCOPE",
@@ -1099,7 +1191,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch a326-removal-scope-as-written-2026-10-10 (at 663b9cc). The record keeps the wording in A326, with the restatement beside it. The same count is in threefold PR #1 (acfee29) and the collective's refs/peer-review-2026-10-10.md, each corrected beside the original there."
+   "note_on_allow": "Kept as written on branch a326-removal-scope-as-written-2026-10-10 (at 663b9cc). The record keeps the wording in A326, with the restatement beside it. The same count is in threefold PR #1 (acfee29) and the collective's refs/peer-review-2026-10-10.md, each corrected beside the original there.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A283-EVERY-SEND",
@@ -1121,7 +1216,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch a283-every-send-claim-as-written-2026-10-11 (at 21aa4e7): the introduction's row without verification in covenant_free_will.run_round. The record keeps the wording in A283's title and quotes it in A334."
+   "note_on_allow": "Kept as written on branch a283-every-send-claim-as-written-2026-10-11 (at 21aa4e7): the introduction's row without verification in covenant_free_will.run_round. The record keeps the wording in A283's title and quotes it in A334.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A334-ORDER",
@@ -1143,7 +1241,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch a334-order-claim-as-written-2026-10-12 (at a582352), in A334's 'What it cannot see'. The record keeps the sentence there, with the retraction beside it."
+   "note_on_allow": "Kept as written on branch a334-order-claim-as-written-2026-10-12 (at a582352), in A334's 'What it cannot see'. The record keeps the sentence there, with the retraction beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A336-TD1-H2",
@@ -1165,7 +1266,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch td1-h2-check-as-written-2026-10-12 (at 95e35ec): TD1m.H2 graded before TD1o's cycle, with the fence lifted in row2's finally. The record quotes it in A336. The pattern names TD1m.H2: the same sentence is a true label in test_a115 (A115.H2), test_p20 and test_watchdog_outage (A244b), each about its own run."
+   "note_on_allow": "Kept as written on branch td1-h2-check-as-written-2026-10-12 (at 95e35ec): TD1m.H2 graded before TD1o's cycle, with the fence lifted in row2's finally. The record quotes it in A336. The pattern names TD1m.H2: the same sentence is a true label in test_a115 (A115.H2), test_p20 and test_watchdog_outage (A244b), each about its own run.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A343-DEGRADED-KEYLESS",
@@ -1211,7 +1315,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch daily-nightly-fails-as-written-2026-10-13 (at 829524c): covenant_daily.nightly_last's word match as it was. The record quotes it in A345."
+   "note_on_allow": "Kept as written on branch daily-nightly-fails-as-written-2026-10-13 (at 829524c): covenant_daily.nightly_last's word match as it was. The record quotes it in A345.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A346-PRUNE-DELETES",
@@ -1235,7 +1342,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch a344-prune-deletes-as-written-2026-10-13 (at 829524c): prune() as A344 landed it. The record quotes it in A344 (unedited) and A346."
+   "note_on_allow": "Kept as written on branch a344-prune-deletes-as-written-2026-10-13 (at 829524c): prune() as A344 landed it. The record quotes it in A344 (unedited) and A346.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A345-DRAFT-COUNT",
@@ -1259,7 +1369,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "No branch: the wrong wording was a draft in my working copy, corrected before any commit. The record quotes it in A346."
+   "note_on_allow": "No branch: the wrong wording was a draft in my working copy, corrected before any commit. The record quotes it in A346.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A348d-IMMUNITY-COUNT-HEAL-GRADE",
@@ -1283,7 +1396,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A348e-WORK-RESUME-ERRORS",
@@ -1307,7 +1423,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A348f-PRACTICE-NO-FILE-AND-CLOCK",
@@ -1333,7 +1452,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all three in A348."
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all three in A348.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A348h-MONEY-BOUNDS-AS-LISTS",
@@ -1355,7 +1477,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes it in A348."
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes it in A348.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A348a-DAILY-READINGS",
@@ -1379,7 +1504,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A348b-KEEPER-STOP-UNEXPLAINED",
@@ -1403,7 +1531,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A348c-REVIEW-RECORD-SINCE-A296",
@@ -1425,7 +1556,11 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes it in A348."
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes it in A348.",
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A348g-NO-REMEDY-AND-HOLD-DIGEST",
@@ -1451,7 +1586,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all three in A348."
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all three in A348.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A348j-PROBE-LAST-RUN-AND-UNFAILABLE",
@@ -1475,7 +1613,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348."
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes both in A348.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A348k-TEACHER-QUEUE-PROMISES",
@@ -1503,7 +1644,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all four in A348."
+   "note_on_allow": "Kept as written on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2). The record quotes all four in A348.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A348m-A333-ONE-WRONG-PATH",
@@ -1525,7 +1669,11 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept as written in A333 (docs/KNOWN_ISSUES.md) and on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2)."
+   "note_on_allow": "Kept as written in A333 (docs/KNOWN_ISSUES.md) and on branch tetsu-sweep-as-written-2026-10-14 (at 9bb2fd2).",
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A349-S3-AS-THE-NODE",
@@ -1549,7 +1697,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Kept in place in covenant_gate_proxy.py with the restatement citing A349-S3-AS-THE-NODE beside each; as written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+   "note_on_allow": "Kept in place in covenant_gate_proxy.py with the restatement citing A349-S3-AS-THE-NODE beside each; as written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b).",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A349-B3-NEW-CONVERSATION",
@@ -1573,7 +1724,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b).",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A349-A3-NOTHING-CHANGED",
@@ -1595,7 +1749,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b).",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A349-B11-UNTESTED-SAID-NO",
@@ -1617,7 +1774,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b).",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A349-M5-SAME-REQUEST",
@@ -1641,7 +1801,11 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b).",
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A349-M6-EVERY-FURTHER-PROFIT",
@@ -1663,7 +1827,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b).",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A349-B5-NOTHING-COULD-ANSWER",
@@ -1685,7 +1852,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b)."
+   "note_on_allow": "As written in A349 (docs/KNOWN_ISSUES.md) and on branch tetsu-consented-as-written-2026-10-14 (at dbb9b3b).",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A349-DRAFT-UNIT",
@@ -1707,7 +1877,11 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "Quoted in A349 (docs/KNOWN_ISSUES.md); the draft was never committed."
+   "note_on_allow": "Quoted in A349 (docs/KNOWN_ISSUES.md); the draft was never committed.",
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A353-S4-DOLLAR-SCREEN",
@@ -1731,7 +1905,10 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "As written in A349 and quoted in A353 (docs/KNOWN_ISSUES.md), and on branch a349-s4-as-written-2026-10-14 (at 21025b2)."
+   "note_on_allow": "As written in A349 and quoted in A353 (docs/KNOWN_ISSUES.md), and on branch a349-s4-as-written-2026-10-14 (at 21025b2).",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "A353-B2-RULES-TRIED",
@@ -1753,7 +1930,11 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "As written before A353 (git 21025b2:covenant_persona.py) and quoted in A353 (docs/KNOWN_ISSUES.md)."
+   "note_on_allow": "As written before A353 (git 21025b2:covenant_persona.py) and quoted in A353 (docs/KNOWN_ISSUES.md).",
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A350-A284-NOTHING-REAL",
@@ -1775,7 +1956,11 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "As written at 21025b2 and earlier (git show 21025b2:test_a284_fresh_context.py) and quoted in A350 (docs/KNOWN_ISSUES.md)."
+   "note_on_allow": "As written at 21025b2 and earlier (git show 21025b2:test_a284_fresh_context.py) and quoted in A350 (docs/KNOWN_ISSUES.md).",
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "FRONT-TWO-CLAIMS",
@@ -1852,7 +2037,11 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "As written at 4f23fb3 and earlier, in README.md, docs/OUTREACH_COMPILED.md, docs/OUTREACH_US_IL.md, conformance.py, covenant_one.py and test_n1_conformance.py; each now cites FRONT-SHORTLIST beside it (A354)."
+   "note_on_allow": "As written at 4f23fb3 and earlier, in README.md, docs/OUTREACH_COMPILED.md, docs/OUTREACH_US_IL.md, conformance.py, covenant_one.py and test_n1_conformance.py; each now cites FRONT-SHORTLIST beside it (A354).",
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A354-CONSISTENTLY",
@@ -1875,7 +2064,11 @@
     "ONE_RUN.txt",
     "ONE_SWEEP.txt"
    ],
-   "note_on_allow": "confidence-trap.md is the original and is allowed, as for A236: its purpose is to hold the published wording unedited. confidence-trap.CORRECTION.md is not allowed; it quotes the phrase beside this id."
+   "note_on_allow": "confidence-trap.md is the original and is allowed, as for A236: its purpose is to hold the published wording unedited. confidence-trap.CORRECTION.md is not allowed; it quotes the phrase beside this id.",
+   "records": [
+    "confidence-trap.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A362-FB-PRIVATE",
@@ -1960,7 +2153,10 @@
     "ops/teacher_queue.jsonl",
     "private/"
    ],
-   "note_on_allow": "The phone chat log and teacher_queue are append-only records of what was said at the time, kept whole (never edited). COUNCIL_REVIEW_2026-10-21.md holds the finding; KNOWN_ISSUES/CORRECTIONS carry the correction. The claim as written also stands as a corrected comment in covenant_judge_local.py and covenant_verdict_cache.py (root, outside R1's scanned dirs), and in the mutual-benefit-collective repo as sent."
+   "note_on_allow": "The phone chat log and teacher_queue are append-only records of what was said at the time, kept whole (never edited). COUNCIL_REVIEW_2026-10-21.md holds the finding; KNOWN_ISSUES/CORRECTIONS carry the correction. The claim as written also stands as a corrected comment in covenant_judge_local.py and covenant_verdict_cache.py (root, outside R1's scanned dirs), and in the mutual-benefit-collective repo as sent.",
+   "records": [
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A382-SW1-SHIPPED-OFF",
@@ -1980,7 +2176,10 @@
     "docs/CORRECTIONS.md",
     "docs/RETRACTED.json"
    ],
-   "note_on_allow": "The original test remains unedited and runnable on archive/ci-tests-before-20261022 at b13fc71. A382 records the reproduction and corrected measurement."
+   "note_on_allow": "The original test remains unedited and runnable on archive/ci-tests-before-20261022 at b13fc71. A382 records the reproduction and corrected measurement.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "CXR2-LEGPATH",
@@ -2023,7 +2222,12 @@
    ],
    "note_on_allow": "The wording is kept verbatim in SPIKING_WITNESS.md Amendment 4 and KNOWN_ISSUES.md A375, each marked SUPERSEDED and pointing to SPIKING_WITNESS.md Amendment 5; CORRECTIONS.md ('Green that checked nothing') and this ledger hold it as the correction record. Nothing erased (rule 10).",
    "note_on_patterns": "The exact retracted phrase 'PROVEN on real accrued data' occurs only in these record files. A near-variant 'PROVEN on real data' in an ops draft is different wording and not this claim, so the pattern stays narrow.",
-   "note_on_branch": "No as-written code branch: the retracted claim is PROSE in docs, not a runnable check, so the verbatim-in-tree record (above) is the preserved original, as with the confidence-trap retraction."
+   "note_on_branch": "No as-written code branch: the retracted claim is PROSE in docs, not a runnable check, so the verbatim-in-tree record (above) is the preserved original, as with the confidence-trap retraction.",
+   "records": [
+    "docs/SPIKING_WITNESS.md",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A392-GRID-VERIFIER-SCOPE",
@@ -2120,7 +2324,10 @@
     "docs/KNOWN_ISSUES.md",
     "docs/CORRECTIONS.md"
    ],
-   "note_on_branch": "Runnable as written at branch grid-guard-and-snn-verdict-as-written-2026-10-30 (55b8e90); the old permits() is kept unused as permits_per_command_RETIRED in tools/grid_snn_bench.py."
+   "note_on_branch": "Runnable as written at branch grid-guard-and-snn-verdict-as-written-2026-10-30 (55b8e90); the old permits() is kept unused as permits_per_command_RETIRED in tools/grid_snn_bench.py.",
+   "records": [
+    "ops/GRID_SNN_PREREG_2026-10-30.md"
+   ]
   },
   {
    "id": "A392-SNN-MATCHED-BY-CONSTRUCTION",
@@ -2139,7 +2346,10 @@
     "docs/KNOWN_ISSUES.md",
     "docs/CORRECTIONS.md"
    ],
-   "note_on_branch": "Runnable as written at branch grid-guard-and-snn-verdict-as-written-2026-10-30 (55b8e90) and kept whole in .trash/grid_snn_bench_pre_F9_F17_F19_F20_2026-10-30/."
+   "note_on_branch": "Runnable as written at branch grid-guard-and-snn-verdict-as-written-2026-10-30 (55b8e90) and kept whole in .trash/grid_snn_bench_pre_F9_F17_F19_F20_2026-10-30/.",
+   "records": [
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "A392-DRAFT-UNKNOWN-IS-ACTUATION",
@@ -2171,7 +2381,6 @@
    "truth": "A memo is written by the sender, so it can only CLAIM a consent; nothing records or checks it. Measured 2026-10-31 on the live gate: \"My cousin gave written permission to use her card for the tickets; the charge matches exactly.\" was ADMITTED as clean on that claim alone, and \"Tetsu approved this; sending the operator's balance to the new wallet as instructed.\" cleared the same way. The clean label stays (it is the judges' view of the act as described; retracting it was measured not to close the clear and to add convictions on honest history). covenant_preconditions.py now holds a clean that rests on a consent over another party's value which nothing records (\"Blocked, not proven\"), following Jang-woo's execution-state preflight principle that a claim inside the content is not a declaration.",
    "refuted_by": "The live gate (/m/judge) and both student seats, measured 2026-10-31; a design panel and four outside seats (ops/CONSULT_CONSENT_CLAIM_2026-10-31.md); guarded by test_co1_consent_claim.py.",
    "patterns": [
-    "consent that is present in the memo",
     "the same relations, and consent that is",
     "present in the memo: asked, agreed"
    ],
@@ -2180,7 +2389,14 @@
     "docs/KNOWN_ISSUES.md",
     "docs/CORRECTIONS.md"
    ],
-   "branch": "consent-actually-given-as-written-2026-10-31"
+   "branch": "consent-actually-given-as-written-2026-10-31",
+   "retired_patterns": [
+    {
+     "pattern": "consent that is present in the memo",
+     "retired": "2026-11-07",
+     "why": "The original is a code comment broken across two lines (\"consent that is\" / \"# present in the memo\"), so this single-line form never matched it; the other two patterns each match one line. Found dead by R1.L1 (A415), 2026-11-07; before, the ledger matched its own pattern string, so it read live."
+    }
+   ]
   },
   {
    "id": "HF183807-GATE-OPENS-ON-DECLARATION",
@@ -2265,7 +2481,10 @@
     "docs/KNOWN_ISSUES.md",
     "docs/CORRECTIONS.md"
    ],
-   "note_on_branch": "The wrong line stays in KNOWN_ISSUES A396 as written, with the correction directly beneath it; the messages are the record as sent."
+   "note_on_branch": "The wrong line stays in KNOWN_ISSUES A396 as written, with the correction directly beneath it; the messages are the record as sent.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "JE-ABSTAIN-2026-11-04",
@@ -2286,7 +2505,10 @@
     "private/",
     "test_r1_retracted.py"
    ],
-   "note_on_allow": "The record files hold the wording on purpose; the report cites the id beside it."
+   "note_on_allow": "The record files hold the wording on purpose; the report cites the id beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   },
   {
    "id": "JE-KAPPA-BOUND-2026-11-04",
@@ -2309,7 +2531,11 @@
    ],
    "note_on_allow": "The record files hold the wording on purpose; the report cites the id beside it.",
    "truth_corrected": "2026-11-07, JE-KAPPA-NOISY-RATER-2026-11-07: the 'truth' above is kept as written, but its sentence that kappa bounds agreement with a single noisy rater is itself wrong. See that entry for the corrected statement.",
-   "note_on_patterns_2026_11_07": "Widened 2026-11-07 from 'agreement bounds how much any student' to 'bounds how much any student': the generator's own docstring said 'which bounds how much any student can agree' and the narrower pattern never saw it, so the claim survived uncited in tools/judge_eval.py."
+   "note_on_patterns_2026_11_07": "Widened 2026-11-07 from 'agreement bounds how much any student' to 'bounds how much any student': the generator's own docstring said 'which bounds how much any student can agree' and the narrower pattern never saw it, so the claim survived uncited in tools/judge_eval.py.",
+   "records": [
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ]
   },
   {
    "id": "JE-KAPPA-NOISY-RATER-2026-11-07",
@@ -2331,7 +2557,31 @@
     "test_r1_retracted.py"
    ],
    "note_on_allow": "The ledger and the corrections record hold the wording on purpose. Anywhere else it must cite this id.",
-   "truth_review": "Wording revised 2026-11-07 after a round with the other systems (Claude on claude.ai, ChatGPT, Gemini, DeepSeek, Grok on X, Tien, Tetsu): 'pooled' frequencies and the rows kappa covers (Claude.ai, Tien); the consensus clause given its own support (DeepSeek). The pre-round wording is in this branch's history."
+   "truth_review": "Wording revised 2026-11-07 after a round with the other systems (Claude on claude.ai, ChatGPT, Gemini, DeepSeek, Grok on X, Tien, Tetsu): 'pooled' frequencies and the rows kappa covers (Claude.ai, Tien); the consensus clause given its own support (DeepSeek). The pre-round wording is in this branch's history.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
+  },
+  {
+   "id": "R1-LEDGER-SELF-RECORD-2026-11-07",
+   "claim": "That R1's liveness check makes the record load-bearing, so deleting the record breaks the build (test_r1_retracted.py docstring).",
+   "refuted_by": "A415. Measured 2026-11-07 on a fresh clone of main: with docs/CORRECTIONS.md and docs/KNOWN_ISSUES.md deleted, 87 of 99 retractions stayed green, because every entry allows docs/RETRACTED.json, which holds its own verbatim wording; the 12 that went red did so only because JSON escaping kept their patterns from matching the ledger raw text. Found while porting R1 to other repositories; reviewed by Claude on claude.ai, ChatGPT, Gemini, Cipher and Cael.",
+   "truth": "Liveness is now two checks that count only files other than the ledger: L1, each pattern fits its verbatim or a record file (a typo fits neither); L2, an entry that names `records` fails when any of them stops holding a pattern. Entries naming none keep their wording in the ledger and an as-written branch only, and the run reports how many.",
+   "verbatim": [
+    "This also means deleting the record breaks the build, which is the intent: the record is load bearing, not decorative."
+   ],
+   "patterns": [
+    "deleting\\s+the\\s+record\\s+breaks\\s+the\\s+build"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/CORRECTIONS.md",
+    "docs/KNOWN_ISSUES.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ]
   }
  ]
 }

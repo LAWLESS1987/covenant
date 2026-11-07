@@ -17061,3 +17061,31 @@ understands."
   clamp; nothing in the module adapts thresholds. Extinction is bounded in spikes, not in time. On a ring,
   integrate() counts recruited spikes in a receiving arm's rate. Nothing in the tree constructs a
   ring yet: wiring one into a learning SNN (the spiking lab, the witness pre-registration) is a separate step.
+
+### A415. [R1's liveness check did not make the record load-bearing: the ledger satisfied it for itself] (2026-11-07)
+
+- **Found** while porting R1 to the other repositories, at Lawrence's request ("update every repo to research grade by
+  using what we learned in covenant to improve the others"). `test_r1_retracted.py` said of its liveness check: "This
+  also means deleting the record breaks the build, which is the intent: the record is load bearing, not decorative."
+- **Measured on a fresh clone of main.** With `docs/CORRECTIONS.md` and `docs/KNOWN_ISSUES.md` deleted, 87 of 99
+  retractions stayed green. Every entry allows `docs/RETRACTED.json`, which holds its own verbatim wording, so the
+  ledger alone satisfied the check. The 12 that went red did so only because JSON escaping (quotes, backslashes,
+  unicode) kept their patterns from matching the ledger's raw text, not because the check saw the record go. In
+  covenant-satc it was 9 of 9 green.
+- **Fixed, the same way in both repositories.** Liveness now counts only files other than the ledger. L1: each pattern
+  fits its verbatim wording or a record file, so a typo that fits neither is dead. L1 cannot require the verbatim
+  alone: A121's pattern `match(?:ing|es|ed)?\s+the\s+(?:published\s+)?root` deliberately guards a paraphrase that is in a
+  record, not in its verbatim. L2: an entry that names `records` fails when any of them stops holding a pattern. The
+  records were measured, not assumed: an allow entry other than the ledger becomes a record only if every pattern of the
+  entry matches there in the tracked tree. Entries with none keep their wording in the ledger and an as-written branch
+  only, and the run reports how many.
+- **Tombstone.** R1-LEDGER-SELF-RECORD-2026-11-07, the same id as in covenant-satc. The docstring keeps its sentence as
+  written, with the ids beside it; the original stands on branch `r1-docstring-as-written-cov-2026-11-07`.
+- **Cross-referenced** with Claude on claude.ai, ChatGPT and Gemini (the rubric round), and with the panel: Cipher,
+  Cael, the 7B coder, Tetsu's voice model and the 2B leg. Cipher and the coder asked for the 12 to be explained before
+  anything was tombstoned, and they were (JSON escaping, above). The 2B leg's guess at the cause was wrong.
+- **What the new L1 found at once:** two dead patterns, which the old check read as live only because the ledger
+  matched its own pattern strings. A269-SLOT-SPLIT's `4 default slots split -c 8192` matched no wording ever written,
+  and CONSENT-IN-THE-MEMO's `consent that is present in the memo` could never match the original, a code comment broken
+  across two lines. Each moved to the entry's `retired_patterns` with its reason; the entries' other patterns still
+  match their verbatims. With them retired, R1 is green, and 67 of 100 retractions name a measured record.
