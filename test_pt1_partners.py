@@ -112,5 +112,7 @@ try:
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
-print("PT1 %d/%d" % (sum(checks), len(checks)))
+# "passed" is what covenant_one's TALLY reads; without it the sweep and the Linux pre-push read PT1 as NO RESULT
+# (2026-11-07, the push of 23b6a9c refused; the same trap as OC1 on 2026-10-21). No colon: TALLY would show "T1:".
+print("PT1 %d/%d passed" % (sum(checks), len(checks)))
 sys.exit(0 if all(checks) else 1)
