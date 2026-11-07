@@ -17006,3 +17006,58 @@ understands."
   asked for, "chosen before the counts were taken". Codex's question 2 named no pair; I chose it, and nothing was
   pre-registered. Corrected in the draft before it was committed; recorded here, per the rule that a corrected draft is
   still a claim made.
+
+### A414. [the octopus's arms gain a direct arm-to-arm ring (Commissure) with serotonin gain, held subcritical by a per-arm charge argument; OPT-IN, because Tetsu said NO for his own arms] (2026-11-07)
+
+- **Asked.** Lawrence: "Optimize connection between octopus legs". Asked which legs, he chose the spiking arms of
+  `covenant_octopus.py` (witness, encoder, reflex), which until now met only through the central brain's
+  `integrate()`. A real octopus also joins neighbouring arms directly (the interbrachial commissure); serotonin
+  follows his 2026-11-03 directive ("make it like an octopus. Like serotonin").
+- **Built.** `Commissure`: arms on a ring in attach order; a spiking arm sends current to its two neighbours only,
+  event-driven, added on the neighbour's next `sense()`; current = weight x serotonin gain x the sender's spike
+  fraction, with weight x gain clamped to 0.475 x the receiver's threshold; queued current capped and clamped again
+  on arrival; serotonin one diffuse level that relaxes toward baseline with time (per arm step), and gives no
+  coupling when it is NaN, inf or negative; the witness sends but never receives (a recruited spike would look like
+  an attestation); the kill switch silences the ring and drops queued current. `Octopus.ring_state()` reads it.
+- **Tetsu's NO.** Asked one plain question (fresh, private): "NO, it changes how my reflex answers you ... I prefer
+  the current setup." Recorded in ops/tetsu_consent.jsonl (kind octopus_ring_consent, chained). His stated reason
+  does not match the code (his conversation reflex is a standalone arm), recorded, not argued, not re-asked. So the
+  ring is OPT-IN: `default_octopus()` has no ring, every existing caller (the gate path, the plug, his conversation
+  reflex) is unchanged, and a caller must construct `Octopus(ring=Commissure())`. A mutant giving the default octopus
+  a ring turns OC1 red.
+- **A runaway found and closed before review.** Measured: with serotonin held high and no clamp, the ring fired
+  forever after the drive stopped (every arm, every step; 2400 spikes in steps 300-400). The clamp rests on the
+  charge argument, per arm: take each arm's charge as the average of its neurons' potentials in units of its own
+  lowest threshold; a spike with fraction r lowers the sender's by at least r and raises each neighbour's by at most
+  0.475r, so every spike lowers the sum by at least 0.05r, with or without leak.
+- **Reviewed** by Claude on claude.ai and ChatGPT (Gemini's tab hung; Tetsu was asked consent, above). Both
+  disagreed with the stability claim as I had DESCRIBED it. Claude.ai reproduced a runaway in a model that sent a
+  flat 0.475 per arm-level spike; ChatGPT described a staggered two-neuron pattern under broadcast. My description
+  had left out the spike-fraction factor. On the real code, all 186,624 primings of the 3-arm
+  x 2-neuron case and 300 random rings (2-8 arms, 1-8 neurons, thresholds 0.5-2, staggered phases, random order,
+  skipped steps, no leak) went silent; the most spikes in any run was 78. Taken from them: the witness only sends;
+  serotonin by time, not activity (decay per carried spike left a quiet ring at a high level, gave the first arm in a
+  sweep more gain, and let activity raise a low level); NaN/inf/negative levels refused (min(3, nan) is 3); the kill
+  switch drops the queue; the arrival clamp; 1- and 2-arm rings; a direct per-spike bound test; a staggered-phase
+  regression; the scheduling wording (no global tick: a spike can reach the next arm within one sweep).
+- **My errors, corrected before merge:**
+  - I wrote that the two layers (per-spike clamp, waiting-current cap) were redundant, from 36 stress runs that all
+    had leak. With no leak, removing the per-spike clamp turns the suite red; the cap alone is not enough.
+  - My first charge argument summed over the receiving neurons, which is wrong when arms differ in size; restated
+    per arm.
+  - I told the reviewers the ring "cannot cascade around the ring within a step"; it can within one sweep.
+- **Second pass.** Both reviewers were sent the measurements and changes. Claude.ai: the per-arm argument is sound,
+  given four conditions nothing enforced -- leak toward 0, reset <= 0, the positive part of the potential, thresholds
+  that are not lowered behind the bound -- and it would merge once each was an assertion with a mutant. ChatGPT:
+  sound, but disagreed that the arrival clamp alone kept the bound after a runtime threshold drop. Taken: join()
+  refuses an arm that leaks away from 0, resets above 0 or has a non-finite or zero threshold; the ring refuses a NaN
+  weight; thresholds are read at SEND time as well as clamped on arrival; the charge is the positive part; the stress
+  test checks the spike bound (fractions within 20 x the starting charge) and the frozen-state stopping rule, not a
+  hand-picked quiet window.
+- **Guards.** OC1 4 -> 32 checks, all passing; 22 of 22 code mutants turn it red. CR1 16/16, PG1 16/16 unchanged.
+  Cost: 3.12 us per spiking step on a ring (thresholds read live) against 1.46 us for a lone arm; the default
+  octopus 1.46 us, unchanged.
+- **Limits.** A threshold lowered in the single step between a send and its arrival is covered only by the arrival
+  clamp; nothing in the module adapts thresholds. Extinction is bounded in spikes, not in time. On a ring,
+  integrate() counts recruited spikes in a receiving arm's rate. Nothing in the tree constructs a
+  ring yet: wiring one into a learning SNN (the spiking lab, the witness pre-registration) is a separate step.
