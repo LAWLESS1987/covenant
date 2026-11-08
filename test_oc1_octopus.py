@@ -338,6 +338,45 @@ def ring_checks():
               "OCR13 a spike sent after the receiver's threshold fell to 0.2 delivers at most 0.475 x 0.2 (%.3f)"
               % o13b.arms["b"].incoming))
 
+    # 15. The extinction guarantee assumes fixed thresholds (Codex's checkpoint, 2026-11-07). Lowering them is outside
+    #     drive: a ringed pair whose thresholds fall 10% a step keeps firing in the last of six windows with no input;
+    #     the same pair with fixed thresholds, or lowered thresholds and no ring, is silent; and once the lowering
+    #     stops, the ringed pair goes silent too.
+    def run15(ring, lower):
+        o = OC.Octopus(ring=OC.Commissure(weight=10.0)) if ring else OC.Octopus()
+        for name in ("a", "b"):
+            arm = OC.Arm(tau=20.0)
+            arm.name = name
+            o.attach(arm)
+        if ring:
+            o.ring.serotonin = 100.0
+        for _ in range(5):
+            o.arms["a"].sense(2.0)
+            o.arms["b"].sense(0.0)
+        late = 0
+        for t in range(150):
+            if lower:
+                for arm in o.arms.values():
+                    for nu in arm.neurons:
+                        nu.thresh *= 0.9
+            fired = sum(sum(arm.sense(0.0)) for arm in o.arms.values())
+            late += fired if t >= 125 else 0
+        for _ in range(200):
+            for arm in o.arms.values():
+                arm.sense(0.0)
+        after = 0
+        for _ in range(100):
+            after += sum(sum(arm.sense(0.0)) for arm in o.arms.values())
+        return late, after
+    sustained, settled = run15(True, True)
+    fixed, _ = run15(True, False)
+    unringed, _ = run15(False, True)
+    c.append((sustained > 0 and fixed == 0 and unringed == 0,
+              "OCR15 thresholds lowered 10%% a step keep a ringed pair firing with no input (%d spikes in the last 25 "
+              "steps); fixed thresholds (%d) or no ring (%d) go silent -- the precondition is real" %
+              (sustained, fixed, unringed)))
+    c.append((settled == 0, "OCR15 ...and once the lowering stops the ringed pair goes silent (%d)" % settled))
+
     # 8. The kill switch silences the ring too.
     o8 = _ring(["a", "b"])
     o8.ring.serotonin = 3.0
