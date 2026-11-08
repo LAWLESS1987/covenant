@@ -17137,3 +17137,51 @@ understands."
   main has re-pinned many times since. #1 and #2 corrected INDEX.md's old key warning. Main already marks that page
   historical, and neither correction should land as written. #1 states facts about an operator's own machine in a
   public repository. #2 rests on a report and, by its own account, not on a measurement.
+- **FIXED, same day: PR #9 ported onto main at b302214** (branch `claude/a416-scope-cache-identity`). The header's
+  "OPEN" was true when written and stays as written. PR #9 is closed as superseded once the port lands.
+- **Defect 1 fixed: one memory per caller and privacy mode.** `/m/agent` now passes
+  `conversation_scope(addr, private)` to both reflex calls. Each scope keeps its own seen-set, encoder topics and log,
+  in files named by the SHA-256 of the scope, so no caller text is in a filename. Tetsu's wording, thresholds and kill
+  switch are unchanged; CR1.32 pins them at the values he chose. The legacy shared files are left as they are. No
+  partition imports them and nothing rewrites them (CR1.25, CR1.26). They are his memory, kept and not migrated. The
+  partition files, and the `.tmp` each save passes through, are ignored by git. `git check-ignore` reports all five new
+  shapes as ignored and a neighbouring `ops/tetsu_conv_other.json` as not ignored. Driven both ways:
+  - CR1 is 32/32. With `_scoped_path` made to ignore the scope it is 26/32; restored, 32/32.
+  - A263 drives the real door and is 45/45. With the route's unscoped call put back it is 43/45; with the privacy flag
+    dropped from the scope, 44/45; restored, 45/45.
+  - A263 runs the real reflex for D1 and D2 only. When the reflex fires, its line goes ahead of the text (A400), and
+    the stand-in model then cannot read a `STUB>>` directive. Ported as PR #9 wrote it, that turned D4, D5 and M3 red.
+- **Defect 2 fixed, measured before choosing.** On this PC a full SHA-256 per lookup took 0.847-1.272 s for the
+  1,274,396,608-byte 2B GGUF and 1.303-2.136 s for the 2,104,932,768-byte 3B, three runs each. A stat took 8.1-8.2 us.
+  PR #9's per-lookup hash would have added that second or two to every judge call, cache hits included. So the digest
+  is now memoised in the process against a change stamp: device, file id, size, mtime_ns and change time.
+  - The change time is NTFS ChangeTime on Windows and `st_ctime_ns` on POSIX. Measured on NTFS: `os.stat`'s
+    `st_ctime` is creation time and does not move on an in-place same-size rewrite with the mtime restored. ChangeTime
+    does move. Reading it costs about 55 us, against 8.8 us for a stat.
+  - Racy window: a file whose change time is within 2 s of its hash is never memoised (git's "racily clean" rule).
+  - The shipped code on the real files: the first lookup took 1.273 s (2B) and 2.149 s (3B); memoised lookups 163.6 us
+    and 174.4 us; strict lookups 0.815 s and 1.388 s. The digests equal the standalone hashes. The live judge name
+    `qwen3:8b` resolves to no file and stays `artifact=unknown`, at 20.7 us.
+  - A name that is not a regular file stays `artifact=unknown`, as before. PR #9's shape would have answered
+    `unreadable` and switched the cache off for a name Windows rejects (`a?b` raises errno 22) or a directory
+    (PermissionError). Measured with `open()` on this PC.
+  - The ledger is reread on every call: 0.187 ms for `docs/RETRACTED.json`. Its (mtime_ns, size) memo had the same
+    defect (Codex's finding in PR #9).
+  - Driven both ways: VC1 is green, and red under each of nine mutants, then green again. The mutants: the basis memo
+    put back; the stamp without its change time; no racy window; strict mode ignored; a change mid-read ignored; the
+    non-file check removed; the metadata key put back; the judge caching against `unstable`; the judge reading the
+    artifact under the kill switch.
+  - NOT closed: a writer who sets the change time back on purpose. Measured: `SetFileInformationByHandle` restores
+    NTFS ChangeTime along with the content change. Root editing an inode is the POSIX case. Such a writer can also
+    edit the cache module. `COVENANT_VERDICT_CACHE_STRICT_HASH=1` closes it at the full-hash cost above, and the kill
+    switch serves no cached verdict at all. A remote server's loaded weights stay unknowable from here.
+- **The tombstone, updated as its entry asked.** The A383 comment that said
+  "any real change -- even same-name -- misses and re-judges (fail-closed)" is gone from the code. The fix replaced
+  it with what the key now does and does not catch. A416-CACHE-ANY-REAL-CHANGE-2026-11-07 now names this file as its
+  record, so emptying the quote above turns R1's L2 red. It no longer allows `covenant_verdict_cache.py`, so the claim
+  coming back into the code turns R1 red. PR #9's own tombstone, A383-CONTENT-IDENTITY, is not ported: it covers the
+  same sentence, and this entry already does.
+- **Not ported from PR #9:** `eval_conv_cues.py`, `test_cue_eval.py`, `tools/check_cue_cache_mutations.py` and
+  `docs/research/CONVERSATION_CACHE_REVIEW_2026-10-24.md`. The offline cue experiment asks a separate question:
+  whether the reflex's spikes change its output. It stays on PR #9's branch. NOT measured, still: whether any word
+  ever crossed between callers or modes before this fix.
