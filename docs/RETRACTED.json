@@ -2603,6 +2603,28 @@
     "docs/KNOWN_ISSUES.md"
    ],
    "note_on_allow_before_fix": "The claim is still in the code at covenant_verdict_cache.py, kept as written with a citation line beneath it; the as-written state is branch a416-cache-claim-as-written-2026-11-07 (main at 1c789f3). The fix that removes it must update this entry."
+  },
+  {
+   "id": "A416-PORT-AT-B302214-2026-11-08",
+   "claim": "That covenant PR #9's fixes were ported onto main at commit b302214. Written in A416's record (docs/KNOWN_ISSUES.md) by the port, covenant #38, before #38 merged.",
+   "verbatim": [
+    "FIXED, same day: PR #9 ported onto main at b302214"
+   ],
+   "truth": "b302214 is the merge of covenant #37, which recorded A416, ignored the reflex state and tombstoned the cache claim; its only change to covenant_verdict_cache.py is a two-line comment. The port branch was cut from it. The port landed at 3969095, the merge of covenant #38 (2026-11-08T02:32:46Z). A merge commit cannot be named before the merge; the sentence named the base instead.",
+   "refuted_by": "Claude, verifying the day's record against GitHub 2026-11-08: GET /repos/LAWLESS1987/covenant/pulls/37 and /pulls/38 give merge_commit_sha b302214 and 3969095; git show b302214 --stat touches no reflex code.",
+   "patterns": [
+    "ported onto main at b302214"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "note_on_branch": "The record line stays as written in docs/KNOWN_ISSUES.md (A416), with the correction beneath it; the as-written state is branch a416-port-sha-as-written-2026-11-08 (main at 3969095)."
   }
  ]
 }
