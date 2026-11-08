@@ -2587,7 +2587,7 @@
    "id": "A416-CACHE-ANY-REAL-CHANGE-2026-11-07",
    "claim": "That folding a local model file's (size, mtime) into the verdict cache key makes any real change to the artifact miss and re-judge (covenant_verdict_cache.py, A383 comment).",
    "refuted_by": "A416. The key reads the file's name, size and whole-second mtime (covenant_verdict_cache.py:123 at 1c789f3); a same-size replacement with its timestamp restored keeps the key, so old verdicts are reused for new weights. Named by Codex in PR #9 (2026-10-24, still open, where its own tombstone A383-CONTENT-IDENTITY waits); checked against main 2026-11-07.",
-   "truth": "Size and mtime catch ordinary edits, not every change. Content identity needs the bytes (PR #9 hashes them, at an unmeasured I/O cost on large GGUF files). Until a fix lands the comment stays in the code beside a line citing this id. A remote server's loaded weights stay unknowable from here either way.",
+   "truth": "Size and mtime catch ordinary edits, not every change. Content identity needs the bytes (PR #9 hashes them, at an unmeasured I/O cost on large GGUF files). Until a fix lands the comment stays in the code beside a line citing this id. A remote server's loaded weights stay unknowable from here either way. FIXED 2026-11-07 (the port of PR #9, branch claude/a416-scope-cache-identity): the comment is gone from the code; the key now folds the SHA-256 of the bytes, memoised in-process against a change stamp (NTFS ChangeTime / POSIX st_ctime_ns) because a per-lookup hash measured 0.85-2.14 s on this PC's GGUFs. The stamp does not catch a writer who sets the change time back on purpose; COVENANT_VERDICT_CACHE_STRICT_HASH=1 does, at the full cost.",
    "verbatim": [
     "any real change -- even same-name -- misses and re-judges (fail-closed)"
    ],
@@ -2596,9 +2596,13 @@
    ],
    "allow": [
     "docs/RETRACTED.json",
-    "covenant_verdict_cache.py"
+    "docs/KNOWN_ISSUES.md"
    ],
-   "note_on_allow": "The claim is still in the code at covenant_verdict_cache.py, kept as written with a citation line beneath it; the as-written state is branch a416-cache-claim-as-written-2026-11-07 (main at 1c789f3). The fix that removes it must update this entry."
+   "note_on_allow": "Updated by the fix, as the note above asked. The claim is quoted verbatim in docs/KNOWN_ISSUES.md (A416), its record; covenant_verdict_cache.py is no longer allowed, so the wording returning to the code fails R1. The as-written state is still branch a416-cache-claim-as-written-2026-11-07 (main at 1c789f3).",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "note_on_allow_before_fix": "The claim is still in the code at covenant_verdict_cache.py, kept as written with a citation line beneath it; the as-written state is branch a416-cache-claim-as-written-2026-11-07 (main at 1c789f3). The fix that removes it must update this entry."
   }
  ]
 }

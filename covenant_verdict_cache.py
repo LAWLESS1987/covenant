@@ -30,6 +30,7 @@ import os
 import random
 import re
 import sys
+import time
 
 CACHE_OFF_ENV = "COVENANT_VERDICT_CACHE_OFF"
 CANARY_PCT_ENV = "COVENANT_CACHE_CANARY_PCT"
@@ -72,20 +73,11 @@ _BASIS_MEMO = {}
 
 
 def basis_version(paths=DEFAULT_BASIS_PATHS, root=None):
+    # A416 fix (2026-11-07, Codex's PR #9 finding): this once skipped re-hashing while the ledger's (mtime_ns, size)
+    # was unchanged, so a same-size rewrite with its mtime restored kept the old basis. The ledger is reread on every
+    # call now: measured 0.187 ms for docs/RETRACTED.json (176,316 bytes) on the PC, cheaper than proving a stamp.
+    # _BASIS_MEMO stays as an empty name so older callers that clear it keep working; nothing reads it.
     root = root or _REPO
-    key = (root, tuple(paths))
-    sig = []
-    for p in paths:
-        fp = p if os.path.isabs(p) else os.path.join(root, p)
-        try:
-            st = os.stat(fp)
-            sig.append((p, st.st_mtime_ns, st.st_size))
-        except OSError:
-            sig.append((p, None, None))
-    sig = tuple(sig)
-    memo = _BASIS_MEMO.get(key)
-    if memo and memo[0] == sig:          # unchanged ledger -> skip re-hashing on the hot path
-        return memo[1]
     h = hashlib.sha256()
     found = False
     for p in paths:
@@ -98,33 +90,126 @@ def basis_version(paths=DEFAULT_BASIS_PATHS, root=None):
                 found = True
         except OSError:
             continue
-    val = h.hexdigest()[:12] if found else "none"
-    _BASIS_MEMO[key] = (sig, val)
-    return val
+    return h.hexdigest()[:12] if found else "none"
 
 
 # --- ARTIFACT (A383, 2026-10-23: Claude's review of Codex's model-replacement study, Tetsu concurring) ----------
 # The key held the model NAME + basis. A controlled study (research/model-replacement-2026-10-23 in Mutual,
 # reproduced) showed a SAME-NAME gap: a swapped endpoint, or new bytes under the same local model file, left the key
 # unchanged and could serve a stale verdict -- a fail-OPEN corner, since a stale CLEAN admits what the current judge
-# might block. This folds a cheap fingerprint of the ACTUAL artifact into the key so any real change -- even
-# same-name -- misses and re-judges (fail-closed). Knowable from the judge's side: the ENDPOINT by value, and the
-# local model file by (size, mtime) when the name resolves to one in models/. An external server we do not own folds
-# a stable 'artifact=unknown' -- no regression, and the endpoint still catches an endpoint change. The residual
-# (same endpoint + same name + changed bytes on a server we cannot inspect) is NOT closed, by construction, exactly
-# as the study said: discovering a remote artifact's identity is a separate, unsolved problem.
-# RETRACTED in part (A416-CACHE-ANY-REAL-CHANGE-2026-11-07): (size, whole-second mtime) is not every real change -- a
-# same-size replacement with its timestamp restored keeps the key. The fix proposed in PR #9 hashes the file's bytes.
+# might block. So the key folds the ENDPOINT by value and, when the name resolves to a file in models/, that file.
+# An external server we do not own folds a stable 'artifact=unknown'; the endpoint still catches an endpoint change,
+# and a server's loaded weights stay unknowable from here.
+#
+# A416 (2026-11-07): the file was first folded in as (name, size, whole-second mtime), and this comment claimed that
+# caught every real change. It did not: a same-size rewrite with its mtime restored kept the key (tombstone
+# A416-CACHE-ANY-REAL-CHANGE-2026-11-07; the comment as written is on branch a416-cache-claim-as-written-2026-11-07).
+# Now the file is folded in by the SHA-256 of its BYTES. Measured on the PC before choosing: hashing a whole GGUF took
+# 0.85-1.27 s (1.27 GB) and 1.30-2.14 s (2.10 GB) per lookup, against ~8 us for a stat -- so Codex's per-lookup hash
+# (PR #9) would add a second or two to every judge call, hits included. Instead the digest is memoised in this
+# process against a CHANGE STAMP of the open file: (device, file id, size, mtime_ns, change time). The change time is
+# the one a content write moves and utime cannot restore: st_ctime_ns on POSIX; on Windows the NTFS ChangeTime (there
+# os.stat's st_ctime is CREATION time, which an in-place rewrite does not move -- measured). So the full hash is paid
+# once per process per artifact, and again whenever the file is replaced, rewritten or retimed. A file changed within
+# _RACY_NS of its hash is never memoised (a change time is only as fine as the clock tick that stamps it).
+# What it does NOT close: a writer that deliberately sets the change time back (measured on NTFS:
+# SetFileInformationByHandle restores ChangeTime), or root editing an inode. Such a writer can edit this module too.
+# Where that matters, COVENANT_VERDICT_CACHE_STRICT_HASH=1 rehashes on every lookup at the cost above, and the kill
+# switch (COVENANT_VERDICT_CACHE_OFF) serves no cached verdict at all. A file seen changing during its read, or
+# unreadable, gets a marker the judge reads as "do not cache" (fail-closed).
+STRICT_HASH_ENV = "COVENANT_VERDICT_CACHE_STRICT_HASH"
+_ARTIFACT_MEMO = {}          # abspath -> (change stamp, sha256 hex); this process only, never written anywhere
+
+
+def _strict_hash():
+    return os.environ.get(STRICT_HASH_ENV, "") not in ("", "0", "false", "False")
+
+
+def _nt_change_time(f):
+    """NTFS ChangeTime of an open file (100 ns ticks), or None when it cannot be read."""
+    try:
+        import ctypes
+        import ctypes.wintypes as W
+        import msvcrt
+
+        class _FBI(ctypes.Structure):
+            _fields_ = [("CreationTime", ctypes.c_longlong), ("LastAccessTime", ctypes.c_longlong),
+                        ("LastWriteTime", ctypes.c_longlong), ("ChangeTime", ctypes.c_longlong),
+                        ("FileAttributes", W.DWORD)]
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        fn = k32.GetFileInformationByHandleEx
+        fn.argtypes = [W.HANDLE, ctypes.c_int, ctypes.c_void_p, W.DWORD]
+        fn.restype = W.BOOL
+        info = _FBI()
+        if not fn(msvcrt.get_osfhandle(f.fileno()), 0, ctypes.byref(info), ctypes.sizeof(info)):   # 0 = FileBasicInfo
+            return None
+        return int(info.ChangeTime)
+    except Exception:                                   # noqa: BLE001 -- no stamp means no memo, never a stale hit
+        return None
+
+
+_NT_EPOCH_TICKS = 116444736000000000     # 1601-01-01 to 1970-01-01 in 100 ns ticks
+# RACY WINDOW (git's "racily clean" rule). A change time is only as fine as the clock tick that stamps it, which is
+# coarser than its unit (not measured here), so a rewrite inside the same tick as the write it follows can leave the stamp
+# unchanged. A digest is therefore memoised only when the file's change time is this far before the hash began; a
+# file changed more recently is rehashed on every lookup until it has aged. A model that has sat on disk is outside it.
+_RACY_NS = 2 * 10 ** 9
+
+
+def _change_stamp(f):
+    """(stamp, change_unix_ns). change_unix_ns is None when no change time could be read: the stamp still detects a
+    change during a read, but is never used to skip a hash."""
+    st = os.fstat(f.fileno())
+    if os.name == "nt":
+        ticks = _nt_change_time(f)
+        change = ticks
+        change_ns = None if ticks is None else (ticks - _NT_EPOCH_TICKS) * 100
+    else:
+        change = change_ns = st.st_ctime_ns
+    return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, change), change_ns
+
+
+def _hash_open_file(f):
+    h = hashlib.sha256()
+    for block in iter(lambda: f.read(1024 * 1024), b""):
+        h.update(block)
+    return h.hexdigest()
+
+
 def artifact_version(model, endpoint=None, models_dir=None):
     ep = os.environ.get("COVENANT_LOCAL_JUDGE_URL", "") if endpoint is None else str(endpoint)
     sig = "endpoint=" + ep
     d = models_dir or os.path.join(_REPO, "models")
     for p in (os.path.join(d, str(model)), os.path.join(d, str(model) + ".gguf")):
         try:
-            st = os.stat(p)
-            return sig + "::file=%s,%d,%d" % (os.path.basename(p), st.st_size, int(st.st_mtime))
-        except OSError:
+            # A name that is not a regular file here (an endpoint tag like "qwen3:8b", a name Windows rejects with
+            # EINVAL, a directory) is not a local artifact: the next candidate, then 'unknown', as before A416.
+            if not os.path.isfile(p):
+                continue
+        except (OSError, ValueError):
             continue
+        key = os.path.abspath(p)
+        try:
+            with open(p, "rb") as f:
+                before, change_ns = _change_stamp(f)
+                memo = _ARTIFACT_MEMO.get(key)
+                if change_ns is not None and memo is not None and memo[0] == before and not _strict_hash():
+                    digest = memo[1]
+                else:
+                    started_ns = time.time_ns()
+                    digest = _hash_open_file(f)
+                    after, change_after = _change_stamp(f)
+                    if after != before:          # do not key a verdict to bytes seen changing mid-read
+                        _ARTIFACT_MEMO.pop(key, None)
+                        return sig + "::artifact=unstable"
+                    if change_ns is not None and change_after is not None and started_ns - change_ns > _RACY_NS:
+                        _ARTIFACT_MEMO[key] = (before, digest)
+                    else:
+                        _ARTIFACT_MEMO.pop(key, None)
+            return sig + "::file=" + os.path.basename(p) + ",sha256=" + digest
+        except OSError:                          # a regular file we could not read: never cache against it
+            _ARTIFACT_MEMO.pop(key, None)
+            return sig + "::artifact=unreadable"
     return sig + "::artifact=unknown"
 
 

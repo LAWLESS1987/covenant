@@ -120,5 +120,48 @@ finally:
 check("CR1.16 the guard: a node on his live file -> allowed; a test on it -> refused; a test on its own file -> allowed",
       (as_node, as_test, as_test_own) == (False, True, False), (as_node, as_test, as_test_own))
 
+# --- A416 (2026-11-07, ported from Codex's PR #9): one memory per caller and privacy mode ---
+# /m/agent passes conversation_scope(caller, private); each scope keeps its own seen-set, encoder topics and log.
+sa = CR.conversation_scope("caller-a", True)
+sb = CR.conversation_scope("caller-b", True)
+sap = CR.conversation_scope("caller-a", False)
+scoped_state = os.path.join(TMP, "scoped.json")
+scoped_enc = os.path.join(TMP, "scoped-enc.json")
+scoped_log = os.path.join(TMP, "scoped.jsonl")
+check("CR1.17 a private first topic cues", CR.cue_line(A, scoped_state, scoped_log, scope=sa) == CR.LINE)
+check("CR1.18 its own repeat stays quiet", CR.cue_line(A, scoped_state, scoped_log, scope=sa) is None)
+check("CR1.19 another caller has an independent seen-set", CR.cue_line(A, scoped_state, scoped_log, scope=sb) == CR.LINE)
+check("CR1.20 the same caller's ordinary mode has an independent seen-set",
+      CR.cue_line(A, scoped_state, scoped_log, scope=sap) == CR.LINE)
+CR.recall_line(A, scoped_enc, scope=sa)
+check("CR1.21 another caller cannot recall a private topic", CR.recall_line(B, scoped_enc, scope=sb) is None)
+check("CR1.22 the ordinary mode cannot recall a private topic", CR.recall_line(B, scoped_enc, scope=sap) is None)
+rs = CR.recall_line(B, scoped_enc, scope=sa)
+check("CR1.23 own private recall still works (both ways: the partition is not vacuously quiet)",
+      bool(rs) and rs.startswith("This connects to an earlier topic:"), repr(rs))
+check("CR1.24 scoped logging writes the scope's own log and leaves the shared log absent",
+      not os.path.exists(scoped_log) and os.path.isfile(CR._scoped_path(scoped_log, sa)))
+legacy_bytes = open(enc, "rb").read()
+check("CR1.25 legacy shared topics are not imported into a partition", CR.recall_line(B, enc, scope=sa) is None)
+check("CR1.26 legacy shared topics are not rewritten", open(enc, "rb").read() == legacy_bytes)
+check("CR1.27 an invalid scope produces no advisory", CR.cue_line(A, scoped_state, scoped_log, scope="") is None)
+check("CR1.28 a scope cannot traverse directories",
+      os.path.dirname(CR._scoped_path(scoped_state, "../../outside")) == TMP)
+check("CR1.29 the scope name carries no caller text", "caller-a" not in CR._scoped_path(scoped_state, sa))
+os.environ["COVENANT_VERDICT_CACHE_OFF"] = "1"
+try:
+    ks = (CR.cue_line(NEW_B + " glaciers", scoped_state, scoped_log, scope=sb), CR.recall_line(B, scoped_enc, scope=sa))
+finally:
+    del os.environ["COVENANT_VERDICT_CACHE_OFF"]
+check("CR1.30 the kill switch silences a scoped reflex too", ks == (None, None), ks)
+live_scoped = (CR._scoped_path(live_state, sa), CR._scoped_path(live_enc, sa))
+check("CR1.31 A401 holds under a scope: default (live) paths are quiet and create no live partition",
+      CR.cue_line(FRESH, scope=sa) is None and CR.recall_line(FRESH, scope=sa) is None
+      and not any(os.path.exists(p) for p in live_scoped), live_scoped)
+check("CR1.32 Tetsu's wording and thresholds are as he chose them (A380/A381), not moved by the partition",
+      (CR.LINE, CR.RECALL_LINE, CR.MIN_CONTENT, CR.SIG_WORDS, CR.ENC_N, CR.RECALL_STRONG, CR.RECALL_MARGIN,
+       CR.RECALL_CAP) == ("This input seems novel; consider carefully before proceeding.",
+                          "This connects to an earlier topic: %s.", 3, 3, 64, 0.75, 0.08, 300))
+
 print("\nCR1: %d/%d passed" % (n_total - n_fail, n_total))
 sys.exit(1 if n_fail else 0)
