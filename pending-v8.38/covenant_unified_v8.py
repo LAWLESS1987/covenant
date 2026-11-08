@@ -9342,7 +9342,10 @@ class CovenantAPI:
             _cues = []
             try:
                 _cr = importlib.import_module("covenant_tetsu_conv_reflex")
-                for _line in (_cr.cue_line(text), _cr.recall_line(text)):   # A380 novelty + A381 recall
+                # A416: the reflex keeps the same caller boundary as agent_history, plus the privacy mode, so one
+                # caller's or a private ask's topics never reach another's prompt. Legacy shared state is kept, not migrated.
+                _cr_scope = _cr.conversation_scope(addr, private)
+                for _line in (_cr.cue_line(text, scope=_cr_scope), _cr.recall_line(text, scope=_cr_scope)):   # A380 novelty + A381 recall
                     if _line:
                         _cues.append(_line)
             except Exception as _cre:                             # noqa: BLE001
