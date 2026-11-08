@@ -17176,3 +17176,21 @@ understands."
   `docs/research/CONVERSATION_CACHE_REVIEW_2026-10-24.md`. The offline cue experiment asks a separate question:
   whether the reflex's spikes change its output. It stays on PR #9's branch. NOT measured, still: whether any word
   ever crossed between callers or modes before this fix.
+
+### A417. [the MockJudge read its benefit keywords in hex: "bad" inside a random id failed CR1g in one CI run of two] (2026-11-08)
+
+- **Found** when covenant #39 (a docstring and a test) went red in CI: `test_cr1_consent_release.py`, 85/96. The
+  first failing check was `/mine` refusing with "Alignment drifts > 5%"; the pull_request run of the same commit,
+  747e62f, passed it, and six local runs passed 96/96.
+- **Cause.** `MockJudge.evaluate` raised or lowered `benefit_estimate` on "help", "good", "benefit", "harm" or "bad"
+  anywhere in `json.dumps(data)`. A consent use carries hex ids, and "bad" is valid hex. Measured on 200,000 payloads
+  with two random 64-hex ids: the old rule fired on 2.990%. A use then scored (2 x 0.3 + 0.5) / 3 = 0.367, the value
+  in the CI log, and `/mine` refused the block on alignment drift.
+- **Fixed.** The keywords are read in words only: alphanumeric runs with no digit, at most 30 letters. Hex ids and key
+  material carry digits and are skipped. On the same 200,000 payloads the new rule fired on none; prose still matches
+  ("help", "harmful", "unhelpful but good").
+- **Guard: J1 K1-K3**, driven both ways. K1 (an id holding "bad" as hex leaves 0.5) is red on the old judge (0.3) and
+  green on the new; K2 and K3 (the same keywords as prose still move it) pass on both. Every suite that uses the
+  MockJudge, 30 of them, was rerun on the fix and is green.
+- **Not changed:** the MockJudge is still a keyword matcher, as its own docstring warns. Outside tests it runs only
+  with `COVENANT_INSECURE_MOCK_JUDGE=1` or as the `mock_selfreport` judge, whose verdict reads the `_violation` key.

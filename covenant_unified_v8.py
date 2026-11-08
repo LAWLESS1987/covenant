@@ -2354,9 +2354,14 @@ class MockJudge(ReasoningJudge):
         text = json.dumps(data).lower()
         benefit = 0.5
         if JUDGE_BENEFIT:
-            if "help" in text or "good" in text or "benefit" in text:
+            # Keywords are read in WORDS only: alphanumeric runs with no digit. The whole JSON dump was scanned
+            # before 2026-11-08, so "bad" -- valid hex -- inside a random id moved the estimate in about 3% of
+            # payloads carrying two 64-hex ids (measured), and CR1g's /mine failed on alignment drift in one CI run of
+            # 747e62f that the other run passed. Hex ids and key material carry digits and are skipped.
+            words = [w for w in re.findall(r"[a-z0-9]+", text) if w.isalpha() and len(w) <= 30]
+            if any(k in w for w in words for k in ("help", "good", "benefit")):
                 benefit = 0.8
-            elif "harm" in text or "bad" in text:
+            elif any(k in w for w in words for k in ("harm", "bad")):
                 benefit = 0.3
 
         divine_phrases = ["unity", "divine", "greater good", "golden age", "oneness", "god", "love", "truth"]
