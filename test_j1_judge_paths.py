@@ -359,6 +359,26 @@ def section_s():
           built is not None, why)
 
 
+def section_k():
+    """K: the MockJudge's benefit keywords read words, not hex (2026-11-08). "bad" is valid hex, so scanning the whole
+    JSON dump moved the estimate on random ids (about 3% of payloads with two 64-hex ids) and made CR1g's /mine fail
+    on alignment drift in one CI run of 747e62f. Driven both ways: ids that contain the keywords as hex leave 0.5, and
+    the same keywords as prose still move it."""
+    if not cov.JUDGE_BENEFIT:
+        skip("K1-K3", "JUDGE_BENEFIT is off in this build")
+        return
+    j = cov.MockJudge()
+
+    def est(data):
+        return j.evaluate(data, cov.DIVINE_PRINCIPLES).benefit_estimate
+    hexy = {"kind": "consent_use", "declaration": "0bad" + "7" * 60, "owner": "1bad2bad" + "9" * 56}
+    check("K1 an id holding 'bad' as hex does not move the benefit estimate", est(hexy) == 0.5, est(hexy))
+    check("K2 ...and prose saying 'this will help' still raises it", est({"message": "this will help"}) == 0.8,
+          est({"message": "this will help"}))
+    check("K3 ...and prose saying 'a bad plan' still lowers it", est({"message": "a bad plan"}) == 0.3,
+          est({"message": "a bad plan"}))
+
+
 def main():
     print(f"source: {cov.COVENANT_VERSION}  {cov.CORE_SOURCE_SHA256[:12]}  "
           f"{cov.CORE_SOURCE_LINES} lines   ledger={HAS_LEDGER} "
@@ -368,6 +388,7 @@ def main():
     section_m()
     section_d()
     section_s()
+    section_k()
     print(f"\nJ1: {PASS}/{PASS + FAIL} passed, {SKIP} skipped")
     sys.exit(0 if FAIL == 0 else 1)
 
