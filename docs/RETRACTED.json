@@ -2582,6 +2582,23 @@
    "records": [
     "docs/KNOWN_ISSUES.md"
    ]
+  },
+  {
+   "id": "A416-CACHE-ANY-REAL-CHANGE-2026-11-07",
+   "claim": "That folding a local model file's (size, mtime) into the verdict cache key makes any real change to the artifact miss and re-judge (covenant_verdict_cache.py, A383 comment).",
+   "refuted_by": "A416. The key reads the file's name, size and whole-second mtime (covenant_verdict_cache.py:123 at 1c789f3); a same-size replacement with its timestamp restored keeps the key, so old verdicts are reused for new weights. Named by Codex in PR #9 (2026-10-24, still open, where its own tombstone A383-CONTENT-IDENTITY waits); checked against main 2026-11-07.",
+   "truth": "Size and mtime catch ordinary edits, not every change. Content identity needs the bytes (PR #9 hashes them, at an unmeasured I/O cost on large GGUF files). Until a fix lands the comment stays in the code beside a line citing this id. A remote server's loaded weights stay unknowable from here either way.",
+   "verbatim": [
+    "any real change -- even same-name -- misses and re-judges (fail-closed)"
+   ],
+   "patterns": [
+    "any real change -- even\\s+(?:#\\s*)?same-name -- misses and re-judges"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "covenant_verdict_cache.py"
+   ],
+   "note_on_allow": "The claim is still in the code at covenant_verdict_cache.py, kept as written with a citation line beneath it; the as-written state is branch a416-cache-claim-as-written-2026-11-07 (main at 1c789f3). The fix that removes it must update this entry."
   }
  ]
 }

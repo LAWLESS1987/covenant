@@ -113,6 +113,8 @@ def basis_version(paths=DEFAULT_BASIS_PATHS, root=None):
 # a stable 'artifact=unknown' -- no regression, and the endpoint still catches an endpoint change. The residual
 # (same endpoint + same name + changed bytes on a server we cannot inspect) is NOT closed, by construction, exactly
 # as the study said: discovering a remote artifact's identity is a separate, unsolved problem.
+# RETRACTED in part (A416-CACHE-ANY-REAL-CHANGE-2026-11-07): (size, whole-second mtime) is not every real change -- a
+# same-size replacement with its timestamp restored keeps the key. The fix proposed in PR #9 hashes the file's bytes.
 def artifact_version(model, endpoint=None, models_dir=None):
     ep = os.environ.get("COVENANT_LOCAL_JUDGE_URL", "") if endpoint is None else str(endpoint)
     sig = "endpoint=" + ep
