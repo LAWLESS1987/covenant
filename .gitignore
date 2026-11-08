@@ -589,3 +589,8 @@ ops/students/RETIRED.jsonl
 ops/study/web_sources.jsonl
 ops/HF_JANGWOO_REPLY4_DRAFT_2026-11-02.md
 ops/HIGHWAY_AUTONOMY_LOOSEN_2026-11-02.md
+
+# retired-student-model tombstone snapshots: kept on disk + on the local backup branch,
+# not shipped on main (keeps the canonical branch lean / joinable). A dedicated archive
+# store is the proper long-term home (PR #42 review, 2026-11-08).
+ops/students/fallback_model*.json
