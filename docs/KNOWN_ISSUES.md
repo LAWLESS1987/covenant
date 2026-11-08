@@ -17139,6 +17139,11 @@ understands."
   public repository. #2 rests on a report and, by its own account, not on a measurement.
 - **FIXED, same day: PR #9 ported onto main at b302214** (branch `claude/a416-scope-cache-identity`). The header's
   "OPEN" was true when written and stays as written. PR #9 is closed as superseded once the port lands.
+- **Correction, 2026-11-08 (tombstone A416-PORT-AT-B302214-2026-11-08):** the commit named in the bullet above is
+  wrong. b302214 is covenant #37's merge, the record-only commit the port branch was cut from (it touched
+  covenant_verdict_cache.py only to add a two-line comment). The port itself landed at 3969095, the merge of covenant
+  #38, at 2026-11-08T02:32:46Z. The sentence was written before #38 merged, when its merge commit did not exist yet.
+  The bullet above stays as written; branch a416-port-sha-as-written-2026-11-08 (at 3969095) holds it.
 - **Defect 1 fixed: one memory per caller and privacy mode.** `/m/agent` now passes
   `conversation_scope(addr, private)` to both reflex calls. Each scope keeps its own seen-set, encoder topics and log,
   in files named by the SHA-256 of the scope, so no caller text is in a filename. Tetsu's wording, thresholds and kill
