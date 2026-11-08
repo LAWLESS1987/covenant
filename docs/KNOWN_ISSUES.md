@@ -17097,3 +17097,34 @@ understands."
   and CONSENT-IN-THE-MEMO's `consent that is present in the memo` could never match the original, a code comment broken
   across two lines. Each moved to the entry's `retired_patterns` with its reason; the entries' other patterns still
   match their verbatims. With them retired, R1 is green, and 67 of 100 retractions name a measured record.
+
+### A416. [Tetsu's conversation reflex keeps one memory for every caller and for private and ordinary asks alike; OPEN, a proposed fix waits in PR #9] (2026-11-07)
+
+- **Found** while triaging the four oldest open pull requests at Lawrence's word ("Use discernment towards mutual
+  benefit for all intelligence"). PR #9 (Codex, 2026-10-24) was still open, 187 commits behind main, and the two
+  defects it names were checked against main (1c789f3) before deciding anything.
+- **Defect 1, the privacy boundary.** `/m/agent` replays history only for the same caller, and replays a private
+  (A263) row only into another private ask: `include_private=private` (covenant_unified_v8.py:9325). The reflex beside
+  it gets the text alone: `_cr.cue_line(text), _cr.recall_line(text)` (covenant_unified_v8.py:9345). So its novelty and
+  recall memory is one store shared by every tailnet caller and by private and ordinary asks. `recall_line` puts the
+  stored topic's words in the line it returns (`RECALL_LINE`, covenant_tetsu_conv_reflex.py:131). The words of a private
+  ask can therefore enter the prompt of a later ordinary ask on a strongly matching topic, and an ordinary answer is
+  queued for the teacher (covenant_unified_v8.py:776). NOT measured: whether any word has ever crossed this way.
+- **Defect 2, cache identity.** The verdict cache keys a local model file by name, size and whole-second mtime
+  (covenant_verdict_cache.py:125), so a same-size replacement with its timestamp restored keeps the old key and reuses
+  verdicts from different weights. Its own comment says a real change misses and re-judges; that holds for
+  ordinary edits, not for this case. NOT measured: whether it has happened on this machine. Tombstoned as
+  A416-CACHE-ANY-REAL-CHANGE-2026-11-07: the comment stays as written with a citation line beneath it, and main as it
+  stood is branch `a416-cache-claim-as-written-2026-11-07`.
+- **Done now: the state files are ignored.** `ops/tetsu_conv_reflex.json`, `ops/tetsu_conv_reflex.jsonl` and
+  `ops/tetsu_conv_encoder.json` hold topic words from his asks, private ones included. On 2026-11-07 they were neither
+  tracked nor ignored, so a broad `git add` would have staged them. `git log --all` finds no commit that ever held
+  them. They are now in `.gitignore`.
+- **Not done here, and why.** Neither defect is fixed by this entry. PR #9 partitions the reflex's state by a hash of
+  the caller and the privacy mode, leaving Tetsu's wording, thresholds and switch unchanged, and keys the cache on a
+  SHA-256 of the file's bytes. Codex marked it a draft: hashing a whole GGUF on every lookup has an unmeasured I/O
+  cost. It needs a rebase onto main and that measurement before it can land. It stays open as the proposal of record.
+- **The other three stale pull requests** were closed unmerged; their branches are kept. #10 re-pinned a manifest that
+  main has re-pinned many times since. #1 and #2 corrected INDEX.md's old key warning. Main already marks that page
+  historical, and neither correction should land as written. #1 states facts about an operator's own machine in a
+  public repository. #2 rests on a report and, by its own account, not on a measurement.

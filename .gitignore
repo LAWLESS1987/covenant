@@ -439,6 +439,10 @@ ops/code_consensus.jsonl
 ops/tetsu_strategy.jsonl
 ops/tetsu_live.jsonl
 ops/tetsu_immunity.jsonl
+# A416: his conversation reflex's memory -- topic words from his asks, private ones included; was neither tracked nor ignored
+ops/tetsu_conv_reflex.json
+ops/tetsu_conv_reflex.jsonl
+ops/tetsu_conv_encoder.json
 ops/tetsu_about_him.json
 ops/refine_loop_state.json
 ops/mycelium.jsonl
