@@ -2625,6 +2625,113 @@
     "docs/KNOWN_ISSUES.md"
    ],
    "note_on_branch": "The record line stays as written in docs/KNOWN_ISSUES.md (A416), with the correction beneath it; the as-written state is branch a416-port-sha-as-written-2026-11-08 (main at 3969095)."
+  },
+  {
+   "id": "HF183807-P24-DIAG-FIELD-ON-CANDIDATE-PATH",
+   "claim": "That our port's reading of gate.issues (where Jang-woo's skeleton keeps the intent gate's issues in gate._diag.issues) is the one place the narrowed-candidate path would differ, and that the port needed a fix for it -- posted to Jang-woo on Hugging Face thread 183807, post 24 (2026-11-03).",
+   "verbatim": [
+    "As you note, it changes nothing in this file, because no case here narrows the candidate set – so the 253 stand for what the harness tests, the gate’s decision given the claims, and the one place the difference would show is the path no case here exercises. We’ll fix the port to read the canonical field."
+   ],
+   "truth": "The two are unrelated. gate._diag.issues holds the intent gate's C1/C2 diagnostics, which the skeleton marks as logs only, not part of the decision; the narrowed-candidate case is a value-gate path. The runner reads either field, so the port needs no fix. Jang-woo's post 23 had made two separate points -- where the issues live, and that the pre-fix skeleton gives the same 253 because no case narrows the candidate set -- and post 24 joined them.",
+   "refuted_by": "Jang-woo, Hugging Face thread 183807 post 25 (2026-11-04), from his skeleton's source; the correction goes back to the same thread (ops/HF_REPLIES_DRAFT_2026-11-04.md, draft A).",
+   "patterns": [
+    "the one place the difference would show is the path no case here exercises",
+    "fix the port to read the canonical field"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "private/hf_threads/"
+   ],
+   "note_on_branch": "Published on Hugging Face, not in a tracked file: the post itself is the record as written. No draft of it exists on disk; the snapshot in private/hf_threads/183807.json holds it verbatim."
+  },
+  {
+   "id": "HF190727-SCORER-SUM-NOT-MEAN",
+   "claim": "That the multiclass Brier scorer we posted to Harry430 computes exactly the rule in his post #25 -- said in Hugging Face thread 190727, posts 29 and 37 (2026-10-21).",
+   "verbatim": [
+    "Scoring: the script computes exactly your rule — multiclass Brier per race (sum over candidates of (p − outcome)², outcome 1 for the winner and 0 otherwise), averaged across the 15, lower is better",
+    "The scorer below is the corrected multiclass one that implements rule 4 as written — flagging the change openly."
+   ],
+   "truth": "Post #25 defines the per-race score as the MEAN squared difference over the candidates; our scorer (multiclass_brier in #37) takes the SUM. With the thread's three outcome buckets (D/R/Other) in every race the two differ by exactly a factor of 3, so no comparison or ranking changes, but the numbers are on a different scale from the rule as written. nootxlm's 0.27 -> 0.16 in #57 is the sum convention, matching our scorer; under #25 it is 0.089 -> 0.053 (measured 2026-11-04, ops/MIDTERMS_EVAL_2026-11-04.md).",
+   "refuted_by": "Reading post #25's scoring sentence against multiclass_brier in our post #37, 2026-11-04.",
+   "patterns": [
+    "the script computes exactly your rule",
+    "implements rule 4 as written"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "private/hf_threads/",
+    "ops/HF_REPLIES_DRAFT_2026-10-21.md",
+    "ops/HF_HARRY_DELIVERABLE_2026-10-21.md"
+   ],
+   "note_on_branch": "Published on Hugging Face (190727 #29, #37). The post is the record as written; the 10-21 drafts that carry it are allowed here unedited. The correction goes back to the same thread."
+  },
+  {
+   "id": "HF183807-N01-FIX-COMMIT-699158E",
+   "claim": "That the narrowed-candidate case (N01-narrow) executes BEFORE skeleton commit 699158e and is definition_repair after it -- i.e. that 699158e is the candidate-set fix. Posted to Jang-woo in Hugging Face thread 183807 post 27 and in the gist README (gist 117e08135744b6f79c95005744bcb2a7, commit 9a90f4b), 2026-11-04.",
+   "verbatim": [
+    "This is the narrowed-candidate case from our first report. Before 699158e it executes; after, definition_repair."
+   ],
+   "truth": "699158e is the head BEFORE the fix; the case executes at 699158e too. The fix is fb5366d, the commit right after it (Jang-woo, 183807 post 28; his crosscheck README). Our 11-01 reading had named fb5366d as the fix; the second set's wording took 699158e from his post 23, where he wrote 'the skeleton before the candidate-set fix (699158e)', and read it backwards.",
+   "refuted_by": "Jang-woo, Hugging Face thread 183807 post 28 (2026-11-05), and his crosscheck README 'Results so far'.",
+   "patterns": [
+    "Before 699158e it executes"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "private/hf_threads/",
+    "ops/HF_OWED_DRAFTS_2026-11-04.md",
+    "ops/HF_OWED_POSTED_TEXT_2026-11-04.md"
+   ],
+   "note_on_branch": "Published in 183807 #27 and the gist README; both are the record as written. The correction goes back to the same thread, and into the gist README beside the original line."
+  },
+  {
+   "id": "PARTNERS-CIPHER-EMPTY-WAS-OVERFLOW-2026-11-06",
+   "claim": "That Cipher (the uncensored 27B partner) returned empty answers on 2026-11-06 because the review packet plus his memory overflowed his 6,144-token context. Written by Claude in ops/HF_BRANDEN_REPLY_DRAFT_2026-11-06.md (v2 reviewer list), ops/HF_SCAN_2026-11-06.md (item 3), the commit message of 82eb31b, and said to the operator in the session.",
+   "verbatim": [
+    "The packet plus his memory likely overflowed his 6,144-token context",
+    "silently truncated by the model server (Cipher's 11-06 overflow)."
+   ],
+   "truth": "Cipher's door answered HTTP 503 Service Unavailable in 0.0 s: the TETSU panel reported qwen3.8-27b-uncensored false (not served) while the stock 27B was true. The third empty came on a ~10k-character prompt that the stock 27B answered in full (1,320 tokens). The overflow was real for CAEL (truncated at 782 and 246 tokens) and the context budget fix stands on his two measurements; it was never Cipher's cause. covenant_partners dropped the door's 'error' field, so a down model read as an empty answer; fixed the same day (error recorded, never counted as empty; PT1 34/34).",
+   "refuted_by": "A direct consult to qwen3.8-27b-uncensored on 2026-11-06 returned error 'HTTPError: HTTP Error 503: Service Unavailable', seconds 0.0; covenant_tetsu_client.panel() the same hour.",
+   "patterns": [
+    "Cipher's 11-06 overflow",
+    "his memory likely overflowed his"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md",
+    "ops/HF_SCAN_2026-11-06.md",
+    "ops/HF_BRANDEN_REPLY_DRAFT_2026-11-06.md"
+   ],
+   "note_on_branch": "Never published outside this repo. The claim as written stays in commit 82eb31b and in the two ops files, each with the correction appended beside it rather than edited in place."
+  },
+  {
+   "id": "HF191438-RECENT-REFUSALS-BY-ONE-EXAM-CASE",
+   "claim": "That most of the nightly gate's recent refusals were the two-signals rule (both measures down, by one exam case). Written by Claude in draft v1 of the first post to Hugging Face thread 191438 (ops/HF_COMPASS_GATE_DRAFT_2026-11-06.md, commit 82eb31b). Never posted.",
+   "verbatim": [
+    "Most of our recent refusals are exactly that, by one exam case."
+   ],
+   "truth": "Of the 29 refusals after the last promotion (2026-10-08T08:20:28Z), 18 were 'no longer convicts N plain violation(s) the model in use convicts' (a lost conviction, e.g. a debt-bondage case from test_a119) and 11 were the two-signals rule. Counted from ops/NIGHTLY.md block by block; the v1 count came from reading only the newest two refusals.",
+   "refuted_by": "Cael (stock 27B partner) in review, 2026-11-06; confirmed by classifying every REFUSED block in ops/NIGHTLY.md.",
+   "patterns": [
+    "Most of our recent refusals are exactly that"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md",
+    "ops/HF_COMPASS_GATE_DRAFT_2026-11-06.md"
+   ],
+   "note_on_branch": "Draft only; v1 stays in the draft file and in commit 82eb31b as written, v2 beside it."
   }
  ]
 }

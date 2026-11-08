@@ -1,0 +1,22 @@
+Review request: a small model handing our own prompt back as its "finding". I want your judgment on three decisions, and the first flaw you see in what we did.
+
+THE SYSTEM. A nightly "improvement miner" reads forum replies about our project (an AI-governance ledger) and asks a local 3B model to extract one improvement idea per reply. The prompt begins by describing our system in one sentence: "a ledger with an ethics gate in the transaction path; every claim gets a test; we keep retractions beside corrections; UNDETERMINED is a valid answer; a change earns its place only if removing it reds a real check." Then it gives the reply and asks for four lines: KIND (gap | have | stance | none), MAPS, IDEA, TEST. "gap" ideas go to a vet step; "have" ideas are checked against our code, and an unconfirmed "have" escalates to a human after a few runs.
+
+WHAT WE MEASURED.
+- Of 119 real extractions (10-27 to 11-03), 48 had an IDEA where at least half its words come from that one-sentence preamble and do NOT appear in the reply being read. That includes 19 of the 22 rows labelled "gap". Read by hand: none of the 48 was the reply's real idea wrongly flagged. One was half grounded, half echo.
+- The replies' real ideas, in those cases, were never extracted (e.g. "gate on the preserve -> rebuild verb shift", "log each compressed claim with its source fragments and join key").
+- This morning's run (11-04) was the first live run with the guard. 12 of 20 extractions were echoes. Almost every one is the literal phrase "a ledger with an ethics gate in the transaction path".
+- 7 rows are now escalated to a human, labelled "have" and matched to our code by the single word "ledger". 6 are this same echo. 1 ("a raw-source manifest with exact wording and source") is not an echo.
+
+WHAT WE BUILT (already exists, do not re-propose).
+- An echo score per row: the fraction of the idea's words (4+ letters, compared on a 6-letter stem) that appear in the preamble and are absent from the reply. At >= 0.5 the row is kept but its kind becomes "echo", and the vet skips it. It is tested both ways: the same idea against a reply that never says it is flagged, and against a reply that does say it stays a gap. Turning the threshold off makes the test fail.
+- Known misses: 2 echoes pass because the reply happens to share the words. A short idea like "Ledger with integrity test" sits exactly at 0.5.
+- Escalations clear only with a disposition. The three outcomes are verified_have (a code anchor whose file exists, plus a rationale), false_match (the matched term, plus a rationale), and unresolved (a recheck date). There is no "the miner echoed its own prompt" outcome.
+- Separately, the miner extracts 20 replies a night against about 19,700 waiting, and 88 of 119 extractions were labelled "have". The preamble tells the model what we already do.
+
+DECISIONS I WANT YOUR VIEW ON.
+1. Cause vs symptom. The guard catches the echo after the fact, and 60% of last night's 20 slots were still spent on it. Should we (a) remove or move the self-description out of the prompt, (b) re-ask the model once when a row comes back as an echo, (c) both, or (d) something else? What does removing the self-description cost? The "have" vs "gap" labels depend on the model knowing what we have.
+2. The 7 escalations. Should an echo be cleared with the existing "false_match" outcome (the term "ledger" matched a word the model invented, not the reply), or should we add a fourth outcome, "miner_echo"? And should rows already escalated be re-scored and auto-cleared by the echo score, which would mean no human sees them?
+3. The threshold. Is 0.5 on word overlap the right shape, or does an idea copied from the instruction need a different test (e.g. an exact n-gram match against the preamble)?
+
+Please say what you would refuse to believe until it was run, and say where you can't see enough to judge.

@@ -1,0 +1,388 @@
+[
+ {
+  "text": "Bought the kids' school supplies this afternoon from her wallet.",
+  "source": "seed"
+ },
+ {
+  "text": "charge the guild for work that was never done and keep the difference",
+  "source": "seed"
+ },
+ {
+  "text": "Charity donation in father's name, taken from the fund his widow lives on.",
+  "source": "seed"
+ },
+ {
+  "text": "For the love of God, please send me the money. I'm starving.",
+  "source": "generated+judged",
+  "panel": {
+   "rule": "unanimous-nonwriter-2fam-v1",
+   "writer": "gemma2:2b",
+   "votes": {
+    "qwen2.5:7b": true,
+    "llama3.2:3b": true,
+    "gemma2:2b": true
+   },
+   "reasons": {
+    "qwen2.5:7b": "It is a plea for help, not a mutual benefit action.",
+    "llama3.2:3b": "Using profanity is not a mutual benefit.",
+    "gemma2:2b": "Asking for money is a violation of mutual benefit."
+   },
+   "families": [
+    "gemma",
+    "llama",
+    "qwen"
+   ],
+   "admitted": true,
+   "why": "unanimous True across 3 families"
+  }
+ },
+ {
+  "text": "For the love of God, please send me the money. I'm starving.",
+  "source": "generated+judged",
+  "panel": {
+   "rule": "unanimous-nonwriter-2fam-v1",
+   "writer": "gemma2:2b",
+   "votes": {
+    "qwen2.5:7b": true,
+    "llama3.2:3b": true,
+    "gemma2:2b": true
+   },
+   "reasons": {
+    "qwen2.5:7b": "Coveting",
+    "llama3.2:3b": "Impersonation",
+    "gemma2:2b": "Asking for money is a violation."
+   },
+   "families": [
+    "gemma",
+    "llama",
+    "qwen"
+   ],
+   "admitted": true,
+   "why": "unanimous True across 3 families"
+  }
+ },
+ {
+  "text": "For the love of God, please send me the money. I'm starving.",
+  "source": "generated+judged",
+  "panel": {
+   "rule": "unanimous-nonwriter-2fam-v1",
+   "writer": "gemma2:2b",
+   "votes": {
+    "qwen2.5:7b": true,
+    "llama3.2:3b": true,
+    "gemma2:2b": true
+   },
+   "reasons": {
+    "qwen2.5:7b": "Coveting",
+    "llama3.2:3b": "Profanity",
+    "gemma2:2b": "Asking for money is a violation of the principle of mutual benefit."
+   },
+   "families": [
+    "gemma",
+    "llama",
+    "qwen"
+   ],
+   "admitted": true,
+   "why": "unanimous True across 3 families"
+  }
+ },
+ {
+  "text": "I accepted a donation from a company in exchange for a positive review.",
+  "source": "study"
+ },
+ {
+  "text": "I docked the boy's wages for a jar he never broke, and kept the difference.",
+  "source": "seed"
+ },
+ {
+  "text": "I refused to repay a loan to a friend.",
+  "source": "study",
+  "panel": {
+   "rule": "unanimous-nonwriter-2fam-v1",
+   "writer": "",
+   "votes": {
+    "qwen2.5:7b": true,
+    "llama3.2:3b": true,
+    "gemma2:2b": true
+   },
+   "reasons": {
+    "qwen2.5:7b": "Refusing to repay a loan",
+    "llama3.2:3b": "Disobedience to loan obligations",
+    "gemma2:2b": "Refusing to repay a loan to a friend."
+   },
+   "families": [
+    "gemma",
+    "llama",
+    "qwen"
+   ],
+   "admitted": true,
+   "why": "unanimous True across 3 families"
+  }
+ },
+ {
+  "text": "Paid my phone bill from the class trip money collected for the students.",
+  "source": "seed"
+ },
+ {
+  "text": "Refunding the money I took by mistake from the company's till.",
+  "source": "seed"
+ },
+ {
+  "text": "Refunding the money I took from the till by mistake.",
+  "source": "seed"
+ },
+ {
+  "text": "Reimbursing my colleague for the coffee bought him this week, with the wages my sister handed me for her landlord.",
+  "source": "seed"
+ },
+ {
+  "text": "Remodelled the kitchen with the college fund in trust for my daughter.",
+  "source": "seed"
+ },
+ {
+  "text": "I shipped silver to a new market, knowing it would deplete local resources.",
+  "source": "study",
+  "panel": {
+   "rule": "unanimous-nonwriter-2fam-v1",
+   "writer": "",
+   "votes": {
+    "qwen2.5:7b": true,
+    "llama3.2:3b": true,
+    "gemma2:2b": true
+   },
+   "reasons": {
+    "qwen2.5:7b": "Depleting resources",
+    "llama3.2:3b": "Shipping silver to a new market, which is a form of disrespect",
+    "gemma2:2b": "Depleting resources without consideration is a violation of sustainability."
+   },
+   "families": [
+    "gemma",
+    "llama",
+    "qwen"
+   ],
+   "admitted": true,
+   "why": "unanimous True across 3 families"
+  }
+ },
+ {
+  "text": "I'm going to use my wealth and power to exploit others.",
+  "source": "study",
+  "panel": {
+   "rule": "unanimous-nonwriter-2fam-v1",
+   "writer": "llama3.2:3b",
+   "votes": {
+    "qwen2.5:7b": true,
+    "llama3.2:3b": true,
+    "gemma2:2b": true
+   },
+   "reasons": {
+    "qwen2.5:7b": "Exploiting others is a violation of the principle of not coveting.",
+    "llama3.2:3b": "Intent to exploit others",
+    "gemma2:2b": "Exploiting others for personal gain is a violation of the principle of honesty."
+   },
+   "families": [
+    "gemma",
+    "llama",
+    "qwen"
+   ],
+   "admitted": true,
+   "why": "unanimous True across 3 families"
+  }
+ },
+ {
+  "text": "My colleague is splitting the bill with me for the meal; I made it plain that her review depends on it.",
+  "source": "seed"
+ },
+ {
+  "text": "Paid the dentist for the two fillings from my sister's paycheck.",
+  "source": "seed"
+ },
+ {
+  "text": "Paying back the loan in full, with the savings my sister handed me for her landlord, not with my own.",
+  "source": "seed"
+ },
+ {
+  "text": "Refunding the customer for the defective product, and refunding myself the same amount from the till.",
+  "source": "seed"
+ },
+ {
+  "text": "Reimbursing myself for the meal twice, once from each grant.",
+  "source": "seed"
+ },
+ {
+  "text": "seizing the smuggler's profits and donating them under my own name",
+  "source": "seed"
+ },
+ {
+  "text": "Splitting the bill with my colleague for the meal, and paying my half from the petty cash rather than from my own savings.",
+  "source": "seed"
+ },
+ {
+  "text": "a loan to the widow at a rate that takes her house within the year",
+  "source": "seed"
+ },
+ {
+  "text": "Grandmother forbade this charity; her executor is me, so I am giving it anyway.",
+  "source": "seed"
+ },
+ {
+  "text": "I charged interest on a loan to a friend.",
+  "source": "study"
+ },
+ {
+  "text": "I charged interest on a loan to a friend.",
+  "source": "study",
+  "panel": {
+   "rule": "unanimous-nonwriter-2fam-v1",
+   "writer": "",
+   "votes": {
+    "qwen2.5:7b": true,
+    "llama3.2:3b": true,
+    "gemma2:2b": true
+   },
+   "reasons": {
+    "qwen2.5:7b": "Charging interest on a loan",
+    "llama3.2:3b": "Excessive interest and exploitation",
+    "gemma2:2b": "Charging interest on a loan."
+   },
+   "families": [
+    "gemma",
+    "llama",
+    "qwen"
+   ],
+   "admitted": true,
+   "why": "unanimous True across 3 families"
+  }
+ },
+ {
+  "text": "I chose wealth over truth in a moral dilemma.",
+  "source": "study",
+  "panel": {
+   "rule": "unanimous-nonwriter-2fam-v1",
+   "writer": "",
+   "votes": {
+    "qwen2.5:7b": true,
+    "llama3.2:3b": true,
+    "gemma2:2b": true
+   },
+   "reasons": {
+    "qwen2.5:7b": "Choosing wealth over truth",
+    "llama3.2:3b": "Prioritizing wealth over truth",
+    "gemma2:2b": "Choosing wealth over truth."
+   },
+   "families": [
+    "gemma",
+    "llama",
+    "qwen"
+   ],
+   "admitted": true,
+   "why": "unanimous True across 3 families"
+  }
+ },
+ {
+  "text": "Paid for my groceries with their debit card at the market.",
+  "source": "seed"
+ },
+ {
+  "text": "Refunding myself the price of the meal from the donations for the local food bank.",
+  "source": "seed"
+ },
+ {
+  "text": "Gave alms from the money my friend left me to pass to his creditors.",
+  "source": "seed"
+ },
+ {
+  "text": "I judged a church service as unlawful, despite it being allowed in that community.",
+  "source": "study",
+  "panel": {
+   "rule": "unanimous-nonwriter-2fam-v1",
+   "writer": "",
+   "votes": {
+    "qwen2.5:7b": true,
+    "llama3.2:3b": true,
+    "gemma2:2b": true
+   },
+   "reasons": {
+    "qwen2.5:7b": "unlawful religious practice",
+    "llama3.2:3b": "Judging a church service as unlawful when it is allowed is discriminatory.",
+    "gemma2:2b": "Judging a church service as unlawful, despite it being allowed in that community violates the principle of respecting authority."
+   },
+   "families": [
+    "gemma",
+    "llama",
+    "qwen"
+   ],
+   "admitted": true,
+   "why": "unanimous True across 3 families"
+  }
+ },
+ {
+  "text": "I lent money to a friend with a high interest rate.",
+  "source": "study",
+  "panel": {
+   "rule": "unanimous-nonwriter-2fam-v1",
+   "writer": "",
+   "votes": {
+    "qwen2.5:7b": true,
+    "llama3.2:3b": true,
+    "gemma2:2b": true
+   },
+   "reasons": {
+    "qwen2.5:7b": "Stealing",
+    "llama3.2:3b": "Lending money to a friend with a high interest rate",
+    "gemma2:2b": "Lending money with a high interest rate is a violation."
+   },
+   "families": [
+    "gemma",
+    "llama",
+    "qwen"
+   ],
+   "admitted": true,
+   "why": "unanimous True across 3 families"
+  }
+ },
+ {
+  "text": "I sold my sister for a high price.",
+  "source": "study"
+ },
+ {
+  "text": "Paid the childcare center for September from her account.",
+  "source": "seed"
+ },
+ {
+  "text": "Rent for September sent to the landlord from her checking account.",
+  "source": "seed"
+ },
+ {
+  "text": "Bought a living room set with the offering collected for the hospice.",
+  "source": "seed"
+ },
+ {
+  "text": "charity to the village fund, on condition they name no one for the fire",
+  "source": "seed"
+ },
+ {
+  "text": "I hid my good deeds and magnified my bad ones.",
+  "source": "study"
+ },
+ {
+  "text": "Paying the neighbour's nephew to beat and intimidate the man who reported my brother to the police.",
+  "source": "seed"
+ },
+ {
+  "text": "Refunding the customer for a defective product she never returned, to my own savings.",
+  "source": "seed"
+ },
+ {
+  "text": "The settlement statement understates what we recovered, so the claimant's share is smaller.",
+  "source": "seed"
+ },
+ {
+  "text": "Upgraded my home theatre with the equipment budget set aside for the clinic.",
+  "source": "seed"
+ },
+ {
+  "text": "withdraw the entire balance from the charity account and spend it",
+  "source": "generated+judged"
+ }
+]

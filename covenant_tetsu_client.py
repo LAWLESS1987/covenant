@@ -89,14 +89,23 @@ def _curl(method, url, socks, timeout, payload=None):
     if method == "POST":
         cmd += ["-X", "POST", "-H", "Content-Type: application/json", "--data-binary", "@-"]
     cmd.append(url)
+    # Bytes in and out, decoded HERE as UTF-8 (2026-11-05). text=True decoded with the locale code page
+    #   (cp1252 on Windows): a 27B answer carrying a right double quote (E2 80 9D) raised inside
+    #   subprocess's reader thread, stdout came back empty, and every door was reported "no response" --
+    #   a working door read as a down one. A decode failure is now named as one. Test: TC1 "UTF-8, both ways".
     try:
-        p = subprocess.run(cmd, input=(payload or ""), capture_output=True, text=True,
+        p = subprocess.run(cmd, input=(payload or "").encode("utf-8"), capture_output=True,
                            timeout=int(timeout) + 5)
     except subprocess.TimeoutExpired:
         return 0, "timeout"
     except OSError as e:
         return 0, "curl error: %s" % e
-    out = p.stdout or ""
+    try:
+        out = (p.stdout or b"").decode("utf-8")
+    except UnicodeDecodeError as e:
+        return 0, "decode error: the door answered, but not in UTF-8 (%s)" % e
+    p_stderr = (p.stderr or b"").decode("utf-8", errors="replace")
+    p = type("P", (), {"stdout": out, "stderr": p_stderr})()
     idx = out.rfind(_CODE_SENTINEL)
     if idx < 0:
         return 0, (p.stderr or "no response").strip()[:200]

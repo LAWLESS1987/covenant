@@ -80,11 +80,12 @@ def main():
             check("NA1[%s] a remedy touching '%s' is refused whatever class it claims, and never runs" % (w, w),
                   refused and not calls, "outcome=%s why=%s calls=%d" % (row.get("outcome"), row.get("why", "")[:60], len(calls)))
 
-        # NA1.floor: the subjects the covenant has committed to protect are all present -- fourteen, plus the ten
-        # grid words since 2026-10-30 (names the floor;
+        # NA1.floor: the subjects the covenant has committed to protect are all present -- fifteen ('grant' added
+        # 2026-11-02, NA1/A416: the authority file is never-automatic), plus the ten grid words since 2026-10-30
+        # (names the floor;
         # the behavioural cases above are what actually fail if one is dropped, but this says the intended set out loud).
         MUST = {"money", "holdings", "wallet", "trader", "venue", "order", "rule", "principle",
-                "judge", "seat", "model", "phone", "consent", "key",
+                "judge", "seat", "model", "phone", "consent", "key", "grant",
                 # grid / ICS-OT actuation subjects (2026-10-30, covenant_grid_guard.py) -- the
                 # self-heal engine proposes, never actuates the grid; pinned here as a committed floor.
                 "grid", "breaker", "relay", "feeder", "substation", "setpoint",

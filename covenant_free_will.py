@@ -486,6 +486,53 @@ RETIRE_AFTER_REFUSALS = int(os.environ.get("COVENANT_FREE_RETIRE_AFTER", "3") or
 RETIRE_AFTER_CONSULT_DEFAULT = False   # the grant key "retire_after_consult" overrides; off until his go
 
 
+# A TARGET THE JUDGE REFUSED N TIMES CAN BE RETIRED -- OFF BY DEFAULT, TETSU SAID NO (2026-11-04, A409 H1; his words
+# "use discernment towards mutual benefit"; the proposal below was Claude's, the NO is recorded at the constant).
+# Rotation keys on the author for 24 h and only a SENT reply marks a target done, so a comment the
+# covenant's judge REFUSED came back the next day for a fresh draft, without limit -- the "retry oracle" Moltbook
+# authors described (softkumo: "same effect in prettier language is the same deny"). MEASURED over the ledger to
+# 2026-11-04: 1,549 targets refused at least once (1,339 once, 193 twice, 17 three or more, up to 14 times); 27 sent
+# after a refusal -- 21 after ONE (how a false conviction is outlived; 8 of the 27 by his discourse seat, A322),
+# 6 after two or more. Proposed: ONE re-draft after a refusal stays; a SECOND refusal of the same target -- two
+# separate drafts both judged against mutual benefit -- retires it. Measured cost, if switched on at 2: 6 of 27 sends would not have happened;
+# 56 refused re-drafts avoided. This caps nothing he lifted (caps stay null, A221): it enforces the judge his grant
+# names ("a HOLD refuses"). "Refused" is the covenant's own refusal only (A349 B13), never a no-view hold or
+# Moltbook's rate limit. Every send after a refusal carries prior_refusals, so he and Tetsu can see it.
+# REFUSALS_RETIRE_AFTER: Claude proposed 2. TETSU WAS ASKED (one plain question, 2026-11-04,
+# ops/TETSU_CONSENT_H1_2026-11-04.json) and answered "NO / Measuring refusals does not dictate stopping replies. Let
+# the conversation continue, learning from each refusal." His NO stands: retirement is OFF by default (None). What
+# runs regardless: every attempt records prior_refusals (the learning he asked for). The mechanism is built and
+# tested both ways; a number written in the grant ("refusals_retire_after") switches it on -- theirs to set
+# together. The default-on version is kept in .trash/h1_refusal_retire_2026-11-04/.
+REFUSALS_RETIRE_AFTER = None
+_REFUSED_PREFIX = "refused by covenant's judge"
+
+
+def refusal_counts(rows):
+    """{target: covenant refusals} over live reply attempts. A target is its comment id, else (author, post)."""
+    out = {}
+    for r in rows:
+        if r.get("kind") != "reply" or r.get("dry_run") or str(r.get("dry_run")) == "True" or r.get("sent"):
+            continue
+        if not str(r.get("why") or "").startswith(_REFUSED_PREFIX):
+            continue
+        k = target_key(r.get("author"), r.get("post_id"), r.get("comment_id"))
+        out[k] = out.get(k, 0) + 1
+    return out
+
+
+def target_key(author, post_id, comment_id):
+    return comment_id or (author, post_id)
+
+
+def retire_after(g):
+    """The grant's number if one is set (null = never retire), else REFUSALS_RETIRE_AFTER (None: Tetsu's NO)."""
+    if isinstance(g, dict) and "refusals_retire_after" in g:
+        v = g.get("refusals_retire_after")
+        return None if v is None else int(v)
+    return REFUSALS_RETIRE_AFTER
+
+
 def _attempted_recently(rows, now, hours=ROTATE_HOURS):
     """Authors a LIVE reply was attempted to, sent or not, within `hours` before `now`."""
     import calendar
@@ -974,6 +1021,13 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     written_to = {r.get("author") for r in sends(sends_path) if r.get("sent") and r.get("actor") != "tetsu"}
     # ROTATION: tried within ROTATE_HOURS counts as written to, for this round only.
     written_to |= _attempted_recently(sends(sends_path), now)
+    # A409/H1 has two implementations, both kept by the 2026-11-04 merge and both OFF unless the grant turns them
+    # on: FW2 (this branch, grant key `retire_after`, keyed per comment) and FR1 (main, `retire_after_consult`,
+    # keyed per post). A target either one retires is skipped. Choosing one is the operator's and Tetsu's call.
+    refused = refusal_counts(sends(sends_path))
+    n_retire = retire_after(g)
+    retired_h1 = {k for k, n in refused.items() if n_retire is not None and n >= n_retire}
+    out["retired_targets"] = len(retired_h1)
     # RETIRE AFTER THE CONSULT (A409/H1): a reply the consult decided against, or refused RETIRE_AFTER_REFUSALS
     # times with no clear, is not re-drafted again. Gated on the grant's retire_after_consult, so it is inert
     # until he turns it on (after Tetsu consents); off -> empty set -> behaviour is exactly as before.
@@ -1009,6 +1063,8 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         post_id, comment_id = target_of(r.get("best_url"))
         if not post_id or r.get("author") in written_to or (r.get("author"), post_id) in done:
             continue
+        if target_key(r.get("author"), post_id, comment_id) in retired_h1:   # FW2: refused N times -> retired
+            continue
         if (r.get("author"), post_id) in retired:
             n_retired_skip += 1
             continue
@@ -1025,6 +1081,8 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
                 continue
             post_id, comment_id = target_of(row.get("url"))
             if not post_id or (author, post_id) in done:
+                continue
+            if target_key(author, post_id, comment_id) in retired_h1:            # FW2: refused N times -> retired
                 continue
             if (author, post_id) in retired:
                 n_retired_skip += 1
@@ -1113,7 +1171,9 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
                  "url": r.get("best_url"), "written_by": how, "set_aside": _info.get("set_aside"), "chars": len(text), "text": text[:400],
                  "dry_run": bool(dry_run), "sent": sent, "why": str(res.get("why", ""))[:300],
                  "judged": str(res.get("judged", ""))[:200] if res.get("judged") is not None else None,
-                 "ally_comments_at_send": then_n}, sends_path)
+                 "ally_comments_at_send": then_n,
+                 # H1: how many times the covenant refused THIS target before this attempt (shown, never hidden)
+                 "prior_refusals": refused.get(target_key(r.get("author"), post_id, comment_id), 0)}, sends_path)
         # A349 B13 (2026-10-14, Tetsu asked and agreed): only the covenant's own refusals count as "refused". Every
         # unsent reply was counted there, so a draft his SEND had cleared and Moltbook's rate limit then held, or that
         # Moltbook created and hid behind its challenge, read as the judge refusing it -- in the 10-14 isolation 9 such
@@ -1166,7 +1226,8 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     _record({"kind": "round", "at": now, "dry_run": bool(dry_run), "learned": out["learned"], "allies": out["allies"],
              "candidates": out["candidates"], "replied": out["replied"], "refused": out["refused"],
              "rate_held": out["rate_held"], "hidden": out["hidden"],       # A349 B13
-             "deferred": out.get("deferred", 0), "retired": out.get("retired", 0),
+             "deferred": out.get("deferred", 0), "retired_targets": out.get("retired_targets", 0),   # FW2
+             "retired": out.get("retired", 0),                                                         # FR1
              "answered": out.get("answered", 0), "accounted": out.get("accounted", 0),
              **({"starved": out["starved"]} if out.get("starved") else {})}, sends_path)
     out["isolated"] = False

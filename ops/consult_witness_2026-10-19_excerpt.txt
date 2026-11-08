@@ -1,0 +1,17 @@
+PLAN (written before any code; nothing built). A personal, open-source system has a "highway": 28 detectors run every ~66 s on a PC and read the system's health (a phone's check-ins, a local model's answers, a forum agent's rounds, node heights, file hashes, builds, CI). The operator asked for "the spiking system" to be "a redundant layer of everything".
+
+Claim 1: a second copy of a check is not redundancy (it fails in the same places). Redundancy needs the SAME verdict by a DIFFERENT mechanism; agreement = confidence, disagreement = a finding (one is blind). Past failures that motivated it: the road read every phone BUILD but never the phone, so a 53-hour phone silence went unnoticed; 35 of 36 guards grepped source text instead of running code; "green" once meant 7 of 25 detectors.
+
+Claim 2: only detectors fed by TIMED EVENTS can be twinned by spiking neurons: phone check-ins (~every 600 s), model asks (ok/failed), forum-agent rounds, forum verification strikes, node heights per poll, node health polls -- 6 of 28. The other 22 compare states (hashes, builds, CI status); a neuron there is the same comparison in costume. Three new senses with no detector today: the watchdog's own rounds stopping; bursts of refused off-network requests; a relay road's unanswered blocks.
+
+Two neurons, event-driven (the leak between events solved exactly, v*exp(-dt/tau); nothing runs between events):
+(a) Pacemaker: constant drive raises the potential, each event resets it; if events stop it crosses threshold = "silent". Drive set from the stream's own median interval (the existing detector uses a fixed 3 h for the phone).
+(b) Leaky burst: each failure adds charge, each success removes some, charge leaks; fires on failures close together, not scattered ones (the existing detector counts failures in a fixed window).
+
+Runs read-only beside the highway, daemon only. No remedy, sends nothing. Each twin's verdict is set beside its detector's; disagreement rows are logged, a disagreement lasting N rounds is told to the operator once, and once when it clears.
+
+BAR, fixed now: replay the last 30 days of ledgers. (1) Must find both known phone silences from the check-in ledger alone (53 h from 10-08; the drop at 10-12 06:48) or the twin is rejected. (2) Agreement with the highway's recorded PRESENT/ABSENT transitions within one round, as a percentage; every disagreement opened and labelled (highway blind / witness blind / threshold difference). Tune only on days 1-15, score on days 16-30. (3) At most one TOLD disagreement per twin per week on the scored days, else shadow-only. Known blind spot: if the ledger itself stops being written, both go blind together.
+
+Already in production: one leaky integrate-and-fire neuron per network road (tailnet, LAN, a sealed relay road) orders which road the phone tries first; in tests, a dead tailnet costs 6 connect attempts over 20 calls instead of 40.
+
+QUESTIONS: 1) Is "same verdict, different mechanism" sound redundancy here, or theatre -- where does it fail? 2) Is the 6-of-28 split right? 3) Is the bar strong enough; is the 15/15 split honest? 4) Hand-set from measured cadence, or learned (STDP) -- what would learning cost in false alarms? 5) What is missing?

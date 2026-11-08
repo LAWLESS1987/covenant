@@ -72,7 +72,10 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 LEDGER = os.environ.get("COVENANT_AI_CONSULT_LEDGER") or os.path.join(HERE, "ops", "ai_consult.jsonl")
 KNOWN_APPS = ("chatgpt", "gemini", "chatsmith")
-DEFAULT_MAX_PER_DAY = 12          # a bounded number of exchanges, not a background chatter loop
+DEFAULT_MAX_PER_DAY = int(os.environ.get("COVENANT_AI_CONSULT_MAX_PER_DAY", "12"))
+# ^ an anti-runaway bound, NOT an account limit: his Chat Smith is unlimited (2026-11-03), so the
+#   12/day cap was only ever "not a background chatter loop". Default stays 12 to keep that guard;
+#   raise it via COVENANT_AI_CONSULT_MAX_PER_DAY for a deliberate heavy-consult day.
 
 # CHAT SMITH (2026-09-21, his words: "incorporate my chat smith account on the
 # pc for help with generalized information and coding cycling models to find

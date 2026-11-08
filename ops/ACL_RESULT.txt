@@ -1,0 +1,73 @@
+﻿==== key ACL tighten (as ops\fix_key_acl.bat, plus _keybackup) 2026-10-03T07:54:05 ====
+--- C:\Users\Lawre\covenant\covenant_A.db.key ---
+processed file: C:\Users\Lawre\covenant\covenant_A.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\covenant_A.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\covenant_A.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\covenant_A.db.key
+Successfully processed 1 files; Failed processing 0 files
+--- C:\Users\Lawre\covenant\nodeA_prod.db.key ---
+processed file: C:\Users\Lawre\covenant\nodeA_prod.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeA_prod.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeA_prod.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeA_prod.db.key
+Successfully processed 1 files; Failed processing 0 files
+--- C:\Users\Lawre\covenant\nodeA_run.db.key ---
+processed file: C:\Users\Lawre\covenant\nodeA_run.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeA_run.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeA_run.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeA_run.db.key
+Successfully processed 1 files; Failed processing 0 files
+--- C:\Users\Lawre\covenant\nodeB_prod.db.key ---
+processed file: C:\Users\Lawre\covenant\nodeB_prod.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeB_prod.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeB_prod.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeB_prod.db.key
+Successfully processed 1 files; Failed processing 0 files
+--- C:\Users\Lawre\covenant\nodeB_run.db.key ---
+processed file: C:\Users\Lawre\covenant\nodeB_run.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeB_run.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeB_run.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeB_run.db.key
+Successfully processed 1 files; Failed processing 0 files
+--- C:\Users\Lawre\covenant\nodeC_prod.db.key ---
+processed file: C:\Users\Lawre\covenant\nodeC_prod.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeC_prod.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeC_prod.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\nodeC_prod.db.key
+Successfully processed 1 files; Failed processing 0 files
+--- C:\Users\Lawre\covenant\w2_probe.db.key ---
+processed file: C:\Users\Lawre\covenant\w2_probe.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\w2_probe.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\w2_probe.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\w2_probe.db.key
+Successfully processed 1 files; Failed processing 0 files
+--- C:\Users\Lawre\covenant\_keybackup\covenant_A.db.key ---
+processed file: C:\Users\Lawre\covenant\_keybackup\covenant_A.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\_keybackup\covenant_A.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\_keybackup\covenant_A.db.key
+Successfully processed 1 files; Failed processing 0 files
+processed file: C:\Users\Lawre\covenant\_keybackup\covenant_A.db.key
+Successfully processed 1 files; Failed processing 0 files
