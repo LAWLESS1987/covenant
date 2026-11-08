@@ -174,6 +174,11 @@ class Commissure:
         Thresholds are read at SEND time and the current is clamped again on ARRIVAL, so the bound holds against
         the thresholds as they are; it can lapse only if a threshold is lowered in the single step between a send
         and its arrival, and the arrival clamp then still caps that step at 0.95 x the new threshold.
+        PRECONDITION, stated 2026-11-07 at Codex's checkpoint ("enforce fixed thresholds while attached or state the
+        precondition"): lowering a threshold raises an arm's charge in its own units, so it is outside drive too.
+        Thresholds lowered 10% every step keep a ringed pair firing at a steady rate with no input at all (OCR15);
+        the finite count above starts from the last threshold change. Nothing in this module changes a threshold
+        after construction.
 
     SEROTONIN (operator 2026-11-03, "make it like an octopus. Like serotonin"): a diffuse neuromodulator, one level for
     the whole ring (volume transmission, not a point-to-point synapse). release() raises it; it relaxes back toward

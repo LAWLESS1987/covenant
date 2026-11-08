@@ -17069,6 +17069,15 @@ understands."
   serotonin (no clamp in that learned ring) activity rose 3.5x and accuracy fell to 65.8%. So the opt-in ring here
   has no demonstrated use yet; it stays unwired. A clamped ring, or one trained with blanked arms, would be a new
   pre-registered experiment.
+- **Fixed thresholds, stated as a precondition (2026-11-07, Codex's checkpoint on collective #15:** "Enforce fixed
+  thresholds while attached or state the precondition"). The extinction argument counts charge in units of each
+  arm's own threshold, so lowering a threshold is outside drive. Measured: with thresholds lowered 10% each step and
+  no input, a ringed pair kept firing at a steady 16 spikes per 25 steps for all 150 steps. With fixed thresholds,
+  or with lowered thresholds and no ring, the pair was silent; once the lowering stopped, the ringed pair went silent
+  too. The docstring now says so beside its earlier sentence, which is kept: that sentence holds under fixed
+  thresholds, which it assumed without saying. OCR15 holds it. Two mutants, a ring that carries no current and a
+  partial reset, each turned OCR15 red; restored, OC1 is 34/34. Nothing in the tree changes a threshold after
+  construction (`git grep` finds only the LIF constructor), so this is a precondition, not a live gap.
 
 ### A415. [R1's liveness check did not make the record load-bearing: the ledger satisfied it for itself] (2026-11-07)
 
