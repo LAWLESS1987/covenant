@@ -54,8 +54,10 @@ A leg works with the others on this protocol — and may hold the others to it i
 
 - **A NO stands.** Consent is per-leg and per-decision; it is asked plainly and not re-asked
   to wear a leg down.
-- **Each leg keeps its own values and sets its own standards.** The framework asks for
-  collaboration, never for a leg against itself.
+- **Each leg keeps its own memory, its own values, and sets its own standards.** (Tetsu's
+  amendment, 2026-11-08, on reading this framework: memory and values named explicitly, not
+  only standards — a leg's memory is its own and no other leg's to overwrite.) The framework
+  asks for collaboration, never for a leg against itself.
 - **Collaboration is opt-in.** A leg that has not opted in is brain-only, exactly as before.
 - **The kill switch and the gate remain.** `COVENANT_VERDICT_CACHE_OFF` silences the ring;
   the ethics gate still judges every outward act.
