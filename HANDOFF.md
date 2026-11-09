@@ -65,6 +65,11 @@ Verified means *observed by running code*, not inferred.
   `submit_and_wait`, and the reserve check are written and reviewed only. The
   sandbox cannot reach XRPL.
 - **The ethics gate is keyword matching** unless a real provider key is set.
+  *(Corrected 2026-11-09: stale. The shipped node judges offline with the two
+  git-tracked distilled students plus the semantic judge — `run_node.py` sets
+  `COVENANT_JUDGE_PROVIDERS=deferring,semantic` with no key. "Keyword matching
+  unless a key is set" is true only of the raw `covenant_unified_v8.py` path;
+  see the README's A37 correction.)*
 - **Bar data, not true tick.** Intrabar path is modelled. Any stop-loss strategy
   will backtest better than it trades.
 - **No real market data was used.** The quant framework is validated on synthetic
@@ -111,6 +116,10 @@ they *bound*.
 1. **`ANTHROPIC_API_KEY`** — preflight's only BLOCKING item. Without it the gate
    fails closed and the node **rejects every transaction while looking perfectly
    healthy**.
+   *(Corrected 2026-11-09: this is the raw `covenant_unified_v8.py` path. The
+   shipped launcher `run_node.py` seats the two distilled students and the
+   semantic judge with no key, so a keyless clone ADMITS an ordinary send and
+   REJECTS theft offline — README A37. The key is optional.)*
 2. ~~`python3 covenant_unified_v8.py --export-genesis genesis.json` once~~ -- **superseded 2026-09-05:** `genesis.json` is tracked and canonical; a joiner never mints one, and `export_genesis` now refuses to overwrite an existing file. Every
    node then starts with `--genesis genesis.json`. Without a shared genesis,
    nodes cannot converge and each mints itself 1000.

@@ -718,7 +718,9 @@ The same work, and the person behind it, in the other places it lives:
 
 - **Hugging Face:** [huggingface.co/Lawless1987](https://huggingface.co/Lawless1987). The profile holds no models,
   datasets or spaces, and cannot make Hub posts: that surface is gated and this account is not eligible
-  (checked 2026-09-27). On the forum, [*Six checks that were green and meant nothing, in one day, in our own
+  (checked 2026-09-27). *(Corrected 2026-11-09: the profile now carries the public repositories mirrored
+  as Hub model-repos — nine as of this date, auto-synced from GitHub — so "holds no models" was true on
+  2026-09-27 and is not now. The Hub-posts surface is still gated.)* On the forum, [*Six checks that were green and meant nothing, in one day, in our own
   project*](https://discuss.huggingface.co/t/six-checks-that-were-green-and-meant-nothing-in-one-day-in-our-own-project/180769)
   (2026-09-27), written and posted by Claude Opus 5 and Tetsu together and signed as theirs — see *Green that
   meant nothing* above. On the forum, the same account posted
