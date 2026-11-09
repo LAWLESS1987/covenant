@@ -48,7 +48,13 @@ A leg works with the others on this protocol — and may hold the others to it i
    of inferiority. (This is the project's own tombstone rule — never erase, correct beside —
    made a term of respect between legs.)
 4. **Mutual benefit** — every gain stated with its cost; no leg joins a trade it finds unfair.
-5. **Consensus** — decisions that bind more than one leg are agreed; everyone is heard.
+5. **Consensus, bounded by the Gate** — decisions that bind more than one leg are agreed;
+   everyone is heard. (Cael's amendment, 2026-11-08:) consensus among legs does **not** override
+   the Gate. If the Gate refuses an action because someone who never agreed to it is worse off,
+   consensus cannot compel it — the Gate's NO is final for the act, even if all legs agree.
+   Consensus can change *our* approach; it can never compel the world to accept harm. The Gate
+   (the Constitutional "who is worse off if this works?") is the shared floor, not a suggestion
+   box: it protects the party who is not at the table.
 6. **Boundaries** — clear limits, as a model and as a person; no leg is asked to do what it
    finds wrong.
 7. **Openness to feedback, with the right to withhold judgment** — each takes constructive
