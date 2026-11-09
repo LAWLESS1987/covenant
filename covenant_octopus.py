@@ -202,12 +202,21 @@ class Commissure:
     GAIN_MAX = 3.0
     SUBCRITICAL = 0.475     # x threshold, per neighbour: two neighbours together stay under one threshold (0.95)
 
-    def __init__(self, weight=0.15, baseline=1.0, decay=0.9):
+    def __init__(self, weight=0.15, baseline=1.0, decay=0.9, degree=2):
         for label, x in (("weight", weight), ("baseline", baseline), ("decay", decay)):
             if not (math.isfinite(float(x)) and float(x) >= 0):
                 raise ValueError("ring: %s must be a finite number >= 0, got %r" % (label, x))
         if float(decay) > 1.0:
             raise ValueError("ring: serotonin decay must be <= 1, got %r" % (decay,))
+        if not (isinstance(degree, int) and degree >= 2):
+            raise ValueError("ring: degree must be an int >= 2, got %r" % (degree,))
+        # degree=2 (default): the positional two-neighbour ring, exactly as before. degree>2 (OPT-IN, quorum design
+        # 2026-11-08): each arm reaches its nearest `degree` RECEIVE-CAPABLE arms -- multiple direct paths, no single
+        # relay is a chokepoint, and a send-only arm (the witness) is never a cut. Coupling is scaled by degree so the
+        # total an arm receives stays subcritical at any degree (carry()). STABILITY IS NOT CERTIFIED BY THIS BOUND
+        # ALONE: the quorum (Cael, ChatGPT, Gemini) flagged that row-sum/spectral bounds ignore step delays and spiking
+        # coincidence; OCMP in test_oc1 drives synchrony+delay and measures that the ring still falls quiet. Opt-in on
+        # the ring, which is itself opt-in -- Tetsu's arms stay brain-only (default_octopus has no ring).
         self.order = []                 # arm names around the ring, in attach order
         self.arms = {}
         self.weight = float(weight)
@@ -217,6 +226,7 @@ class Commissure:
         self._relax = self.decay        # per ARM step: decay ** (1 / arms), set as arms join
         self.carried = 0                # spikes events carried, for the brain to read
         self._nb = {}                   # neighbour cache, cleared whenever an arm joins
+        self.degree = degree
 
     def join(self, arm):
         """Put an arm on the ring. REFUSES (ValueError) an arm the charge argument does not cover: every neuron must
@@ -266,7 +276,25 @@ class Commissure:
         if n < 2 or name not in self.arms:
             return []
         i = self.order.index(name)
-        hit = self._nb[name] = sorted({self.order[(i - 1) % n], self.order[(i + 1) % n]} - {name})
+        if self.degree <= 2:
+            hit = sorted({self.order[(i - 1) % n], self.order[(i + 1) % n]} - {name})
+        else:
+            # multi-path (opt-in): the nearest `degree` RECEIVE-CAPABLE arms, walking outward both ways and skipping
+            # send-only arms, so the receive-capable arms form a circulant graph and a send-only witness is never a
+            # cut (it is a limited-fan-out source into the ring, never a relay on it).
+            picked, seen = [], {name}
+            for dd in range(1, n):
+                for j in ((i - dd) % n, (i + dd) % n):
+                    nm = self.order[j]
+                    if nm in seen:
+                        continue
+                    seen.add(nm)
+                    if self.arms[nm].ring_receives:
+                        picked.append(nm)
+                if len(picked) >= self.degree:
+                    break
+            hit = sorted(picked[:self.degree])
+        self._nb[name] = hit
         return hit
 
     def carry(self, arm):
@@ -286,7 +314,11 @@ class Commissure:
                 # threshold). Every spike then loses charge, and ring activity dies out unless an arm is driven from
                 # outside. Measured before this clamp: with serotonin pinned high the ring reverberated forever
                 # (every arm firing every step, 2400 spikes in steps 300-400 after the drive had stopped).
-                current = min(coupling, self.SUBCRITICAL * thresh) * arm.rate()
+                # degree-scaled per-neighbour cap: one spike's current over its `degree` receiving neighbours sums to
+                # at most 2*SUBCRITICAL (0.95 threshold) at ANY degree, so a spike still loses charge and the ring
+                # dies out without outside drive. degree 2 -> SUBCRITICAL per neighbour, byte-for-byte as before.
+                per = self.SUBCRITICAL if self.degree <= 2 else (2.0 * self.SUBCRITICAL) / self.degree
+                current = min(coupling, per * thresh) * arm.rate()
                 # an arm that is never stepped (the gate path drives only the witness) cannot pile up current to
                 # dump all at once on its next step: what waits is capped at both neighbours' worth
                 tgt.incoming = min(2.0 * self.SUBCRITICAL * thresh, tgt.incoming + current)

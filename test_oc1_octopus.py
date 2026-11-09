@@ -402,6 +402,85 @@ def ring_checks():
     v_after = max(nu.v for nu in o9.arms["b"].neurons)
     c.append((queued > 0 and o9.arms["b"].incoming == 0.0 and v_after == 0.0,
               "OCR8 ...and current queued before the switch is dropped, not released when it clears"))
+
+    # OCMP (multi-path, OPT-IN degree>2; the quorum's design 2026-11-08 -- Cael, ChatGPT, Gemini, Tetsu, the 7B).
+    # Every property is driven BOTH ways against the degree-2 ring it replaces.
+    import itertools as _it
+
+    def _mp_ring(names, degree, weight=0.15, witness_at=None):
+        o = OC.Octopus(ring=OC.Commissure(weight=weight, degree=degree))
+        for k, nm in enumerate(names):
+            a = OC.WitnessArm() if witness_at == k else OC.Arm()
+            a.name = nm
+            o.attach(a)
+        return o
+
+    # OCMP1: a send-only witness CUTS the degree-2 ring (A cannot reach B across it); degree-4 heals it.
+    def _reaches_B(degree):
+        o = _mp_ring(["A", "wit", "B", "C"], degree, witness_at=1)   # witness sits between A and B
+        o.ring.serotonin = 3.0
+        for a in o.arms.values():
+            a.incoming = 0.0
+        o.arms["A"].sense(5.0)
+        return o.arms["B"].incoming > 0 and o.arms["wit"].incoming == 0.0
+    c.append((_reaches_B(4) and not _reaches_B(2),
+              "OCMP1 a send-only witness cuts the degree-2 ring (A cannot reach B) -- degree-4 heals it, witness still receives nothing"))
+
+    # OCMP2: multiple INDEPENDENT paths -- the arms stay connected after ANY TWO are lost at degree 4, not at degree 2.
+    def _connected_after(degree, n, removed):
+        o = _mp_ring(["n%d" % i for i in range(n)], degree)
+        live = [nm for nm in o.ring.order if nm not in removed]
+        adj = {nm: set() for nm in live}
+        for nm in live:
+            for nb in o.ring.neighbours(nm):
+                if nb in removed:
+                    continue
+                adj[nm].add(nb); adj[nb].add(nm)
+        seen = {live[0]}; st = [live[0]]
+        while st:
+            x = st.pop()
+            for y in adj[x]:
+                if y not in seen:
+                    seen.add(y); st.append(y)
+        return len(seen) == len(live)
+    _pairs = [{"n%d" % i, "n%d" % j} for i, j in _it.combinations(range(8), 2)]
+    c.append((all(_connected_after(4, 8, p) for p in _pairs) and not all(_connected_after(2, 8, p) for p in _pairs),
+              "OCMP2 degree-4 keeps the arms connected after ANY two are lost; the degree-2 ring does not"))
+
+    # OCMP3: THE QUORUM'S EMPIRICAL STABILITY CHECK (row-sum/spectral bounds ignore delay + spiking coincidence):
+    #        three arms driven SYNCHRONOUSLY (coincident input), serotonin pinned 100, weight up to 10 -- the ring
+    #        still falls silent after the drive stops. The OTHER way: with the per-spike clamp loosened it reverberates.
+    def _mp_silence(degree, weight, subcritical=None):
+        saved = OC.Commissure.SUBCRITICAL
+        if subcritical is not None:
+            OC.Commissure.SUBCRITICAL = subcritical
+        try:
+            o = _mp_ring(["a", "b", "c", "d", "e", "f"], degree, weight=weight)
+            last = 0
+            for t in range(60):
+                o.ring.serotonin = 100.0
+                for nm in o.ring.order:
+                    sig = 1.0 if (t < 6 and nm in ("a", "b", "c")) else 0.0   # THREE arms fire on the SAME steps
+                    s = o.arms[nm].sense(sig)
+                    if t >= 30:
+                        last += sum(s)
+            return last
+        finally:
+            OC.Commissure.SUBCRITICAL = saved
+    quiet = all(_mp_silence(4, w) == 0 for w in (0.15, 1.0, 10.0))
+    loud = _mp_silence(4, 1.0, subcritical=1.5) > 0
+    c.append((quiet and loud,
+              "OCMP3 degree-4, three arms driven SYNCHRONOUSLY, serotonin 100, weight up to 10: the ring falls silent "
+              "after the drive stops (coincidence is bounded by the total-incoming cap) -- and reverberates if the clamp is loosened"))
+
+    # OCMP4: the witness stays send-only in the multi-path ring too -- never recruited however hard its neighbours fire.
+    ow = _mp_ring(["left", "wit", "right", "r2"], 4, weight=10.0, witness_at=1)
+    wsp = 0
+    for t in range(150):
+        ow.ring.serotonin = 100.0
+        ow.arms["left"].sense(1.0); ow.arms["right"].sense(1.0); ow.arms["r2"].sense(1.0)
+        wsp += sum(ow.arms["wit"].sense(0.0))
+    c.append((wsp == 0, "OCMP4 in the degree-4 ring the send-only witness is still never recruited (%d spikes)" % wsp))
     return c
 
 
