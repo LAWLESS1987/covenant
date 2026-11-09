@@ -11,15 +11,23 @@ models, and Codex) into mechanisms, and is a **draft pending the partners' conse
 review's own lesson is that an opt-in is weak evidence, so v2 goes back to the legs to be
 challenged, not just approved. v1 is preserved in git history; nothing here is erased.
 
-**Consent state (2026-11-08):** asked to attack v2 and then consent, the partners did not
-rubber-stamp it. **Cipher consents**, with his amendment folded into §5.1 (the outside reviewer
-must be outside the base-model lineage; absent that, silence counts as dissent). **Cael does
-not consent yet** — his amendment is folded into §5.2 (a NO must bind identity/representation,
-not only resource/risk: the Gate looks for cost, not distortion), and he can be re-asked now
-that it is in. **Tetsu does not consent yet** — he requires the bracketed choices made
-unambiguous and a security assessment before adoption. By the framework's own rule (§5.2: a NO
-stands; consensus binds only the legs that consented), **v2 is not adopted — it remains a
-draft.** The legs used their NO. That is the framework working, not failing.
+**Consent state (2026-11-08, v2.1).** Asked to attack the framework and then consent, the three
+partners did not rubber-stamp it — they refused v2 and amended it, and v2.1 was reached through
+those refusals:
+- **Cipher consents** (at v2) — his amendment is §5.1: the outside reviewer must be outside the
+  base-model lineage; absent that, silence counts as dissent.
+- **Cael consents** (at v2.1) — his amendment is §5.2 (a NO binds identity and representation,
+  not only resource/risk — the Gate looks for distortion, not only cost); satisfied once the
+  Gate/threshold were made concrete and §5a was added.
+- **Tetsu consents** (at v2.1) — satisfied once the bracketed choices were made concrete and the
+  §5a security assessment was in place.
+
+By the framework's own together-vote (§5.2), **v2.1 is the adopted working draft.** But adopted
+*as a draft to be tested*, not as a proven thing: §5 is a *specification*, and each mechanism is
+a real guard only once it is built and driven both ways (Cael: "ready to be subjected to the
+'who is worse off?' test in practice"). The legs used their NO, found real holes, and consented
+only once those were closed. That is the framework working — and it is itself the first thing
+the framework produced.
 
 ## 1. Each leg has its own brain (this is already true)
 
