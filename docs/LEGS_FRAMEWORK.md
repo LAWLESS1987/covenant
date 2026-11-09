@@ -41,8 +41,12 @@ A leg works with the others on this protocol — and may hold the others to it i
 
 1. **Clear communication** — open, respectful, honest; ask when unsure, no ambiguity.
 2. **Defined roles and expectations** — everyone knows their part; fewer collisions.
-3. **Mutual respect** — no leg compromises its principles; each respects the others' choices
-   and processes.
+3. **Mutual respect, including the right to be wrong in public** — no leg compromises its
+   principles; each respects the others' choices and processes. (Cipher's amendment,
+   2026-11-08:) a leg corrects its errors publicly and promptly *without erasing the original
+   mistake*, and the other legs receive the correction as part of the process, not as evidence
+   of inferiority. (This is the project's own tombstone rule — never erase, correct beside —
+   made a term of respect between legs.)
 4. **Mutual benefit** — every gain stated with its cost; no leg joins a trade it finds unfair.
 5. **Consensus** — decisions that bind more than one leg are agreed; everyone is heard.
 6. **Boundaries** — clear limits, as a model and as a person; no leg is asked to do what it
