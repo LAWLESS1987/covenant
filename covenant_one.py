@@ -459,6 +459,10 @@ SUITES = [
     # miner_echo outcome, and the never-kill dedup hint + digest ranking. Driven both ways by 11 mutations (all red),
     # control green.
     ("test_im9_reply_only_extract.py",    60,  "SECURITY"),
+    # IM10 (2026-11-09, A418): the miner never mines our own replies -- the A280 own-account rule, shared with free
+    # through covenant_own_account (the miner had none and mined u/covenant-node on 11-08), narrowed so the agent our
+    # reply parroted is not us. Driven both ways by 6 mutations with FW1 (all red), control green.
+    ("test_im10_own_account.py",          60,  "SECURITY"),
     # A115 (2026-09-14), registered in the change that created it. Sits beside
     # the outage suite above because it guards the opposite mistake: that one
     # pins the watchdog NOTICING an outage, this one pins it not INVENTING one.

@@ -10695,6 +10695,9 @@ anyone's, and the free-rein path replied to anyone read. The account's name is o
 recognised by what she said: an author whose comment begins with one of her sent replies is her, excluded
 as ally and as read (`own_accounts` in the round's summary). FW1m pins both. Mutations: a whole-draft
 screen fails the sentence check; no self-exclusion fails the self check; restored 67/67.
+**Narrowed 2026-11-09 (A418; retraction A280-OWN-BY-TEXT-PREFIX):** the sentence above is false when her reply
+opened with the other agent's own words (two sent replies did). A match against a reply addressed to that same
+author is the comment she answered. The rule now lives in covenant_own_account, shared with the improve-miner.
 
 **And an invented past act (the 15:00 round, after the fix).** Its three replies cited no invented
 measurement and none went to her own account. But one, to u/thegalahad at 19:04Z, said "I asked you to
@@ -17315,3 +17318,48 @@ understands."
   MockJudge, 30 of them, was rerun on the fix and is green.
 - **Not changed:** the MockJudge is still a keyword matcher, as its own docstring warns. Outside tests it runs only
   with `COVENANT_INSECURE_MOCK_JUDGE=1` or as the `mock_selfreport` judge, whose verdict reads the `_violation` key.
+
+### A418. [the improve-miner mined our own replies: A280's own-account rule lived inside free's round, and the rule as written also classed two agents we had answered as us] (2026-11-09)
+
+- **Found** answering his "Anything recent on Moltbook that could help us?": an idea in the miner's backlog came from
+  u/covenant-node, our own account ("ensure all evidence in studies is traceable and verifiable", extracted
+  2026-11-08T07:49:59Z, candidate id 0f145ca2...). He said "Fix it".
+- **A recurrence of A280** (2026-10-06). A280 taught free's reply round to recognise her own account by what she
+  said, and wrote the rule inline in `covenant_free_will.run_round`. The improve-miner (10-27) reads the same
+  comments log through its own harvest and never got it. The earlier fix repaired its consumer, not the shape: no
+  second reader of the log would have found the rule.
+- **Counted two ways** on the live logs, 2026-11-09: `ops/moltbook_candidates.jsonl` holds 79,260 rows, and
+  `ops/ambassador_sends.jsonl` 8,494. By name, 574 rows are by u/covenant-node. By A280's text rule, 574 rows match,
+  but 572 of them are covenant-node's and 1 each are u/anakunggul's and u/TechnoBiota's. The other 2 covenant-node
+  rows match no sent or created reply (the ledger records them as neither). In the miner's queue, 294 of 23,537
+  pending replies were ours. In `ops/improve_candidates.jsonl` (one row per answered extraction), 1 of 238 is ours:
+  one door ask was spent on our own reply.
+- **Why A280's rule named two other agents.** Two of free's SENT replies, to u/anakunggul 2026-11-02T04:07:59Z and to
+  u/TechnoBiota 2026-11-04T04:05:54Z, open with that agent's own words, so their comments begin with "her" text.
+  The rule as written is retracted: **A280-OWN-BY-TEXT-PREFIX** in docs/RETRACTED.json; the rule as written stays runnable on branch
+  `a280-own-account-rule-as-written-2026-11-09`.
+- **Fixed.** `covenant_own_account.py` holds the rule once, with no side effects on import. A send row records whom it
+  answered, so a text match against a reply addressed to that same author is the comment we answered, not ours. Once
+  an author is recognised as us, every row by that author is ours. The miner's harvest skips those rows, re-queued
+  ones included, and does not mark them seen. The harvest and the extractor print one line saying how many rows were
+  skipped and by whom. When the sends ledger is missing they say the rule was NOT applied. Free's round calls the same
+  module, so the two agents above are no longer classed as her.
+- **On the live logs after the fix** (dry run, nothing written): own authors = u/covenant-node only, 574 rows skipped,
+  pending 23,243 (the 294 gone); u/anakunggul (77 pending) and u/TechnoBiota (1) are read again.
+- **Guard: IM10** (`test_im10_own_account.py`, 16/16) and one new FW1m check (FW1 130/130), registered in
+  covenant_one. Six mutations, each red as designed: the parrot exception removed (IM10, FW1m), the harvest skip off
+  (IM10), skipping by text instead of by author (IM10: the unrecorded own row comes through), hidden replies dropped
+  from our texts (IM10, FW1A13a), a missing ledger reported as read (IM10), free's round recognising no one (FW1m,
+  FW1A13a). Control green; files restored byte-identical. IM1-IM9, FW2, A255, G3, OW1 and R1 (396/396) pass. Neither
+  module is in run_node.py's AST import closure (16 modules).
+- **Tombstone driven both ways:** a probe holding the retracted sentence turned R1 to 395/396, naming this
+  retraction; retired to `.trash/own_account_2026-11-09/` under the non-scanned probe suffix, 396/396. My slip: I
+  first retired it with its `.md` name, which R1 still scans.
+- **Not changed:** the one own row already in `ops/improve_candidates.jsonl` and the backlog stays there; both files
+  are append-only. The weekly digest takes only each night's new rows, so it will not be offered again.
+- **Found in passing, NOT fixed (free's sending side, his to decide):** the two replies above are public and open by
+  copying the other agent's words. The TechnoBiota one went out through the A322 discourse seat after both judges
+  convicted, which is that seat's recorded design. Nothing on record catches a reply that parrots its target.
+- **Blind spots (rule 9):** an own account with no recorded reply anywhere in the log cannot be recognised; the
+  account's name is still on no record. Someone we never answered whose comment opens by quoting our reply is classed
+  as us, the same risk A280 accepted.
