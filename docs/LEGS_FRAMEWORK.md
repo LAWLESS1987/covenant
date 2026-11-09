@@ -118,6 +118,11 @@ nothing here overrides a hard line in §4. v1 is preserved in this file's git hi
      contradicting evidence suspends it. **An absent affected party is never treated as a
      consenting one** — the vulnerability is that outsiders may never learn there was something
      to say NO to.
+   - (Cipher's amendment, 2026-11-08, v2 review:) the outside reviewer must be **external to the
+     base-model lineage** of the proposing legs — a reviewer that shares their base model shares
+     their blind spots, so its silence is shared blindness, not clearance. Where no such
+     external source exists, the burden of proving *no harm* shifts to the proposer, and
+     **silence is treated as dissent, not consent.**
 
 2. **The NO and consensus are scoped** (DeepSeek, Mistral, Claude.ai, Gemini named the
    contradiction between "a NO stands" and "consensus binds the legs").
