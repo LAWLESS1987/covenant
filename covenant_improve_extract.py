@@ -229,7 +229,9 @@ def extract(limit=MAX_PER_RUN, ask=None, out=None, say=print):
         # fresh=True (A284): each reply is an independent question -- no history bleed between unrelated
         # replies -- and a fresh exchange still reaches the teacher queue, so Tetsu still learns from it.
         ask = lambda text: TW.ask(text, door="agent", fresh=True)   # noqa: E731
-    new = IM.harvest(update=False, requeue_first=True)[:limit]
+    st = {}
+    new = IM.harvest(update=False, requeue_first=True, stats=st)[:limit]
+    say("improve-extract: " + IM.own_line(st))                 # A418: never our own replies; say it when it can't tell
     if not new:
         say("improve-extract: nothing new to extract")
         return []

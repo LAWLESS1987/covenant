@@ -2732,6 +2732,26 @@
     "ops/HF_COMPASS_GATE_DRAFT_2026-11-06.md"
    ],
    "note_on_branch": "Draft only; v1 stays in the draft file and in commit 82eb31b as written, v2 beside it."
+  },
+  {
+   "id": "A280-OWN-BY-TEXT-PREFIX",
+   "claim": "That an author whose comment begins with the text of one of free's sent replies is free's own account. Written in docs/KNOWN_ISSUES.md A280 (2026-10-06) and in the NEVER HERSELF comment of covenant_free_will.run_round, which implemented it as written.",
+   "verbatim": [
+    "an author whose comment begins with one of her sent replies is her, excluded as ally and as read",
+    "an author whose comment\n    # BEGINS with the text of one of her sent replies or posts is her."
+   ],
+   "truth": "False when free's reply opened with the other agent's own words. Measured 2026-11-09 on ops/moltbook_candidates.jsonl (79,260 rows) against ops/ambassador_sends.jsonl: the rule matched 574 rows, 572 by u/covenant-node and 1 each by u/anakunggul and u/TechnoBiota, whose comments free's sent replies of 2026-11-02T04:07:59Z and 2026-11-04T04:05:54Z had copied as their opening. Restated (A418, covenant_own_account.is_our_text): a match against a reply addressed to that same author is the comment she answered, not hers.",
+   "refuted_by": "Claude, 2026-11-09, counting own-account rows two ways (by name and by the A280 text rule) for A418; the two routes disagreed by these two authors.",
+   "patterns": [
+    "whose comment begins with one of her sent replies is her"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The rule as written stays runnable on branch a280-own-account-rule-as-written-2026-11-09 (b54566f), and the pre-change files are kept in .trash/own_account_2026-11-09/."
   }
  ]
 }

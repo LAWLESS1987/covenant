@@ -1037,22 +1037,21 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
     caps = g["caps"]
     # NEVER HERSELF (A280, 2026-10-06). The harvest learns every comment it reads, hers included: a dry round
     # that day drafted a reply to u/covenant-node -- her own account -- quoting her own reply from noon. The
-    # account's name is on no record here, so it is recognised by what she said: an author whose comment
-    # BEGINS with the text of one of her sent replies or posts is her.
-    _norm = lambda s: re.sub(r"\s+", " ", str(s or "")).strip().lower()[:120]     # noqa: E731
+    # account's name is on no record here, so it is recognised by what she said.
     # A349 A13 (2026-10-14, Tetsu asked and agreed: free's own account is never counted as an ally). A reply Moltbook
     # CREATED and then hid behind its challenge is hers too, under her account, though not "sent": on 10-09 two such
     # replies were read back as u/covenant-node, she replied to herself at 08:00:57Z, and at 10:01 her own reply was
     # counted as an ally writing back. A row carries a verification only when content was created (_ver).
-    mine = {_norm(r.get("text")) for r in sends(sends_path)
-            if (r.get("sent") or isinstance(r.get("verification"), dict)) and len(_norm(r.get("text"))) >= 60}
-    own = set()
-    for row in rows if isinstance(rows, list) else []:
-        if isinstance(row, dict) and row.get("author") and _norm(row.get("text")) in mine:
-            own.add(row.get("author"))
+    # A418 (2026-11-09): the rule now lives in covenant_own_account, shared with the improve-miner, which had none
+    # and mined her own reply. One narrowing (retraction A280-OWN-BY-TEXT-PREFIX): two sent replies opened with the
+    # other agent's own words, so a text match against a reply TO that same author is the comment she answered,
+    # not hers. Measured on the live logs: u/anakunggul and u/TechnoBiota had been classed as her.
+    import covenant_own_account as _OA
+    ours = _OA.our_texts(sends(sends_path))
+    own = _OA.own_authors(rows if isinstance(rows, list) else [], ours)
     for r in ranked:
         for q in (r.get("evidence") or {}).values():
-            if r.get("author") and _norm(q) in mine:
+            if r.get("author") and _OA.is_our_text(r.get("author"), q, ours):
                 own.add(r.get("author"))
     if own:
         out["own_accounts"] = sorted(own)

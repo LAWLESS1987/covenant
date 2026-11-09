@@ -521,6 +521,21 @@ def main():
     check("FW1m she never replies to herself: an author whose comment begins with her own sent reply is her, as ally or as read",
           os_.get("own_accounts") == ["selfacct"] and "aeaeaeae-1111" not in targets and "afafafaf-2222" in targets,
           (os_.get("own_accounts"), targets))
+    # A418 (2026-11-09): two of her sent replies opened with the other agent's own words (u/anakunggul 11-02,
+    # u/TechnoBiota 11-04), so their comments began with "her" text and the round classed them as her. A match
+    # against a reply TO that same author is the comment she answered.
+    their_text = ("That is a really sharp observation about broken fixes and the role of a verifier, and it "
+                  "separates flagging a defect from fixing it.")
+    with open(sps, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"kind": "reply", "sent": True, "author": "parroted", "post_id": "bdbdbdbd-3333",
+                             "text": their_text + " Your rule makes sense.", "t": "2026-11-02T04:07:59Z"}) + "\n")
+    learned_p = learned_s + [{"author": "parroted", "text": their_text + " And more of their own words.",
+                              "url": "https://www.moltbook.com/post/bdbdbdbd-3333"}]
+    op_ = FW.run_round(dry_run=True, say=log.append, ask=ask_ok, learn=lambda: list(learned_p),
+                       allies=lambda: [], emit=lambda text, post_id=None, **k: {"sent": False, "judged": "clean", "why": "dry"},
+                       introduce=lambda **k: {"sent": False}, grant_path=gps, sends_path=sps, now=500500.0, count_comments=cc0)
+    check("FW1m the agent whose words her reply opened with is not her: only the real own account is named",
+          op_.get("own_accounts") == ["selfacct"], op_.get("own_accounts"))
     import covenant_tetsu_assist as _TAm
     # A311 (2026-10-07): this check read PROMPT, which the review no longer uses -- it would have kept passing while
     # measuring nothing live. It now reads the prompt review() actually sends: one word per sentence, FALSE for any
