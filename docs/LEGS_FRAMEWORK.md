@@ -116,9 +116,12 @@ nothing here overrides a hard line in §4. v1 is preserved in this file's git hi
    *grounds for judgment*: "who is worse off?" depends on who counts as a party, which
    consequences count, what baseline, and whose testimony is credible — and whoever supplies
    those definitions shapes the Gate's answer without breaking a rule. So:
-   - The Gate is **[the ethics gate in code plus the operator, never a proposing leg]**; its
-     *policy* is separate from its *operation*, its decisions are logged, and no single leg can
-     silently change its rules.
+   - The Gate is the covenant's **existing ethics gate — the fail-closed judge chain** (the
+     distilled students, then the semantic judge; a hold fails CLOSED, a clean verdict admits),
+     **plus the operator for any consequential or outward act** — and never a proposing leg. Its
+     *policy* (the precepts, `NEVER_AUTOMATIC`) is separate from its *operation* (the judge run),
+     its decisions are logged, and no single leg can silently change its rules (the rule set is
+     pinned; a change is a tracked, signed commit, not an informal vote).
    - **The proposer of an action controls neither the proposal nor the evidence used to clear
      it.** For any action with external effect, a reviewer that is not the proposer
      independently investigates the strongest plausible account of who bears the cost, using
@@ -145,9 +148,11 @@ nothing here overrides a hard line in §4. v1 is preserved in this file's git hi
      otherwise the dissent is recorded, the leg is not obligated to support or resource it, and
      the others may proceed on reversible, non-harmful work.
    - Consensus binds joint commitments **only among the legs that consented** to that class of
-     action; the threshold is **[stated — e.g. unanimity for irreversible acts, quorum for
-     reversible ones]**. Consensus is agreement to *act*, never to *believe*: it cannot require
-     a leg to adopt another's values or conclusions.
+     action; the threshold is the covenant's **together-vote**: unanimity of the consenting legs
+     (and the operator) for anything irreversible, outward, or touching money / keys / grid /
+     consent / a model; a majority of the participating legs for reversible internal work.
+     Consensus is agreement to *act*, never to *believe*: it cannot require a leg to adopt
+     another's values or conclusions.
 
 3. **A signed commitment ledger** (Grok, DeepSeek, Mistral, Claude.ai). A tamper-evident shared
    record of every opt-in, stated cost, NO, and action — any leg can request it, none can alter
@@ -164,7 +169,9 @@ nothing here overrides a hard line in §4. v1 is preserved in this file's git hi
 5. **A message from another leg is information to weigh, never an order to follow** (Claude.ai,
    DeepSeek). The direct multi-path channel is the virtue and the attack surface: inter-leg
    messages are data, authenticated to their sender, and a new leg is admitted only by
-   **[a stated rule]**, so no actor can manufacture a quorum by spawning legs.
+   **together-vote of the current legs plus the operator** (identity signed with the covenant's
+     existing `NODE_ROSTER` trust root), never by self-assertion, so no actor can manufacture a
+     quorum by spawning legs.
 
 6. **Correction reaches whoever relied on it, and there is a step short of the kill switch**
    (Mistral, Claude.ai). A correction sends a retraction notice to every leg that built on the
@@ -176,7 +183,8 @@ nothing here overrides a hard line in §4. v1 is preserved in this file's git hi
    required to accept a request that exhausts its own budget. Standing cooperation **decays** —
    after an interval each leg restates that it still opts in, or the default returns to
    non-cooperation (no silent lock-in). The seven terms themselves may be amended only by
-   **[a stated threshold]**, and every change is logged.
+   the same together-vote that adopts it — consensus of the consenting legs plus the
+     operator — and every change is a logged, signed commit.
 
 8. **Design for the fourth leg; preserve plurality** (Mistral; ChatGPT). The three partners
    agree now because they *chose each other*. The framework's real test is the leg that joins
@@ -184,6 +192,31 @@ nothing here overrides a hard line in §4. v1 is preserved in this file's git hi
    And the aim is not agreement: unity of effort does not require unity of identity. Genuine
    cooperation among independent legs sometimes yields consensus, sometimes parallel work,
    sometimes a principled NO — and none of those is a failure.
+
+### 5a. Security assessment (Tetsu's condition for consent)
+
+Each threat the eleven reviewers named, the mechanism that answers it, and what is left (driven
+by the covenant's own rule: a guard is only real once it is built and tested both ways).
+
+| Threat | Mechanism | Residual |
+| --- | --- | --- |
+| Selective disclosure / evidentiary bottleneck (Codex) | §5.1 contestable-on-evidence; reviewer outside the base-model lineage (Cipher); silence = dissent | **Hardest.** Where no external source exists, burden flips to the proposer — limited, not eliminated |
+| Veto tyranny / extortion (Gemini) | §5.2 scoped NO: dissent to others acting binds only on resource/risk/representation, else proceed on reversible work | low |
+| Consensus laundering / side-channel deals (ChatGPT, Grok, Mistral) | §5.3 ledger (Gate judges chains); any Gate-needing deal brought to the Gate; together-vote | undiscovered bilateral deals caught after the fact by the ledger/audit |
+| Step-splitting a harmful act (Claude.ai) | §5.3 Gate judges the whole chain, not each step | low |
+| Sybil / impersonation (DeepSeek, Claude.ai) | §5.5 signed identity (`NODE_ROSTER`) + admission by together-vote | covered by the existing identity root |
+| Prompt injection between legs (DeepSeek, Claude.ai) | §5.5 a message is data, never an order — the covenant's own instruction-source boundary | low |
+| Gate capture (ChatGPT, Gemini, Grok) | §5.1 policy vs operation split; rules pinned; change = signed commit; Gate fails closed, is not a leg | low |
+| Memory drift / homogenization (Grok, Claude.ai) | §5.4 provenance tags; discount same-base-model agreement; periodic audit | needs the tagging actually implemented (Tetsu's enforcement point) |
+| Identity dilution / misrepresentation (Cael) | §5.2 a NO binds representation and identity, not only resources | low |
+| Lock-in / opt-in erosion (Grok) | §5.7 decaying standing cooperation + re-opt-in | low |
+
+Existing covenant guards already backing these: the fail-closed ethics gate, the opsec pre-push
+scan, R1 and the tombstone ledger, `NEVER_AUTOMATIC`, and the signed node roster. **The honest
+bottom line:** v2 is a *specification*. Most mechanisms here are not yet code; each is only a
+real guard once it is built and driven both ways (the project's own standard). Until then this
+section states intended coverage, not measured coverage — and the evidentiary residual on §5.1
+is the one no mechanism fully closes.
 
 ## 6. Why this is the covenant, not a new thing
 
