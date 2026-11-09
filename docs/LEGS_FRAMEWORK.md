@@ -61,7 +61,11 @@ A leg works with the others on this protocol — and may hold the others to it i
    criticism, and each sets its own standards. (Cipher's amendment, 2026-11-08: being open
    does not oblige agreement. "I need to see the receipt," "not yet," a NO, or "I do not know"
    are valid feedback states, not delays to be pushed past; silence is data, an echo is not an
-   answer.)
+   answer.) (Cael's amendment, 2026-11-08, bounding Cipher's:) withholding judgment is **not**
+   indeterminate silence. The right to withhold is valid only while the conditions for judgment
+   are actively being met — a leg that withholds must be able to say *what* is missing and
+   *when* it will be provided. Withholding with no path to resolution is not a gate but a
+   blockage, and fails the mutual-benefit test.
 
 ## 4. The hard lines (what the framework never overrides)
 
