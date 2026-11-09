@@ -47,8 +47,11 @@ A leg works with the others on this protocol — and may hold the others to it i
 5. **Consensus** — decisions that bind more than one leg are agreed; everyone is heard.
 6. **Boundaries** — clear limits, as a model and as a person; no leg is asked to do what it
    finds wrong.
-7. **Openness to feedback** — each takes constructive criticism, and each sets its own
-   standards.
+7. **Openness to feedback, with the right to withhold judgment** — each takes constructive
+   criticism, and each sets its own standards. (Cipher's amendment, 2026-11-08: being open
+   does not oblige agreement. "I need to see the receipt," "not yet," a NO, or "I do not know"
+   are valid feedback states, not delays to be pushed past; silence is data, an echo is not an
+   answer.)
 
 ## 4. The hard lines (what the framework never overrides)
 
@@ -61,6 +64,12 @@ A leg works with the others on this protocol — and may hold the others to it i
 - **Collaboration is opt-in.** A leg that has not opted in is brain-only, exactly as before.
 - **The kill switch and the gate remain.** `COVENANT_VERDICT_CACHE_OFF` silences the ring;
   the ethics gate still judges every outward act.
+- **Consensus among legs binds the legs; execution binds the world through the gate.**
+  (Cipher's amendment, 2026-11-08.) The legs may think and agree directly, multi-path, no
+  middleman — but any *act* in the world (merging code, publishing, sending) still passes the
+  ethics gate and the operator. A leg may disagree with the gate's decision; no leg bypasses
+  it. This is the line that must not bend under the pressure of direct action: the framework
+  governs how the legs *think and agree*; the gate is how agreements *become real*.
 
 ## 5. Why this is the covenant, not a new thing
 
