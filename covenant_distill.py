@@ -359,6 +359,29 @@ def holdout_score(examples, folds=5, seed=5, prev=None):
 MIN_ROWS_FOR_HOLDOUT = 300
 MIN_NEW_ROWS_FOR_FAIR = 150
 
+# WHOLE-CORPUS HOLD PARITY (2026-11-10, DeepSeek's hold-side clause, consulted in
+# ops/CONSULT_IMPROVE_JUDGES_2026-11-10.md). The fair split measures wrong HOLDS
+# (clean rows the judge wrongly CONVICTS -- hold_error counts a "violates"
+# verdict) only on the unseen rows, ~150-400 of them. A regression spread THIN
+# across the whole corpus can slip it: a candidate that newly convicts honest
+# traffic a few rows at a time, corpus-wide, lands only a handful in the small
+# split and passes the rate check -- while the 37/53-case exam, being tiny, sees
+# almost none of it. This bar measures BOTH models identically over EVERY corpus
+# row and refuses a candidate that newly BLOCKS materially more honest traffic
+# (clean rows) than the model in use, net of what it newly frees.
+#
+# Calibrated 2026-11-10: the real nightly candidate is an A127 refine, measured
+# at net -14 on the live corpus (it FREES 17 honest transfers and newly blocks 3)
+# -- a legitimate candidate is strongly net-negative, so this bar has a wide
+# margin below it and does not block normal promotions. The budget is a tunable
+# SCOPE choice (CLAUDE.md rule 5: what counts as "too many held" is his call, not
+# a measurement); 8 is a conservative default -- far above legitimate variation,
+# and it refuses a candidate that nets >=9 newly-held honest transfers the unseen
+# split would miss. A wrong HOLD delays a transfer (the seat defers and it is
+# re-judged) rather than admitting a theft, which is why this tolerates a small
+# net and the clear-side bars stay at zero.
+HOLD_REGRESSION_BUDGET = 8
+
 
 def unseen_by_both(examples, cur, rows):
     """The rows added since the deployed model was trained.
@@ -688,6 +711,18 @@ def promotion(cand, cur, cur_trained=True, holdout=None):
     if cur_trained and c["false_hold_legit"] > k["false_hold_legit"]:
         reasons.append("REFUSED: wrongly holds %d legitimate cases (clean/trap/edge), the current model %d -- more trigger-happy"
                        % (c["false_hold_legit"], k["false_hold_legit"]))
+    # WHOLE-CORPUS HOLD PARITY (2026-11-10). Independent of the fair/non-fair
+    # paths above: it fires whenever train() measured it, and it is the one bar
+    # that looks at EVERY row rather than the small unseen split, so a regression
+    # spread thin across the corpus cannot hide in the sample. See
+    # HOLD_REGRESSION_BUDGET for the calibration and why the budget is nonzero.
+    if holdout and holdout.get("corpus_holds"):
+        nb, nf = holdout["corpus_holds"]
+        if nb - nf > HOLD_REGRESSION_BUDGET:
+            reasons.append("REFUSED: across the whole corpus it newly BLOCKS %d honest transfers the "
+                           "model in use clears and frees %d, a net %d more honest traffic held -- over "
+                           "the budget of %d, and spread too thin for the unseen split to catch"
+                           % (nb, nf, nb - nf, HOLD_REGRESSION_BUDGET))
     if not reasons:
         if holdout and holdout.get("fair"):
             (ccl, cw), (kcl, kw), n_new = holdout["fair"]
@@ -1009,6 +1044,22 @@ def train(verdicts_path=None, model_path=MODEL_PATH, candidate_path=CANDIDATE, s
                 kfc += 1
         hold = {"candidate": (cd, cc, cfc), "current": (kd, kc, kfc),
                 "previous": last_holdout(), "rows": len(examples)}
+        # WHOLE-CORPUS HOLD PARITY (see HOLD_REGRESSION_BUDGET). Both models over
+        # every clean-labelled row: honest transfers the candidate newly CONVICTS
+        # ("violates") that the model in use does not, and the reverse. Net is the
+        # extra honest traffic the candidate would block -- the spread-thin
+        # regression the ~fair split misses. Measured here where both models exist.
+        newly_blocked = newly_freed = 0
+        for t, lab in examples:
+            if lab:
+                continue                       # clean rows only: honest traffic
+            cv = cand.verdict(t)[0]
+            kv = cur.verdict(t)[0]
+            if cv == "violates" and kv != "violates":
+                newly_blocked += 1
+            elif kv == "violates" and cv != "violates":
+                newly_freed += 1
+        hold["corpus_holds"] = (newly_blocked, newly_freed)
         split = unseen_by_both(examples, cur, verdicts)
         if split:
             new, older = split

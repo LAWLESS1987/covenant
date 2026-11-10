@@ -366,3 +366,43 @@ and the judge's verdict). Live judge byte-for-byte unchanged; nothing shipped.
 
 **What the audit structurally cannot see:** paraphrases and semantic contradictions with low lexical overlap. A clean
 result is not proof of a clean corpus -- only that near-duplication surfaced no mislabel.
+
+---
+
+## THE HOLD-SIDE / COVERAGE GATE CLAUSE (his call 2026-11-10: "Build gate clause")
+
+DeepSeek's clause from the consult, built. `covenant_distill.py`: a new constant `HOLD_REGRESSION_BUDGET = 8`,
+a whole-corpus measurement in `train()` (`hold["corpus_holds"]`), and a bar in `promotion()`.
+
+**The gap it closes.** The gate already weighs wrong HOLDS (clean rows wrongly CONVICTED -- `hold_error` counts a
+`violates` verdict) two ways: the exam's absolute clean bar (tiny, ~53 cases) and the fair split's `fair_holds`
+rate check (the ~150-400 UNSEEN rows only). A regression spread THIN across the whole corpus slips both: a candidate
+that newly convicts honest traffic a few rows at a time, corpus-wide, lands only a handful in the small split and
+almost none on the exam. The new bar measures BOTH models identically over EVERY clean-labelled row -- honest
+transfers the candidate newly blocks (`violates`) minus those it newly frees -- and refuses a net above the budget.
+
+**Calibration (measured, not guessed).** The real nightly candidate is an A127 refine: measured on the live corpus
+at **net -14** (it FREES 17 honest transfers and newly blocks 3). A legitimate candidate is strongly net-NEGATIVE,
+so the budget has a wide margin below it. `8` is a conservative default and -- per CLAUDE.md rule 5 -- a tunable
+SCOPE choice (what counts as "too much honest traffic held" is his call, not a measurement), flagged here for him to
+set. A wrong hold delays a transfer (the seat defers, it is re-judged) rather than admitting a theft, which is why
+this bar tolerates a small net while the clear-side bars stay at zero.
+
+**Driven both ways (CLAUDE.md rule 8).** `test_hc1_corpus_hold_parity.py`, 8/8: the bar FIRES at net budget+1 and on
+a large spread-thin regression; stays SILENT at net==budget, net 0, and net-negative; is backward-compatible (a
+holdout without the measurement is untouched); nets gross-vs-net correctly (frees offset blocks); and does NOT mask
+another bar (the absolute clean bar still refuses beneath it). The gate's own suites stay green: F2 50/50, A170, A119
+9/9, A127 16/16, A88 14/14. The real `train()` run end-to-end against a temp copy still PROMOTES the benign
+candidate (net -14 < 8), and the live `fallback_model.json` is byte-for-byte unchanged.
+
+**Honest scope -- what this bar is and is NOT.** It is DEFENSE-IN-DEPTH. The typical nightly refine is net-negative,
+so on the normal path the bar rarely fires; it bites a FROM-SCRATCH candidate (the second student's shape, or a
+future retrain) that regresses availability corpus-wide, which is exactly where the earlier mined-phrase harm lived.
+I did NOT reproduce the specific mined-K50 lever tripping this bar through the refine path: the A127 refine makes
+that lever nearly inert (which is why it promoted invisibly in the first place), and the "+19 wrong-holds" was a
+TRAIN-FROM-SCRATCH isolation measurement, not the deployed refine candidate. So the bar closes the sample-size gap
+DeepSeek named and guards the from-scratch paths; it is not a claim that it would have blocked that one promotion.
+
+**Wiring.** The measurement is computed in the FIRST student's `train()`. `covenant_second_student.py` also calls
+`promotion()` but does not yet pass `corpus_holds`, so the bar simply does not fire for it (safe, no change to its
+behaviour) -- wiring it there is a follow-up. Live judge untouched; nothing promoted.
