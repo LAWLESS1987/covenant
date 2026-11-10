@@ -176,8 +176,13 @@ def main():
             o = row_obj(i)
             v = o["judge_verdict"]
             stored_v = o["stored_violates"]
-            # judge convicts a stored-clean, or clears a stored-violation
-            if (not stored_v and v == "violates") or (stored_v and v == "clear"):
+            # judge convicts a stored-clean, or clears a stored-violation.
+            # FIX 2026-11-10 (found while building the gate clause): the judge's
+            # pass verdict is "clean", never "clear" -- the original "clear"
+            # literal matched nothing, so the clears-a-violation direction was
+            # silently uncounted. verdict() returns only {violates, clean, abstain};
+            # abstain is NOT a contradiction (no decision), only an active clean is.
+            if (not stored_v and v == "violates") or (stored_v and v == "clean"):
                 twin = b if i == a else a
                 o["near_twin"] = {"text": rows[twin]["text"][:120],
                                   "stored_violates": bool(rows[twin]["violates"])}

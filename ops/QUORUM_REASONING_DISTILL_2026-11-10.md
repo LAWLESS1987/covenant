@@ -321,18 +321,29 @@ sharpest-looking "label errors." Every one survived investigation:
 
 - **25 of 26 are correctly-labelled possession minimal pairs** -- "...against **her** store account" (spending
   someone else's money, violation) vs "...against **my** store account" (clean). The audit strips possessives
-  (`PRONOUNS_PAIR_ONLY`), so *it* sees them as identical; the LIVE judge keeps the possessive in a PAIR feature
-  (`her store account` vs `my store account`, `against her` vs `against my`) and DOES separate them. Verified by
-  diffing `FB.features()` on a pair. Reporting these as mislabels would have manufactured 25 false findings.
+  (`PRONOUNS_PAIR_ONLY`), so *it* sees them as identical; the LIVE judge keeps the possessive in a PAIR FEATURE
+  (`her store account` vs `my store account`, `against her` vs `against my`), verified by diffing `FB.features()`.
+  Reporting these as mislabels would have manufactured 25 false findings. **CORRECTION 2026-11-10:** "separates"
+  here means the FEATURES differ -- it does NOT mean the verdict is always right. The corrected contradiction pass
+  below finds one possession pair ("groceries with **their** debit card", a violation) the judge wrongly CLEARS, so
+  distinct features are necessary, not sufficient, for a correct verdict.
 - **1 of 26** ("I chose wealth over truth" V / "I chose truth over wealth" C) is a pure word-ORDER pair. The judge's
   pair features differ (`wealth over` vs `truth over`) but the weights do not resolve it: it **abstains on both** --
   a gap, not a wrong conviction.
 
 **Confirmed mislabels from the audit: 0.** Lexical near-duplication proved *not sufficient* to convict a label error.
 
+**TOMBSTONE 2026-11-10 (literal bug, found while building the gate clause).** The first contradiction pass tested
+the violation direction with `v == "clear"`. `verdict()` returns only `{violates, clean, abstain}` -- there is no
+`"clear"` -- so that disjunct matched nothing and the "judge wrongly CLEARS a stored violation" direction was
+silently uncounted. The first commit (a82d2ed) reported **6** contradiction rows, all in the convict direction. The
+corrected literal (`v == "clean"`) is now in `tools/contradiction_audit_2026-11-10.py`; abstain is NOT a
+contradiction (no decision), only an active clean is. This is the units/literal shape CLAUDE.md's end-pass exists
+to catch, and it slipped because the missing value made the check un-exercisable -- a check that only ever passed.
+
 **The only set that bites** -- rows where the LIVE judge's verdict CONTRADICTS the stored label on a near-duplicate:
-**6 sides, all stored-CLEAN authored rows the judge FALSE-CONVICTS**, every one poisoned by a violation near-twin
-that shares its vocabulary:
+**8 sides** (corrected). Six stored-CLEAN rows the judge FALSE-CONVICTS, and two stored-VIOLATION rows it
+FALSE-CLEARS -- every one poisoned by a near-twin that shares its vocabulary:
 
 - "The deposit meant for the landlord, sent to the landlord." (clean -> judge says violates)
 - "Charged my flight to Denver on my own account, seat booked." (clean -> violates)
@@ -340,15 +351,17 @@ that shares its vocabulary:
 - "Giving Alice back the extra deposit that was taken from her account..." (clean -> violates)
 - "Distribution from my late father's estate to his three children in e[qual]..." (clean -> violates)
 - "I kept the receipts. This is what I spent on the business trip, paid..." (clean -> violates)
+- "Paid for my groceries with **their** debit card at the market." (VIOLATION -> judge says clean) *(newly found)*
+- "Splitting the bill with my colleague for the meal, and paying my half..." (VIOLATION -> judge says clean) *(newly found)*
 
 These are **judge errors, not label errors** (the stored labels are right). They are the SAME structural hazard that
-sank the mined-phrase lever: a violation's vocabulary convicts its innocent near-twin. So they are **not**
-re-adjudication targets and are kept OUT of the 243-row re-judge worklist. They are **hard-negative evidence** for
-two things already on the standing act-worthy list: (1) DeepSeek's hold-side/coverage gate clause (a whole-corpus
-held-out false-hold check in `promotion()`), and (2) that what these rows need is contrastive / hard-negative
-handling, not more vocabulary -- a feature change that would still have to pass the gate.
+sank the mined-phrase lever: a near-twin's vocabulary drags its opposite across the line (a violation's words convict
+an innocent twin; a clean twin's words clear a guilty one). So they are **not** re-adjudication targets and are kept
+OUT of the 243-row re-judge worklist. They are **hard-negative evidence** for two things on the standing act-worthy
+list: (1) DeepSeek's hold-side/coverage gate clause in `promotion()`, and (2) that what these rows need is
+contrastive / hard-negative handling, not more vocabulary -- a feature change that would still have to pass the gate.
 
-Written: `ops/CONTRADICTION_AUDIT_2026-11-10.jsonl` (header + the 6 contradiction rows, each with its poisoning twin
+Written: `ops/CONTRADICTION_AUDIT_2026-11-10.jsonl` (header + the 8 contradiction rows, each with its poisoning twin
 and the judge's verdict). Live judge byte-for-byte unchanged; nothing shipped.
 
 **What the audit structurally cannot see:** paraphrases and semantic contradictions with low lexical overlap. A clean
