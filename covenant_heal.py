@@ -92,12 +92,22 @@ def heal(dry_run=False, who="button", ledger_path=None, run=None, sense=None):
         after = (sense or HW.sense)()
         for name in sorted(present):
             gone = after.get(name, {}).get("state") != HW.PRESENT
-            (out["fixed"] if gone else out["still_needs_a_person"]).append({
+            item = {
                 "condition": name,
                 "measured": present[name].get("measured"),
                 "why_no_fix": "" if gone else ("dry run: nothing was repaired, this is what a real press would face"
                                                if dry_run else (present[name].get("note") or _no_remedy_reason(HW, name))),
-            })
+            }
+            if not gone:
+                # A420 (his words, 2026-11-10: "I often get there's nothing here to fix it on the phone. I want
+                # you to have something there that can fix it"). The reason alone stopped where he needed it to
+                # go on. Every condition left now carries its card -- the next step, whose it is, the gain and
+                # the cost -- and the step rides in why_no_fix, which is the field the phone already shows.
+                c = _fix_card(HW, name)
+                if c:
+                    item["fix"] = c
+                    item["why_no_fix"] = (item["why_no_fix"] + "  " + c["line"]).strip()
+            (out["fixed"] if gone else out["still_needs_a_person"]).append(item)
         out["ok"] = True
         out["lines"] = [str(x)[:300] for x in (list(alerts) + list(infos))][:40]
     except Exception as e:                                        # noqa: BLE001
@@ -113,6 +123,17 @@ def heal(dry_run=False, who="button", ledger_path=None, run=None, sense=None):
     out["summary"] = summary(out)
     _record(dict(out, kind="heal"), ledger_path)
     return out
+
+
+def _fix_card(HW, name):
+    """The card for a condition the heal left (covenant_fixplan), or None. By name, lazily: a heal never fails
+    because the card could not be read, and the launcher's import closure does not grow."""
+    try:
+        FP = importlib.import_module("covenant_fixplan")
+        c = FP.card(HW, name)
+        return dict(c, line=FP.line(c), short=FP.short(c))
+    except Exception:                                             # noqa: BLE001
+        return None
 
 
 def _told_path(path=None):
@@ -145,7 +166,13 @@ def tell_left(out, tell, who="", state_path=None):
         for x in left[:6]:
             m = x.get("measured") if isinstance(x.get("measured"), dict) else {}
             reason = str(m.get("why") or x.get("why_no_fix") or "").replace("\n", " ")
-            bits.append("%s -- %s" % (x["condition"], reason[:140]))
+            # A420: what was measured, then the step. A reason with no step is what he asked to stop getting.
+            step = str((x.get("fix") or {}).get("short") or "")
+            if step:
+                reason = str(m.get("why") or "").replace("\n", " ")
+                bits.append("%s%s. Next: %s" % (x["condition"], (" -- " + reason[:100]) if reason else "", step))
+            else:
+                bits.append("%s -- %s" % (x["condition"], reason[:140]))
         text = "After the heal (%s), %d still need you: %s" % (who or "a press", len(now), "; ".join(bits))
     else:
         text = "After the heal (%s), nothing is left for you: %s cleared." % (who or "a press", ", ".join(prev))
