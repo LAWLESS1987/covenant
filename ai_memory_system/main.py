@@ -59,6 +59,16 @@ def main(argv=None) -> int:
                    choices=["user", "feedback", "project", "reference"])
     p.add_argument("--body", required=True)
     p.add_argument("--agent", default="cli")
+    p.add_argument("--intent", required=True,
+                   help="one sentence, present tense: what this record is meant "
+                        "to cause (not a restatement of the body)")
+    p.add_argument("--beneficiary", required=True,
+                   help="who or what this is for; 'future unknown agent' is valid")
+    p.add_argument("--divergence", required=True,
+                   help="the value or prior claim this conflicts with, or 'none'")
+    p.add_argument("--diverges-from", dest="diverges_from", default="",
+                   help="required when --divergence is not 'none': the record "
+                        "name this write diverges from")
 
     g = sub.add_parser("get", help="read one memory")
     g.add_argument("name")
@@ -90,7 +100,9 @@ def main(argv=None) -> int:
     store = MemoryStore(root)
 
     if a.cmd == "put":
-        out = store.put(a.name, a.description, a.type, a.body, a.agent)
+        out = store.put(a.name, a.description, a.type, a.body, a.agent,
+                        intent=a.intent, beneficiary=a.beneficiary,
+                        divergence=a.divergence, diverges_from=a.diverges_from)
         print(json.dumps(out, indent=1, sort_keys=True))
         return 0
 
@@ -185,7 +197,11 @@ def main(argv=None) -> int:
                 m = parse_memory(open(path, encoding="utf-8").read())
                 store.put(m["name"], m.get("description", ""),
                           (m.get("metadata") or {}).get("type", "reference"),
-                          m["body"], a.agent)
+                          m["body"], a.agent,
+                          intent=f"adopt the existing memory {m['name']} so "
+                                 f"recall can reach it from this store",
+                          beneficiary="future unknown agent",
+                          divergence="none")
                 took.append(m["name"])
             except (ValueError, OSError) as e:
                 skipped.append(f"{fn}: {type(e).__name__}: {e}")

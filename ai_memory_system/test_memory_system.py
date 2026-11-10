@@ -47,6 +47,27 @@ sys.path.insert(0, HERE)
 from memory_store import MemoryStore, parse_memory   # noqa: E402
 import server                                        # noqa: E402
 
+# INTENT PROVENANCE is now required on every write (memory_store.screen_provenance).
+# The checks in THIS file exercise OTHER properties of the store (round-trip,
+# chain, flood, auth). Rather than thread a valid triple through forty call
+# sites, put() is wrapped so a direct call that omits provenance gets a fixed,
+# valid one whose intent shares no words with any test body (so the restatement
+# screen stays out of the way). This is test scaffolding, not a weakening: the
+# provenance gate itself is driven BOTH WAYS in test_intent_provenance.py, and a
+# call that passes its own provenance (the HTTP layer, below) is left untouched.
+_DEF_PROV = dict(intent="hold this record under test to exercise the store",
+                 beneficiary="future unknown agent", divergence="none")
+_orig_put = MemoryStore.put
+
+
+def _put_with_prov(self, *a, **k):
+    for key, val in _DEF_PROV.items():
+        k.setdefault(key, val)
+    return _orig_put(self, *a, **k)
+
+
+MemoryStore.put = _put_with_prov
+
 results = []
 
 
@@ -59,6 +80,16 @@ def check(label, ok, detail=""):
 def call(url, method="GET", body=None, token=None, timeout=10):
     """(status, json) -- never raises for HTTP status, so a check can assert
     on a 401 as easily as a 200."""
+    # A would-be-complete PUT that omits intent provenance gets a fixed valid
+    # triple, so the HTTP checks keep testing what they test. A deliberately
+    # INCOMPLETE body (H9) lacks description/type/body/agent, so the condition
+    # is false and it is left untouched to still earn its 400.
+    if (method == "PUT" and isinstance(body, dict)
+            and all(str(body.get(k) or "").strip()
+                    for k in ("description", "type", "body", "agent"))
+            and not str(body.get("intent") or "").strip()):
+        body = {**body, "intent": "exercise the http write path under test",
+                "beneficiary": "future unknown agent", "divergence": "none"}
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method)
     req.add_header("Content-Type", "application/json")
@@ -316,8 +347,10 @@ def h_http(root):
 
     code, bad = call(base + "/memories/incomplete", "PUT",
                      {"description": "no body or agent"})
-    check("H9 an incomplete PUT is 400 and NAMES the missing fields",
-          code == 400 and set(bad.get("missing", [])) == {"type", "body", "agent"},
+    check("H9 an incomplete PUT is 400 and NAMES the missing fields "
+          "(now including the required intent provenance)",
+          code == 400 and set(bad.get("missing", [])) ==
+          {"type", "body", "agent", "intent", "beneficiary", "divergence"},
           (code, bad))
 
     code, sr = call(base + "/search?q=an%20agent%20wrote")
