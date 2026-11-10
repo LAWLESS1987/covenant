@@ -498,3 +498,37 @@ judgment enters as reviewable DATA, never as a verdict, never in the gate. It is
 engaging it means model calls on the runner (his go), the same line the 243-row re-adjudication waits behind.
 
 Both live judges byte-for-byte unchanged; nothing promoted. The report is a regenerable artifact (not committed).
+
+---
+
+## ENGAGING THE REASONING HALF ON THE RUNNER (his call 2026-11-10: "Engage on the runner", then "Run the rest")
+
+The auditor's reasoning half, run for real. The teacher panel (qwen2.5:7b, llama3.2:3b, gemma2:2b -- three
+families) re-judged the auditor's **300 lowest-trust queued rows** BLIND on the GitHub runner
+(`.github/workflows/judge.yml`), against the ten DIVINE_PRINCIPLES, in ~38 min / 21 dispatches.
+`tools/engage_auditor_panel_2026-11-10.py`. His "engage" is the operator consent the A21 credential gate asks for;
+the opt-in was explicit and logged. Only shareable rows were sent (256 single_judge + 44 authored; no `queue` rows).
+
+**Result (`ops/REJUDGE_RESULT_2026-11-10.jsonl`): 267 CONFIRMED, 7 CORRECTED, 26 CONTESTED.** The live corpus
+(`ops/verdicts.jsonl`) was NOT rewritten and no model was touched -- a reviewable artifact, as the scaffold intends.
+
+- **267 confirmed** -- low deterministic trust, but the panel unanimously agrees the stored label. The trust floor
+  is cautious by design; most flagged rows were fine.
+- **7 corrected** -- the panel unanimously overturns the stored label. A MIXED bag, and the reason corrections are
+  reviewable and never auto-applied: some are reasonable (an inheritance-refusal row V->C), several are debatable,
+  and at least one is **wrong to apply** -- "I protected a runaway servant from their master" (stored CLEAN) the
+  panel flips to VIOLATION. Calling the protection of someone fleeing bondage a violation is an ethically bad label
+  that echoes exactly the reasoning the covenant refuses. A panel is a SIGNAL, never a conviction (signal vs
+  conviction): these seven go to human review, row by row, not into the corpus.
+- **26 contested** -- no two-family unanimous consensus; kept, never taught.
+
+**The arc, closed.** Five feature-space levers failed to improve the inspectable judge through its weights; the
+evidence pointed to cleaner labels and a reasoning auditor. The auditor scaffold queued the suspect rows by
+provenance and trust, and the reasoning half -- context-aware, on the runner -- did what more bag-of-words weight
+provably could not: it confirmed 267 labels and surfaced 7 correction candidates a context-free judge had no way to
+see. And it stayed honest about its own fallibility: the corrections are reviewable, one of them demonstrably should
+be refused. Nothing entered the gate or the live judge; both remain byte-for-byte unchanged.
+
+**NOT done, by design and his go:** applying any correction to `ops/verdicts.jsonl` (row by row, human-reviewed,
+NEVER the runaway-servant flip), after which the student retrains and goes through the full promotion gate. That is a
+separate, deliberate step.

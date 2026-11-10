@@ -177,6 +177,11 @@ INPUT_LEDGERS = {
         "LABEL-lever re-adjudication worklist; one-off offline artifact, read not written by the loop",
     "ops/CONTRADICTION_AUDIT_2026-11-10.jsonl":
         "contradiction-audit result; one-off offline artifact, read not written by the loop",
+    # 2026-11-10: the auditor reasoning-half engagement -- the teacher panel's re-adjudication of the
+    # auditor's 300 lowest-trust queued rows, run once on the runner and committed as the record of
+    # that engagement. Reviewable (the live corpus was NOT rewritten); read not written by the loop.
+    "ops/REJUDGE_RESULT_2026-11-10.jsonl":
+        "panel re-adjudication result (auditor engagement); one-off runner artifact, read not written",
 }
 
 
