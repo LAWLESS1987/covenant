@@ -403,6 +403,14 @@ that lever nearly inert (which is why it promoted invisibly in the first place),
 TRAIN-FROM-SCRATCH isolation measurement, not the deployed refine candidate. So the bar closes the sample-size gap
 DeepSeek named and guards the from-scratch paths; it is not a claim that it would have blocked that one promotion.
 
-**Wiring.** The measurement is computed in the FIRST student's `train()`. `covenant_second_student.py` also calls
-`promotion()` but does not yet pass `corpus_holds`, so the bar simply does not fire for it (safe, no change to its
-behaviour) -- wiring it there is a follow-up. Live judge untouched; nothing promoted.
+**Wiring.** The measurement is computed in `covenant_distill.train()`.
+
+**CORRECTION 2026-11-10 (his call "wire second student").** The paragraph here first said the second student "does
+not yet pass `corpus_holds`, so the bar does not fire for it -- a follow-up." That was WRONG. `covenant_second_student.py`
+does not reimplement training: its `train()` delegates to `covenant_distill.train()` (with its own model, ledger and
+held-out paths rebound for the call), so it inherits the whole gate -- `corpus_holds` and this bar included -- for
+free. Verified by running the second student's `train()` sandboxed against a temp copy of `fallback_model_2.json`:
+`corpus_holds = (3, 2)` (net +1 over its half) reaches `promotion()`, the bar is active, and `fallback_model_2.json`
+is byte-for-byte unchanged. `test_hp1_corpus_hold_parity.py` check 9 now PINS this: it asserts the second student
+routes through the shared `train()`, so if anyone ever gives it a separate training path the bar's coverage of it
+cannot lapse silently. Both live judges untouched; nothing promoted.

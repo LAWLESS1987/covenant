@@ -91,6 +91,30 @@ def main():
     check("absolute clean bar still refuses even with benign corpus_holds",
           (not ok) and not fired(r))
 
+    # 9. THE SECOND STUDENT INHERITS THIS BAR (2026-11-10). It does not
+    #    reimplement training -- covenant_second_student.train() delegates to
+    #    covenant_distill.train(), where corpus_holds is computed, so the bar
+    #    covers it too. Pin that it ROUTES through the shared train(): if someone
+    #    ever gives the second student its own training path, the measurement (and
+    #    this bar) would silently stop covering it, and this check goes red.
+    import covenant_second_student as S2
+    routed = {}
+
+    def fake_train(verdicts_path=None, model_path=None, candidate_path=None, say=print):
+        routed["yes"] = True
+        return False, {}
+
+    real_train = D.train
+    D.train = fake_train
+    try:
+        S2.train(model_path="unused")
+    except Exception:
+        pass
+    finally:
+        D.train = real_train
+    check("second student routes through covenant_distill.train (inherits the bar)",
+          routed.get("yes", False))
+
     npass = sum(1 for _, c in checks if c)
     print("\nHP1: %d/%d passed" % (npass, len(checks)))
     return 0 if npass == len(checks) else 1
