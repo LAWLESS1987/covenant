@@ -31,7 +31,10 @@ def row(rid, idea, label):
 
 HAVE = row("h", "alpha beta gamma delta", "real_have")
 GAP = row("g", "alpha beta gamma delta", "real_gap")
-two = lambda terms: "alpha @ a.py (code `alpha`); beta @ b.py (code `beta`)"   # noqa: E731  -- 2 matches -> have
+# 2026-11-04: the vet no longer KILLS on a word match; "flagged as a duplicate" is now a dup_hint, which needs
+# two specific terms in ONE file. The stub puts both in a.py (it had them in a.py/b.py, which is no longer
+# evidence -- IM5.13 pins that). Old file kept in .trash/echo_v2_build_2026-11-04/.
+two = lambda terms: "alpha @ a.py (code `alpha`); beta @ a.py (code `beta`)"   # noqa: E731  -- co-located -> dup_hint
 none = lambda terms: ""                                                        # noqa: E731  -- 0 matches
 notomb = lambda text: None                                                     # noqa: E731
 hittomb = lambda text: "RETRACTED.json: ... matched line"                      # noqa: E731

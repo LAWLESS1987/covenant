@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import covenant_tetsu_client as tc
 
 checks = []
+UNICODE_ANSWER = "Luna’s “lead” — 0.8 → too close ≤ 1"
 
 
 def check(name, cond):
@@ -47,9 +48,26 @@ class Stub(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+    def _send_raw(self, b):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(b)))
+        self.end_headers()
+        self.wfile.write(b)
+
     def do_POST(self):
         n = int(self.headers.get("Content-Length", "0"))
         Stub.last_post = json.loads(self.rfile.read(n) or b"{}")
+        q = Stub.last_post.get("question")
+        if q == "unicode":
+            # what the real door sends: raw UTF-8, NOT \u-escaped (ensure_ascii=False). The 27B's answer on
+            # 2026-11-05 carried a right double quote (bytes E2 80 9D); 0x9D has no cp1252 mapping.
+            self._send_raw(json.dumps({"question": q, "answers": [{"model": "m", "answer": UNICODE_ANSWER}]},
+                                      ensure_ascii=False).encode("utf-8"))
+            return
+        if q == "badbytes":
+            self._send_raw(b'{"answers": [{"answer": "\xff\xfe"}]}')         # not valid UTF-8
+            return
         self._send({"question": Stub.last_post.get("question"),
                     "answers": [{"model": "leg-qwen3.5-2b", "answer": "READY",
                                  "seconds": 0.0, "tokens": 1, "error": None}]})
@@ -91,6 +109,23 @@ try:
     Stub.last_post = None
     tc.consult("q", max_tokens=50, timeout=4, doors=[GOOD])
     check("max_tokens SENT when explicitly set", (Stub.last_post or {}).get("max_tokens") == 50)
+
+    # --- UTF-8, both ways (2026-11-05). A non-ASCII answer from a WORKING door must come back intact;
+    #     an undecodable one must be named a decode error, never "no response" (which reads as a down door). ---
+    u = None
+    try:
+        u = tc.consult("unicode", timeout=4, doors=[GOOD])
+    except tc.AllDoorsDown as e:
+        u = e
+    check("a raw-UTF-8 answer comes back intact (not 'all doors down')",
+          isinstance(u, dict) and u["result"]["answers"][0]["answer"] == UNICODE_ANSWER)
+    bad = None
+    try:
+        tc.consult("badbytes", timeout=4, doors=[GOOD])
+    except tc.AllDoorsDown as e:
+        bad = e
+    check("undecodable bytes are reported as a decode error, not as a down door",
+          bad is not None and "decode" in str(bad).lower())
 
     # --- FAIL direction: every door down -> AllDoorsDown, no hang/crash ---
     err = None

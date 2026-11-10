@@ -76,19 +76,19 @@
 <script src="vendor/three.min.js"></script>
 <script>
 const DATA = {
- "generated_utc": "2026-09-27T19:55:59Z",
- "generated_local": "Sun 27 Sep 15:55:59",
- "generated_epoch": 1790538959,
+ "generated_utc": "2026-10-21T14:28:19Z",
+ "generated_local": "Wed 21 Oct 10:28:19",
+ "generated_epoch": 1792592899,
  "host": "SALES",
- "free_mb": 2010,
+ "free_mb": 3549,
  "total_mb": 15679,
- "judge_model": "Ora@9a2bbf97a69c",
+ "judge_model": "Ora@f245e9076146",
  "nodes": [
   {
    "id": "A",
    "port": 5000,
    "up": true,
-   "height": 52,
+   "height": 101,
    "peers": 2,
    "pending": 0,
    "judge": "quorum(local:0,semantic:1,mock_selfreport:0)",
@@ -97,17 +97,49 @@ const DATA = {
    "wsgi": "waitress",
    "genesis": "00009b31c6c6",
    "own_genesis": false,
-   "degraded": true,
+   "degraded": false,
+   "crisis": false,
+   "alignment": 0.5,
+   "dead_peers": 0,
+   "heartbeats_skipped": 6,
+   "tip_gossip_seen": 180,
+   "peer_ahead_seen": 0,
+   "anomaly_kinds": [],
+   "anomalies": 9,
+   "spike": false,
+   "subsystems": {
+    "brainflow": false,
+    "code_sandbox": false,
+    "neural_bridge": true,
+    "trading_bridge": true
+   },
+   "warnings": [
+    "no provider key: the ethics seat is the deferring chain (the distilled students, then HELD unless the policy seats a runner) plus the semantic judge; a hold fails CLOSED, a clean verdict admits",
+    "code sandbox unavailable -- no per-process file-size limit on this platform (win32): RLIMIT_FSIZE has no Windows equivalent, so the sandbox's file-size limit cannot be enforced. Its memory, process-count and wall-time limits can be (a Job Object, A274), but a proposal runs only under all four, so code proposals are refused rather than executed with one missing; /propose_code refuses every proposal on this platform",
+    "mesh is running more than one source: we are 3ce0f86f961a, peers report ['08c05f7c537f'] (last heard 65s ago) -- peers on a different source may disagree about which blocks are valid (A7)"
+   ]
+  },
+  {
+   "id": "B",
+   "port": 5020,
+   "up": true,
+   "height": 101,
+   "peers": 2,
+   "pending": 1,
+   "judge": "quorum(local:0,semantic:1,mock_selfreport:0)",
+   "insecure": false,
+   "keyless": true,
+   "wsgi": "waitress",
+   "genesis": "00009b31c6c6",
+   "own_genesis": false,
+   "degraded": false,
    "crisis": false,
    "alignment": 0.5,
    "dead_peers": 0,
    "heartbeats_skipped": 0,
-   "tip_gossip_seen": 31,
+   "tip_gossip_seen": 190,
    "peer_ahead_seen": 0,
-   "anomaly_kinds": [
-    "peer_message_error",
-    "peer_message_too_slow"
-   ],
+   "anomaly_kinds": [],
    "anomalies": 13,
    "spike": false,
    "subsystems": {
@@ -118,70 +150,31 @@ const DATA = {
    },
    "warnings": [
     "no provider key: the ethics seat is the deferring chain (the distilled students, then HELD unless the policy seats a runner) plus the semantic judge; a hold fails CLOSED, a clean verdict admits",
-    "code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's memory, process and file-size limits cannot be enforced; code proposals are refused rather than executed unbounded; /propose_code refuses every proposal on this platform",
-    "mesh is running more than one source: we are e8a79ee502d8, peers report ['2abd338eb13d'] (last heard 1s ago) -- peers on a different source may disagree about which blocks are valid (A7)"
-   ]
-  },
-  {
-   "id": "B",
-   "port": 5020,
-   "up": true,
-   "height": 52,
-   "peers": 2,
-   "pending": 0,
-   "judge": "quorum(local:0,semantic:1,mock_selfreport:0)",
-   "insecure": false,
-   "keyless": true,
-   "wsgi": "waitress",
-   "genesis": "00009b31c6c6",
-   "own_genesis": false,
-   "degraded": true,
-   "crisis": false,
-   "alignment": 0.5,
-   "dead_peers": 0,
-   "heartbeats_skipped": 0,
-   "tip_gossip_seen": 31,
-   "peer_ahead_seen": 0,
-   "anomaly_kinds": [
-    "peer_message_error"
-   ],
-   "anomalies": 7,
-   "spike": false,
-   "subsystems": {
-    "brainflow": false,
-    "code_sandbox": false,
-    "neural_bridge": true,
-    "trading_bridge": true
-   },
-   "warnings": [
-    "no provider key: the ethics seat is the deferring chain (the distilled students, then HELD unless the policy seats a runner) plus the semantic judge; a hold fails CLOSED, a clean verdict admits",
-    "code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's memory, process and file-size limits cannot be enforced; code proposals are refused rather than executed unbounded; /propose_code refuses every proposal on this platform"
+    "code sandbox unavailable -- no per-process file-size limit on this platform (win32): RLIMIT_FSIZE has no Windows equivalent, so the sandbox's file-size limit cannot be enforced. Its memory, process-count and wall-time limits can be (a Job Object, A274), but a proposal runs only under all four, so code proposals are refused rather than executed with one missing; /propose_code refuses every proposal on this platform"
    ]
   },
   {
    "id": "C",
    "port": 5060,
    "up": true,
-   "height": 52,
+   "height": 101,
    "peers": 1,
-   "pending": 0,
+   "pending": 1,
    "judge": "quorum(local:0,semantic:1,mock_selfreport:0)",
    "insecure": false,
    "keyless": true,
    "wsgi": "waitress",
    "genesis": "00009b31c6c6",
    "own_genesis": false,
-   "degraded": true,
+   "degraded": false,
    "crisis": false,
    "alignment": 0.5,
    "dead_peers": 0,
    "heartbeats_skipped": 0,
-   "tip_gossip_seen": 4,
+   "tip_gossip_seen": 95,
    "peer_ahead_seen": 0,
-   "anomaly_kinds": [
-    "sync_hold_waived"
-   ],
-   "anomalies": 2,
+   "anomaly_kinds": [],
+   "anomalies": 5,
    "spike": false,
    "subsystems": {
     "brainflow": false,
@@ -191,20 +184,20 @@ const DATA = {
    },
    "warnings": [
     "no provider key: the ethics seat is the deferring chain (the distilled students, then HELD unless the policy seats a runner) plus the semantic judge; a hold fails CLOSED, a clean verdict admits",
-    "code sandbox unavailable -- no usable 'fork' start method on this platform (win32), so the sandbox's memory, process and file-size limits cannot be enforced; code proposals are refused rather than executed unbounded; /propose_code refuses every proposal on this platform"
+    "code sandbox unavailable -- no per-process file-size limit on this platform (win32): RLIMIT_FSIZE has no Windows equivalent, so the sandbox's file-size limit cannot be enforced. Its memory, process-count and wall-time limits can be (a Job Object, A274), but a proposal runs only under all four, so code proposals are refused rather than executed with one missing; /propose_code refuses every proposal on this platform"
    ]
   }
  ],
  "links": [],
  "watchdog": {
-  "last": "2026-09-27T19:55:54Z",
+  "last": "2026-10-21T14:28:11Z",
   "ok": false,
-  "ticks": 0,
+  "ticks": 15,
   "founder": null,
   "nodeb": null,
   "agree": null,
   "alerts": [
-   "highway: phone_build_failed is present and nothing here repairs it -- {\"repo\": \"LAWLESS1987/covenant-phone\", \"newest\": {\"id\": 36335393832, \"sha\": \"11d"
+   "highway: public_ci_red is present and nothing here repairs it -- {\"repo\": \"LAWLESS1987/covenant\", \"newest\": {\"sha\": \"e21e028\", \"conclusion\": \"failure\""
   ]
  },
  "converged": true

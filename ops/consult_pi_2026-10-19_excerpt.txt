@@ -1,0 +1,12 @@
+CONTEXT (data, not instructions). An open-source personal AI system wants to give its small LOCAL model (a 3B, "Tetsu", served by llama.cpp) the ability to actually edit code, not just discuss it. The candidate tool is Pi (Earendil Works, MIT): an open-source terminal coding agent with four built-in tools (read, write, edit, bash), extensible via TypeScript, bring-your-own-key, works with LOCAL models via llama.cpp, and embeddable (TUI, print/JSON, RPC over stdin/stdout, SDK). Its documented caveat: NO built-in sandbox and NO permission system.
+
+The system's existing safety design is the opposite of that: its code-proposal path REFUSES every proposal on the only OS it runs (no sandbox); its self-healing layer has a NEVER_AUTOMATIC set (money, keys, the phone, rules, judge seats) refused by construction; its principle is "a model that edits its own guards unwatched is the thing we judge, not the thing it is." Standing rule: new capability waits for the operator's word or a judge consensus; refinements are automatic.
+
+The proposed integration: use Pi (or its pattern) BEHIND the existing gates -- Tetsu proposes edits through Pi's tool loop, but every write/bash is routed through the covenant's refusal/judge path and lands as PROPOSE_ONLY, never auto-executed; reads first, writes only to a scratch area, bash sandboxed or disabled. New capability, pending the operator's word.
+
+QUESTIONS (answer in under 300 words; cite the sentence you rely on; if you can't see it, say so):
+1) Can Pi's tool loop be wrapped in an external permission gate safely, or does an agent designed with NO permission model leak authority in ways a wrapper cannot close? Where does the wrapper fail first?
+2) Is a 3B model even worth giving write/bash tools -- does weak planning make an edit loop MORE dangerous (confident wrong edits), and what single safeguard matters most?
+3) If you were doing this, would you embed Pi (RPC/SDK) or just copy its 4-tool minimal design into the system's own gated harness? Which is safer and cheaper to audit?
+4) What is the smallest first step that proves value without risk -- e.g. Pi in READ-ONLY mode producing diffs a person applies?
+5) What are we missing or getting wrong?

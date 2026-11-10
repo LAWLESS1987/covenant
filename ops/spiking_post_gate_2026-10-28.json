@@ -1,0 +1,20 @@
+{
+ "outcome": "answered",
+ "answer": {
+  "verdict": "PASS",
+  "reason": "No task details provided to evaluate."
+ },
+ "views": [
+  {
+   "model": "github-actions/qwen2.5:7b",
+   "place": "github-actions",
+   "seconds": 106.0,
+   "run_url": "https://github.com/LAWLESS1987/covenant/actions/runs/40677025054",
+   "answer": {
+    "verdict": "PASS",
+    "reason": "No task details provided to evaluate."
+   }
+  }
+ ],
+ "log": "C:\\Users\\Lawre\\covenant\\ops\\judge_route.log"
+}

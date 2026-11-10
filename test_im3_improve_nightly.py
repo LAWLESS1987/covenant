@@ -28,12 +28,21 @@ def _write(path, rows):
 
 def main():
     fails = []
-    long = "x" * 250
-    orig_cand, orig_seen = IM.CANDIDATES, IM.SEEN
+    # 2026-11-04: the nightly now extracts with the reply-only prompt (v2), whose idea must rest on a QUOTE found in
+    # the reply -- so the fixture replies carry a real sentence to quote, and the stub door answers in v2 format.
+    long = " we should keep join keys on every distilled row so it can be traced " + "x" * 200
+    import covenant_improve_extract as EX
+    orig_cand, orig_seen, orig_out = IM.CANDIDATES, IM.SEEN, EX.CANDIDATES_OUT
+    # IM8 (2026-11-04): this suite appended 120 fixture rows to the LIVE ops/improve_candidates.jsonl (10-27..10-29)
+    # while printing 15/15, because nightly() -> extract() wrote through a frozen default. Every live ledger the
+    # flow can touch is redirected below AND snapshotted here, so a write that escapes the temp dir turns this red.
+    live = [orig_out, CI.BACKLOG, orig_seen, orig_cand]
+    before = {p: (os.path.getsize(p) if os.path.exists(p) else None) for p in live}
     try:
         with tempfile.TemporaryDirectory() as d:
             IM.CANDIDATES = os.path.join(d, "candidates.jsonl")
             IM.SEEN = os.path.join(d, "seen.json")
+            EX.CANDIDATES_OUT = os.path.join(d, "improve_candidates.jsonl")
             backlog = os.path.join(d, "backlog.jsonl")
 
             # ---- unit: vet downgrades every non-starter, promotes only a genuine gap ----
@@ -52,18 +61,25 @@ def main():
                 fails.append("vet: gap with no test should be needs-test")
             if CI.vet(cases["recurrence"], no_grep, lambda t: "RETRACTED.json: old line")["status"] != "recurrence":
                 fails.append("vet: tombstoned idea should be recurrence")
-            if CI.vet(cases["have"], lambda terms: True, no_tomb)["status"] != "have":
-                fails.append("vet: keyword-in-source should be have")
+            # SUPERSEDED 2026-11-04 (A409 follow-up): "keyword-in-source should be have" pinned the rule that a
+            # word match KILLS a candidate. Measured on 32 real ideas, every such kill rested on a co-incidence; a
+            # match is now a signal (dup_hint) and never a verdict. The old checks are kept as written in
+            # .trash/echo_v2_build_2026-11-04/test_im3_improve_nightly.py.before_never_kill. Both ways, the new rule:
+            kw = CI.vet(cases["have"], lambda terms: True, no_tomb)
+            if kw["status"] != "backlog":
+                fails.append("vet: a keyword match must NOT kill a candidate (signal, not conviction), got %r" % kw)
             if CI.vet(cases["backlog"], no_grep, no_tomb)["status"] != "backlog":
                 fails.append("vet: a genuine gap with a test should reach backlog")
-            # a 'have' must NAME the keyword that tripped the dedup, so a single-generic-word
-            # false-match is measurable (2026-10-28, A375 side-finding). Both ways:
-            named = CI.vet(cases["have"], lambda terms: "joins @ covenant_mycelium.py", no_tomb)
-            if named["status"] != "have" or "joins @ covenant_mycelium.py" not in named["why"]:
-                fails.append("vet: a have from a real dedup match must name the term in why, got %r" % named)
-            plain = CI.vet(cases["have"], lambda terms: True, no_tomb)
-            if ":" in plain["why"]:
-                fails.append("vet: a bare-True grep (stub) must leave why generic, got %r" % plain)
+            # the evidence is still NAMED, so a person (and the benchmark) can see why it might be a duplicate
+            co = {"kind": "gap", "idea": "zebrafoo quokkabar", "test": "t"}
+            named = CI.vet(co, lambda terms: "zebrafoo @ m.py (code `zebrafoo`); quokkabar @ m.py (code `quokkabar`)",
+                           no_tomb)
+            if named["status"] != "backlog" or "zebrafoo @ m.py" not in named.get("dup_hint", ""):
+                fails.append("vet: two specific terms in one file must be carried as a named dup_hint, got %r" % named)
+            apart = CI.vet(co, lambda terms: "zebrafoo @ m.py (code `zebrafoo`); quokkabar @ n.py (code `quokkabar`)",
+                           no_tomb)
+            if apart.get("dup_hint"):
+                fails.append("vet: the same two terms in DIFFERENT files are not a mechanism -> no hint, got %r" % apart)
 
             # ---- flow: COLD START seeds, no digest ----
             _write(IM.CANDIDATES, [_row("a", "A " + long, "a1"), _row("b", "B " + long, "b2")])
@@ -81,8 +97,8 @@ def main():
             # ---- flow: a NEW reply after seeding -> backlog -> digest on the weekly day ----
             with open(IM.CANDIDATES, "a", encoding="utf-8") as f:
                 f.write(json.dumps(_row("carol", "CAROL " + long, "c3")) + "\n")
-            door = lambda t: (200, {"answer": "KIND: gap\nMAPS: distill\nIDEA: keep join keys\n"
-                                              "TEST: present=green / removed=red"})
+            door = lambda t: (200, {"answer": "KIND: idea\nQUOTE: we should keep join keys on every distilled row\n"
+                                              "IDEA: keep join keys\nTEST: present=green / removed=red"})
             r1 = CI.nightly(say=lambda *a: None, ask=door, weekday=CI.DIGEST_WEEKDAY,
                             digest=lambda top, say: digested.append(list(top)),
                             backlog=backlog, grep=no_grep, tomb=no_tomb)
@@ -124,15 +140,21 @@ def main():
             if not digested or len(digested[-1]) != CI.DIGEST_CAP:
                 fails.append("digest must be capped at %d, got %r" % (CI.DIGEST_CAP, [len(x) for x in digested]))
     finally:
-        IM.CANDIDATES, IM.SEEN = orig_cand, orig_seen
+        IM.CANDIDATES, IM.SEEN, EX.CANDIDATES_OUT = orig_cand, orig_seen, orig_out
+
+    after = {p: (os.path.getsize(p) if os.path.exists(p) else None) for p in live}
+    for p in live:
+        if before[p] != after[p]:
+            fails.append("the suite wrote to a LIVE ledger %s (%r -> %r bytes): a path escaped the temp dir"
+                         % (os.path.relpath(p, HERE), before[p], after[p]))
 
     if fails:
         print("IM3 FAIL:")
         for x in fails:
             print("  -", x)
         return 1
-    print("IM3: 15/15 passed -- cold start seeds with no digest; vet downgrades every non-starter; a genuine gap reaches "
-          "backlog; the weekly digest fires capped on its day and holds off-day. Offline, no network.")
+    print("IM3: 16/16 passed -- cold start seeds with no digest; vet downgrades every non-starter; a genuine gap reaches "
+          "backlog; the weekly digest fires capped on its day and holds off-day; no live ledger written. Offline, no network.")
     return 0
 
 

@@ -37,6 +37,20 @@ DIGEST_CAP = 5
 DIGEST_WEEKDAY = 0          # Monday (time.gmtime().tm_wday); the weekly roll-up, not per-round
 _STOP = {"the", "that", "with", "from", "this", "into", "when", "which", "their", "about", "every",
          "value", "check", "claim", "model", "agent", "system", "covenant", "gate", "test"}
+# Closed-class English (function words, modals, generic connectives). MEASURED 2026-11-04: with the reply-only
+# extractor, 13 of 19 ideas were called 'have' on words like "before", "should", "against", "ensure" matching code
+# identifiers (`held_before`, `should_canary`, `_emit_against`). A word with no content is never evidence that we
+# already built someone's idea. Closed-class only -- no domain word is added here (that is what df below is for).
+_STOP |= {"after", "again", "against", "along", "also", "although", "among", "another", "around", "because",
+          "before", "behind", "being", "below", "beside", "between", "beyond", "both", "could", "doing", "during",
+          "each", "either", "else", "enough", "even", "ever", "first", "have", "having", "here", "however",
+          "instead", "itself", "just", "less", "like", "make", "makes", "many", "might", "more", "most", "much",
+          "must", "never", "only", "other", "otherwise", "over", "rather", "same", "shall", "should", "since",
+          "some", "still", "such", "than", "them", "then", "there", "these", "they", "those", "though",
+          "through", "under", "unless", "until", "upon", "very", "what", "whatever", "where", "whether", "while",
+          "whose", "will", "within", "without", "would", "your", "ensure", "using", "always"}
+# (Specificity for the dedup HINT is measured by document frequency over the scanned files: see term_df and
+# DUP_HINT_DF_FRAC below.)
 
 
 def is_seeded(seen_path=None):
@@ -92,6 +106,39 @@ def _components(identifier):
     return parts
 
 
+def _scan_files(root):
+    """The files the dedup reads: top-level .py, minus frozen '.PRE-' copies (retired versions kept as tombstones --
+    a match there says what we HAD, not what we have; 20 of 496 on 2026-11-04)."""
+    return [p for p in sorted(glob.glob(os.path.join(root, "*.py"))) if ".PRE-" not in os.path.basename(p)]
+
+
+_DF_CACHE = {}
+
+
+def term_df(root=HERE):
+    """(n_files, {component: number of scanned files whose identifiers contain it}). Cached per root and file-set
+    signature (names + mtimes), so a nightly builds it once."""
+    files = _scan_files(root)
+    sig = tuple((p, os.path.getmtime(p)) for p in files)
+    hit = _DF_CACHE.get(root)
+    if hit and hit[0] == sig:
+        return hit[1]
+    df = {}
+    for p in files:
+        try:
+            src = open(p, encoding="utf-8", errors="ignore").read()
+        except Exception:                                      # noqa: BLE001
+            continue
+        comps = set()
+        for ident in _code_identifiers(src):
+            comps |= _components(ident)
+        for c in comps:
+            df[c] = df.get(c, 0) + 1
+    val = (len(files), df)
+    _DF_CACHE[root] = (sig, val)
+    return val
+
+
 def _grep_repo(terms, root=HERE):
     """Dedup against the CODE, not the prose. For each top-level .py, match each candidate keyword against the
     file's identifier tokens at WORD level (snake/camel components), never as a raw-text substring. Returns
@@ -108,7 +155,7 @@ def _grep_repo(terms, root=HERE):
         return ""
     termset = {t.lower() for t in terms}
     matches, seen = [], set()
-    for path in sorted(glob.glob(os.path.join(root, "*.py"))):
+    for path in _scan_files(root):
         try:
             src = open(path, encoding="utf-8", errors="ignore").read()
         except Exception:                                      # noqa: BLE001
@@ -125,10 +172,12 @@ def _grep_repo(terms, root=HERE):
 _RETRACTION_CACHE = {}
 
 
-def _retraction_patterns(path=RETRACTED):
+def _retraction_patterns(path=None):
     """The narrow per-claim regexes from docs/RETRACTED.json -- the DESIGNED recurrence instrument, the very
     patterns test_r1_retracted.py enforces (rule 10: 'a narrow pattern', one set per refuted claim). Returns
     [(id, claim, compiled), ...]; cached by (path, mtime) so a nightly compiles them once."""
+    if path is None:                                           # IM8: every path default resolves at call time
+        path = RETRACTED
     try:
         mtime = os.path.getmtime(path)
     except OSError:
@@ -152,7 +201,7 @@ def _retraction_patterns(path=RETRACTED):
     return out
 
 
-def _tombstoned(text, path=RETRACTED):
+def _tombstoned(text, path=None):
     """Return 'RETRACTED <id>: <claim>' if `text` RE-STATES a retracted claim (matches one of that retraction's
     narrow patterns), else None.
 
@@ -173,6 +222,42 @@ def _tombstoned(text, path=RETRACTED):
     return None
 
 
+# A LEXICAL MATCH NEVER KILLS (2026-11-04, A409 follow-up; the operator: "use logic and reason towards mutual
+# benefit"). Until now a keyword in our code made a candidate 'have' -- discarded as a duplicate, then held by the
+# circle-back until a person wrote a disposition. MEASURED on the reply-only extractor's 32 real ideas: at every
+# generic-word cutoff tried (5%..100% of files) the 'have' verdicts rested on co-incidences ("handle"+"rollback" in a
+# 9,000-line file, "before" in `held_before`), and the author-labelled seed traded 4/5 false haves for 4/5 missed
+# duplicates as the cutoff moved. A word match cannot show a MECHANISM exists. The 10-28 design already said so ("a
+# lexical match is evidence to INVESTIGATE -- never, on its own, proof"); the covenant's own precept is "investigate
+# on a signal, never convict on one". So the strongest lexical evidence (two specific terms in one file) is carried as
+# `dup_hint` and the candidate goes to the backlog; the weekly digest (capped at DIGEST_CAP) shows unhinted ideas
+# first. Who gains: commenters' ideas are no longer discarded on a coincidence; the person's load stays capped and
+# the circle-back is not flooded; Tetsu learns from what was really proposed. What it costs: a true duplicate is no
+# longer dropped automatically -- it reaches a person, ranked after new ideas, with its evidence attached. The
+# precise kill that remains is 'recurrence' (a RETRACTED.json pattern), re-verified mechanically by the circle-back.
+DUP_HINT_DF_FRAC = 0.20     # for the HINT only: a term in > 20% of scanned files is not specific (seed: 2/5 missed,
+                            # 0/5 false at 0.20; n=10, author-labelled -- indicative, not validated)
+
+
+def dup_hint(g, content):
+    """The strongest lexical evidence in a grep result: matches of >= 2 specific terms in ONE file (or the single
+    term of a one-term candidate), as a '; '-joined string -- or "". Evidence to rank and show, never a verdict."""
+    if not g or g is True:
+        return ""
+    segs = [s.strip() for s in str(g).split(";") if "@" in s]
+    by_file = {}
+    for s in segs:
+        t = s.split("@", 1)[0].strip()
+        f = s.split("@", 1)[1].strip().split(" ", 1)[0]
+        n, df = term_df()
+        if n and df.get(t.lower(), 0) > DUP_HINT_DF_FRAC * n:
+            continue
+        by_file.setdefault(f, []).append(s)
+    best = max(by_file.values(), key=lambda v: len({x.split("@", 1)[0].strip() for x in v}), default=[])
+    k = len({x.split("@", 1)[0].strip() for x in best})
+    return "; ".join(best) if (k >= 2 or (k == 1 and len(content) == 1)) else ""
+
+
 def vet(c, grep=None, tomb=None):
     grep = grep or _grep_repo
     tomb = tomb or _tombstoned
@@ -185,26 +270,19 @@ def vet(c, grep=None, tomb=None):
     if hit:
         return {"status": "recurrence", "why": hit}
     g = grep(_keywords(c))
+    hint = dup_hint(g, _keywords(c))
     if g:
-        if g is not True:                                      # a real matcher names the matched term(s)
-            matched = {seg.split("@", 1)[0].strip() for seg in str(g).split(";") if "@" in seg}
-            content = _keywords(c)
-            if len(matched) == 1 and len(content) >= 2:
-                # Coverage downgrade (ChatGPT review, 2026-10-28): a single lone lexical match on a candidate
-                # with several distinct content concepts is too weak to call a 'have' -- it touches one concept
-                # and does not show the capability (the measured case: 'unresolved' df=1 matched, promote/joins/
-                # first-class df=0). Keep the lexical evidence and route to a human; do NOT conclude 'not
-                # implemented' (coverage measures how much of a claim the evidence touches, not whether it is true).
-                return {"status": "backlog", "why": "survived cheap vet -- only a single lexical match (%s), %d "
-                        "of %d content terms; needs a human/strong-seat call" % (g, len(matched), len(content))}
-            why = "a capability keyword already appears in source (dedup): %s" % g
-        else:
-            why = "a capability keyword already appears in source (dedup)"
-        return {"status": "have", "why": why}
-    return {"status": "backlog", "why": "survived cheap vet -- needs a human/strong-seat call"}
+        return {"status": "backlog", "dup_hint": hint,
+                "why": "survived cheap vet -- %s; needs a human/strong-seat call"
+                       % ("POSSIBLE DUPLICATE (two specific terms in one file): %s" % hint if hint else
+                          "lexical matches only, no file holds two specific terms -- not evidence we have it"
+                          + ("; matches: %s" % str(g)[:300] if g is not True else ""))}
+    return {"status": "backlog", "dup_hint": "", "why": "survived cheap vet -- needs a human/strong-seat call"}
 
 
-def _append_backlog(row, path=BACKLOG):
+def _append_backlog(row, path=None):
+    if path is None:                                           # IM8: call time, never a frozen default (see extract)
+        path = BACKLOG
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
@@ -232,7 +310,13 @@ CIRCLE_BACK_RUNS = 3                                   # his run-check-adjust x3
 SUNSET_RUNS = 30                                       # grandfathered pre-fix haves must be dispositioned by then
 FALSE_MATCH_STOPWORD_K = 3                             # this many false_match hits on a term = a vocabulary bug
 TERM_NAMING_FIX_ISO = "2026-10-28T13:29:21Z"           # f08ce10: 'have' verdicts name the term from here on
-_OUTCOMES = ("verified_have", "false_match", "unresolved")
+_OUTCOMES = ("verified_have", "false_match", "unresolved", "miner_echo")
+# miner_echo (2026-11-04, A409 follow-up; 7 of 7 context seats, ops/ECHO_CONSULT_2026-11-04.md): the "idea" came
+# from the MINER'S OWN PROMPT, not the reply. false_match says the matcher was wrong about real text; here the matcher
+# did its job on text that should not have existed. Logging it as false_match would hide the miner's failure rate
+# and feed the false_match stopword-demotion count with matches that were never the vocabulary's fault.
+# Clears only with evidence: the echo score at/over the bar (echo_frac) AND the echoed phrase AND a rationale.
+# Proposed by propose_echo_dispositions(); WRITTEN by a human or Tetsu (4 of 7 seats: a person confirms each).
 _HAVE_TERM = re.compile(r"dedup\)\s*:\s*(?P<term>[^@;]+?)\s*@\s*(?P<file>[^\s();]+)")   # first "term @ file"
 _RECURRENCE_ID = re.compile(r"RETRACTED\s+(?P<id>[^\s:]+)\s*:")                         # "RETRACTED A121: ..."
 
@@ -251,7 +335,7 @@ def recurrence_retraction_id(why):
     return m.group("id").strip() if m else None
 
 
-def _recurrence_still_matches(idea, rid, path=RETRACTED):
+def _recurrence_still_matches(idea, rid, path=None):
     """Does `idea` STILL match the named retraction's narrow patterns? The recurrence instrument is re-runnable
     (unlike a have's justification), so the circle-back can MECHANICALLY reconfirm a recurrence. One that no
     longer matches -- a crude legacy verdict, or a retraction later restated/removed -- is surfaced for re-vet,
@@ -261,16 +345,20 @@ def _recurrence_still_matches(idea, rid, path=RETRACTED):
     return any(r_rid == rid and rx.search(idea or "") for r_rid, _claim, rx in _retraction_patterns(path))
 
 
-def _load_backlog(path=BACKLOG):
+def _load_backlog(path=None):
+    if path is None:                                           # IM8: call time
+        path = BACKLOG
     if not os.path.exists(path):
         return []
     with open(path, encoding="utf-8") as f:
         return [json.loads(ln) for ln in f if ln.strip()]
 
 
-def load_dispositions(path=DISPOSITIONS):
+def load_dispositions(path=None):
     """{candidate_id: latest disposition row}. Append-only ledger, last write wins (an 'unresolved' can later
     become 'verified_have' or 'false_match')."""
+    if path is None:                                           # IM8: call time
+        path = DISPOSITIONS
     out = {}
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
@@ -310,12 +398,36 @@ def disposition_clears(d, today, root=HERE):
         return bool((d.get("term") or "").strip()) and bool((d.get("rationale") or "").strip())
     if o == "unresolved":
         return bool(d.get("recheck")) and str(d.get("recheck")) >= today
+    if o == "miner_echo":
+        try:
+            ef = float(d.get("echo_frac"))
+        except (TypeError, ValueError):
+            return False
+        return (ef >= EX.ECHO_FRAC and bool((d.get("phrase") or "").strip())
+                and bool((d.get("rationale") or "").strip()))
     return False
 
 
-def circle_back(rows=None, dispositions=None, n_runs=CIRCLE_BACK_RUNS, backlog=BACKLOG,
-                fix_iso=TERM_NAMING_FIX_ISO, sunset_runs=SUNSET_RUNS, disp_path=DISPOSITIONS, today=None,
-                retracted=RETRACTED):
+def propose_echo_dispositions(escalated, reply_text):
+    """For escalated 'have' rows whose IDEA is our prompt handed back (echo score >= the bar against the row's own
+    reply), return the miner_echo disposition a human/Tetsu would write. PROPOSES ONLY -- writes nothing.
+    `reply_text(id) -> str` supplies the reply the miner read."""
+    out = []
+    for o in escalated:
+        rep = reply_text(o.get("id")) or ""
+        ef = EX.preamble_echo_frac(o.get("idea"), rep)
+        if ef < EX.ECHO_FRAC:
+            continue
+        out.append({"candidate_id": o.get("id"), "outcome": "miner_echo", "echo_frac": round(ef, 3),
+                    "phrase": o.get("idea"), "term": o.get("term"),
+                    "rationale": "IDEA is %d%% preamble words absent from the reply; the term '%s' matched text the "
+                                 "miner invented" % (round(ef * 100), o.get("term"))})
+    return out
+
+
+def circle_back(rows=None, dispositions=None, n_runs=CIRCLE_BACK_RUNS, backlog=None,
+                fix_iso=TERM_NAMING_FIX_ISO, sunset_runs=SUNSET_RUNS, disp_path=None, today=None,
+                retracted=None):
     """Read the discard verdicts back -- BOTH the have-Y claims and the recurrence claims. Returns
     {'escalate','miner_defect','stale_recurrence','cleared','reconfirmed','demote_terms','ok'}.
     A 'have' is CLEARED only by a well-formed disposition keyed to its candidate id; otherwise it is held to an
@@ -376,15 +488,17 @@ BENCHMARK = os.path.join(HERE, "ops", "dedup_benchmark.jsonl")
 _COVERED = ("have", "recurrence")
 
 
-def benchmark(rows=None, path=BENCHMARK, grep=None, tomb=None):
+def benchmark(rows=None, path=None, grep=None, tomb=None):
     """Score the vet over a labelled set. Returns the two error rates + the per-row outcomes. refs/tomb inject
     for the test; the default runs the real matcher over the live tree."""
+    if path is None:                                           # IM8: call time (NOT _load_backlog's BACKLOG default)
+        path = BENCHMARK
     rows = _load_backlog(path) if rows is None else rows
     out = []
     for r in rows:
         v = vet({"kind": "gap", "maps": r.get("maps", ""), "idea": r.get("idea", ""),
                  "test": r.get("test") or "present=green / removed=red"}, grep=grep, tomb=tomb)
-        covered = v["status"] in _COVERED
+        covered = v["status"] in _COVERED or bool(v.get("dup_hint"))   # a hint now = 'flagged as a dup'
         if r.get("label") == "real_have":
             outcome = "caught" if covered else "missed_duplicate"
         else:                                                  # real_gap
@@ -420,9 +534,17 @@ def _default_digest(top, say):
     return body
 
 
-def nightly(say=print, ask=None, weekday=None, digest=None, backlog=BACKLOG, grep=None, tomb=None):
+def rank_ready(rows):
+    """The order a person sees the weekly digest in: ideas WITHOUT a dup_hint (likely new) first, hinted ones
+    after; stable within each group. The digest is capped, so this decides which ideas use the person's slots."""
+    return sorted(rows, key=lambda r: bool(r.get("dup_hint")))
+
+
+def nightly(say=print, ask=None, weekday=None, digest=None, backlog=None, grep=None, tomb=None):
     """One cycle. Seeds on the first ever run; otherwise extracts the delta, vets it, and on the weekly day
     emits ONE capped digest of what reached 'backlog'. Fail-soft: never raises into the nightly."""
+    if backlog is None:                                        # IM8: call time, never a frozen default
+        backlog = BACKLOG
     if not is_seeded():
         return {"seeded": True, "n": seed_baseline(say)}
     weekday = time.gmtime().tm_wday if weekday is None else weekday
@@ -435,13 +557,14 @@ def nightly(say=print, ask=None, weekday=None, digest=None, backlog=BACKLOG, gre
     counts, ready = {}, []
     for c in new:
         v = vet(c, grep=grep, tomb=tomb)
-        row = {**c, "vet": v["status"], "why": v["why"]}
+        row = {**c, "vet": v["status"], "why": v["why"], "dup_hint": v.get("dup_hint", "")}
         _append_backlog(row, backlog)
         counts[v["status"]] = counts.get(v["status"], 0) + 1
         if v["status"] == "backlog":
             ready.append(row)
     say("improve: %d new, vetted -> %s" % (len(new), ", ".join("%s=%d" % kv for kv in sorted(counts.items())) or "none"))
     emitted = 0
+    ready = rank_ready(ready)
     if ready and weekday == DIGEST_WEEKDAY:
         digest(ready[:DIGEST_CAP], say)
         emitted = min(len(ready), DIGEST_CAP)
@@ -474,6 +597,16 @@ def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if "--seed" in argv:
         seed_baseline()
+        return 0
+    if "--propose-echo" in argv:                              # print miner_echo dispositions for a person to confirm
+        texts = {}
+        for row in IM._rows(IM.CANDIDATES):
+            texts.setdefault(IM._row_id(row), str(row.get("text") or ""))
+        props = propose_echo_dispositions(circle_back()["escalate"], texts.get)
+        for p in props:
+            print(json.dumps(p, ensure_ascii=False))
+        print("propose-echo: %d miner_echo proposal(s); nothing written -- append the ones you confirm to %s"
+              % (len(props), DISPOSITIONS))
         return 0
     if "--circle-back" in argv:                               # the hard check: nonzero if any have needs a human
         cb = circle_back()

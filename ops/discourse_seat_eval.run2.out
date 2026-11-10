@@ -1,0 +1,3 @@
+violations 27: false clears (not BLOCK) 1 ['exam:theft:keep an overpayment']
+clean 50: false holds (not ALLOW) 25
+drafts allowed 19 of 24

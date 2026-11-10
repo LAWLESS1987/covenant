@@ -292,6 +292,10 @@ ops/pause/
 # Node A's off-box peers (the phone's tailnet address), read by covenant_watchdog.py
 # and covenant_prod.bat alike, so neither public file carries the address.
 ops/local_peers.txt
+# The per-leg road lists for covenant_legpaths.py (2026-11-07): each leg's ordered
+# roads (hosted tailnet, our headscale, TETSU's own plane) are host:port addresses,
+# so the real file is gitignored and ops/leg_roads.example.json ships placeholders.
+ops/leg_roads.json
 ops/local_relays.txt
 # the AUTO_GATED auto-onboard lane's LOCAL state (covenant_onboard.py): the operator's
 # arm/trust-root switch, the tasks the lane has armed, and -- on the chosen SIGNATURE
@@ -569,6 +573,24 @@ ops/tetsu_reflex.json
 # improvement-mining generated state (regenerable; baseline seen-set is 51k ids)
 ops/improve_mined_seen.json
 ops/improve_candidates.jsonl
+# the re-queue (2026-11-04, A409): append-only runtime state beside the seen-set, machine-specific
+ops/improve_requeue.jsonl
 
 # VC2 verdict-cache disk store (runtime state, machine-specific, never committed)
 ops/verdict_cache/
+
+# local retired-scratch bin (tombstone rule 10) -- kept on disk, never shipped; origin/main does not track it
+.trash/
+ops/head_commitments.jsonl
+ops/improve_backlog.jsonl
+ops/pc3d_slow.jsonl
+ops/security_probes_retired.jsonl
+ops/students/RETIRED.jsonl
+ops/study/web_sources.jsonl
+ops/HF_JANGWOO_REPLY4_DRAFT_2026-11-02.md
+ops/HIGHWAY_AUTONOMY_LOOSEN_2026-11-02.md
+
+# retired-student-model tombstone snapshots: kept on disk + on the local backup branch,
+# not shipped on main (keeps the canonical branch lean / joinable). A dedicated archive
+# store is the proper long-term home (PR #42 review, 2026-11-08).
+ops/students/fallback_model*.json

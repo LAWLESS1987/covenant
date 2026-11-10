@@ -649,6 +649,19 @@ emulator; nothing of it is published), or the Termux kit in [mobile/TERMUX_SETUP
 The phone's rule, written into the app: a phone is private to the person holding it.
 An iPhone can only be a client of a PC node; it cannot carry a judge.
 
+**Current, on the packaged app (measured 2026-11-03).** The node holds the screen
+awake only while its app is in the foreground and releases it on backgrounding
+(a window flag, not a wake lock, and no new permission); bringing the app to the
+front fires one immediate signed check-in, so a held message would show at once
+rather than on the next scheduled beat; and the holder can encrypt the
+node's identity key at rest in the phone's secure hardware (StrongBox/TEE), off by
+default and the holder's own choice. Joining the operator's **self-hosted
+headscale** mesh — a sovereign tailnet beside the hosted coordinator, not replacing
+it — is built into the app but does not yet complete on-device: the bundled
+userspace `tailscaled` is a CGO-off build with no resolver for the mesh's
+MagicDNS-only control name, so it cannot reach the login server and the join
+remains deferred. The phone stays on the hosted tailnet in the meantime.
+
 ## Talking to the covenant, and the tools around it
 
 **Two of these tools do not run on this machine. Corrected 2026-09-11.**

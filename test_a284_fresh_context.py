@@ -88,6 +88,8 @@ DECLARED = {
     "covenant_ted.py": "fresh",                   # A372: each transcript stands alone, private and fresh
     "covenant_improve_extract.py": "fresh",       # IM2 (2026-10-27): each forum reply is extracted on its
                                                   # own -- no history bleed between unrelated replies
+    "ops/ECHO_AB_2026-11-04/ab_echo.py": "fresh",        # A409: the v1-vs-v2 side-by-side, one stand-alone
+    "ops/ECHO_AB_2026-11-04/ab_echo_rerun.py": "fresh",  # extraction per reply (kept as the record of that run)
 }
 PRUNE = {".git", ".claude", ".trash", "__pycache__", "node_modules", "private", "venv", ".venv"}
 

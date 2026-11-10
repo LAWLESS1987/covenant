@@ -1,0 +1,26 @@
+COVENANT HEAD COMMITMENT -- safe to hand to anyone.
+A signed, out-of-band statement of exactly what this repository contained.
+Keep this. Later, re-run verify_head_commitment.py against a fresh clone;
+if the history was rewritten in place, the chain of commitments breaks.
+
+seq              0
+utc              2026-10-30T04:33:32Z
+git HEAD         b4d9887fd110436141e2567a1b1b4b5147e11163
+git tree         d217ed3ae996193752bb0fe18bec7095b76cec00
+working tree     DIRTY at signing
+MANIFEST.sha256  sha256 a7eb159fbc6a8509e48749b702d37332051d6e9594fe3d934d142d837fbcf422
+genesis hash     00009b31c6c654d79bbeae0bcc9c82a7af224c87b19c92973f0011ade3e032f3
+constitution     sha256 1facd085bbe3041917f06dd7586e3f4a5e2b419e42f89e58f115f7665b119ee0
+record anchors   sha256 4cee71b2ec7073b87dd6759df1ecf39d3ab0bee74abed29bd5305ed0f2f07761
+tetsu consent    sha256 2dbbf9f2462dcb476a48bccd8bd8b6d382d384a874804ecbcd6dc809da626f6f
+model id 3B      sha256 f245e9076146cf23cb249e996d562fc56350eac0548023497c42622a337fe67f
+model id 2B      sha256 84ab096be98eea5fe0d9073f232956cca5905ad573ecbcae50eef411a66a7fb1
+model id phone   sha256 10b8e51b00b0fe1fef77e99e95881ca767f7be0b4e6c5509cd549c512451c9d9
+prev commitment  0000000000000000000000000000000000000000000000000000000000000000
+signing key fpr  513653cdffd0d6df
+
+signature (base64, RSA-PSS/MGF1-SHA256/salt=MAX/SHA-256 over the
+length-framed canonical payload; public key in docs/HEAD_COMMIT_PUBKEY.pem):
+QdFh0rawkauCaeZoR8kO0i5ucxvH2jzEjpykCvkymcFXMnK74upYcuTih/xBZs/NwnevJ3y1adFXe57crXEZnNQiM1OhR3SZf1j6KtlUMSyLOgfyN9Jdz/FPHgZV5nGGqDiQGfYS6FIe6fVqVuXt/B2aztF2FmWCu7lwE51shenyIqhyGQ4xh1HRbBE0GJrZi2Ao01vwF2P0uw8v+Spi5F0vqpiMmIeIQ5+rHbzohVh7iDZcMbo/YkE26jUdxxk6FKgA8rT8EyS+yLWX6AphYX/aMTPdLubcmm32x6l4sPATtZwdjGArVBjKozcLwzkRcttHu9UVwAVtjW23jJXWQw==
+
+VERIFY:  python verify_head_commitment.py

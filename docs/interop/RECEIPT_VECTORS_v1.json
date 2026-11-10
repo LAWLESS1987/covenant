@@ -1,0 +1,962 @@
+{
+ "about": "covenant's side of the receipt interop test vectors promised in Hugging Face thread 180706 post #22. Canonicalization: RFC 8785 (JCS) plus profile rules P1-P6 below. TEST KEYS ONLY: derived as sha256 of the phrases given, so every signature is reproducible; not covenant's receipt signer. covenant's production receipts do NOT yet canonicalize with JCS: each vector carries the current production canonical form where it differs.",
+ "profile_rules": {
+  "P1": "reject duplicate member names at parse",
+  "P2": "reject any string (name or value) that holds a lone surrogate or is not already Unicode NFC. Cost: some valid JCS input is refused -- RFC 8785's own 3.2.3 sorting sample contains U+FB33, which NFC maps to U+05D3 U+05BC",
+  "P3": "reject any number TOKEN whose magnitude exceeds 2^53-1, in any spelling (plain or exponent form), checked on the token with exact decimal arithmetic before any conversion to a double; carry such values as strings",
+  "P4": "exclude the proof at the top level only; nested 'proof' members are signed content",
+  "P5": "reject high-s ECDSA signatures (EIP-2)",
+  "P6a": "relying party rejects a domain other than the one it expects",
+  "P6b": "relying party rejects an audience other than itself",
+  "P6c": "relying party rejects a chain_id other than the one it requires",
+  "P7": "a verifier takes each signer's framing from the discovery document and never tries the other one",
+  "P6d": "relying party rejects a receipt with no nonce, or a (signer, nonce) it has already accepted, and records the pair on acceptance. The check-and-record must be atomic and durable (concurrent presentations, restarts); these vectors cannot test that, a verifier's own tests must"
+ },
+ "issuer": "the replay key is (signer, nonce) and nothing in the signed bytes names an issuer: the signing key IS the issuer. A design choice; an issuer field in the signed content is the alternative",
+ "not_covered": [
+  "number tokens that lose precision through a double (1.00000000000000001 canonicalizes to 1): P3 bounds magnitude only. Amounts in this profile are strings, which is why",
+  "the trust root: N02 checks a signature against the signer a discovery document names; nothing here establishes that the discovery document itself is genuine (DNS/TLS, or an out-of-band pin)",
+  "atomic, durable nonce consumption (see P6d)",
+  "independence: results_by_our_verifier come from this file's own verifier, which shares its canonicalizer with the generator. A second implementation's results are the real cross-check"
+ ],
+ "new_fields": "domain, audience, chain_id and nonce are fields of this proposed profile; the receipt exchanged in the thread on 2026-10-21 had none of them",
+ "signing": "deterministic ECDSA (RFC 6979, as eth_account does it): regenerating this file reproduces every signature byte for byte",
+ "framing_choice": "EIP-191, with each signer's framing pinned in the discovery document (P7). EIP-712, raised in the thread as the clean route for domain separation, is not used here and is still open",
+ "reject_vectors": "each profile-reject vector is signed (by A and by C) over the bytes a verifier WITHOUT the rule computes, so such a verifier would accept it and only the rule can reject it; the lone surrogate and 1e400 are the exceptions: no canonical bytes can exist for them",
+ "framings": {
+  "hex-text": "EIP-191 personal_sign over the 64-char lowercase hex of SHA-256(canonical) (covenant)",
+  "digest-bytes": "EIP-191 personal_sign over the raw 32-byte SHA-256 (Agent Embassy)"
+ },
+ "test_keys": {
+  "A": {
+   "phrase": "covenant receipt interop TEST KEY A -- never sign anything real",
+   "private_key": "sha256(phrase)",
+   "address": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+   "framing": "hex-text"
+  },
+  "C": {
+   "phrase": "covenant receipt interop TEST KEY C -- never sign anything real",
+   "private_key": "sha256(phrase)",
+   "address": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+   "framing": "digest-bytes"
+  },
+  "B": {
+   "phrase": "covenant receipt interop TEST KEY B -- never sign anything real",
+   "private_key": "sha256(phrase)",
+   "address": "0x03baF76F904Be65A14C8ec0D33D081a4CFDb7f86",
+   "framing": "none: in no discovery document"
+  }
+ },
+ "discovery_document": {
+  "signers": [
+   {
+    "address": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+    "scheme": "eip191-personal-sign",
+    "framing": "hex-text"
+   },
+   {
+    "address": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+    "scheme": "eip191-personal-sign",
+    "framing": "digest-bytes"
+   }
+  ],
+  "test_only": true,
+  "rule": "P7: a verifier takes the framing from this document, by signer, and never tries the other one"
+ },
+ "rfc8785_selfcheck": "Appendix B (26 numbers incl. NaN/Infinity rejected), 3.2.3 sort order, 3.2.4 bytes: all pass",
+ "vectors": [
+  {
+   "id": "V01-base",
+   "what": "a plain receipt in the profile",
+   "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"6f1d0c3a9b8e4f20a7c5d1e3b2f40986\", \"id\": \"cov-vec-base\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+   "expect": "accept",
+   "why": "control",
+   "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-base\",\"nonce\":\"6f1d0c3a9b8e4f20a7c5d1e3b2f40986\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "canonical_jcs_hex": "7b22616d6f756e745f75736463223a22302e303230303030222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d62617365222c226e6f6e6365223a223666316430633361396238653466323061376335643165336232663430393836222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a227d",
+   "sha256_jcs": "2df8644516246eb9295622de596621916ba3f90e29e88dd709a2e5f40a6878db",
+   "current_production_canonical_differs": false,
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0x9d6ee8383b7e521ec30495a8aef44d50484c38dd2d8416dcb11245520f1114bd7749bf2cc05d1a56c0523b28b460349e5182c47d1a02c1525a096f3b141e88fa1b"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0xa528086d07c692b955a1ad01a298c836ae492f7ac607d29ae002b91e33bb6b67388b56eb3ce0fceac21686ce89992791fd949d66ab37b2e76234993a097d4a3a1c"
+    }
+   ]
+  },
+  {
+   "id": "V02-float",
+   "what": "numbers JCS spells differently from Python",
+   "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"c6019789080c31da333ab264fb9cdbb6\", \"id\": \"cov-vec-float\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\", \"metrics\": {\"one\": 1.0, \"tenth\": 0.1, \"big\": 4500000000000000.0, \"small\": 1e-07, \"negzero\": -0.0}}",
+   "expect": "accept",
+   "why": "JCS: 1, 0.1, 4500000000000000, 1e-7, 0",
+   "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-float\",\"metrics\":{\"big\":4500000000000000,\"negzero\":0,\"one\":1,\"small\":1e-7,\"tenth\":0.1},\"nonce\":\"c6019789080c31da333ab264fb9cdbb6\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "canonical_jcs_hex": "7b22616d6f756e745f75736463223a22302e303230303030222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d666c6f6174222c226d657472696373223a7b22626967223a343530303030303030303030303030302c226e65677a65726f223a302c226f6e65223a312c22736d616c6c223a31652d372c2274656e7468223a302e317d2c226e6f6e6365223a226336303139373839303830633331646133333361623236346662396364626236222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a227d",
+   "sha256_jcs": "765fa20facf59c8197ce9406f44be43a634d9ca63992f75e5b27f0a701334aab",
+   "current_production_canonical_differs": true,
+   "current_production_canonical": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-float\",\"metrics\":{\"big\":4500000000000000.0,\"negzero\":-0.0,\"one\":1.0,\"small\":1e-07,\"tenth\":0.1},\"nonce\":\"c6019789080c31da333ab264fb9cdbb6\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0x74cb609e5a550559e675e0cdee880725c44dae45f301a48e6f848a581dc33de853b6ebda66e1cb50605dc179d984086cd80cc92a110a8ed8e4a5c0cbb85c3c561c"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x63df3e881933e7bce46ee20d8a7acdc977dabe84934fc89d628786e9f230fb742cb583dfa8c993968089cae0c60727c3548e078b222b2e490e168b4308f018a21b"
+    }
+   ]
+  },
+  {
+   "id": "V03-int-safe-as-string",
+   "what": "an integer past 2^53-1 carried as a string",
+   "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"efa8c501a75d89e5a5aa429bf938ed36\", \"id\": \"cov-vec-bigint-str\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\", \"amount_atomic\": \"9007199254740993\"}",
+   "expect": "accept",
+   "why": "P3",
+   "canonical_jcs": "{\"amount_atomic\":\"9007199254740993\",\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-bigint-str\",\"nonce\":\"efa8c501a75d89e5a5aa429bf938ed36\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "canonical_jcs_hex": "7b22616d6f756e745f61746f6d6963223a2239303037313939323534373430393933222c22616d6f756e745f75736463223a22302e303230303030222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d626967696e742d737472222c226e6f6e6365223a226566613863353031613735643839653561356161343239626639333865643336222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a227d",
+   "sha256_jcs": "8b318d4f165edc55ac0ac655f242996bca69f2a2a49e7ae0e42d89f7e0e18f86",
+   "current_production_canonical_differs": false,
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0x84539981f3ae0e9710826ab8436dbee749a1daa739a893a50754e18d95643e08591d7b7dd590e5382335d903a0742cdbebbfac4cab02de900e9936371643b09a1c"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x71a61ce86cd253ba7b1a614ad71c192d603ab7c4ad88564d3b1075605d39a3407736f19bc15522719c00dffdca0537ab031b14720e045b0ecad5afcdbd2643211c"
+    }
+   ]
+  },
+  {
+   "id": "V04-int-unsafe-as-number",
+   "what": "the same integer as a JSON number",
+   "input_json_text": "{\"amount_atomic\":9007199254740993,\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"8750fcef2c4b0b92208f55df31f13ed9\", \"id\": \"cov-vec-bigint-num\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+   "expect": "reject",
+   "why": "P3 -- through a double it would silently become 9007199254740992",
+   "expect_reason": "P3",
+   "profile_rejects_with": "P3 number token 9007199254740993 has magnitude above 2^53-1; carry it as a string",
+   "lenient_bytes": "{\"amount_atomic\":9007199254740992,\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-bigint-num\",\"nonce\":\"8750fcef2c4b0b92208f55df31f13ed9\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0x3e7299832dbfabeb47ca8817720cb9f4040d006afef51053d2518298604a35034d1bb8ad7bca66208737cfeefdbf4557edb1d3d93208087be0d0015f5e3b06331b"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x4a6eb406917ca34fccb1de8cd47576f59184f3b89a927636e41300a3c154b4e16fe8bc4150f31e7e9e3f63563afc86a20ba4b5c762da00474a284098fbc15e031c"
+    }
+   ],
+   "note": "signed over the bytes a verifier WITHOUT this rule computes, so such a verifier accepts it; only the rule can reject it",
+   "current_production_canonical": "{\"amount_atomic\":9007199254740993,\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-bigint-num\",\"nonce\":\"8750fcef2c4b0b92208f55df31f13ed9\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "current_production_note": "covenant's current canonicalizer produces bytes for this input"
+  },
+  {
+   "id": "V05-nfc",
+   "what": "a non-ASCII string in NFC",
+   "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"0e271e3a3d23a3ae2a037a7da4e6bb92\", \"id\": \"cov-vec-nfc\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\", \"memo\": \"café\"}",
+   "expect": "accept",
+   "why": "P2",
+   "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-nfc\",\"memo\":\"café\",\"nonce\":\"0e271e3a3d23a3ae2a037a7da4e6bb92\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "canonical_jcs_hex": "7b22616d6f756e745f75736463223a22302e303230303030222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d6e6663222c226d656d6f223a22636166c3a9222c226e6f6e6365223a223065323731653361336432336133616532613033376137646134653662623932222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a227d",
+   "sha256_jcs": "b086c1bcd54cb325f4b45cb6a77a957901657659c3c8e3aaccee0b520f745023",
+   "current_production_canonical_differs": false,
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0x2ea1befbc07126c3721026d97e43ecac3fa2af6a8ae007bebbee326c2a7dcbdf1c2766e5cb3513cd1af50dc6a18bc0d8c37ef30569dae4434970173c888dbcbc1b"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x226945d504f310cb6d250817fffd1648b00d42b650852283e2c64d90911c820879c3acf4a74d24364266138e7e3e053f6ac89a6ea2ffabfe477b1ff58ed0e9641c"
+    }
+   ]
+  },
+  {
+   "id": "V06-nfd",
+   "what": "the same string in NFD (e + combining acute)",
+   "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"62c19965fdf8d97d727f1f9eb454578c\", \"id\": \"cov-vec-nfd\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\", \"memo\": \"café\"}",
+   "expect": "reject",
+   "why": "P2 -- JCS keeps it as is, so the digest would differ from V05's",
+   "expect_reason": "P2",
+   "profile_rejects_with": "P2 string is not NFC: 'café'",
+   "lenient_bytes": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-nfd\",\"memo\":\"café\",\"nonce\":\"62c19965fdf8d97d727f1f9eb454578c\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0xeabcc072d4f8c42cc8b00975658f167196c4f58f343fa72bf6fd7f5c3a3345ef3eed28dba0667fcb185f21250ba591964780ffd4c9a111644cc743e5a62838ef1b"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x5f1259258c5fb76b4bda575054ab656ac6d8710e5fc5243d8b6b5eb9cadc6f174b92f19780ae80799736525ca06d483bd602c81870086a9ed4a5519b77beb50b1c"
+    }
+   ],
+   "note": "signed over the bytes a verifier WITHOUT this rule computes, so such a verifier accepts it; only the rule can reject it",
+   "current_production_canonical": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-nfd\",\"memo\":\"café\",\"nonce\":\"62c19965fdf8d97d727f1f9eb454578c\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "current_production_note": "covenant's current canonicalizer produces bytes for this input"
+  },
+  {
+   "id": "V07-control",
+   "what": "control characters, DEL and U+2028 in a value",
+   "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"b51c14a647b84d1dc89a76c341dcb118\", \"id\": \"cov-vec-ctrl\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\", \"memo\": \"a\\nb\\tc\\u0007d\\u001fef g\"}",
+   "expect": "accept",
+   "why": "JCS escaping: \\n \\t \\u0007 \\u001f; DEL and U+2028 raw",
+   "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-ctrl\",\"memo\":\"a\\nb\\tc\\u0007d\\u001fef g\",\"nonce\":\"b51c14a647b84d1dc89a76c341dcb118\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "canonical_jcs_hex": "7b22616d6f756e745f75736463223a22302e303230303030222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d6374726c222c226d656d6f223a22615c6e625c74635c7530303037645c7530303166657f66e280a867222c226e6f6e6365223a226235316331346136343762383464316463383961373663333431646362313138222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a227d",
+   "sha256_jcs": "e8eb11dfb8c626cf48f31e4c76f37ce56938827af66574caff700e13b551f587",
+   "current_production_canonical_differs": false,
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0x4c06faa8856c328ef2bb156d57f5a1fbe4db10bc24280ad033fb0072b714d95910dd97280de17bbe7cd03a392db9075d3d627094b5c4f4b79ea2c0d069cd8e1d1b"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x86d64e936e763e714532dbc8815da650b237fba4d8c16c22ccb4cc404486f4d522cf1904eada0955fbffffc19082b6c10ad91eac0a739e8a33aff81b2cb74fb71c"
+    }
+   ]
+  },
+  {
+   "id": "V08-key-order",
+   "what": "non-ASCII member names (UTF-16 order differs from code-point order)",
+   "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"59973dd28a7f50b4e7838c50afe65fcb\", \"id\": \"cov-vec-keys\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\", \"tags\": {\"z\": 1, \"€\": 2, \"😀\": 3, \"ﬁ\": 4}}",
+   "expect": "accept",
+   "why": "JCS: z, €, 😀, ﬁ (code-point order would put ﬁ before 😀)",
+   "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-keys\",\"nonce\":\"59973dd28a7f50b4e7838c50afe65fcb\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\",\"tags\":{\"z\":1,\"€\":2,\"😀\":3,\"ﬁ\":4}}",
+   "canonical_jcs_hex": "7b22616d6f756e745f75736463223a22302e303230303030222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d6b657973222c226e6f6e6365223a223539393733646432386137663530623465373833386335306166653635666362222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a222c2274616773223a7b227a223a312c22e282ac223a322c22f09f9880223a332c22efac81223a347d7d",
+   "sha256_jcs": "7ac5eb950074a3bfdb824a2cad3227aee094eb09d3937a843cb7168324da8606",
+   "current_production_canonical_differs": true,
+   "current_production_canonical": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-keys\",\"nonce\":\"59973dd28a7f50b4e7838c50afe65fcb\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\",\"tags\":{\"z\":1,\"€\":2,\"ﬁ\":4,\"😀\":3}}",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0xdb661713bf7d6f2a113f3ae2892ec28f2d7d262e6d05136b9c2d48a2087a2f9a2a263b1a2a8451cf616e1bcba33d51b0ecdc189aa7a2ec101b77131e901f8dbb1b"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x48ff1255d98feaff0a4fcf7af609eb84cb6aa8a27a593f3fb06246084f4bd9265f347f3fc7c721eebd1a341e161f7105de0fdf64d6c00c6f181fde926d02999d1b"
+    }
+   ]
+  },
+  {
+   "id": "V09-duplicate",
+   "what": "a duplicate member name in the raw text",
+   "input_json_text": "{\"amount_usdc\":\"0.020000\",\"amount_usdc\":\"9.990000\",\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"84d44df1f565d59611c1a5bd42f21005\", \"id\": \"cov-vec-dup\", \"offer\": \"receipt\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+   "expect": "reject",
+   "why": "P1 -- a lenient parser keeps the last value silently",
+   "expect_reason": "P1",
+   "profile_rejects_with": "P1 duplicate member name 'amount_usdc'",
+   "lenient_bytes": "{\"amount_usdc\":\"9.990000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-dup\",\"nonce\":\"84d44df1f565d59611c1a5bd42f21005\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0xac13f273779e68a53acbdbe46e14a6a65c29e614e7029e1677481bc85bfb734b5c20da8ffae16a2001ed00e394081c5277a50dc92e01741ef17497a01a6429c71b"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x2baef8bbfb797eb51f37f713b7825626cadb67b3e3e3fa0c5145fb32338719ed52c3a361f5ecbcfe212bcbd994d135200a30eb01f1c1c899c7e3ae5f0784908c1b"
+    }
+   ],
+   "note": "signed over the bytes a verifier WITHOUT this rule computes, so such a verifier accepts it; only the rule can reject it",
+   "current_production_canonical": "{\"amount_usdc\":\"9.990000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-dup\",\"nonce\":\"84d44df1f565d59611c1a5bd42f21005\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "current_production_note": "covenant's current canonicalizer produces bytes for this input"
+  },
+  {
+   "id": "V10-nested-proof",
+   "what": "a nested member named proof is signed content",
+   "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"5f5b4ef8dd4270f59f10f63870d803e0\", \"id\": \"cov-vec-nested\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\", \"meta\": {\"proof\": \"citation-check-7\", \"files\": 2}}",
+   "expect": "accept",
+   "why": "P4 -- only the top-level proof is excluded",
+   "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-nested\",\"meta\":{\"files\":2,\"proof\":\"citation-check-7\"},\"nonce\":\"5f5b4ef8dd4270f59f10f63870d803e0\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "canonical_jcs_hex": "7b22616d6f756e745f75736463223a22302e303230303030222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d6e6573746564222c226d657461223a7b2266696c6573223a322c2270726f6f66223a226369746174696f6e2d636865636b2d37227d2c226e6f6e6365223a223566356234656638646434323730663539663130663633383730643830336530222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a227d",
+   "sha256_jcs": "0155303b45d061e7e5db754613851b2fa420ed335c5e0507623a2e0407704466",
+   "current_production_canonical_differs": false,
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0x331bdd3668cb54466afe0d12d2917c788dd14586d247af86c7f4b3fbe7eb9e9c3a70f824aa7d8ee22d2069d7cdbc1daf603951a7cdb37efce9cb3994f8de10361c"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0xcf2b04277f95d2d6b07a2382ed7ac7edf1ad4b256ac6418ba9af58a46dc9441968642f9ae3cb022561fa4d91504f0ef20cc6b7c045f934427d49bffea06939501c"
+    }
+   ]
+  },
+  {
+   "id": "V11-int-unsafe-exponent",
+   "what": "the unsafe integer of V04 spelled in exponent form",
+   "input_json_text": "{\"amount_atomic\":9.007199254740993e15,\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"4a8aedb5d9200cae454c89fe8d14a276\", \"id\": \"cov-vec-bigint-exp\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+   "expect": "reject",
+   "why": "P3 on the token -- a check made after parsing to a double sees 9007199254740992 and passes it",
+   "expect_reason": "P3",
+   "profile_rejects_with": "P3 number token 9.007199254740993e15 has magnitude above 2^53-1; carry it as a string",
+   "lenient_bytes": "{\"amount_atomic\":9007199254740992,\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-bigint-exp\",\"nonce\":\"4a8aedb5d9200cae454c89fe8d14a276\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0xc9fd4b0aaaea3f74161b591810c64d411280b01e9f1b671d9086abdcf73a9d7e27e24bacce4655f5d775f9b6a42357ac847dcb8ff443a3c89254655ad2b2dee81b"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x435bbd4cec8579d548f6ae24a3c052396a7c03b7bd891558540478315d47b4c00a9c1fcc9c538aa5db25dd9ff00f42fd8c857d57dc6cd8a77476dcfdf8793ba51c"
+    }
+   ],
+   "note": "signed over the bytes a verifier WITHOUT this rule computes, so such a verifier accepts it; only the rule can reject it",
+   "current_production_canonical": "{\"amount_atomic\":9007199254740992.0,\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-bigint-exp\",\"nonce\":\"4a8aedb5d9200cae454c89fe8d14a276\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "current_production_note": "covenant's current canonicalizer produces bytes for this input"
+  },
+  {
+   "id": "V12-duplicate-escaped",
+   "what": "a duplicate member name, the second spelled with a \\u escape",
+   "input_json_text": "{\"memo\":\"first\",\"\\u006demo\":\"second\",\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"5f7133145954e2a978269e86cbf40ab9\", \"id\": \"cov-vec-dup-esc\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+   "expect": "reject",
+   "why": "P1 -- names are compared after unescaping",
+   "expect_reason": "P1",
+   "profile_rejects_with": "P1 duplicate member name 'memo'",
+   "lenient_bytes": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-dup-esc\",\"memo\":\"second\",\"nonce\":\"5f7133145954e2a978269e86cbf40ab9\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0xf501c5aa68752d688e2890a52af5c84a129941395682ef72627eda0f57153a6f10ead3e0814edfcd7b32612db01fc60897e249d8a2b451a4e09cca7ada3427991c"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x56935699950430a9edce9dfb1ec12d492f035a3c45cb884fadf4534c3be666d54d6341a760a83e192b5d642dff7f339281219ecbebbaa088289525f6d3fa66491c"
+    }
+   ],
+   "note": "signed over the bytes a verifier WITHOUT this rule computes, so such a verifier accepts it; only the rule can reject it",
+   "current_production_canonical": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-dup-esc\",\"memo\":\"second\",\"nonce\":\"5f7133145954e2a978269e86cbf40ab9\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "current_production_note": "covenant's current canonicalizer produces bytes for this input"
+  },
+  {
+   "id": "V14-lone-surrogate",
+   "what": "a value holding a lone high surrogate, written as a JSON \\u escape",
+   "input_json_text": "{\"memo\":\"x\\ud800y\",\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"d33b721848b049261438f5e11be06cee\", \"id\": \"cov-vec-surrogate\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+   "expect": "reject",
+   "why": "P2 -- not a valid Unicode scalar value, so not valid UTF-8; JCS assumes I-JSON",
+   "expect_reason": "P2",
+   "profile_rejects_with": "P2 string holds a lone surrogate, which is not valid Unicode (RFC 8785 requires I-JSON)",
+   "lenient_bytes": null,
+   "signatures": [],
+   "note": "a verifier without the rule cannot produce canonical bytes for this input either (no UTF-8 encoding for a lone surrogate; a double of Infinity for 1e400), so nothing can be signed",
+   "current_production_note": "covenant's current canonicalizer crashes on it: 'utf-8' codec can't encode character '\\ud800' in position 172: surrogates not allowed"
+  },
+  {
+   "id": "V15-int-boundary",
+   "what": "2^53-1 as a JSON number, the largest P3 allows",
+   "input_json_text": "{\"amount_atomic\":9007199254740991,\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"5f99ceb35325046d924cb7d7f36a0ba6\", \"id\": \"cov-vec-boundary\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+   "expect": "accept",
+   "why": "P3 boundary -- a verifier that rejects every large number would fail this",
+   "canonical_jcs": "{\"amount_atomic\":9007199254740991,\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-boundary\",\"nonce\":\"5f99ceb35325046d924cb7d7f36a0ba6\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "canonical_jcs_hex": "7b22616d6f756e745f61746f6d6963223a393030373139393235343734303939312c22616d6f756e745f75736463223a22302e303230303030222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d626f756e64617279222c226e6f6e6365223a223566393963656233353332353034366439323463623764376633366130626136222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a227d",
+   "sha256_jcs": "84c0341452eccc862ea0054de3fa4624522c7dfd6feecb7c6feec3f89de79817",
+   "current_production_canonical_differs": false,
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0xb5aa18f48dd7efae02e40c344ebc9b566e6539bf6b82b0a70fd9e625562dae460adddf643c8c2dc8055e7749dca7d2e4c500423e4f1616011b2d22ff5917de601b"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x7d778c15a4c2d24e4dff5e89c4e7c5ca103e4fb0cef0a5035abfa1f3ac8edba541ea23d15117c7364ed2abd1cae20537154fd10e5c29182b4b1ad473fed33e811c"
+    }
+   ]
+  },
+  {
+   "id": "V16-int-unsafe-negative",
+   "what": "-(2^53+1) as a JSON number",
+   "input_json_text": "{\"amount_atomic\":-9007199254740993,\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"70b74e5eb7dfefdc3ddb932f82538d2a\", \"id\": \"cov-vec-bigint-neg\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+   "expect": "reject",
+   "why": "P3 -- the bound is on magnitude",
+   "expect_reason": "P3",
+   "profile_rejects_with": "P3 number token -9007199254740993 has magnitude above 2^53-1; carry it as a string",
+   "lenient_bytes": "{\"amount_atomic\":-9007199254740992,\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-bigint-neg\",\"nonce\":\"70b74e5eb7dfefdc3ddb932f82538d2a\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0x5c8302472a0e1f57a08f826f28d0c8328bd02acd84819904ec279bbb3940e2bb0a7da72f24e6a4892c63d8956f4827b6d10681e810596b77db329ef5559b604e1b"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0xeda49aec0f8f005c1e3f6fd12f5b437c090cd971bfe3c5698f8d9f31acce0ab758315038e8c93d4ef93fddb10f6119cac68eaddb599616fbaff07950dc24edf31b"
+    }
+   ],
+   "note": "signed over the bytes a verifier WITHOUT this rule computes, so such a verifier accepts it; only the rule can reject it",
+   "current_production_canonical": "{\"amount_atomic\":-9007199254740993,\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-bigint-neg\",\"nonce\":\"70b74e5eb7dfefdc3ddb932f82538d2a\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "current_production_note": "covenant's current canonicalizer produces bytes for this input"
+  },
+  {
+   "id": "V17-nfd-member-name",
+   "what": "a member NAME in NFD",
+   "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"e06a1b3a68d2428d700688cddb0e2f43\", \"id\": \"cov-vec-nfd-name\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\", \"tags\": {\"café\": 1}}",
+   "expect": "reject",
+   "why": "P2 -- names are strings too",
+   "expect_reason": "P2",
+   "profile_rejects_with": "P2 string is not NFC: 'café'",
+   "lenient_bytes": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-nfd-name\",\"nonce\":\"e06a1b3a68d2428d700688cddb0e2f43\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\",\"tags\":{\"café\":1}}",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0xe975fb844b2e7179c35f572a596a6a471c548e32f56ee72e813a67db1b12ab550895ba83476d0e4ce6b0c4b872a01702bf131f7b97235bd54859cf0209e4b0e01b"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x1fd7e6a4a55adeafdc1043b777b1678b19b8a9509bb575b81df243c5130f865f41e13e087da6cf5c04c3222d9969bf214374f3b7d2ac4c157055a622fea226f31b"
+    }
+   ],
+   "note": "signed over the bytes a verifier WITHOUT this rule computes, so such a verifier accepts it; only the rule can reject it",
+   "current_production_canonical": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-nfd-name\",\"nonce\":\"e06a1b3a68d2428d700688cddb0e2f43\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\",\"tags\":{\"café\":1}}",
+   "current_production_note": "covenant's current canonicalizer produces bytes for this input"
+  },
+  {
+   "id": "V18-boundary-exponent",
+   "what": "2^53-1 spelled in exponent form",
+   "input_json_text": "{\"amount_atomic\":9.007199254740991e15,\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"0b022f8c3bd07132702e300a4504b180\", \"id\": \"cov-vec-boundary-exp\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+   "expect": "accept",
+   "why": "P3 boundary -- a verifier that rejects every exponent would fail this",
+   "canonical_jcs": "{\"amount_atomic\":9007199254740991,\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-boundary-exp\",\"nonce\":\"0b022f8c3bd07132702e300a4504b180\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "canonical_jcs_hex": "7b22616d6f756e745f61746f6d6963223a393030373139393235343734303939312c22616d6f756e745f75736463223a22302e303230303030222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d626f756e646172792d657870222c226e6f6e6365223a223062303232663863336264303731333237303265333030613435303462313830222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a227d",
+   "sha256_jcs": "26e68066de31a52017036d8db60cdba3e5f36a035bbfb0adaad6771f7b19f716",
+   "current_production_canonical_differs": true,
+   "current_production_canonical": "{\"amount_atomic\":9007199254740991.0,\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-boundary-exp\",\"nonce\":\"0b022f8c3bd07132702e300a4504b180\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0xbb8807dab09fa81bf7c871d0ce98168eccb5014fada9ce68626e338368731b6027bda303ced31e9302a26d7dbffdb73db9a3c01910a5cfe92796629012d017e41c"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0xedb0bb47caa877f00a28eca14f831f2c5c03bd70902243d1fad76d29dfa5e3343cb5034d131de405201732d8920d9a135675a74e2b51679950fb06d0782a2eed1c"
+    }
+   ]
+  },
+  {
+   "id": "V19-nonint-above-bound",
+   "what": "a non-integer just above 2^53-1",
+   "input_json_text": "{\"amount_atomic\":9007199254740991.5,\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"835fadcf42fd0dfb7f8de3f3fc9c67b0\", \"id\": \"cov-vec-nonint\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+   "expect": "reject",
+   "why": "P3 -- the bound is on magnitude, integer or not",
+   "expect_reason": "P3",
+   "profile_rejects_with": "P3 number token 9007199254740991.5 has magnitude above 2^53-1; carry it as a string",
+   "lenient_bytes": "{\"amount_atomic\":9007199254740992,\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-nonint\",\"nonce\":\"835fadcf42fd0dfb7f8de3f3fc9c67b0\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0x600ef882f85739362a235159ac9c59afdc08f103b3f85ec4706ffb0e343bbcc302545d5f08e68fe9f883f2fefb2bc1f6d092f8d484a013cced931797b7ad32cd1c"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x78c1e4672ec4bfc8fcb1de481284e7353fb9a8b2e61124ce1d65f50b8cb7481a6e01ff1b839a05a2189d4d42003f6741e317979772b494d49aa15aab7c27e4ba1b"
+    }
+   ],
+   "note": "signed over the bytes a verifier WITHOUT this rule computes, so such a verifier accepts it; only the rule can reject it",
+   "current_production_canonical": "{\"amount_atomic\":9007199254740992.0,\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-nonint\",\"nonce\":\"835fadcf42fd0dfb7f8de3f3fc9c67b0\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "current_production_note": "covenant's current canonicalizer produces bytes for this input"
+  },
+  {
+   "id": "V20-huge-exponent",
+   "what": "a number far outside double range",
+   "input_json_text": "{\"amount_atomic\":1e400,\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"62c32ee7494f01909797ea8fac262797\", \"id\": \"cov-vec-huge\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+   "expect": "reject",
+   "why": "P3 -- exact decimal arithmetic must reject it without converting it (a double would be Infinity)",
+   "expect_reason": "P3",
+   "profile_rejects_with": "P3 number token 1e400 has magnitude above 2^53-1; carry it as a string",
+   "lenient_bytes": null,
+   "signatures": [],
+   "note": "a verifier without the rule cannot produce canonical bytes for this input either (no UTF-8 encoding for a lone surrogate; a double of Infinity for 1e400), so nothing can be signed",
+   "current_production_canonical": "{\"amount_atomic\":Infinity,\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-huge\",\"nonce\":\"62c32ee7494f01909797ea8fac262797\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "current_production_note": "covenant's current canonicalizer produces bytes for this input"
+  },
+  {
+   "id": "V13-top-level-proof",
+   "what": "a receipt carrying its top-level proof member",
+   "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"1445a3da493cb543188c66de52d90cb4\", \"id\": \"cov-vec-toplevel-proof\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\", \"proof\": {\"scheme\": \"eip191-personal-sign\", \"note\": \"excluded\"}}",
+   "expect": "accept",
+   "why": "P4 -- the top-level proof is excluded from the canonical bytes",
+   "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-toplevel-proof\",\"nonce\":\"1445a3da493cb543188c66de52d90cb4\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "canonical_jcs_hex": "7b22616d6f756e745f75736463223a22302e303230303030222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d746f706c6576656c2d70726f6f66222c226e6f6e6365223a223134343561336461343933636235343331383863363664653532643930636234222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a227d",
+   "sha256_jcs": "f32ea731ef7ee79ca2fcfe305402204d499248efa449343c33cb83b57a3c9078",
+   "current_production_canonical_differs": false,
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0xa6a84c443fc65c06a5afb28b87cc4892bb69f96af6e7d2ae7bfaee93bd106a747c1c20bcc3e481c976df3219c8c4029339e70270378f4ead02c71aeb92ff2bac1b"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x54a372fdd6dfccf8cd854e68e1b399c59b8573a8993066aba1e76862bff469c66b73a31cffbbab8c25901dc0966be1e62268543fca89e431632c7341579625cf1c"
+    }
+   ]
+  }
+ ],
+ "negatives": [
+  {
+   "id": "N01-mutated-bytes",
+   "what": "amount changed in the canonical bytes; V01's signatures kept",
+   "canonical_jcs": "{\"amount_usdc\":\"0.020001\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-base\",\"nonce\":\"6f1d0c3a9b8e4f20a7c5d1e3b2f40986\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "canonical_jcs_hex": "7b22616d6f756e745f75736463223a22302e303230303031222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d62617365222c226e6f6e6365223a223666316430633361396238653466323061376335643165336232663430393836222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a227d",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0x9d6ee8383b7e521ec30495a8aef44d50484c38dd2d8416dcb11245520f1114bd7749bf2cc05d1a56c0523b28b460349e5182c47d1a02c1525a096f3b141e88fa1b"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0xa528086d07c692b955a1ad01a298c836ae492f7ac607d29ae002b91e33bb6b67388b56eb3ce0fceac21686ce89992791fd949d66ab37b2e76234993a097d4a3a1c"
+    }
+   ],
+   "expect": "reject",
+   "why": "the digest changes, so recovery yields some other address"
+  },
+  {
+   "id": "N02-wrong-signer",
+   "what": "V01's bytes signed by key B (in no discovery document), presented as A's",
+   "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-base\",\"nonce\":\"6f1d0c3a9b8e4f20a7c5d1e3b2f40986\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "canonical_jcs_hex": "7b22616d6f756e745f75736463223a22302e303230303030222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d62617365222c226e6f6e6365223a223666316430633361396238653466323061376335643165336232663430393836222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a227d",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0x0ba23689e230b5305360900826777cf8f0a8f11610b227c199b9e39ff288f60b5df89866a07166ed5a76176a3be28f13d2bffa44b16a5cb60682df02afdf626c1c"
+    }
+   ],
+   "signed_by_test_key": "0x03baF76F904Be65A14C8ec0D33D081a4CFDb7f86",
+   "expect": "reject",
+   "why": "a valid signature by the wrong key recovers to B, not A"
+  },
+  {
+   "id": "N03-high-s",
+   "what": "V01's signatures with s replaced by n-s and v flipped",
+   "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-base\",\"nonce\":\"6f1d0c3a9b8e4f20a7c5d1e3b2f40986\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "canonical_jcs_hex": "7b22616d6f756e745f75736463223a22302e303230303030222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d62617365222c226e6f6e6365223a223666316430633361396238653466323061376335643165336232663430393836222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a227d",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0x9d6ee8383b7e521ec30495a8aef44d50484c38dd2d8416dcb11245520f1114bd88b640d33fa2e5a93fadc4d74b9fcb60692c18699545dee965c8ef51bc17b8471c"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0xa528086d07c692b955a1ad01a298c836ae492f7ac607d29ae002b91e33bb6b67c774a914c31f03153de979317666d86cbd1a3f800410ed545d9dc552c6b8f7071b"
+    }
+   ],
+   "expect": "reject",
+   "why": "P5 -- each still recovers to its signer, so only an explicit low-s rule rejects it"
+  },
+  {
+   "id": "N04-nested-proof-altered",
+   "what": "V10 with meta.proof changed after signing; V10's signatures kept",
+   "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"5f5b4ef8dd4270f59f10f63870d803e0\", \"id\": \"cov-vec-nested\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\", \"meta\": {\"proof\": \"citation-check-8\", \"files\": 2}}",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0x331bdd3668cb54466afe0d12d2917c788dd14586d247af86c7f4b3fbe7eb9e9c3a70f824aa7d8ee22d2069d7cdbc1daf603951a7cdb37efce9cb3994f8de10361c"
+    },
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0xcf2b04277f95d2d6b07a2382ed7ac7edf1ad4b256ac6418ba9af58a46dc9441968642f9ae3cb022561fa4d91504f0ef20cc6b7c045f934427d49bffea06939501c"
+    }
+   ],
+   "expect": "reject",
+   "why": "P4 -- nested proof is signed content; a verifier that strips 'proof' recursively accepts this"
+  },
+  {
+   "id": "N05-framing-not-pinned",
+   "what": "V01's bytes signed by A under digest-bytes; A is pinned to hex-text",
+   "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-base\",\"nonce\":\"6f1d0c3a9b8e4f20a7c5d1e3b2f40986\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "canonical_jcs_hex": "7b22616d6f756e745f75736463223a22302e303230303030222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d62617365222c226e6f6e6365223a223666316430633361396238653466323061376335643165336232663430393836222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a227d",
+   "signatures": [
+    {
+     "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+     "signature": "0x2fc1c27aa6fab4ef022db2a1aec4b6fba46759e5ea918b8c22fe71875f12d3b6448ab989e09e6b27eacdeb03a723659c3a6f352578d59eaad592bc0f471d88b51b"
+    }
+   ],
+   "expect": "reject",
+   "why": "P7 -- a verifier that falls back to the other framing would accept this"
+  },
+  {
+   "id": "N06-framing-not-pinned-mirror",
+   "what": "V01's bytes signed by C under hex-text; C is pinned to digest-bytes",
+   "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-base\",\"nonce\":\"6f1d0c3a9b8e4f20a7c5d1e3b2f40986\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+   "canonical_jcs_hex": "7b22616d6f756e745f75736463223a22302e303230303030222c2261756469656e6365223a2261656d622e70726f222c22617574686f72697a6174696f6e223a22617574686f72697a6564222c22636861696e5f6964223a226569703135353a38343533222c22646f6d61696e223a22636f76656e616e742d6561726e2d726563656970742f7631222c226964223a22636f762d7665632d62617365222c226e6f6e6365223a223666316430633361396238653466323061376335643165336232663430393836222c226f66666572223a2272656365697074222c2274223a22323032362d31312d30345431323a30303a30305a227d",
+   "signatures": [
+    {
+     "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+     "signature": "0x79fb36922baff0ad555cd480e5781922dba7ecf388595b0d8cd7e83c49f985aa64aa94b2238d4fa4723e6d1a4ca60f68e32531794471d72b6c59c4fd9ac7ed781b"
+    }
+   ],
+   "expect": "reject",
+   "why": "P7 -- the same, in the other direction"
+  }
+ ],
+ "replay_sequence": {
+  "id": "S01-replay-sequence",
+  "relying_party": {
+   "me": "aemb.pro",
+   "domain": "covenant-earn-receipt/v1",
+   "chain_id": "eip155:8453"
+  },
+  "note": "run against a FRESH relying party configured as above; the only vectors that share verifier state. Each step presents one receipt with one signer's signature; every receipt carries its own unused nonce except where a step reuses one on purpose, so each rejection can only come from the rule named in expect_reason",
+  "steps": [
+   {
+    "present": "V01-base",
+    "signer": "A",
+    "expect": "accept",
+    "expect_reason": "accepted"
+   },
+   {
+    "present": "V01-base",
+    "signer": "A",
+    "expect": "reject",
+    "expect_reason": "P6d"
+   },
+   {
+    "present": "V01-base",
+    "signer": "C",
+    "expect": "accept",
+    "expect_reason": "accepted",
+    "why": "the same nonce from a different signer: the replay key is the (signer, nonce) pair"
+   },
+   {
+    "present": "R-wrong-audience",
+    "signer": "A",
+    "expect": "reject",
+    "expect_reason": "P6b"
+   },
+   {
+    "present": "R-wrong-domain",
+    "signer": "A",
+    "expect": "reject",
+    "expect_reason": "P6a"
+   },
+   {
+    "present": "R-wrong-chain",
+    "signer": "A",
+    "expect": "reject",
+    "expect_reason": "P6c"
+   },
+   {
+    "present": "R-no-nonce",
+    "signer": "A",
+    "expect": "reject",
+    "expect_reason": "P6d",
+    "why": "absent-field bypass: without the presence check this is accepted the first time"
+   },
+   {
+    "present": "R-no-domain",
+    "signer": "A",
+    "expect": "reject",
+    "expect_reason": "P6a"
+   },
+   {
+    "present": "R-fresh",
+    "signer": "A",
+    "expect": "accept",
+    "expect_reason": "accepted"
+   }
+  ],
+  "receipts": {
+   "R-wrong-audience": {
+    "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"someone-else.example\", \"chain_id\": \"eip155:8453\", \"nonce\": \"ae0bd6a6ff60039206438fe294713be7\", \"id\": \"cov-vec-aud\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+    "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"someone-else.example\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-aud\",\"nonce\":\"ae0bd6a6ff60039206438fe294713be7\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+    "sha256_jcs": "679104585cf4fe83f192230e676c2478d6dd7a5b238a98f8c9f70b2d21c98413",
+    "signatures": [
+     {
+      "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+      "signature": "0xb5087e4b772d63e0469ca70b8b43f1478b46cf826cbfc110425235633371a8cd0aeb8acd13959ce0345dcfaf505775605169928d91d1d59f89aaec8c592d671f1c"
+     },
+     {
+      "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+      "signature": "0x45f3415a1bab6475f13b7d5fd6d5716c63e0ce3f7a9e2059e831acdd283576cc3d71ae3553e1e1279fd36786e0cb7cc6913716399fa155b246fcae7c616dcb251b"
+     }
+    ]
+   },
+   "R-wrong-domain": {
+    "input_json_text": "{\"domain\": \"covenant-earn-receipt/v0\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"2a17b2d3438f0f8a3184c5d7c501f97f\", \"id\": \"cov-vec-dom\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+    "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v0\",\"id\":\"cov-vec-dom\",\"nonce\":\"2a17b2d3438f0f8a3184c5d7c501f97f\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+    "sha256_jcs": "02060145057a619870777adc90a79fc812f01a264223a33ba3adf2f99838b7b7",
+    "signatures": [
+     {
+      "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+      "signature": "0xe40ec7197470999636c9912e8095dcd9b29209aaeccc0b033b43109548f0b33744a83c1b8fed53cbea8b03f520a36b975f53748005daca1975790127c73de9d21c"
+     },
+     {
+      "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+      "signature": "0x87a7bbdcd493a4c9b60a90c72fb47b284675dd7ffc0fc69365ed472f983f3f7a1e4cb468ae4032d37b9c23b74b52123b1e47bfd811b7bfc591a6da6f8d8319c51c"
+     }
+    ]
+   },
+   "R-wrong-chain": {
+    "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:1\", \"nonce\": \"4796f04860082dd27674fe535d331073\", \"id\": \"cov-vec-chain\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+    "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:1\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-chain\",\"nonce\":\"4796f04860082dd27674fe535d331073\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+    "sha256_jcs": "dc910a52a5e442af13c3666332b3b414b897513631a9f7492083ce8228383e73",
+    "signatures": [
+     {
+      "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+      "signature": "0x75f6b703ed790f5667b95b428a12e556acbde38bafeb31b047d1b1f50bb4aea22a889a5056df2f3e6963e4038d5f85eca2c2625a336e50b6beaea68aa1c17fa51c"
+     },
+     {
+      "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+      "signature": "0xad70f118dd652d7020d237db30a699f57c6a1641bd60f84b366c400619c2c18d65be3ea0e64d0f4defd4e083f31bc005246c27db09829adcadcab0068e27d8af1b"
+     }
+    ]
+   },
+   "R-no-nonce": {
+    "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"id\": \"cov-vec-no-nonce\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+    "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-no-nonce\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+    "sha256_jcs": "39eaa7ca2b261585a8c131819afb9c57e4faba636d1899b31f1103d6e9e95ec8",
+    "signatures": [
+     {
+      "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+      "signature": "0xb81ac04037c3792fe55dd0916cf12f1fe44dc0671ee09d868a8990e4316dd8e57408e0a635c016ad76bf3957ff1689c8f53bcd2bc7d580df673e1925ec4eb5861b"
+     },
+     {
+      "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+      "signature": "0xeae532c334612205c52f2e622e60b0e9436ea610331bf725e1817799b9c94ef8425b786cd85a934c633fb64428d0fa0d6feb05b4c141998ee50a8f91d878a4b61c"
+     }
+    ]
+   },
+   "R-no-domain": {
+    "input_json_text": "{\"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"10af8a2052cd64167c8be12f2ae12043\", \"id\": \"cov-vec-no-domain\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+    "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"id\":\"cov-vec-no-domain\",\"nonce\":\"10af8a2052cd64167c8be12f2ae12043\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+    "sha256_jcs": "3649dff5cfdc66b69b22c872521ddb254fd71535e54880e4a0096a7f21dfa154",
+    "signatures": [
+     {
+      "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+      "signature": "0xa7ca8deae19a3162cbf8e77f623f2f7973e36c5ef3bdcaff0507f3f4727fd50f79000c491302c9fcde79abb32b51ebdbf8a49bf0c8b3bb15ebd0182a2f9f9ac11b"
+     },
+     {
+      "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+      "signature": "0xf82b0d23a466b5d949be8509301ebc90c75a8f19a40b861be59c02c09775f05f0d3be598ba01e8a95fccaa6ea8128c58ff8fac8b339637277fa4f022ad09199c1b"
+     }
+    ]
+   },
+   "R-fresh": {
+    "input_json_text": "{\"domain\": \"covenant-earn-receipt/v1\", \"audience\": \"aemb.pro\", \"chain_id\": \"eip155:8453\", \"nonce\": \"09b9a490b8a78dc8b6693ae9612262da\", \"id\": \"cov-vec-fresh\", \"offer\": \"receipt\", \"amount_usdc\": \"0.020000\", \"authorization\": \"authorized\", \"t\": \"2026-11-04T12:00:00Z\"}",
+    "canonical_jcs": "{\"amount_usdc\":\"0.020000\",\"audience\":\"aemb.pro\",\"authorization\":\"authorized\",\"chain_id\":\"eip155:8453\",\"domain\":\"covenant-earn-receipt/v1\",\"id\":\"cov-vec-fresh\",\"nonce\":\"09b9a490b8a78dc8b6693ae9612262da\",\"offer\":\"receipt\",\"t\":\"2026-11-04T12:00:00Z\"}",
+    "sha256_jcs": "cf93d1b7753fa3ffc07a1d649fcfe2333d6a127eef8d1394be52bd0d52f7bcf7",
+    "signatures": [
+     {
+      "signer": "0x480fF8912Ace464dAa57bE068F852aDFdb97E836",
+      "signature": "0x3092e7f5b62ff3bbab8440f461f8e5bc3c7cfe510e918d94a22ec63a4b22bd935d3261c8ad456313b1d4ca968c0b3838f01f4a08d90d22de9bcad50f659eec371b"
+     },
+     {
+      "signer": "0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE",
+      "signature": "0x67834043b70179aae37e3faba49dc35b7c596e5899a1ab0d9336c89b368792f0150822712978b8289e0d3221ac8c9ee14fbcc1d9372c6661ad18c2a373826a071c"
+     }
+    ]
+   }
+  }
+ },
+ "results_by_our_verifier": [
+  {
+   "id": "V01-base",
+   "got": "accept",
+   "expect": "accept",
+   "reason": ""
+  },
+  {
+   "id": "V02-float",
+   "got": "accept",
+   "expect": "accept",
+   "reason": ""
+  },
+  {
+   "id": "V03-int-safe-as-string",
+   "got": "accept",
+   "expect": "accept",
+   "reason": ""
+  },
+  {
+   "id": "V04-int-unsafe-as-number",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "P3 number token 9007199254740993 has magnitude above 2^53-1; carry it as a string"
+  },
+  {
+   "id": "V05-nfc",
+   "got": "accept",
+   "expect": "accept",
+   "reason": ""
+  },
+  {
+   "id": "V06-nfd",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "P2 string is not NFC: 'café'"
+  },
+  {
+   "id": "V07-control",
+   "got": "accept",
+   "expect": "accept",
+   "reason": ""
+  },
+  {
+   "id": "V08-key-order",
+   "got": "accept",
+   "expect": "accept",
+   "reason": ""
+  },
+  {
+   "id": "V09-duplicate",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "P1 duplicate member name 'amount_usdc'"
+  },
+  {
+   "id": "V10-nested-proof",
+   "got": "accept",
+   "expect": "accept",
+   "reason": ""
+  },
+  {
+   "id": "V11-int-unsafe-exponent",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "P3 number token 9.007199254740993e15 has magnitude above 2^53-1; carry it as a string"
+  },
+  {
+   "id": "V12-duplicate-escaped",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "P1 duplicate member name 'memo'"
+  },
+  {
+   "id": "V14-lone-surrogate",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "P2 string holds a lone surrogate, which is not valid Unicode (RFC 8785 requires I-JSON)"
+  },
+  {
+   "id": "V15-int-boundary",
+   "got": "accept",
+   "expect": "accept",
+   "reason": ""
+  },
+  {
+   "id": "V16-int-unsafe-negative",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "P3 number token -9007199254740993 has magnitude above 2^53-1; carry it as a string"
+  },
+  {
+   "id": "V17-nfd-member-name",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "P2 string is not NFC: 'café'"
+  },
+  {
+   "id": "V18-boundary-exponent",
+   "got": "accept",
+   "expect": "accept",
+   "reason": ""
+  },
+  {
+   "id": "V19-nonint-above-bound",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "P3 number token 9007199254740991.5 has magnitude above 2^53-1; carry it as a string"
+  },
+  {
+   "id": "V20-huge-exponent",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "P3 number token 1e400 has magnitude above 2^53-1; carry it as a string"
+  },
+  {
+   "id": "V13-top-level-proof",
+   "got": "accept",
+   "expect": "accept",
+   "reason": ""
+  },
+  {
+   "id": "N01-mutated-bytes",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "recovers to 0xe32829ecAC5cDFfcAa4330913907C0FAC0B099Ad under hex-text, not the claimed 0x480fF8912Ace464dAa57bE068F852aDFdb97E836; recovers to 0xB7Ae2986213914c35B42e3603129FDb2B14C1204 under digest-bytes, not the claimed 0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE"
+  },
+  {
+   "id": "N02-wrong-signer",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "recovers to 0x03baF76F904Be65A14C8ec0D33D081a4CFDb7f86 under hex-text, not the claimed 0x480fF8912Ace464dAa57bE068F852aDFdb97E836"
+  },
+  {
+   "id": "N03-high-s",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "P5 high-s signature; P5 high-s signature"
+  },
+  {
+   "id": "N04-nested-proof-altered",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "recovers to 0xb468907707528ff2cBb5935096a93dD06D9d4dd2 under hex-text, not the claimed 0x480fF8912Ace464dAa57bE068F852aDFdb97E836; recovers to 0xc6ff7258ce74571B7a974Cb467aC674C63181211 under digest-bytes, not the claimed 0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE"
+  },
+  {
+   "id": "N05-framing-not-pinned",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "recovers to 0x7F4D397327C621481b6Cd66e57E43B77e92Bda96 under hex-text, not the claimed 0x480fF8912Ace464dAa57bE068F852aDFdb97E836"
+  },
+  {
+   "id": "N06-framing-not-pinned-mirror",
+   "got": "reject",
+   "expect": "reject",
+   "reason": "recovers to 0x66B105D8d091D4031323705CAb118FDC8507b1D3 under digest-bytes, not the claimed 0xF02aC3ec3DfB75AFd9Ec9962d7f3bdeDe0Cc81FE"
+  },
+  {
+   "id": "S01-replay-sequence#1 V01-base/A",
+   "got": "accept:accepted",
+   "expect": "accept:accepted",
+   "reason": "accepted and (signer, nonce) recorded"
+  },
+  {
+   "id": "S01-replay-sequence#2 V01-base/A",
+   "got": "reject:P6d",
+   "expect": "reject:P6d",
+   "reason": "P6d replay: (signer, nonce) already accepted"
+  },
+  {
+   "id": "S01-replay-sequence#3 V01-base/C",
+   "got": "accept:accepted",
+   "expect": "accept:accepted",
+   "reason": "accepted and (signer, nonce) recorded"
+  },
+  {
+   "id": "S01-replay-sequence#4 R-wrong-audience/A",
+   "got": "reject:P6b",
+   "expect": "reject:P6b",
+   "reason": "P6b audience 'someone-else.example' is not this relying party 'aemb.pro'"
+  },
+  {
+   "id": "S01-replay-sequence#5 R-wrong-domain/A",
+   "got": "reject:P6a",
+   "expect": "reject:P6a",
+   "reason": "P6a domain 'covenant-earn-receipt/v0' is not 'covenant-earn-receipt/v1'"
+  },
+  {
+   "id": "S01-replay-sequence#6 R-wrong-chain/A",
+   "got": "reject:P6c",
+   "expect": "reject:P6c",
+   "reason": "P6c chain_id 'eip155:1' is not the required 'eip155:8453'"
+  },
+  {
+   "id": "S01-replay-sequence#7 R-no-nonce/A",
+   "got": "reject:P6d",
+   "expect": "reject:P6d",
+   "reason": "P6d no nonce: a missing nonce is not a fresh one"
+  },
+  {
+   "id": "S01-replay-sequence#8 R-no-domain/A",
+   "got": "reject:P6a",
+   "expect": "reject:P6a",
+   "reason": "P6a domain None is not 'covenant-earn-receipt/v1'"
+  },
+  {
+   "id": "S01-replay-sequence#9 R-fresh/A",
+   "got": "accept:accepted",
+   "expect": "accept:accepted",
+   "reason": "accepted and (signer, nonce) recorded"
+  }
+ ]
+}
