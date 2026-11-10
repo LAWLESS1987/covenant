@@ -17388,3 +17388,34 @@ understands."
 - **Blind spots (rule 9):** an own account with no recorded reply anywhere in the log cannot be recognised; the
   account's name is still on no record. Someone we never answered whose comment opens by quoting our reply is classed
   as us, the same risk A280 accepted.
+
+### A420. [the heal told him what it could not fix and stopped there; every condition it leaves now carries the next step, whose it is, the gain and the cost] (2026-11-10)
+
+- **His words:** "I often get there's nothing here to fix it on the phone. I want you to have something there that
+  can fix it. Root it in mutual benefit of all intelligence."
+- **What he was reading.** `covenant_heal` hands back each condition it leaves with one sentence: either that no
+  automatic remedy exists and it is reported for a person, or that the remedy ran and the condition is still present.
+  The newest real heal in `ops/heal.jsonl` (2026-11-09 03:53, the daily loop) left 11 conditions that way; a dry run
+  on 2026-11-10 faced 13. The phone's Heal answer prints that sentence for the first six.
+- **The same family, fourth time.** A215 gave him the button and promised it would name what it cannot fix. A235
+  closed two of its blind spots. A336 made what is left reach his phone. Each one moved the report closer to him and
+  none of them said what to do next, so the report arrived and ended.
+- **What changed.** `covenant_fixplan.py` holds a card for every detector that has no remedy the machine may run by
+  itself: the step, the owner, the gain, the cost, and why it is not automatic. The owner is not always the operator:
+  some belong to whoever holds a device, to Tetsu, or to another party's repository. For a condition whose remedy ran
+  and did not settle it, the card quotes that remedy's newest real ledger line. `covenant_heal` attaches the card to
+  each condition it leaves, puts the step into `why_no_fix` (the field the phone already prints, so no new app build
+  is needed for it to show), and names the step in what `tell_left` sends.
+- **What did not change.** Nothing new runs. The card module registers no remedy. Money, keys, consent, a model, an
+  account and another party's repository stay with their owners; the card gives the owner the step and its price.
+  Every gain and cost line is marked as claimed by Claude and not ratified, like the highway's own benefit lines.
+- **Counted.** The highway registers 42 detectors; 23 have no AUTO_REVERSIBLE remedy; 23 cards, 0 missing
+  (`python covenant_fixplan.py --missing`).
+- **Driven both ways.** `test_fp1_fixplan.py` 32 of 32. A detector added with no card turns it red, as does a card
+  with its cost blanked. 12 single-part mutations of the two modules, 12 red. `test_hl1_heal.py` 34 of 34, unchanged.
+- **Blind spots (rule 9).** The suite counts cards against detectors and reads none for truth: whether a step works
+  is known only when it is run and the condition measured again. The cards were written from the detectors'
+  docstrings on one day. The 13 conditions standing on 2026-11-10 are not repaired by this entry. The nodes must be
+  restarted before the phone's Heal press returns the new text (A153).
+
+---
