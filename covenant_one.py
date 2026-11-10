@@ -395,6 +395,10 @@ SUITES = [
     # DeepSeek's hold-side clause. Drives the bar both ways; registered here at
     # birth so it is never ORPHANED (F2/F3's lesson above).
     ("test_hp1_corpus_hold_parity.py",    60,  "JUDGE"),
+    # AU1 (2026-11-10): the reasoning-consuming AUDITOR scaffold -- emits
+    # reviewable label-trust artifacts, never a verdict, never in the gate,
+    # reasoning half inert by default. Pins all four hard lines both ways.
+    ("test_au1_auditor_scaffold.py",      60,  "JUDGE"),
     ("covenant_quiet.py",                 30,  "JUDGE"),
     ("test_dk1_desk.py",                  60,  "JUDGE"),
     ("test_f4_capability.py",            120,  "JUDGE"),

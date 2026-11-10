@@ -465,3 +465,36 @@ phrases, and structured predicates -- and it points the same way: the reasoning'
 AUDITOR that can use context to tell the polysemous cases apart (and cleaner LABELS via re-adjudication), NOT more
 bag-of-words weight. The hold-parity bar earns its place here: it is what refuses the aggressive settings outright.
 Both live judges byte-for-byte unchanged.
+
+---
+
+## THE REASONING-CONSUMING AUDITOR SCAFFOLD (his call 2026-11-10: "Build auditor scaffold")
+
+DeepSeek's option (b), built. After five feature-space levers failed to improve the judge through its weights, the
+evidence points to an AUDITOR that uses CONTEXT to tell the polysemous cases apart -- one that emits reviewable
+artifacts and never votes. `covenant_judge_auditor.py` + `test_au1_auditor_scaffold.py` (AU1 15/15).
+
+**What it is.** It reads the corpus and the inspectable judge and emits REVIEWABLE ARTIFACTS -- a label-trust score
+and flags per row, a re-adjudication queue, counts of contradictions and unconfirmed convictions. On the live corpus:
+rows 3842 (panel 1455 / authored 1590 / single_judge 797), **300 queued for re-adjudication** (trust below the review
+floor 0.5), **10 flagged contradictions**, **190 rows carrying a conviction no panel row confirms**. Runs in ~2s.
+
+**The four hard lines, each pinned by AU1 both ways.**
+1. NEVER A VERDICT -- records carry `label_trust` in [0,1] and flags, never clean/violates for the gate; the gate does
+   not import the auditor (asserted).
+2. NEVER WRITES A MODEL -- a real `audit()` leaves both `fallback_model*.json` and `ops/verdicts.jsonl` byte-for-byte
+   unchanged (asserted by hash).
+3. THE REASONING HALF IS INERT BY DEFAULT AND GATED -- `audit(reasoner=None)` runs the deterministic priors only and
+   makes no external call; a reasoning model (the teacher panel, or a larger model) plugs in by passing a `reasoner`
+   callable, which is his-go / runner-gated exactly like the panel re-adjudication. AU1 drives this both ways: inert
+   by default (no `reasoning` key, marked "inert"), and a provided reasoner is called once per row and merged.
+4. READ-ONLY + OPSEC -- it only emits a report to a path it is given; `write_report()` withholds private-source
+   (`queue`) row TEXT from the file while the in-memory `audit()` still sees them, so the artifact is shareable (the
+   worklist discipline). AU1 pins both directions.
+
+**Where it sits.** The deterministic half is the offline engine of the LABEL lever the quorum endorsed: it ranks which
+labels to trust and queues the rest. The reasoning half is the integration POINT -- the place a context-aware model's
+judgment enters as reviewable DATA, never as a verdict, never in the gate. It is inert until he engages it, because
+engaging it means model calls on the runner (his go), the same line the 243-row re-adjudication waits behind.
+
+Both live judges byte-for-byte unchanged; nothing promoted. The report is a regenerable artifact (not committed).
