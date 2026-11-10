@@ -941,6 +941,13 @@ SUITES = [
     ("test_li1_lookback_index.py", 60, "SECURITY"),
     # A367 (2026-10-17): alert push sends held-down condition starts and clears, not log lines.
     ("test_ap1_alert_push.py", 30, "SECURITY"),
+    # A419 (2026-11-09, his "Yes, additive only" to the all-repos audit): two suites in subfolders that no runner
+    # named. The coverage phase globs the root only, so it could not call them orphans; they passed by hand
+    # (M1 203/203 on a free loopback port, ~9 s; the go-live scheme ALL PASS) and were run by nobody. Both are
+    # staged (tools/ and ai_memory_system/ are in STAGE_DIRS) and set up their own sys.path from their own dir.
+    # The go-live scheme ends "ALL PASS" with no number, so it joins "passed, counted 0" -- named, not hidden.
+    ("ai_memory_system/test_memory_system.py", 180, "SECURITY"),
+    ("tools/test_golive_scheme.py", 60, "SECURITY"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
@@ -1448,6 +1455,8 @@ def phase_coverage(say):
         if out.returncode == 0:
             tracked = {os.path.basename(l.strip()) for l in
                        out.stdout.splitlines() if l.strip()}
+            # A419: a suite listed by its subfolder path is tracked under that path, not its basename.
+            tracked |= {l.strip() for l in out.stdout.splitlines() if l.strip()}
         unshipped = sorted(s for s in listed
                            if s not in tracked
                            and os.path.isfile(os.path.join(HERE, s)))
@@ -1765,6 +1774,7 @@ def phase_sweep(say, only=None, repeat=1, verbose=False):
             continue
         clean_dbs(work)
         log = os.path.join(work, "logs", suite + ".log")
+        os.makedirs(os.path.dirname(log), exist_ok=True)     # A419: a suite in a subfolder logs in a subfolder
         t0 = time.time()
         with open(log, "w", encoding="utf8", errors="replace") as lf:
             p = subprocess.Popen([sys.executable, suite], cwd=work, env=env,

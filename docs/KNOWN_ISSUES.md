@@ -17315,3 +17315,29 @@ understands."
   MockJudge, 30 of them, was rerun on the fix and is green.
 - **Not changed:** the MockJudge is still a keyword matcher, as its own docstring warns. Outside tests it runs only
   with `COVENANT_INSECURE_MOCK_JUDGE=1` or as the `mock_selfreport` judge, whose verdict reads the `_violation` key.
+
+### A419. [the public threefold-memory ledger forks at audit line 1008, and two subfolder suites were run by no runner; OPEN for the fork, FIXED for the suites] (2026-11-09)
+
+- **Found** in a read-only audit of every repo, on his words "Go through all work looking for improvements while
+  not disabling anything we've built or removing anything without consulting me. Scan all of the repos" and
+  "Actually run them all to test too". The additions here follow his "Yes, additive only".
+- **The fork (OPEN, cause UNDETERMINED).** threefold-memory at 90c5470, read with this repo's own verifier
+  (`MemoryStore.verify_chain` and `verify_integrity` from `ai_memory_system/memory_store.py`, called on a bare
+  object so no store was built and nothing was written). `verify_chain`: ok False, 1007 entries verify, broken at
+  1008. Line 1008 (grok-bot, create task-20261104-173244-103492, 2026-11-04T17:33:37Z) names line 1006 as its
+  predecessor; line 1007 (grok-bot, create probe-integrity-20261102, 2026-11-03T01:08:53Z) is skipped. The shape is
+  two writers appending to copies of the ledger from different heads. `verify_integrity`: 995 checked, 1 drifted
+  (task-20261007-njest-2107491305077055657-ocr), 3 unverifiable (README and two lspace notes, A365's class), 0
+  missing. The same numbers came from an LF checkout and a CRLF checkout, so line endings are ruled out. Nothing on
+  that repository runs the verifier. Related: A304, A365, A326, A396.
+  **Not measured:** which writer appended line 1008, why the one record drifted, and whether the private store
+  carries the same fork. Repairing a public ledger is a change to published history and waits on him.
+- **The suites (FIXED).** `ai_memory_system/test_memory_system.py` (M1, 203/203 on a free loopback port, about 9 s)
+  and `tools/test_golive_scheme.py` (ALL PASS) were in no runner. The coverage phase globs the root only, so it
+  could not call them orphans. Both are now in `SUITES`. Two runner lines changed so a subfolder suite works: its
+  log folder is made before the log is opened, and the SHIPPED check reads tracked paths as well as basenames.
+  **Driven both ways:** before that second line, `--only` on the two suites printed both as UNSHIPPED although
+  `git ls-files` lists them; after it, SHIPPED. The go-live scheme ends "ALL PASS" with no number, so it now shows
+  in "passed, counted 0", the runner's named gap; the test file was not edited to change that.
+- **Not here:** `test_hf_threads_own_topic.py` and `.claude/hooks/test_cite_hook.py`, the other two unregistered
+  tests the audit found, are not on main; they get registered on the branch that carries them.
