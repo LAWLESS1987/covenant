@@ -106,9 +106,11 @@ nodes sit behind a home router and learn no inbound peers. Ask for the
 Tailscale address; you will get something like `100.x.y.z`. Then:
 
 ```
-python run_with_ollama_judge.py --port 5000 --node-id <your-name> \
+python run_node.py --port 5000 --node-id <your-name> \
     --genesis genesis.json --peers <owner-address>:5001
 ```
+
+*(Launcher corrected 2026-11-09: the deleted `run_with_ollama_judge.py` name is replaced with `run_node.py` in this peering block too — the A257-SHIM note earlier in this doc had been applied only to the first command block.)*
 
 Three things that are easy to get wrong:
 

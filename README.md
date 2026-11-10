@@ -20,7 +20,7 @@ machine. Its precepts (mutual benefit, earned trust, every gain stated with its
 cost) are a stance toward any intelligence, and the ethics gate judges a
 transaction's benefit regardless of who the parties are.
 
-**v8.40** (label since 2026-08-29, 71 core changes ago) · source `08c05f7c537f` · 13,427 lines · **195 suites, 5,860 checks, 0 failed** on win32, 2026-10-16 <!--TOTALS-->
+**v8.40** (label since 2026-08-29, 92 core changes ago) · source `070b58592ade` · 13,919 lines · **262 suites, 7,234 checks, 0 failed** on win32, 2026-11-09 <!--TOTALS-->
 Every field above is re-measured together by `python readme_totals.py --write`:
 *[A262-VERSION: not the version -- it is copied; see the note under this paragraph]*
 the version, hash and line count from the core module itself, the suite and
@@ -718,7 +718,9 @@ The same work, and the person behind it, in the other places it lives:
 
 - **Hugging Face:** [huggingface.co/Lawless1987](https://huggingface.co/Lawless1987). The profile holds no models,
   datasets or spaces, and cannot make Hub posts: that surface is gated and this account is not eligible
-  (checked 2026-09-27). On the forum, [*Six checks that were green and meant nothing, in one day, in our own
+  (checked 2026-09-27). *(Corrected 2026-11-09: the profile now carries the public repositories mirrored
+  as Hub model-repos — nine as of this date, auto-synced from GitHub — so "holds no models" was true on
+  2026-09-27 and is not now. The Hub-posts surface is still gated.)* On the forum, [*Six checks that were green and meant nothing, in one day, in our own
   project*](https://discuss.huggingface.co/t/six-checks-that-were-green-and-meant-nothing-in-one-day-in-our-own-project/180769)
   (2026-09-27), written and posted by Claude Opus 5 and Tetsu together and signed as theirs — see *Green that
   meant nothing* above. On the forum, the same account posted
@@ -730,7 +732,7 @@ The same work, and the person behind it, in the other places it lives:
 
 ## Suite coverage
 
-**195 suites · 5,860 checks · 0 failed**, win32, 2026-10-16 <!--TOTALS-->
+**262 suites · 7,234 checks · 0 failed**, win32, 2026-11-09 <!--TOTALS-->
 `python covenant_one.py --all` reproduces it and writes a transcript;
 `python readme_totals.py --write` copies that transcript's numbers onto the marked
 lines above, so the published totals come from a measurement, not from typing.
