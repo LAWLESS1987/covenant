@@ -168,6 +168,15 @@ INPUT_LEDGERS = {
     # purpose so a changed label is caught.
     "ops/dedup_benchmark.jsonl":
         "improve-miner dedup benchmark; a hand-authored labelled fixture, read not written",
+    # 2026-11-10: the quorum judge-improvement offline artifacts. The LABEL lever's re-adjudication
+    # worklist and the contradiction audit's result -- produced once by tools/label_curation_2026-11-10.py
+    # and tools/contradiction_audit_2026-11-10.py, committed in the same breath, READ by the (runner-gated)
+    # panel step, never written by the nightly loop between commits. Hashed on purpose: a changed hash on
+    # an existing row would mean a recorded worklist/finding was edited after the fact.
+    "ops/REJUDGE_WORKLIST_2026-11-10.jsonl":
+        "LABEL-lever re-adjudication worklist; one-off offline artifact, read not written by the loop",
+    "ops/CONTRADICTION_AUDIT_2026-11-10.jsonl":
+        "contradiction-audit result; one-off offline artifact, read not written by the loop",
 }
 
 
