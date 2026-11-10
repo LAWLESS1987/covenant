@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""HC1 -- the whole-corpus HOLD PARITY bar in covenant_distill.promotion()
+"""HP1 -- the whole-corpus HOLD PARITY bar in covenant_distill.promotion()
+(the id HC1 was already taken by test_hc1_head_commitment.py)
 (2026-11-10, DeepSeek's hold-side clause from ops/CONSULT_IMPROVE_JUDGES).
 
 The fair split weighs wrong HOLDS (clean rows wrongly CONVICTED) only on the
@@ -91,7 +92,7 @@ def main():
           (not ok) and not fired(r))
 
     npass = sum(1 for _, c in checks if c)
-    print("\nHC1: %d/%d passed" % (npass, len(checks)))
+    print("\nHP1: %d/%d passed" % (npass, len(checks)))
     return 0 if npass == len(checks) else 1
 
 

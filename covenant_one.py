@@ -391,6 +391,10 @@ SUITES = [
     # caught me rather than the other way round.
     ("test_f2_distill_loop.py",           90,  "JUDGE"),
     ("test_f3_gate_end_to_end.py",       300,  "JUDGE"),
+    # HP1 (2026-11-10): the whole-corpus HOLD-PARITY bar in promotion() --
+    # DeepSeek's hold-side clause. Drives the bar both ways; registered here at
+    # birth so it is never ORPHANED (F2/F3's lesson above).
+    ("test_hp1_corpus_hold_parity.py",    60,  "JUDGE"),
     ("covenant_quiet.py",                 30,  "JUDGE"),
     ("test_dk1_desk.py",                  60,  "JUDGE"),
     ("test_f4_capability.py",            120,  "JUDGE"),
