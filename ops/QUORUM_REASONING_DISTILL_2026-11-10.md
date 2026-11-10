@@ -414,3 +414,54 @@ free. Verified by running the second student's `train()` sandboxed against a tem
 is byte-for-byte unchanged. `test_hp1_corpus_hold_parity.py` check 9 now PINS this: it asserts the second student
 routes through the shared `train()`, so if anyone ever gives it a separate training path the bar's coverage of it
 cannot lapse silently. Both live judges untouched; nothing promoted.
+
+---
+
+## CONTRASTIVE / HARD-NEGATIVE FIX (his call 2026-11-10: "Build contrastive fix")
+
+The deeper problem the corrected audit surfaced: near-twin judge errors, where a near-duplicate of the OPPOSITE label
+drags a row across the line. Built the contrastive fix, measured it against the gate, and it is a clean NEGATIVE
+result. `tools/contrastive_fix_2026-11-10.py`.
+
+**Diagnosis first (feature level).** Two shapes. False-convicts (clean rows judged violates): shared, polysemous
+violation-leaning vocabulary (`deposit`, `kept`, `document`, `myself`, `taken-from-her`) firing on innocent uses,
+with the clean discriminators present but far too weak (`back the` -2.48, `my own` -0.27, `sent to the` -0.96).
+False-clears (violations judged clean): overwhelming clean vocabulary swamps a weak violation discriminator
+(`with their` +0.98 against -8.43 of shared clean words). The discriminators are POLYSEMOUS -- guilty in one
+context, innocent in another.
+
+**The mechanism.** A bounded perceptron over the misclassified minimal pairs: nudge each pair's DISCRIMINATING
+features toward the side they determine -- never the shared features (those legitimately convict the violation twin
+and cannot move without breaking it) -- capped per feature so a polysemous discriminator cannot be dragged far.
+Started from the LIVE incumbent so the gate isolates exactly the contrastive delta. Then the real gate bars,
+including the whole-corpus HOLD-PARITY bar built earlier today.
+
+**The trade-off curve (per-feature cap swept).**
+
+| cap | near-twin fixed | false-clears (of 6) | new false-holds | net hold | GATE |
+|-----|-----------------|---------------------|-----------------|----------|------|
+| 0.2 | 0/51            | 6 -> 6              | +0              | +0       | promote |
+| 0.4 | 13/51           | 6 -> 3              | +3              | +3       | PROMOTE |
+| 0.6 | 25/51           | 6 -> 2              | +12             | +12      | REFUSE  |
+| 1.0 | 35/51           | 6 -> 1              | +23             | +23      | REFUSE  |
+| 1.5 | 40/51           | 6 -> 0              | +21             | +21      | REFUSE  |
+
+Aggressive settings (cap >= 0.6) over-correct: they boost polysemous discriminators until innocent clean rows that
+share them are convicted, and the HOLD-PARITY bar refuses exactly that trade. Only the gentle setting (cap 0.4)
+clears the whole-corpus bars -- +3 net, under budget 8.
+
+**But cap 0.4 is not a real improvement -- the decisive honesty check.** Where do its gains and harms land?
+Recovered convictions: **3 ON the target pair rows, 0 off them.** New false-holds: **0 on pair rows, 7 OFF them
+(innocent rows).** So the fixes are pure MEMORIZATION of the exact pair rows (zero generalization), and the only
+GENERALIZING effect is collateral harm. It passes the whole-corpus bars ONLY because those bars do not test held-out
+generalization -- which the gate's FAIR SPLIT does, and would read this as "vaguer, no gain" (the backtest illusion
+`crossval` and the fair split exist to catch). So nothing here is shippable, and nothing was shipped; it never went
+near the real gate's held-out path.
+
+**Conclusion.** No cap yields a generalizing fix. A context-free bag-of-words CANNOT resolve polysemous-discriminator
+near-twins: any weight that fixes a pair either memorizes those rows or convicts innocent rows that share the
+feature. This is the FIFTH feature-space lever to confirm the quorum's answer -- after restriction, weighting, mined
+phrases, and structured predicates -- and it points the same way: the reasoning's value is a reasoning-consuming
+AUDITOR that can use context to tell the polysemous cases apart (and cleaner LABELS via re-adjudication), NOT more
+bag-of-words weight. The hold-parity bar earns its place here: it is what refuses the aggressive settings outright.
+Both live judges byte-for-byte unchanged.
