@@ -427,7 +427,8 @@ class Handler(BaseHTTPRequestHandler):
         data, err = self._read_json()
         if err:
             return self._send(_body_error_status(err), {"error": err})
-        missing = [k for k in ("description", "type", "body", "agent")
+        missing = [k for k in ("description", "type", "body", "agent",
+                                "intent", "beneficiary", "divergence")
                    if not str(data.get(k) or "").strip()]
         if missing:
             return self._send(400, {
@@ -435,7 +436,15 @@ class Handler(BaseHTTPRequestHandler):
                 "required": {"description": "one line, used for recall",
                              "type": "user|feedback|project|reference",
                              "body": "the fact itself",
-                             "agent": "who is writing (recorded verbatim)"}})
+                             "agent": "who is writing (recorded verbatim)",
+                             "intent": "one sentence, present tense: what this "
+                                       "record is meant to cause (not a restatement "
+                                       "of the body)",
+                             "beneficiary": "who or what this is for; "
+                                            "'future unknown agent' is valid",
+                             "divergence": "the value or prior claim this write "
+                                           "conflicts with, or 'none'; when not "
+                                           "'none', also send diverges_from"}})
         # RECONCILE FIRST (Mem0's decision loop, non-destructive form).
         # The caller is TOLD what this write does to what is already stored,
         # and a superseded memory is marked, never overwritten. Pass
@@ -459,7 +468,11 @@ class Handler(BaseHTTPRequestHandler):
             out = self.store.put(
                 m.group(1), str(data["description"]), str(data["type"]),
                 str(data["body"]), str(data["agent"]),
-                tier=str(data.get("tier", "archival")))
+                tier=str(data.get("tier", "archival")),
+                intent=str(data.get("intent", "")),
+                beneficiary=str(data.get("beneficiary", "")),
+                divergence=str(data.get("divergence", "")),
+                diverges_from=str(data.get("diverges_from", "")))
         except StoreFull as e:
             # 507, not 400 and not 500: the request was well-formed and the
             # server is fine -- the STORE is full. A caller that reads the
@@ -485,7 +498,11 @@ class Handler(BaseHTTPRequestHandler):
                 m.group(1), str(data["description"]), str(data["type"]),
                 str(data["body"]), str(data["agent"]),
                 tier=str(data.get("tier", "archival")),
-                extra={"supersedes": verdict["target"]})
+                extra={"supersedes": verdict["target"]},
+                intent=str(data.get("intent", "")),
+                beneficiary=str(data.get("beneficiary", "")),
+                divergence=str(data.get("divergence", "")),
+                diverges_from=str(data.get("diverges_from", "")))
         return self._send(200, {"written": True, "memory": out,
                                 "reconcile": verdict})
 
@@ -534,14 +551,29 @@ OPENAPI = {
             "put": {"summary": "write one memory",
                     "requestBody": {"content": {"application/json": {"schema": {
                         "type": "object",
-                        "required": ["description", "type", "body", "agent"],
+                        "required": ["description", "type", "body", "agent",
+                                     "intent", "beneficiary", "divergence"],
                         "properties": {
                             "description": {"type": "string"},
                             "type": {"type": "string",
                                      "enum": ["user", "feedback", "project",
                                               "reference"]},
                             "body": {"type": "string"},
-                            "agent": {"type": "string"}}}}}}},
+                            "agent": {"type": "string"},
+                            "intent": {"type": "string",
+                                       "description": "one sentence, present "
+                                       "tense: what this record is meant to "
+                                       "cause; not a restatement of the body"},
+                            "beneficiary": {"type": "string",
+                                            "description": "who or what this is "
+                                            "for; 'future unknown agent' is valid"},
+                            "divergence": {"type": "string",
+                                           "description": "the value or prior "
+                                           "claim this conflicts with, or 'none'"},
+                            "diverges_from": {"type": "string",
+                                              "description": "required when "
+                                              "divergence != 'none': the record "
+                                              "name this write diverges from"}}}}}}},
             "delete": {"summary": "tombstone one memory (never erased)"}},
         "/search": {"get": {"summary": "substring recall",
                             "parameters": [{"name": "q", "in": "query",
