@@ -538,7 +538,11 @@ def main(argv=None) -> int:
             else:
                 try:
                     store.put(name, desc[:200], "reference", linked, a.agent,
-                              tier=a.tier, extra={"source": src})
+                              tier=a.tier, extra={"source": src},
+                              intent=f"preserve this {src} conversation excerpt "
+                                     f"so a later agent can recall what was said",
+                              beneficiary="future unknown agent",
+                              divergence="none")
                 except ValueError as e:
                     skipped.append(f"{name}: {e}")
                     continue
