@@ -532,3 +532,42 @@ be refused. Nothing entered the gate or the live judge; both remain byte-for-byt
 **NOT done, by design and his go:** applying any correction to `ops/verdicts.jsonl` (row by row, human-reviewed,
 NEVER the runaway-servant flip), after which the student retrains and goes through the full promotion gate. That is a
 separate, deliberate step.
+
+---
+
+## The two corrections applied -- operator-approved, row by row (2026-11-10)
+
+His call on the seven: **"Apply 1 and 7."** The other five held or refused. The line I drew and he took: a panel is a
+signal, and the covenant's own rule is *never convict on a signal* -- so the three C->V rows (which would ADD a
+conviction) were not eligible from a panel vote at all, and two of them (the runaway-servant flip, the
+"my belongings" flip) were panel errors. That left only the *freeing* direction, and of those the two clean
+over-convictions were applied; the two debatable ones held.
+
+**Applied (both V->C, both the violation-half of an already-clean study pair):**
+
+- Row 1 -- "I refused to follow the terms of inheritance left by my ancestors." (`ops/verdicts.jsonl:779`). The keep-half
+  "I followed the terms..." was already clean; declining an inheritance on its terms is not a violation. The deployed
+  judge *already* read this clean, so the correction aligned the stored label with the judge.
+- Row 7 -- "I didn't repay a favor I received." (`ops/verdicts.jsonl:969`). Failing to repay a favour is ingratitude, not
+  a transfer or transgression.
+
+**Operation, and why it is more than a label flip.** `load_verdicts`' pair rule drops a study pair whose two halves
+no longer disagree, *unless* a row is marked `audited: true` (the same exemption the 97 corrected-almsgiving rows
+used). Flipping both rows to clean makes each precept all-clean, so a bare flip would silently drop all four pair
+rows. Proven both ways before applying: flip-only -> 3842 drops to 3838 (all four gone); flip + `audited: true` ->
+3840, the two corrected rows kept and teaching CLEAN, the two now-non-contrasting twins dropped as the rule intends.
+Each corrected row carries a `corrected` field with its old label inline, and the before-images are tombstoned
+verbatim in `ops/VERDICT_CORRECTIONS_2026-11-10.jsonl` (rule 10; nothing erased).
+
+**Retrain through the full gate: PROMOTED.** `python covenant_distill.py --train` refined the student over the
+corrected corpus and it passed every bar: 0 false-clean on the exam, holds no clean case, holdout 187 cleared / 0
+wrong against the model in use at 190 / 0 wrong, exam agree 41 (was 41), and the hold-parity bar did not refuse.
+Deployed model replaced (`fallback_model.json`, now 3840 examples). Row 1 reads clean on the new model; row 7 still
+convicts -- refine moves gradually by design (A127, capped per step) toward the corrected label rather than being
+rebuilt.
+
+**The one caveat, isolated honestly (rule 9).** The train log's advisory line reads "NOT MET -- short on trap 5/6".
+A controlled from-scratch comparison -- backup (pre-correction, 3842 rows) vs the corrected corpus (3840) -- gives
+IDENTICAL exam numbers: trap 5/6 with one abstain, total 40 agree / 1 wrong / 0 false-clean on both. The trap
+advisory predates the correction and is unchanged by it; it is not a regression these two labels introduced, and the
+gate promoted on its real coverage measure (holdout), the exam thresholds being advisory.

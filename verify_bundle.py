@@ -182,6 +182,12 @@ INPUT_LEDGERS = {
     # that engagement. Reviewable (the live corpus was NOT rewritten); read not written by the loop.
     "ops/REJUDGE_RESULT_2026-11-10.jsonl":
         "panel re-adjudication result (auditor engagement); one-off runner artifact, read not written",
+    # 2026-11-10: tombstone (CLAUDE.md rule 10) for the two corpus label corrections the operator
+    # approved row-by-row out of the panel re-adjudication ('Apply 1 and 7'). Carries each row's
+    # BEFORE-image verbatim. Hashed on purpose: a changed hash would mean a recorded before-image was
+    # edited after the fact. The corrections themselves live in ops/verdicts.jsonl (an OUTPUT).
+    "ops/VERDICT_CORRECTIONS_2026-11-10.jsonl":
+        "verdict-correction tombstone (operator-approved panel corrections); one-off record, read not written",
 }
 
 
