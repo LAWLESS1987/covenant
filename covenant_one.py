@@ -953,6 +953,9 @@ SUITES = [
     # The go-live scheme ends "ALL PASS" with no number, so it joins "passed, counted 0" -- named, not hidden.
     ("ai_memory_system/test_memory_system.py", 180, "SECURITY"),
     ("tools/test_golive_scheme.py", 60, "SECURITY"),
+    # HT (2026-11-09, 116094e): in a topic we opened, a reply to post #1 is addressed to us. It shipped
+    # unregistered, so the sweep of 298bd10 read "orphaned on disk 1". Pure, no network; 4/4 by hand.
+    ("test_hf_threads_own_topic.py", 30, "JUDGE"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
