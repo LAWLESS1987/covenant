@@ -469,6 +469,27 @@ class Handler(BaseHTTPRequestHandler):
             return False
         return True
 
+    def _not_cross_site(self):
+        """A loopback bind and a client-IP check are NOT a CSRF defence. A page
+        on any site the operator visits can POST to 127.0.0.1 with a "simple"
+        request; the browser still connects from loopback, so _guard passes, and
+        when actions are armed a drive-by site could trigger restart/sweep/aclfix.
+        So a STATE-CHANGING request that carries positive evidence of a cross-site
+        browser origin is refused. Non-browser callers (curl, the operator's own
+        tools) send neither header and are unaffected; the console's own page is
+        same-origin and its Origin matches. 2026-11-02, the security-hunt.
+        """
+        allowed = {f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}",
+                   f"http://[::1]:{PORT}"}
+        origin = self.headers.get("Origin")
+        if origin and origin not in allowed:
+            self._send(403, json.dumps({"error": "cross-site request refused"}))
+            return False
+        if (self.headers.get("Sec-Fetch-Site") or "").lower() == "cross-site":
+            self._send(403, json.dumps({"error": "cross-site request refused"}))
+            return False
+        return True
+
     def do_GET(self):
         if not self._guard():
             return
@@ -485,6 +506,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if not self._guard():
+            return
+        if not self._not_cross_site():
             return
         p = self.path.split("?")[0]
         n = int(self.headers.get("Content-Length") or 0)

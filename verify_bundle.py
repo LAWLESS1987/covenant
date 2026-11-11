@@ -137,6 +137,13 @@ SKIP_NAME = {n.lower() for n in OUTPUTS}
 # deliberate choice from a forgotten one. Empty on 2026-10-04: all eight
 # tracked .jsonl files were measured to be written by the running system.
 INPUT_LEDGERS = {
+    # A409 (2026-11-04): the v1-vs-v2 improve-miner side-by-side, run once through Tetsu's door on 40 real replies
+    # (the first pass, then the paced rerun of the 21 the door rate-limited). Published results, never rewritten --
+    # the blind judging and the decision to switch rest on them. Hashed on purpose: a changed row is an edited record.
+    "ops/ECHO_AB_2026-11-04/ab_echo_results.jsonl":
+        "A409 side-by-side results (first pass); published, never rewritten",
+    "ops/ECHO_AB_2026-11-04/ab_echo_results2.jsonl":
+        "A409 side-by-side results (paced rerun of the rate-limited 21); published, never rewritten",
     # A327 (2026-10-11): tools/outside_eval.py publishes each run's per-item results under
     # eval/outside/results/<date>/. Hashed on purpose: docs/OUTSIDE_EVAL.md rule 3 says every item's
     # result is published, and a published run is never rewritten -- a new run is a new directory,

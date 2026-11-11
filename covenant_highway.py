@@ -94,7 +94,9 @@ PROPOSE_ONLY = "PROPOSE_ONLY"
 # anything else whose whole point is that a person agreed to it.
 NEVER_AUTOMATIC = ("money", "holdings", "wallet", "trader", "venue", "order",
                    "rule", "principle", "judge", "seat", "model", "phone",
-                   "consent", "key",
+                   "consent", "key", "grant",
+                   # 'grant' (2026-11-02, NA1/A416): the authority file (ops/*_grant.json) is
+                   # never-automatic -- a self-heal remedy could otherwise widen who-may-do-what.
                    # grid / ICS-OT actuation (2026-10-30, covenant_grid_guard.py):
                    # the self-heal engine PROPOSES, never actuates. Bare "trip" is
                    # omitted on purpose -- it is a substring of "strip"; breaker /

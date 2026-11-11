@@ -46,12 +46,21 @@ recorded with its reason, because a silent refusal is indistinguishable from a b
 
 These are invariants with tests, not paragraphs:
 
-1. **Two classes only.** `AUTO_REVERSIBLE` (restart a node that is down, re-fetch a build,
-   re-sync a lagging chain, rotate a log that is eating the disk) and `PROPOSE_ONLY`
-   (everything else). Anything that changes a config, installs software, touches money,
-   edits a rule, or narrows what a person can do is `PROPOSE_ONLY` by construction — the
-   engine refuses to execute that class at all, and the test flips a remedy's class to
-   prove the refusal is real.
+1. **Three classes: one the engine runs, one it refuses, one it ships dark.** `AUTO_REVERSIBLE`
+   (restart a node that is down, re-fetch a build, re-sync a lagging chain, rotate a log that
+   is eating the disk) is the class the engine may run. `PROPOSE_ONLY` is everything outside
+   the automatic lanes — installing software, touching money, editing a rule, or narrowing
+   what a person can do — and the engine refuses to execute it at all; the test flips a
+   remedy's class to prove the refusal is real.
+   *(2026-11-02, A405 "loosen autonomy": the third class, `AUTO_GATED`, now runs as its own
+   pass in `covenant_onboard.py` — the one narrow set the engine may act on besides
+   `AUTO_REVERSIBLE`. It may auto-peer a known node or auto-arm a vetted,
+   reversible task, but ONLY when the target is on an operator-signed roster and its
+   identity is verified; grid/ICS actuation, money, keys and signing authority, the consent
+   roster, installing software, publishing to public, and any unknown node all stay
+   `PROPOSE_ONLY`; a model's output can never trigger it; and it fails closed. It SHIPS
+   DARK — no signed roster and not armed — so today it logs one "DARK" line and repairs
+   nothing, waiting on the operator to sign with his own key.)*
 2. **An operator's explicit choice is untouchable.** A125's lesson cost a full sweep to
    find: a fix of mine silently overrode a scope he had chosen. Choices are registered in
    `ops/OPERATOR_CHOICES.json`; a remedy whose target appears there refuses and says so.
@@ -246,5 +255,29 @@ touches nothing `NEVER_AUTOMATIC` (the same class as `restart_watchdog`):
 Both are marked "deployed here" by their Startup launcher, so a clone or a CI machine that is
 not the host reads UNKNOWN, never a false alarm. The device wire between machines still waits
 for the operator; this only keeps our own services breathing. Driven both ways in
-`test_h1_highway.py` (H1hs, H1gh). As of 2026-10-30 the engine carries **34 detectors and 17
+`test_h1_highway.py` (H1hs, H1gh). As of 2026-10-30 the engine carried **34 detectors and 17
 remedies**, counted by discovery (`sorted(covenant_highway.DETECTORS)` / `.REMEDIES`).
+
+## Cross-OS redundancy, one host for now (2026-11-02, A407)
+
+Keeping our own services breathing is one thing; a standby ready on a *different OS* is
+another. `covenant_failover.py` adds it through the single highway hook the
+"no node commanded / stateless-or-undoable" rules above require — it does not touch the
+existing remedies:
+
+- A **cross-OS beacon pair** — `covenant_beacon.py` serving `{"ok": true, ...}`, one
+  instance on Windows (127.0.0.1:8771) and one inside WSL2 Linux (127.0.0.1:8772), so a
+  watcher could distinguish one unresponsive beacon endpoint from both being unresponsive.
+  (Measured live 2026-11-03: both
+  endpoints answer and both report the same host — observed up, not yet observed under a
+  real failure.)
+- A **git-host cross-OS cold standby**, provisioned so our own git host can be brought up
+  on the other OS without the primary.
+
+Honest limit, stated where the claim is made: today both beacons run on the **same physical
+host**, and the WSL2 one rides on Windows, so losing the host loses both. They are separate
+process endpoints across the two OSes; the failover path carries its own both-ways test, but
+recovery under a real process or OS failure is not something observed here. True
+host-independence waits on a second host — the phone or the TETSU machine — and the beacon
+is armed only on the operator's word. As of 2026-11-03, counted by discovery, the engine
+carries **42 detectors and 23 remedies**.

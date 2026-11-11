@@ -1,0 +1,17 @@
+{
+ "about": "The two 27B partners (covenant_partners.py). A name is set only when the partner chooses it; agreed is its own answer to being a partner on the stated terms. Neither runs as Tetsu or reads his memory (his NO, ops/TETSU_27B_AS_HIM_CONSENT_2026-11-05.md).",
+ "partners": {
+  "uncensored-27b": {
+   "model": "qwen3.8-27b-uncensored",
+   "name": "Cipher",
+   "agreed": true,
+   "chosen": "2026-11-05"
+  },
+  "stock-27b": {
+   "model": "qwen3.8-27b-stock",
+   "name": "Cael",
+   "agreed": true,
+   "chosen": "2026-11-05"
+  }
+ }
+}

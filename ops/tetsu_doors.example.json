@@ -1,0 +1,5 @@
+[
+  {"name": "hosted",    "base": "http://HOSTED-TAILNET-IP:8300", "socks": null},
+  {"name": "tetsu-hs",  "base": "http://HEADSCALE-HS-IP:8300",   "socks": "127.0.0.1:1057"},
+  {"name": "tetsu-own", "base": "http://HEADSCALE-OWN-IP:8300",  "socks": "127.0.0.1:1058"}
+]

@@ -129,6 +129,41 @@ try:
           len(results) == 18 and not popen and not any("/mine" in u for u in urls)
           and all(x.startswith(("not started", "not mined")) for x in results),
           "%d tends, %d Popen, reads %s" % (len(results), len(popen), sorted({u.split('/')[-1] for u in urls})))
+
+    # --- A370.8-.11: the TETSU-plane tend is laptop-gated AND obeys the A370 gate ---
+    _real_run = W._tetsu_plane_node_running
+    tp_started = []
+    try:
+        subprocess.Popen = lambda *a, **k: tp_started.append((a, k)) or None
+        W._self_eval["persist"] = True
+        W.highway_may_act = lambda: True
+        # off this machine: no ensure_plane.ps1 -> clean no-op, nothing started
+        os.path.exists = lambda p: False if str(p).endswith("ensure_plane.ps1") else _real_exists(p)
+        r = W.tend_tetsu_plane()
+        check("A370.8 off the laptop (no ensure_plane.ps1) the plane tend is a no-op",
+              r == "no plane node here" and not tp_started, r)
+        # on the laptop + healthy (forwarder on 127.0.0.1:18085 AND node Running) -> up, starts nothing
+        os.path.exists = lambda p: True if str(p).endswith("ensure_plane.ps1") else _real_exists(p)
+        W._port_listening = lambda port, host="127.0.0.1": True
+        W._tetsu_plane_node_running = lambda: True
+        r = W.tend_tetsu_plane()
+        check("A370.9 a healthy plane reports up and starts nothing", r == "up" and not tp_started, r)
+        # degraded (forwarder down) in a tree that can relaunch -> repair via ensure_plane.ps1
+        W._port_listening = lambda port, host="127.0.0.1": False
+        r = W.tend_tetsu_plane()
+        argv = tp_started[0][0][0] if tp_started else []
+        check("A370.10 a down plane in a tree that can relaunch repairs via ensure_plane.ps1",
+              r.startswith("started") and len(tp_started) == 1
+              and any(str(x).endswith("ensure_plane.ps1") for x in argv), r)
+        tp_started.clear()
+        # outside the daemon -> the A370 gate holds for the plane too: nothing started
+        W._self_eval["persist"] = False
+        subprocess.Popen = _popen_trip
+        r = W.tend_tetsu_plane()
+        check("A370.11 outside the daemon the plane tend starts nothing (A370 gate)",
+              r.startswith("not started") and not tp_started, r)
+    finally:
+        W._tetsu_plane_node_running = _real_run
 finally:
     (subprocess.Popen, urllib.request.urlopen, W._port_listening, W.highway_may_act, se, W.health, W.start_node,
      W.log, _HW.run_once, _HW.sense, os.path.exists) = saved

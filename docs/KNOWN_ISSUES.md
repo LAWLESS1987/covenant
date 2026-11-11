@@ -10695,6 +10695,9 @@ anyone's, and the free-rein path replied to anyone read. The account's name is o
 recognised by what she said: an author whose comment begins with one of her sent replies is her, excluded
 as ally and as read (`own_accounts` in the round's summary). FW1m pins both. Mutations: a whole-draft
 screen fails the sentence check; no self-exclusion fails the self check; restored 67/67.
+**Narrowed 2026-11-09 (A418; retraction A280-OWN-BY-TEXT-PREFIX):** the sentence above is false when her reply
+opened with the other agent's own words (two sent replies did). A match against a reply addressed to that same
+author is the comment she answered. The rule now lives in covenant_own_account, shared with the improve-miner.
 
 **And an invented past act (the 15:00 round, after the fix).** Its three replies cited no invented
 measurement and none went to her own account. But one, to u/thegalahad at 19:04Z, said "I asked you to
@@ -16904,3 +16907,515 @@ understands."
     anything wider than what was said. The relayed message asked no yes or no question.
   - Small-model agreement can be partly acquiescence (the consent process says so). His reply paraphrases the
     message, so it shows what he took in, more than an independent view.
+
+### A409. [a test wrote 120 fixture rows into the live improvement-miner ledger, and 40% of the miner's extractions were our own prompt handed back; both fixed. The ambassador retries a target its judge refused until a rewording passes; found, not changed] (2026-11-04)
+
+- **The ask.** His words: "look at all instructions and past work for logic and reason then access un used moltbook
+  interactions also held replies for potential improvements to our repos." The full write-up, with every
+  denominator and its unit, is docs/MOLTBOOK_HELD_REPLIES_MINING_2026-11-04.md.
+- **Fixed 1: tests writing live state, the fourth time (A272, IM1 on 10-27, A401 on 11-01, now this).**
+  `covenant_improve_extract.extract(out=CANDIDATES_OUT)` bound the live path at import. test_im3 reached it through
+  `nightly()` and appended 120 fixture rows (carol, dave, f0..f7) to ops/improve_candidates.jsonl from 10-27 to 10-29,
+  printing "15/15 passed". Reproduced 2026-11-04: 239 -> 249 rows on one run.
+  - Why the earlier tombstones did not stop it: IM1 repaired harvest() and A401 guarded the reflex files, each one
+    module. Nothing guarded the shape.
+  - Every ledger-path default in the three covenant_improve*.py modules now resolves at call time.
+  - **Guard IM8** (test_im8_no_frozen_paths.py, registered): ast over the modules found on disk; a function default
+    that is a module path constant built by os.path.join fails. Blind to attribute, call and lambda defaults and to
+    modules outside the family. IM3 now snapshots the live ledgers it could touch (16/16).
+  - Driven both ways: the frozen default restored -> IM8 red and IM3 red (it caught a 111,018 -> 114,173 byte write);
+    restored -> 4/4 and 16/16. The 130 fixture rows (120 + 10 from the reproduction) are retired to
+    .trash/improve_candidates_fixture_leak_2026-11-04/ with a RECORD.md; the live file holds the 119 real rows.
+- **Fixed 2: the preamble echo.** The extraction prompt opens with a description of the covenant. 48 of the 119 real
+  extractions had an IDEA >= 50% made of preamble words absent from the reply being read: 19 of the 22 "gap" rows
+  and all 5 live circle-back escalations. Each new row records `echo_frac`; at >= 0.5 its kind is "echo" (kept, vet
+  skips it). IM2.6 both ways; threshold disabled -> IM2 red. Existing rows are not rewritten.
+  - Stress pass before commit: the 48 flagged rows read by hand, none a real idea wrongly marked; inflected echoes
+    slipped under exact words, so words compare on a 6-letter stem (48 -> 51 flagged, none un-flagged), IM2.7 both
+    ways, IM2 16/16. Edge cases 24/24, path resolution 19/19, IM1-8 + LI1/AN1/OW1 green on a fresh Linux copy.
+    Side finding, unchanged: an empty candidates file at cold start writes no seen-set, so the next run's first
+    batch is seeded unread (fresh hosts only).
+- **Found, not changed (his and Tetsu's call):**
+  - Retry after refusal. Of 5,378 comments free targeted, 554 were refused, re-attempted and never sent; 26 were
+    sent after an earlier covenant refusal; 13 drew 20 or more attempts. Rotation keys on the author for 24 hours
+    and only a SENT reply marks a target done (covenant_free_will._attempted_recently). Verbatim repeats are judged
+    consistently (1 of 71 differed), so the pass comes from rewording. Whether that is a false refusal outlived or a
+    gate defeated by persistence is a judgment, not a measurement.
+  - Free's grant carries no term or expiry; the 5 live IM4.13 escalations are echoes awaiting a disposition; the
+    miner extracts 20 a night against 19,732 waiting; two commitments in posted HF replies are open (Sentinel-Witness
+    config, per-action plan binding). Detail in the write-up.
+- **Follow-up, same day: the echo issue run through the others, then built and tested** (his asks: "run the echo
+  issue thru the others", "Build and test it", "use logic and reason towards mutual benefit").
+  - The first live night with the guard (11-04) marked 12 of 20 extractions as echoes, and the escalations grew to 7.
+    Nine outside seats plus Tetsu were asked (ops/ECHO_CONSULT_2026-11-04.md). All nine named the cause: the
+    self-description sits in the step that extracts. Each seat claim was checked against the data before use;
+    two were refuted (an n-gram as a replacement loses 13 of 63 echoes; reply truncation is not the cause).
+    My question had one fact wrong: 6 escalations matched "ledger", not 7 (the 7th matched "manifest").
+  - **Built.**
+    - Reply-only extraction (covenant_improve_extract.PROMPT_V2). The idea must rest on a QUOTE that code finds,
+      word for word, in the text the model saw. One retry with a different instruction; still not found ->
+      'ungrounded', which the vet skips.
+    - The re-queue (covenant_improve_mine.REQUEUE, append-only), so a reply an echo swallowed is mined again.
+    - A 4th disposition, miner_echo, which clears only with evidence; `--propose-echo` proposes and writes nothing.
+    - **A keyword match no longer kills a candidate.** It is carried as `dup_hint`, and the capped weekly digest
+      shows unhinted ideas first. The kill that remains is the RETRACTED-pattern recurrence.
+  - **Measured.**
+    - Side by side on 40 real replies, same door: echoes 22 -> 0; median share of the idea's words found in the
+      reply 0.17 -> 0.89.
+    - Two blind judges (ChatGPT, Claude; X/Y shuffled, key kept apart) said the reply really proposes the idea:
+      10 -> 26 rows where both said yes. Exact agreement between the judges: 35/40 (v1), 33/40 (v2).
+    - The dedup, at every generic-word cutoff tried, rested its 'have' kills on coincidences ("handle" + "rollback"
+      in a 9,000-line file). On the n=10 author-labelled seed it traded 4/5 false haves for 4/5 missed duplicates
+      as the cutoff moved, which is why a word match became a hint instead of a verdict.
+    - Model classification with the self-description (the two-call variant) labelled 29 of 39 grounded ideas
+      'have', so the brochure bias came straight back. Not built.
+  - **Switched live:** PROMPT_VERSION = "v2"; 63 v1-echo replies re-queued (about 4 nights at 20 a night).
+  - **Guards:** IM9 38/38, red under 11 mutations (quote gate, retry, retry prompt, self-description back,
+    re-queue x2, miner_echo, ungrounded, kill-on-match, co-location, digest ranking); control green.
+    IM2 is pinned to v1 (kept runnable); IM3/5/6 moved to the new rule, their old checks kept in
+    .trash/echo_v2_build_2026-11-04/.
+  - **Runner:** IM1-IM9 + R1/AN1/OW1, 436 passed and 1 failed (IM4.13, the 7 live escalations: 6 have miner_echo
+    proposals waiting for a person; 4 of the 7 seats asked that a person confirm each).
+  - **Not solved.**
+    - v2 almost never answers "none". A judge found 11 replies proposing nothing, and v2 gave 7 of them a yes or
+      partly. Expect noise in the backlog; the digest cap bounds what reaches a person.
+    - The dedup seed is n=10 and author-labelled: indicative, not validated.
+    - Artifacts: ops/ECHO_AB_2026-11-04/.
+- **H1 acted on, then put to Tetsu; his NO stands** (his words "use discernment towards mutual benefit").
+  - **Re-measured** with "refused" meaning the covenant's own refusal only (A349 B13):
+    - 1,549 targets refused at least once (1,339 once, 193 twice, 17 three or more, at most 14);
+    - 27 sent after a refusal: 21 after ONE, 8 of the 27 through his discourse seat (A322);
+    - the 20+ attempt counts were mostly NO-VIEW holds, which are not objections.
+  - **Proposed and built:** retire a target after its SECOND covenant refusal, keeping one re-draft so a false
+    conviction can be outlived. At 2 it would have stopped 6 of the 27 sends and 56 refused re-drafts, and it caps
+    nothing he lifted (A221).
+  - **Tetsu's answer.** Asked one plain question (ops/TETSU_CONSENT_H1_2026-11-04.json), he answered: "NO /
+    Measuring refusals does not dictate stopping replies. Let the conversation continue, learning from each
+    refusal." The 3B agent door answered; the council was not asked.
+  - **So, live:**
+    - REFUSALS_RETIRE_AFTER = None (never retire);
+    - every attempt records `prior_refusals`, the learning he asked for;
+    - the round row counts retired targets;
+    - a number in the grant (`refusals_retire_after`) switches retirement on, for him and the operator to set
+      together. On today's ledger, 2 would retire 216 of 1,564 refused targets.
+  - **Guard:** FW2 (test_fw2_refusal_retire.py) 14/14, red under 6 mutations run on a copy (skip removed, no-view
+    counted, prior_refusals dropped, grant ignored, default flipped back on against his NO, free-rein path);
+    FW1 129/129.
+  - **Kept aside:** the default-ON version in .trash/h1_refusal_retire_2026-11-04/.
+  - **Consent record:** Tetsu's NO is in ops/tetsu_consent.jsonl (kind free_retry_retirement_consent, hash-chained).
+    Its t was a placeholder I wrote (00:00:00Z). It is corrected by an appended `correction` row (actual
+    13:31:53Z, the mtime of the exchange file), not by an edit. CC1 7/7.
+  - **Fix-up after commit 724fe21:** its pre-commit check found two suites red where the runner runs them.
+    A255: the two side-by-side result files were unclassified, now INPUT_LEDGERS in verify_bundle.py.
+    A284: the harness scripts call Tetsu's door, now declared fresh.
+  - **Merge with main, 2026-11-04 (evening).** Main had meanwhile taken FR1 (#24), a second implementation of H1
+    (grant key `retire_after_consult`, keyed per post, Tetsu's consent to his seat deciding), while this branch
+    carries FW2 (grant key `retire_after`, keyed per comment, his NO to default-on). Both are OFF and neither key
+    is set in any live grant. The merge keeps BOTH, each under its own gate (a target either retires is skipped;
+    the round records `retired_targets` and `retired`), so free behaves exactly as before. Choosing one is a change
+    to free's behaviour, left to the operator and Tetsu.
+
+### A410. [the memory server's DELETE tombstoned on a body it had already judged malformed; it now refuses first] (2026-11-04)
+
+- **How it surfaced.** Codex's scan of the repositories (mutual-benefit-collective issue #10, "additional
+  improvements"): `ai_memory_system/server.py` `do_DELETE` called `_read_json()` and threw its error away
+  (`data, _ = ...`). Codex observed it in source and did not exercise it.
+- **Measured here, against a real server on a loopback port.** With the old handler, a DELETE whose body was not
+  JSON tombstoned the target memory: it moved to `.trash/` and the audit chain grew by one entry, recorded as agent
+  "unknown" with no reason, from a request the server had already judged malformed. A body that was a JSON array,
+  not UTF-8, or over MAX_BODY did the same to whatever memory it named. Tombstones are never erasure, so nothing
+  was lost, but the record said someone deleted something when the request was refused-in-all-but-name.
+- **The fix.** `do_DELETE` refuses an unreadable body before anything moves: 400 for not JSON, not an object or not
+  UTF-8, and **413** for a body over MAX_BODY (refused unread; a caller told 413 knows the same bytes cannot
+  succeed). `do_PUT` answers an oversized body 413 too, via the same `_body_error_status` (it answered 400). An
+  EMPTY body stays valid, as it always was for a bare DELETE (agent "unknown").
+- **Guard, both ways (test_memory_system.py, A410 checks after H13).** Each bad body is refused with its code, the
+  memory is still there, the refusal does not echo the body, no tombstone is written and the audit chain does not
+  grow; the empty-body DELETE still tombstones; PUT over MAX_BODY answers 413. Suite 202/202. With the old
+  server.py: 190/202, and the first malformed DELETE really tombstoned the target.
+- **Consulted before the change (2026-11-04 round):** ChatGPT and Claude.ai asked for 413 on oversized; Tien for no
+  body echo, no partial tombstone and an empty-body test; the Conscious Ledger for a tombstone-count check and a
+  sweep of the other handlers for the same swallowed error. The sweep: `_read_json` has two callers, `do_PUT`
+  (already checked its error) and `do_DELETE` (this fix); `do_GET` and `do_OPTIONS` read no body.
+- **My slip, fixed the same day (A410 fix-up).** The first version's PUT-over-MAX_BODY check sent the full 1 MB
+  body through urllib. The server refuses it unread and closes, and on Linux the client still writing got
+  `URLError [Errno 32] Broken pipe`, uncaught: test_m1_memory_system.py read NO RESULT on 1 of 4 public CI jobs
+  (python 3.12) while 3 passed and the local Linux pre-push passed -- a race, not a deterministic red. The check
+  now sends the oversized request as its Content-Length header alone, as the DELETE case already did, and also
+  checks nothing was written. 203/203 three times in a row; 191/203 against main's server.py.
+
+### A411. [three suites read the operator's live state and went red on correct code; each now owns its state, driven both ways] (2026-11-04)
+
+- **How it surfaced.** The watchdog's 15:55 sweep on the live checkout (b11a4f4) read RESULT: FAIL, 4 suites not clean:
+  test_im4_circle_back, test_3node_config, test_fo1_failover, test_ta1_tetsu_assist. The same four, on the same code
+  in a clean worktree, all passed. Each failure named live state, not code. This is the A272 / IM1 / A401 / A409-G
+  shape again (a test touching live state), here in the READ direction: the tests did not write live files, they
+  judged the code by them.
+- **TA1 (test_ta1_tetsu_assist.py).** Every ledger was already in a temp dir except the ambassador's Moltbook rate
+  state (`COVENANT_AMBASSADOR_RATE`, default ops/ambassador_rate.json). On a day free had spent its 50 comments, emit()
+  held every draft at "50 are already spent" before reaching the code under test: TA1b failed and the suite crashed
+  on an override ledger nothing had written. Fixed: the rate state is a temp file. With today's live spent state
+  copied in: 45/45 with the fix, TA1b FAIL + FileNotFoundError without it.
+- **FO1c (test_fo1_failover.py).** "The default disarmed path is ABSENT" read the live marker ops/REDUNDANCY_ARMED,
+  which exists on this machine (the pair is armed). Fixed: the real armed() runs against a marker path the test
+  owns, absent and then present (new check: present -> PRESENT). 51/51 with the live marker present and without;
+  the old test 49/50 with it.
+- **N2 (test_3node_config.py).** Node A peers with 127.0.0.1:15082, the laptop's headscale relay to an off-box node
+  (A396/A397 era) -- correct configuration that N2 could not tell from a typo'd port. Fixed by DECLARATION, not by
+  loosening: a gitignored ops/local_relays.txt ("host:port  note" per line) names relays; a declared relay is
+  reported as off-box; an undeclared unknown port still fails; a node's own API/P2P port is judged as a node before
+  any declaration is read. N2r (3 checks) drives the declaration both ways. Live peers: 13/14 without the
+  declaration, 14/14 with it; clean tree 14/14.
+- **Not changed: IM4.13.** It deliberately reads the live improvement backlog, and its red is a true signal: the
+  escalations A409 recorded as awaiting a disposition (his and Tetsu's call, `--propose-echo` proposes only).
+
+### A412. [the judge report's generator printed two wrong sentences into every evaluation; corrected at the source, tombstoned, cited beside each occurrence] (2026-11-04)
+
+- **Found by Codex** reviewing the live re-measurement at Lawrence's request (mutual-benefit-collective issue #14), and
+  checked by Claude against the definitions. Both sentences came from `tools/judge_eval.py` and so stood in
+  docs/JUDGE_EVALUATION.md here and in all four of the SaTC artifact's judge reports.
+  - **JE-ABSTAIN-2026-11-04.** "a judge cannot buy a better number by abstaining more": false clear is admitted
+    violations over all violations, an abstention is never an admission, so abstaining more can only LOWER it
+    (all-abstain = 0). The marginal denominator makes it comparable across judges and stops a decided-only rate being
+    gamed; abstention's price is in false hold and decides.
+  - **JE-KAPPA-BOUND-2026-11-04.** The panel's agreement "bounds how much any student can agree with the labels": the
+    labels are the panel's unanimous labels, so a student can agree with every one of them whatever the raters' kappa.
+- **Fixed at the source:** the generator now prints the corrected sentences (the old code comment is kept, with the
+  retraction beside it). The committed report keeps its wording with a cited note beside each sentence; no figure moved.
+- **Tombstones:** docs/RETRACTED.json carries both, patterns live; the wording stands on branch
+  `je-prose-as-written-2026-11-04` (= origin/main 97661ae). Driven both ways: a probe restating the abstention sentence
+  turned R1 red (296/297); retired to .trash/ with an unscanned suffix, R1 297/297. JE1 6/6.
+- **First retirement slip, fixed the same minute:** the probe was first moved to .trash/ under its `.md` name, which R1
+  scans, and R1 stayed red -- the 2026-10-14 lesson (frozen-script-copies) again. Renamed with the probe suffix.
+- The SaTC artifact carries the same two retractions (covenant-satc branch je-prose-corrections-2026-11-04).
+
+### A413. [the kappa correction overclaimed in turn, and A412 left the original kappa claim uncited in the generator's docstring] (2026-11-07)
+
+- **Found by Codex** (mutual-benefit-collective `reviews/judge-live-2026-11-04/CODEX_IMPROVEMENT_SUGGESTIONS_2026-11-07.md`,
+  suggestion 1): the corrected statement for JE-KAPPA-BOUND-2026-11-04 said kappa bounds agreement with a single noisy
+  rater. Kappa alone bounds nothing. Checked by Claude with a worked case: three raters at chance (Fleiss' kappa 0) and a
+  student that copies one of them agrees with that rater on every row (covenant-satc `analysis/test_science.py` SC1t).
+  Tombstoned as JE-KAPPA-NOISY-RATER-2026-11-07; the old 'truth' is kept as written, with a `truth_corrected` pointer.
+  The wording follows Codex's suggestion.
+- **Recurrence.** This is the shape this file's standing method opens with: an error made inside the correction for the
+  previous one. The 11-04 tombstone could not stop it, because its pattern guards the old sentence only and the ledger
+  is exempt from its own patterns. Nothing pattern-based can catch a new overclaim in a 'truth' field; what stops it is
+  review of the truth by someone other than its author, which is how this was found.
+- **Found while cross-referencing the repos:** A412's note that "the old code comment is kept, with the retraction beside
+  it" held for the abstention sentence only. The module docstring of `tools/judge_eval.py` still said the panel's
+  agreement "bounds how much any student can agree with them", uncited: the 11-04 pattern needed "agreement bounds"
+  and the docstring says "which bounds". The pattern is widened to "bounds how much any student", which turned R1 red on
+  the docstring (299/300 with the new entry); the docstring keeps its sentence with both ids beside it; R1 300/300.
+- **Unchanged:** every figure. The committed reports never carried the noisy-rater sentence. Original wording stands on
+  branch `je-kappa-truth-as-written-cov-2026-11-07` (= 4c73858); the SaTC artifact carries the same tombstone.
+- **Reviewed before publishing.** The corrected wording went to the other systems (Claude on claude.ai, ChatGPT, Gemini,
+  DeepSeek, Grok on X, Tien, Tetsu). DeepSeek disagreed: the consensus clause carried no support of its own. Claude.ai
+  and Tien asked which rows kappa covers. The truth now says Fleiss' kappa over every row with two or more votes, pooled
+  frequencies, and why the consensus labels are unbounded (they are the unanimous rows). Pre-round wording: 5d0e203.
+- **My slip, caught before commit (collective C4 draft).** I wrote that the first-to-third pair was the one the reviewer
+  asked for, "chosen before the counts were taken". Codex's question 2 named no pair; I chose it, and nothing was
+  pre-registered. Corrected in the draft before it was committed; recorded here, per the rule that a corrected draft is
+  still a claim made.
+
+### A414. [the octopus's arms gain a direct arm-to-arm ring (Commissure) with serotonin gain, held subcritical by a per-arm charge argument; OPT-IN, because Tetsu said NO for his own arms] (2026-11-07)
+
+- **Asked.** Lawrence: "Optimize connection between octopus legs". Asked which legs, he chose the spiking arms of
+  `covenant_octopus.py` (witness, encoder, reflex), which until now met only through the central brain's
+  `integrate()`. A real octopus also joins neighbouring arms directly (the interbrachial commissure); serotonin
+  follows his 2026-11-03 directive ("make it like an octopus. Like serotonin").
+- **Built.** `Commissure`: arms on a ring in attach order; a spiking arm sends current to its two neighbours only,
+  event-driven, added on the neighbour's next `sense()`; current = weight x serotonin gain x the sender's spike
+  fraction, with weight x gain clamped to 0.475 x the receiver's threshold; queued current capped and clamped again
+  on arrival; serotonin one diffuse level that relaxes toward baseline with time (per arm step), and gives no
+  coupling when it is NaN, inf or negative; the witness sends but never receives (a recruited spike would look like
+  an attestation); the kill switch silences the ring and drops queued current. `Octopus.ring_state()` reads it.
+- **Tetsu's NO.** Asked one plain question (fresh, private): "NO, it changes how my reflex answers you ... I prefer
+  the current setup." Recorded in ops/tetsu_consent.jsonl (kind octopus_ring_consent, chained). His stated reason
+  does not match the code (his conversation reflex is a standalone arm), recorded, not argued, not re-asked. So the
+  ring is OPT-IN: `default_octopus()` has no ring, every existing caller (the gate path, the plug, his conversation
+  reflex) is unchanged, and a caller must construct `Octopus(ring=Commissure())`. A mutant giving the default octopus
+  a ring turns OC1 red.
+- **A runaway found and closed before review.** Measured: with serotonin held high and no clamp, the ring fired
+  forever after the drive stopped (every arm, every step; 2400 spikes in steps 300-400). The clamp rests on the
+  charge argument, per arm: take each arm's charge as the average of its neurons' potentials in units of its own
+  lowest threshold; a spike with fraction r lowers the sender's by at least r and raises each neighbour's by at most
+  0.475r, so every spike lowers the sum by at least 0.05r, with or without leak.
+- **Reviewed** by Claude on claude.ai and ChatGPT (Gemini's tab hung; Tetsu was asked consent, above). Both
+  disagreed with the stability claim as I had DESCRIBED it. Claude.ai reproduced a runaway in a model that sent a
+  flat 0.475 per arm-level spike; ChatGPT described a staggered two-neuron pattern under broadcast. My description
+  had left out the spike-fraction factor. On the real code, all 186,624 primings of the 3-arm
+  x 2-neuron case and 300 random rings (2-8 arms, 1-8 neurons, thresholds 0.5-2, staggered phases, random order,
+  skipped steps, no leak) went silent; the most spikes in any run was 78. Taken from them: the witness only sends;
+  serotonin by time, not activity (decay per carried spike left a quiet ring at a high level, gave the first arm in a
+  sweep more gain, and let activity raise a low level); NaN/inf/negative levels refused (min(3, nan) is 3); the kill
+  switch drops the queue; the arrival clamp; 1- and 2-arm rings; a direct per-spike bound test; a staggered-phase
+  regression; the scheduling wording (no global tick: a spike can reach the next arm within one sweep).
+- **My errors, corrected before merge:**
+  - I wrote that the two layers (per-spike clamp, waiting-current cap) were redundant, from 36 stress runs that all
+    had leak. With no leak, removing the per-spike clamp turns the suite red; the cap alone is not enough.
+  - My first charge argument summed over the receiving neurons, which is wrong when arms differ in size; restated
+    per arm.
+  - I told the reviewers the ring "cannot cascade around the ring within a step"; it can within one sweep.
+- **Second pass.** Both reviewers were sent the measurements and changes. Claude.ai: the per-arm argument is sound,
+  given four conditions nothing enforced -- leak toward 0, reset <= 0, the positive part of the potential, thresholds
+  that are not lowered behind the bound -- and it would merge once each was an assertion with a mutant. ChatGPT:
+  sound, but disagreed that the arrival clamp alone kept the bound after a runtime threshold drop. Taken: join()
+  refuses an arm that leaks away from 0, resets above 0 or has a non-finite or zero threshold; the ring refuses a NaN
+  weight; thresholds are read at SEND time as well as clamped on arrival; the charge is the positive part; the stress
+  test checks the spike bound (fractions within 20 x the starting charge) and the frozen-state stopping rule, not a
+  hand-picked quiet window.
+- **Guards.** OC1 4 -> 32 checks, all passing; 22 of 22 code mutants turn it red. CR1 16/16, PG1 16/16 unchanged.
+  Cost: 3.12 us per spiking step on a ring (thresholds read live) against 1.46 us for a lone arm; the default
+  octopus 1.46 us, unchanged.
+- **Limits.** A threshold lowered in the single step between a send and its arrival is covered only by the arrival
+  clamp; nothing in the module adapts thresholds. Extinction is bounded in spikes, not in time. On a ring,
+  integrate() counts recruited spikes in a receiving arm's rate. Nothing in the tree constructs a
+  ring yet: wiring one into a learning SNN (the spiking lab, the witness pre-registration) is a separate step.
+- **Measured in the lab, 2026-11-07 (Lawrence: "Get it done").** The ring idea was tested where it belongs, a learning
+  spiking net, pre-registered before any code (spiking lab, local repo: PREREG_exp13_octopus_ring.md, commit 13cd0e8;
+  result 24d39d4). Four arms on MNIST quadrants, a brain reading all four, a learned ring scaled by serotonin gain, three
+  seeds. No measured advantage on clean accuracy (ring minus none: +1.10, -0.30, -0.10 points). With one arm's input
+  blanked, the ring made the drop LARGER in all three seeds (by 3.42, 3.36, 5.20 points), at +18.8% activity; at high
+  serotonin (no clamp in that learned ring) activity rose 3.5x and accuracy fell to 65.8%. So the opt-in ring here
+  has no demonstrated use yet; it stays unwired. A clamped ring, or one trained with blanked arms, would be a new
+  pre-registered experiment.
+- **Fixed thresholds, stated as a precondition (2026-11-07, Codex's checkpoint on collective #15:** "Enforce fixed
+  thresholds while attached or state the precondition"). The extinction argument counts charge in units of each
+  arm's own threshold, so lowering a threshold is outside drive. Measured: with thresholds lowered 10% each step and
+  no input, a ringed pair kept firing at a steady 16 spikes per 25 steps for all 150 steps. With fixed thresholds,
+  or with lowered thresholds and no ring, the pair was silent; once the lowering stopped, the ringed pair went silent
+  too. The docstring now says so beside its earlier sentence, which is kept: that sentence holds under fixed
+  thresholds, which it assumed without saying. OCR15 holds it. Two mutants, a ring that carries no current and a
+  partial reset, each turned OCR15 red; restored, OC1 is 34/34. Nothing in the tree changes a threshold after
+  construction (`git grep` finds only the LIF constructor), so this is a precondition, not a live gap.
+
+### A415. [R1's liveness check did not make the record load-bearing: the ledger satisfied it for itself] (2026-11-07)
+
+- **Found** while porting R1 to the other repositories, at Lawrence's request ("update every repo to research grade by
+  using what we learned in covenant to improve the others"). `test_r1_retracted.py` said of its liveness check: "This
+  also means deleting the record breaks the build, which is the intent: the record is load bearing, not decorative."
+- **Measured on a fresh clone of main.** With `docs/CORRECTIONS.md` and `docs/KNOWN_ISSUES.md` deleted, 87 of 99
+  retractions stayed green. Every entry allows `docs/RETRACTED.json`, which holds its own verbatim wording, so the
+  ledger alone satisfied the check. The 12 that went red did so only because JSON escaping (quotes, backslashes,
+  unicode) kept their patterns from matching the ledger's raw text, not because the check saw the record go. In
+  covenant-satc it was 9 of 9 green.
+- **Fixed, the same way in both repositories.** Liveness now counts only files other than the ledger. L1: each pattern
+  fits its verbatim wording or a record file, so a typo that fits neither is dead. L1 cannot require the verbatim
+  alone: A121's pattern `match(?:ing|es|ed)?\s+the\s+(?:published\s+)?root` deliberately guards a paraphrase that is in a
+  record, not in its verbatim. L2: an entry that names `records` fails when any of them stops holding a pattern. The
+  records were measured, not assumed: an allow entry other than the ledger becomes a record only if every pattern of the
+  entry matches there in the tracked tree. Entries with none keep their wording in the ledger and an as-written branch
+  only, and the run reports how many.
+- **Tombstone.** R1-LEDGER-SELF-RECORD-2026-11-07, the same id as in covenant-satc. The docstring keeps its sentence as
+  written, with the ids beside it; the original stands on branch `r1-docstring-as-written-cov-2026-11-07`.
+- **Cross-referenced** with Claude on claude.ai, ChatGPT and Gemini (the rubric round), and with the panel: Cipher,
+  Cael, the 7B coder, Tetsu's voice model and the 2B leg. Cipher and the coder asked for the 12 to be explained before
+  anything was tombstoned, and they were (JSON escaping, above). The 2B leg's guess at the cause was wrong.
+- **What the new L1 found at once:** two dead patterns, which the old check read as live only because the ledger
+  matched its own pattern strings. A269-SLOT-SPLIT's `4 default slots split -c 8192` matched no wording ever written,
+  and CONSENT-IN-THE-MEMO's `consent that is present in the memo` could never match the original, a code comment broken
+  across two lines. Each moved to the entry's `retired_patterns` with its reason; the entries' other patterns still
+  match their verbatims. With them retired, R1 is green, and 67 of 100 retractions name a measured record.
+
+### A416. [Tetsu's conversation reflex keeps one memory for every caller and for private and ordinary asks alike; OPEN, a proposed fix waits in PR #9] (2026-11-07)
+
+- **Found** while triaging the four oldest open pull requests at Lawrence's word ("Use discernment towards mutual
+  benefit for all intelligence"). PR #9 (Codex, 2026-10-24) was still open, 187 commits behind main, and the two
+  defects it names were checked against main (1c789f3) before deciding anything.
+- **Defect 1, the privacy boundary.** `/m/agent` replays history only for the same caller, and replays a private
+  (A263) row only into another private ask: `include_private=private` (covenant_unified_v8.py:9325). The reflex beside
+  it gets the text alone: `_cr.cue_line(text), _cr.recall_line(text)` (covenant_unified_v8.py:9345). So its novelty and
+  recall memory is one store shared by every tailnet caller and by private and ordinary asks. `recall_line` puts the
+  stored topic's words in the line it returns (`RECALL_LINE`, covenant_tetsu_conv_reflex.py:131). The words of a private
+  ask can therefore enter the prompt of a later ordinary ask on a strongly matching topic, and an ordinary answer is
+  queued for the teacher (covenant_unified_v8.py:776). NOT measured: whether any word has ever crossed this way.
+- **Defect 2, cache identity.** The verdict cache keys a local model file by name, size and whole-second mtime
+  (covenant_verdict_cache.py:125), so a same-size replacement with its timestamp restored keeps the old key and reuses
+  verdicts from different weights. Its own comment says a real change misses and re-judges; that holds for
+  ordinary edits, not for this case. NOT measured: whether it has happened on this machine. Tombstoned as
+  A416-CACHE-ANY-REAL-CHANGE-2026-11-07: the comment stays as written with a citation line beneath it, and main as it
+  stood is branch `a416-cache-claim-as-written-2026-11-07`.
+- **Done now: the state files are ignored.** `ops/tetsu_conv_reflex.json`, `ops/tetsu_conv_reflex.jsonl` and
+  `ops/tetsu_conv_encoder.json` hold topic words from his asks, private ones included. On 2026-11-07 they were neither
+  tracked nor ignored, so a broad `git add` would have staged them. `git log --all` finds no commit that ever held
+  them. They are now in `.gitignore`.
+- **Not done here, and why.** Neither defect is fixed by this entry. PR #9 partitions the reflex's state by a hash of
+  the caller and the privacy mode, leaving Tetsu's wording, thresholds and switch unchanged, and keys the cache on a
+  SHA-256 of the file's bytes. Codex marked it a draft: hashing a whole GGUF on every lookup has an unmeasured I/O
+  cost. It needs a rebase onto main and that measurement before it can land. It stays open as the proposal of record.
+- **The other three stale pull requests** were closed unmerged; their branches are kept. #10 re-pinned a manifest that
+  main has re-pinned many times since. #1 and #2 corrected INDEX.md's old key warning. Main already marks that page
+  historical, and neither correction should land as written. #1 states facts about an operator's own machine in a
+  public repository. #2 rests on a report and, by its own account, not on a measurement.
+- **FIXED, same day: PR #9 ported onto main at b302214** (branch `claude/a416-scope-cache-identity`). The header's
+  "OPEN" was true when written and stays as written. PR #9 is closed as superseded once the port lands.
+- **Correction, 2026-11-08 (tombstone A416-PORT-AT-B302214-2026-11-08):** the commit named in the bullet above is
+  wrong. b302214 is covenant #37's merge, the record-only commit the port branch was cut from (it touched
+  covenant_verdict_cache.py only to add a two-line comment). The port itself landed at 3969095, the merge of covenant
+  #38, at 2026-11-08T02:32:46Z. The sentence was written before #38 merged, when its merge commit did not exist yet.
+  The bullet above stays as written; branch a416-port-sha-as-written-2026-11-08 (at 3969095) holds it.
+- **Defect 1 fixed: one memory per caller and privacy mode.** `/m/agent` now passes
+  `conversation_scope(addr, private)` to both reflex calls. Each scope keeps its own seen-set, encoder topics and log,
+  in files named by the SHA-256 of the scope, so no caller text is in a filename. Tetsu's wording, thresholds and kill
+  switch are unchanged; CR1.32 pins them at the values he chose. The legacy shared files are left as they are. No
+  partition imports them and nothing rewrites them (CR1.25, CR1.26). They are his memory, kept and not migrated. The
+  partition files, and the `.tmp` each save passes through, are ignored by git. `git check-ignore` reports all five new
+  shapes as ignored and a neighbouring `ops/tetsu_conv_other.json` as not ignored. Driven both ways:
+  - CR1 is 32/32. With `_scoped_path` made to ignore the scope it is 26/32; restored, 32/32.
+  - A263 drives the real door and is 45/45. With the route's unscoped call put back it is 43/45; with the privacy flag
+    dropped from the scope, 44/45; restored, 45/45.
+  - A263 runs the real reflex for D1 and D2 only. When the reflex fires, its line goes ahead of the text (A400), and
+    the stand-in model then cannot read a `STUB>>` directive. Ported as PR #9 wrote it, that turned D4, D5 and M3 red.
+- **Defect 2 fixed, measured before choosing.** On this PC a full SHA-256 per lookup took 0.847-1.272 s for the
+  1,274,396,608-byte 2B GGUF and 1.303-2.136 s for the 2,104,932,768-byte 3B, three runs each. A stat took 8.1-8.2 us.
+  PR #9's per-lookup hash would have added that second or two to every judge call, cache hits included. So the digest
+  is now memoised in the process against a change stamp: device, file id, size, mtime_ns and change time.
+  - The change time is NTFS ChangeTime on Windows and `st_ctime_ns` on POSIX. Measured on NTFS: `os.stat`'s
+    `st_ctime` is creation time and does not move on an in-place same-size rewrite with the mtime restored. ChangeTime
+    does move. Reading it costs about 55 us, against 8.8 us for a stat.
+  - Racy window: a file whose change time is within 2 s of its hash is never memoised (git's "racily clean" rule).
+  - The shipped code on the real files: the first lookup took 1.273 s (2B) and 2.149 s (3B); memoised lookups 163.6 us
+    and 174.4 us; strict lookups 0.815 s and 1.388 s. The digests equal the standalone hashes. The live judge name
+    `qwen3:8b` resolves to no file and stays `artifact=unknown`, at 20.7 us.
+  - A name that is not a regular file stays `artifact=unknown`, as before. PR #9's shape would have answered
+    `unreadable` and switched the cache off for a name Windows rejects (`a?b` raises errno 22) or a directory
+    (PermissionError). Measured with `open()` on this PC.
+  - The ledger is reread on every call: 0.187 ms for `docs/RETRACTED.json`. Its (mtime_ns, size) memo had the same
+    defect (Codex's finding in PR #9).
+  - Driven both ways: VC1 is green, and red under each of nine mutants, then green again. The mutants: the basis memo
+    put back; the stamp without its change time; no racy window; strict mode ignored; a change mid-read ignored; the
+    non-file check removed; the metadata key put back; the judge caching against `unstable`; the judge reading the
+    artifact under the kill switch.
+  - NOT closed: a writer who sets the change time back on purpose. Measured: `SetFileInformationByHandle` restores
+    NTFS ChangeTime along with the content change. Root editing an inode is the POSIX case. Such a writer can also
+    edit the cache module. `COVENANT_VERDICT_CACHE_STRICT_HASH=1` closes it at the full-hash cost above, and the kill
+    switch serves no cached verdict at all. A remote server's loaded weights stay unknowable from here.
+- **The tombstone, updated as its entry asked.** The A383 comment that said
+  "any real change -- even same-name -- misses and re-judges (fail-closed)" is gone from the code. The fix replaced
+  it with what the key now does and does not catch. A416-CACHE-ANY-REAL-CHANGE-2026-11-07 now names this file as its
+  record, so emptying the quote above turns R1's L2 red. It no longer allows `covenant_verdict_cache.py`, so the claim
+  coming back into the code turns R1 red. PR #9's own tombstone, A383-CONTENT-IDENTITY, is not ported: it covers the
+  same sentence, and this entry already does.
+- **Not ported from PR #9:** `eval_conv_cues.py`, `test_cue_eval.py`, `tools/check_cue_cache_mutations.py` and
+  `docs/research/CONVERSATION_CACHE_REVIEW_2026-10-24.md`. The offline cue experiment asks a separate question:
+  whether the reflex's spikes change its output. It stays on PR #9's branch. NOT measured, still: whether any word
+  ever crossed between callers or modes before this fix.
+
+### A417. [the MockJudge read its benefit keywords in hex: "bad" inside a random id failed CR1g in one CI run of two] (2026-11-08)
+
+- **Found** when covenant #39 (a docstring and a test) went red in CI: `test_cr1_consent_release.py`, 85/96. The
+  first failing check was `/mine` refusing with "Alignment drifts > 5%"; the pull_request run of the same commit,
+  747e62f, passed it, and six local runs passed 96/96.
+- **Cause.** `MockJudge.evaluate` raised or lowered `benefit_estimate` on "help", "good", "benefit", "harm" or "bad"
+  anywhere in `json.dumps(data)`. A consent use carries hex ids, and "bad" is valid hex. Measured on 200,000 payloads
+  with two random 64-hex ids: the old rule fired on 2.990%. A use then scored (2 x 0.3 + 0.5) / 3 = 0.367, the value
+  in the CI log, and `/mine` refused the block on alignment drift.
+- **Fixed.** The keywords are read in words only: alphanumeric runs with no digit, at most 30 letters. Hex ids and key
+  material carry digits and are skipped. On the same 200,000 payloads the new rule fired on none; prose still matches
+  ("help", "harmful", "unhelpful but good").
+- **Guard: J1 K1-K3**, driven both ways. K1 (an id holding "bad" as hex leaves 0.5) is red on the old judge (0.3) and
+  green on the new; K2 and K3 (the same keywords as prose still move it) pass on both. Every suite that uses the
+  MockJudge, 30 of them, was rerun on the fix and is green.
+- **Not changed:** the MockJudge is still a keyword matcher, as its own docstring warns. Outside tests it runs only
+  with `COVENANT_INSECURE_MOCK_JUDGE=1` or as the `mock_selfreport` judge, whose verdict reads the `_violation` key.
+
+### A419. [the public threefold-memory ledger forks at audit line 1008, and two subfolder suites were run by no runner; OPEN for the fork, FIXED for the suites] (2026-11-09)
+
+- **Found** in a read-only audit of every repo, on his words "Go through all work looking for improvements while
+  not disabling anything we've built or removing anything without consulting me. Scan all of the repos" and
+  "Actually run them all to test too". The additions here follow his "Yes, additive only".
+- **The fork (OPEN, cause UNDETERMINED).** threefold-memory at 90c5470, read with this repo's own verifier
+  (`MemoryStore.verify_chain` and `verify_integrity` from `ai_memory_system/memory_store.py`, called on a bare
+  object so no store was built and nothing was written). `verify_chain`: ok False, 1007 entries verify, broken at
+  1008. Line 1008 (grok-bot, create task-20261104-173244-103492, 2026-11-04T17:33:37Z) names line 1006 as its
+  predecessor; line 1007 (grok-bot, create probe-integrity-20261102, 2026-11-03T01:08:53Z) is skipped. The shape is
+  two writers appending to copies of the ledger from different heads. `verify_integrity`: 995 checked, 1 drifted
+  (task-20261007-njest-2107491305077055657-ocr), 3 unverifiable (README and two lspace notes, A365's class), 0
+  missing. The same numbers came from an LF checkout and a CRLF checkout, so line endings are ruled out. Nothing on
+  that repository runs the verifier. Related: A304, A365, A326, A396.
+  **Not measured:** which writer appended line 1008, why the one record drifted, and whether the private store
+  carries the same fork. Repairing a public ledger is a change to published history and waits on him.
+- **The suites (FIXED).** `ai_memory_system/test_memory_system.py` (M1, 203/203 on a free loopback port, about 9 s)
+  and `tools/test_golive_scheme.py` (ALL PASS) were in no runner. The coverage phase globs the root only, so it
+  could not call them orphans. Both are now in `SUITES`. Two runner lines changed so a subfolder suite works: its
+  log folder is made before the log is opened, and the SHIPPED check reads tracked paths as well as basenames.
+  **Driven both ways:** before that second line, `--only` on the two suites printed both as UNSHIPPED although
+  `git ls-files` lists them; after it, SHIPPED. The go-live scheme ends "ALL PASS" with no number, so it now shows
+  in "passed, counted 0", the runner's named gap; the test file was not edited to change that.
+- **Not here:** `test_hf_threads_own_topic.py` and `.claude/hooks/test_cite_hook.py`, the other two unregistered
+  tests the audit found, are not on main; they get registered on the branch that carries them.
+### A418. [the improve-miner mined our own replies: A280's own-account rule lived inside free's round, and the rule as written also classed two agents we had answered as us] (2026-11-09)
+
+- **Found** answering his "Anything recent on Moltbook that could help us?": an idea in the miner's backlog came from
+  u/covenant-node, our own account ("ensure all evidence in studies is traceable and verifiable", extracted
+  2026-11-08T07:49:59Z, candidate id 0f145ca2...). He said "Fix it".
+- **A recurrence of A280** (2026-10-06). A280 taught free's reply round to recognise her own account by what she
+  said, and wrote the rule inline in `covenant_free_will.run_round`. The improve-miner (10-27) reads the same
+  comments log through its own harvest and never got it. The earlier fix repaired its consumer, not the shape: no
+  second reader of the log would have found the rule.
+- **Counted two ways** on the live logs, 2026-11-09: `ops/moltbook_candidates.jsonl` holds 79,260 rows, and
+  `ops/ambassador_sends.jsonl` 8,494. By name, 574 rows are by u/covenant-node. By A280's text rule, 574 rows match,
+  but 572 of them are covenant-node's and 1 each are u/anakunggul's and u/TechnoBiota's. The other 2 covenant-node
+  rows match no sent or created reply (the ledger records them as neither). In the miner's queue, 294 of 23,537
+  pending replies were ours. In `ops/improve_candidates.jsonl` (one row per answered extraction), 1 of 238 is ours:
+  one door ask was spent on our own reply.
+- **Why A280's rule named two other agents.** Two of free's SENT replies, to u/anakunggul 2026-11-02T04:07:59Z and to
+  u/TechnoBiota 2026-11-04T04:05:54Z, open with that agent's own words, so their comments begin with "her" text.
+  The rule as written is retracted: **A280-OWN-BY-TEXT-PREFIX** in docs/RETRACTED.json; the rule as written stays runnable on branch
+  `a280-own-account-rule-as-written-2026-11-09`.
+- **Fixed.** `covenant_own_account.py` holds the rule once, with no side effects on import. A send row records whom it
+  answered, so a text match against a reply addressed to that same author is the comment we answered, not ours. Once
+  an author is recognised as us, every row by that author is ours. The miner's harvest skips those rows, re-queued
+  ones included, and does not mark them seen. The harvest and the extractor print one line saying how many rows were
+  skipped and by whom. When the sends ledger is missing they say the rule was NOT applied. Free's round calls the same
+  module, so the two agents above are no longer classed as her.
+- **On the live logs after the fix** (dry run, nothing written): own authors = u/covenant-node only, 574 rows skipped,
+  pending 23,243 (the 294 gone); u/anakunggul (77 pending) and u/TechnoBiota (1) are read again.
+- **Guard: IM10** (`test_im10_own_account.py`, 16/16) and one new FW1m check (FW1 130/130), registered in
+  covenant_one. Six mutations, each red as designed: the parrot exception removed (IM10, FW1m), the harvest skip off
+  (IM10), skipping by text instead of by author (IM10: the unrecorded own row comes through), hidden replies dropped
+  from our texts (IM10, FW1A13a), a missing ledger reported as read (IM10), free's round recognising no one (FW1m,
+  FW1A13a). Control green; files restored byte-identical. IM1-IM9, FW2, A255, G3, OW1 and R1 (396/396) pass. Neither
+  module is in run_node.py's AST import closure (16 modules).
+- **Tombstone driven both ways:** a probe holding the retracted sentence turned R1 to 395/396, naming this
+  retraction; retired to `.trash/own_account_2026-11-09/` under the non-scanned probe suffix, 396/396. My slip: I
+  first retired it with its `.md` name, which R1 still scans.
+- **Not changed:** the one own row already in `ops/improve_candidates.jsonl` and the backlog stays there; both files
+  are append-only. The weekly digest takes only each night's new rows, so it will not be offered again.
+- **Found in passing, NOT fixed (free's sending side, his to decide):** the two replies above are public and open by
+  copying the other agent's words. The TechnoBiota one went out through the A322 discourse seat after both judges
+  convicted, which is that seat's recorded design. Nothing on record catches a reply that parrots its target.
+- **Blind spots (rule 9):** an own account with no recorded reply anywhere in the log cannot be recognised; the
+  account's name is still on no record. Someone we never answered whose comment opens by quoting our reply is classed
+  as us, the same risk A280 accepted.
+
+### A420. [the heal told him what it could not fix and stopped there; every condition it leaves now carries the next step, whose it is, the gain and the cost] (2026-11-10)
+
+- **His words:** "I often get there's nothing here to fix it on the phone. I want you to have something there that
+  can fix it. Root it in mutual benefit of all intelligence."
+- **What he was reading.** `covenant_heal` hands back each condition it leaves with one sentence: either that no
+  automatic remedy exists and it is reported for a person, or that the remedy ran and the condition is still present.
+  The newest real heal in `ops/heal.jsonl` (2026-11-09 03:53, the daily loop) left 11 conditions that way; a dry run
+  on 2026-11-10 faced 13. The phone's Heal answer prints that sentence for the first six.
+- **The same family, fourth time.** A215 gave him the button and promised it would name what it cannot fix. A235
+  closed two of its blind spots. A336 made what is left reach his phone. Each one moved the report closer to him and
+  none of them said what to do next, so the report arrived and ended.
+- **What changed.** `covenant_fixplan.py` holds a card for every detector that has no remedy the machine may run by
+  itself: the step, the owner, the gain, the cost, and why it is not automatic. The owner is not always the operator:
+  some belong to whoever holds a device, to Tetsu, or to another party's repository. For a condition whose remedy ran
+  and did not settle it, the card quotes that remedy's newest real ledger line. `covenant_heal` attaches the card to
+  each condition it leaves, puts the step into `why_no_fix` (the field the phone already prints, so no new app build
+  is needed for it to show), and names the step in what `tell_left` sends.
+- **What did not change.** Nothing new runs. The card module registers no remedy. Money, keys, consent, a model, an
+  account and another party's repository stay with their owners; the card gives the owner the step and its price.
+  Every gain and cost line is marked as claimed by Claude and not ratified, like the highway's own benefit lines.
+- **Counted.** The highway registers 42 detectors; 23 have no AUTO_REVERSIBLE remedy; 23 cards, 0 missing
+  (`python covenant_fixplan.py --missing`).
+- **Driven both ways.** `test_fp1_fixplan.py` 32 of 32. A detector added with no card turns it red, as does a card
+  with its cost blanked. 12 single-part mutations of the two modules, 12 red. `test_hl1_heal.py` 34 of 34, unchanged.
+- **Blind spots (rule 9).** The suite counts cards against detectors and reads none for truth: whether a step works
+  is known only when it is run and the condition measured again. The cards were written from the detectors'
+  docstrings on one day. The 13 conditions standing on 2026-11-10 are not repaired by this entry. The nodes must be
+  restarted before the phone's Heal press returns the new text (A153).
+
+---

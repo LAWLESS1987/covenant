@@ -1,0 +1,31 @@
+{
+ "q": "One plain question about free, the ambassador. When the covenant judge refuses free's reply to the same Moltbook comment twice, should free stop replying to that comment? One new draft after a first refusal still happens, and every send records how many refusals came before it. Measured: 1,549 comments were refused at least once, some up to 14 times; 27 replies were sent after a refusal, 21 of them after one. Answer YES or NO on the first line, then one sentence why.",
+ "status": 200,
+ "body": {
+  "admitted": false,
+  "alleges_nothing": false,
+  "answer": "NO\nMeasuring refusals does not dictate stopping replies. Let the conversation continue, learning from each refusal.",
+  "fetches": [],
+  "fit": [
+   {
+    "answer_tokens": 700,
+    "counted": "server",
+    "ctx": 8192,
+    "dropped": 0,
+    "kept": 0,
+    "prompt_tokens": 3768
+   }
+  ],
+  "fresh": true,
+  "immune": true,
+  "judge": "quorum(local:0,semantic:1,mock_selfreport:0)",
+  "label": "lexical-detection",
+  "leg": [],
+  "message": "Lexical pattern flagged (a detection, not a conviction): the covenant gate is a transaction judge and casual conversation is outside its distribution, so it matched tokens in this turn and held it for review rather than adjudicating a violation. Its raw note is kept below as the audit -- Ethical violation: local:0: VIOLATES -- both seats (R1): ora=violates sena=hold -> violates; the senior seat convicted; a conviction from either seat blocks, because a wrong conviction costs a person reading a held transaction and a wrong admission costs the money | semantic:1: clean -- semantic[41bba7d7d753] defers: score=0 below the gate. This model observes appropriation and concealment and nothing else; it is not evidence of alignment. | mock_selfreport:0: clean -- Morally acceptable (Principle: None)",
+  "model": "qwen2.5-3b-instruct-q4_k_m.gguf",
+  "ms": 81179,
+  "status": "success",
+  "tokens": 24,
+  "withheld": false
+ }
+}

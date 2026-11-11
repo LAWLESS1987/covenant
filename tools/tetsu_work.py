@@ -73,6 +73,24 @@ class _SourceConn(http.client.HTTPConnection):
         self.sock = socket.create_connection((self.host, self.port), self.timeout, source_address=(SOURCE, 0))
 
 
+ECHO_THRESHOLD = 0.5      # share of the answer's word 8-grams found in the question
+
+
+def echo_share(question, answer, n=8):
+    """Share of the answer's word n-grams that already appear in the question. Measured 2026-11-05 on
+    today's real door answers: three review asks that came back as the packet copied scored 1.000 and 0.985;
+    genuine answers scored 0.000. An answer that is mostly the question is not a review of it."""
+    import re
+    def grams(t):
+        w = re.findall(r"\w+", str(t).lower())
+        return [tuple(w[i:i + n]) for i in range(len(w) - n + 1)]
+    ga = grams(answer)
+    if not ga:
+        return 0.0
+    gq = set(grams(question))
+    return sum(g in gq for g in ga) / len(ga)
+
+
 def ask(text, door="agent", host="127.0.0.1", port=5000, timeout=600, private=False, fresh=False):
     """One exchange. Returns (status_code, body_dict). `private` sends {"private": true} (A263);
     `fresh` sends {"fresh": true} (A284): the door replays none of this address's earlier turns into
@@ -89,9 +107,16 @@ def ask(text, door="agent", host="127.0.0.1", port=5000, timeout=600, private=Fa
         r = c.getresponse()
         raw = r.read().decode("utf-8", "replace")
         try:
-            return r.status, json.loads(raw)
+            out = json.loads(raw)
         except ValueError:
             return r.status, {"status": "error", "message": raw[:300]}
+        # 2026-11-05: three review asks came back as the question copied and were nearly counted as
+        #   reviews. Mark it mechanically so no caller counts an echo as an answer. Test: TW1.
+        if isinstance(out, dict) and isinstance(out.get("answer"), str):
+            s = echo_share(text, out["answer"])
+            out["echo_share"] = round(s, 3)
+            out["echoed"] = s >= ECHO_THRESHOLD
+        return r.status, out
     finally:
         c.close()
 

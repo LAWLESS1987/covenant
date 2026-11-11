@@ -287,6 +287,87 @@ def leak_checks(vb):
           repr(seen))
 
 
+def write_if_clean_head_checks(vb):
+    """WIC*: the self-heal remedy's EXACT invocation -- `verify_bundle.py --write-if-clean=HEAD`
+    as a subprocess -- against real git, both ways.
+
+    WHY THIS EXISTS (2026-11-02). remedy_rehash_bundle AUTO-regenerates MANIFEST.sha256 (the
+    tamper-evidence baseline). If it would rewrite the manifest over a tree whose hashed files
+    differ from what is committed, it could paper over an alteration -- the self-heal engine
+    silently healing the integrity record to match tampered content. The guard against that is
+    the remedy's use of `--write-if-clean=HEAD` (against HEAD, because no commit is in progress),
+    which refuses when any hashed file differs from HEAD, staged OR not. That end-to-end behaviour
+    was only ever pinned with subprocess STUBBED (H1r) or via the hook's DIFFERENT index form (K*);
+    the =HEAD main()-to-disk path the engine actually runs was unmeasured. These drive it for real.
+    The index/HEAD distinction is load-bearing: WIC2 shows the index form WOULD write over the same
+    staged change, so flipping the remedy back to it silently re-opens the masking hole.
+    """
+    import shutil
+    import tempfile
+    root = tempfile.mkdtemp(prefix="a255_wic_")
+
+    def vb_run(*a):
+        return subprocess.run([sys.executable, os.path.join(root, "verify_bundle.py")] + list(a),
+                              cwd=root, capture_output=True, text=True, timeout=300, env=vb.repo_env())
+
+    def manifest(root):
+        p = os.path.join(root, "MANIFEST.sha256")
+        return open(p, encoding="utf-8").read() if os.path.exists(p) else ""
+
+    try:
+        if _git(root, "init", "-q").returncode != 0:
+            print("  not measured: git init failed in %s -- WIC* did not run" % root)
+            return
+        for rel, text in {"a.py": "A = 1\n", "b.py": "B = 1\n"}.items():
+            with open(os.path.join(root, rel), "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(text)
+        shutil.copy2(os.path.join(HERE, "verify_bundle.py"), root)
+        _git(root, "add", "-A")
+        if vb_run("--write").returncode != 0 or "  a.py" not in manifest(root):
+            print("  not measured: verify_bundle --write did not build a baseline manifest -- WIC* did not run")
+            return
+        _git(root, "add", "-A")
+        _git(root, "commit", "-q", "-m", "base")
+
+        # WIC1 -- THE POINT: a hashed file modified and STAGED (index clean, HEAD dirty). The engine's
+        # =HEAD form must REFUSE and leave the manifest untouched -- it cannot heal over tampered bytes.
+        with open(os.path.join(root, "a.py"), "a", encoding="utf-8", newline="\n") as fh:
+            fh.write("A = 999\n")
+        _git(root, "add", "a.py")
+        before = manifest(root)
+        r = vb_run("--write-if-clean=HEAD")
+        said = (r.stdout + r.stderr)
+        check("WIC1 a staged change to a hashed file: --write-if-clean=HEAD refuses (exit 3), leaves "
+              "MANIFEST.sha256 untouched, and names the file -- it cannot mask tampering",
+              r.returncode == 3 and manifest(root) == before and "a.py" in said,
+              "rc=%s unchanged=%s names_a=%s: %s" % (r.returncode, manifest(root) == before,
+                                                     "a.py" in said, said.strip()[-160:]))
+
+        # WIC2 -- WHY =HEAD IS LOAD-BEARING (the contrast, driven as a live mutation): the hook's default
+        # index form sees the staged file as clean and WOULD write. So reverting the remedy to the index
+        # form re-opens the hole; this check fails if someone makes =HEAD and the index form behave alike.
+        before2 = manifest(root)
+        r2 = vb_run("--write-if-clean")
+        check("WIC2 mutation: the index form (--write-if-clean) WRITES over the same staged change -- "
+              "proving the remedy's =HEAD is what withholds the write, not the flag's mere presence",
+              r2.returncode == 0 and manifest(root) != before2,
+              "rc=%s changed=%s" % (r2.returncode, manifest(root) != before2))
+
+        # WIC3 -- EARNED GREEN the other way: a tree clean vs HEAD with only the manifest out of step
+        # (the legitimate post-commit case) DOES get rewritten, so WIC1 is a real refusal, not a block.
+        _git(root, "reset", "--hard", "-q", "HEAD")
+        with open(os.path.join(root, "MANIFEST.sha256"), "a", encoding="utf-8", newline="\n") as fh:
+            fh.write("deadbeef  zzz_not_a_real_entry.py\n")       # manifest is an OUTPUT, never hashed (U2)
+        before3 = manifest(root)
+        r3 = vb_run("--write-if-clean=HEAD")
+        check("WIC3 a tree clean vs HEAD (only the manifest stale): --write-if-clean=HEAD writes (exit 0) "
+              "-- the legitimate heal still happens, so WIC1 refuses, it does not merely block",
+              r3.returncode == 0 and manifest(root) != before3 and "  a.py" in manifest(root),
+              "rc=%s rewritten=%s" % (r3.returncode, manifest(root) != before3))
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def main():
     import verify_bundle as vb
 
@@ -347,6 +428,7 @@ def main():
           "logs/ is in SKIP_DIR, so the manifest never hashes it")
 
     scratch_repo_checks(vb)
+    write_if_clean_head_checks(vb)
     leak_checks(vb)
 
     print("\n  not measured: generated files that are not .jsonl (RUN_WITHOUT.json was one). "

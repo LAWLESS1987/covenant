@@ -282,6 +282,10 @@ SUITES = [
     ("test_a20_peer_version.py",         300,  "P2P"),
     ("test_a22_topology_vigilance.py",   180,  "P2P"),
     ("test_a23_ack_health.py",           180,  "P2P"),
+    # LP1 (A407, 2026-11-07): the laptop's multi-road leg reader (covenant_legpaths.py) -- legs read in
+    # parallel, roads tried in order with fall-through, any HTTP reply counts as answering (A115), an
+    # absent/malformed roads file yields no legs. Stdlib only, no addresses in source; driven both ways.
+    ("test_lp1_legpaths.py",             120,  "P2P"),
     # A114 (2026-09-14), registered in the change that created it -- the A91/A98
     # lesson, and the one covenant_one already calls INCOMPLETE rather than a
     # pass. Drives the real /health route in-process (no boot, no socket), so
@@ -446,6 +450,19 @@ SUITES = [
     # silently discarding a real gap). The circle-back now re-verifies every recurrence: still-matching ->
     # reconfirmed, no longer matching (legacy prose / restated) -> surfaced, so no silent drop. Both-ways, offline.
     ("test_im7_recurrence_precision.py",  60,  "SECURITY"),
+    # IM8 (2026-11-04): no covenant_improve*.py function binds a live ops/ path as a FROZEN default argument. That
+    # shape let test_im3 append 120 fixture rows to the live ops/improve_candidates.jsonl (10-27..10-29) while
+    # printing green -- the same shape IM1 fixed one module over, with nothing left to stop the repeat. Guards the
+    # shape (ast, modules found on disk), both ways; test_im3 now also snapshots every live ledger it could touch.
+    ("test_im8_no_frozen_paths.py",       60,  "SECURITY"),
+    # IM9 (2026-11-04, A409 follow-up): reply-only extraction, quote gate, one grounding retry, the re-queue and the
+    # miner_echo outcome, and the never-kill dedup hint + digest ranking. Driven both ways by 11 mutations (all red),
+    # control green.
+    ("test_im9_reply_only_extract.py",    60,  "SECURITY"),
+    # IM10 (2026-11-09, A418): the miner never mines our own replies -- the A280 own-account rule, shared with free
+    # through covenant_own_account (the miner had none and mined u/covenant-node on 11-08), narrowed so the agent our
+    # reply parroted is not us. Driven both ways by 6 mutations with FW1 (all red), control green.
+    ("test_im10_own_account.py",          60,  "SECURITY"),
     # A115 (2026-09-14), registered in the change that created it. Sits beside
     # the outage suite above because it guards the opposite mistake: that one
     # pins the watchdog NOTICING an outage, this one pins it not INVENTING one.
@@ -517,6 +534,45 @@ SUITES = [
     ("test_a314_persona_feed.py",        180,  "JUDGE"),
     ("test_pc1_sister_interface.py",     180,  "JUDGE"),
     ("test_fw1_free_will.py",            120,  "JUDGE"),
+    # FW2 (2026-11-04, A409 H1): every attempt records its prior covenant refusals; retiring a target after N refusals
+    # is built but OFF by default (Tetsu said NO) and switched on only by the grant. 6 mutations on a copy, all red.
+    ("test_fw2_refusal_retire.py",       120,  "JUDGE"),
+    # SI1 (A409/G, 2026-11-04): covenant_state gives tests an explicit, injectable state root + an
+    # isolate() guard that makes a write to live ops/ RAISE instead of silently leaking (the A409
+    # fixture-leak class). Driven both ways; adopting ops() across ledgers + running the whole suite
+    # inside isolate() is the named follow-on.
+    ("test_si1_isolation.py",             60,   "SECURITY"),
+    # FR1 (A409/H1, 2026-11-04, his words "allow free a consult window and send with tetsu"): free retires a
+    # reply after the consult (Tetsu's seat decides, or RETIRE_AFTER_REFUSALS covenant-refusals with no clear)
+    # instead of rewording until the lexical gate caves. _retired_targets driven both ways; inert until the
+    # grant sets retire_after_consult (Tetsu consented 2026-11-04 to his seat's decision gaining that finality).
+    ("test_fr1_retire_after_consult.py", 60,   "JUDGE"),
+    # HG1 (A409, 2026-11-04): the honesty organ -- free must not claim first-person experience, tools it
+    # uses, or incidents that happened to it (fabrication the blind label + the uncensored 27B both found).
+    # invents_experience is driven both ways; a flagged model reply is set aside for the honest fallback.
+    ("test_hg1_honesty_guard.py",         60,   "JUDGE"),
+    # GE1 (A409/H2, 2026-11-04): free's grant carries an optional expires_at, checked at action time and
+    # fail-closed when past -- an immortal grant re-read every round proves it exists, not that consent
+    # still holds. Absent expires_at = no window (backward compatible); the operator renews by re-signing.
+    ("test_ge1_grant_expiry.py",          60,   "JUDGE"),
+    # OA1 (A409 ecosystem groundwork, 2026-11-04): write_reply records which screen set a draft aside
+    # (ungrounded/length/money/off-limits/model-error) in an opt-in out dict -- the measurable basis for a
+    # ring-earning prune of free's organs. how tag unchanged; both ways.
+    ("test_oa1_organ_attribution.py",     60,   "JUDGE"),
+    # TC1 (2026-11-04, operator "We need the PCs to interact without you. There has to be redundancy."):
+    # covenant_tetsu_client reaches TETSU's model panel across three network-plane doors, falling through
+    # on timeout (door 1 direct, doors 2/3 via their headscale SOCKS proxies). Hermetic both-ways test
+    # (local stub doors), no live TETSU needed; records which door answered.
+    ("test_tc1_tetsu_client.py",          120,  "HTTP"),
+    # VC1 (2026-11-05): the version is single-sourced -- COVENANT_VERSION is the one truth and
+    # HANDOFF.md must match it, so preflight/banner/hand-off cannot drift again (readiness #4).
+    ("test_vc1_version_consistency.py",   60,   "DEPLOYMENT"),
+    # tools/tetsu_work.ask marks an answer that copies its question ("echoed", "echo_share"), so a copied
+    # review packet is never counted as a review (2026-11-05: three were, nearly). Hermetic stub door.
+    ("test_tw1_tetsu_echo.py",            60,   "HTTP"),
+    # PT1 (2026-11-05): the two 27B partners (covenant_partners.py) keep their own memory, read the shared
+    # record from the files, never read Tetsu's memory (his NO), stay in budget. Hermetic; four mutations red.
+    ("test_pt1_partners.py",              60,   "IDENTITY"),
     ("test_ct1_contact.py",              120,  "JUDGE"),
     ("test_a170_promotion_dispositions.py", 600, "JUDGE"),
     ("test_tp1_persona.py",               120,  "JUDGE"),
@@ -571,6 +627,7 @@ SUITES = [
     ("test_ow1_own_work.py",              120,  "JUDGE"),
     ("test_wb1_web.py",                   120,  "JUDGE"),
     ("test_hl1_heal.py",                  120,  "JUDGE"),
+    ("test_fp1_fixplan.py",               120,  "JUDGE"),
     ("test_pv1_provenance.py",            120,  "JUDGE"),
     ("test_av1_immune.py",                180,  "JUDGE"),
     ("test_oa1_open_access.py",           120,  "JUDGE"),
@@ -625,8 +682,9 @@ SUITES = [
     # feed and scheduler are fixtures, the cache a temp file, no node and no network.
     ("test_sf1_sync_fabric.py", 120, "DAILY + GUARDS"),
     # NA1 (2026-10-20): H1i names six protected subjects; the engine's NEVER_AUTOMATIC tuple had fourteen
-    # (twenty-four since 2026-10-30: the grid/ICS-OT actuation words, A392).
-    # NA1 drives every one through apply_remedy so the money/seat/rule/consent/key list cannot silently shrink.
+    # (twenty-four since 2026-10-30: the grid/ICS-OT actuation words, A392; twenty-five since 2026-11-02: 'grant',
+    # the authority file, NA1/A416).
+    # NA1 drives every one through apply_remedy so the money/seat/rule/consent/key/grant list cannot silently shrink.
     ("test_na1_never_automatic.py", 120, "DAILY + GUARDS"),
     # OG1 (2026-11-02, "loosen autonomy ... create its own lane"): the highway's AUTO_GATED auto-onboard lane
     # (covenant_onboard.py) -- a third class between AUTO_REVERSIBLE and PROPOSE_ONLY. Every gate driven both
@@ -635,6 +693,16 @@ SUITES = [
     # a flagged node, an outward action never AUTO_GATED. Hermetic: an in-process key signs a fixture roster,
     # identity is stubbed, every path is a temp file. Ships DARK and NOT ARMED.
     ("test_og1_onboard.py", 120, "DAILY + GUARDS"),
+    # ZS1 (2026-11-02, the security-hunt): archive extraction cannot write outside its destination. The zip
+    # sites (import_conversations, usb_link) are safe by CPython's own sanitization (measured); covenant_seal's
+    # tarfile unseal is safe by a HAND-ROLLED member guard, driven both ways against the real unseal here so it
+    # cannot regress silently (tar, unlike zip, does not self-sanitize -- ZS1.s3 proves the guard load-bearing).
+    ("test_zs1_extract_containment.py", 120, "DAILY + GUARDS"),
+    # CX1 (2026-11-02, the security-hunt): the loopback console refuses cross-site state-changing POSTs
+    # (CSRF). A loopback bind + client-IP _guard is not an origin check; do_POST now refuses a mismatched
+    # Origin or Sec-Fetch-Site: cross-site. Drives the REAL Handler on an ephemeral port (no prod ports),
+    # both ways: cross-site -> 403, same-origin/headless -> allowed.
+    ("test_cx1_app_csrf.py", 120, "DAILY + GUARDS"),
     # PB1 (2026-09-26, A231): the highway's two phone-build signals measure what they name -- a look that finds
     # nothing newer counts as a look (fetch_build was quarantined for it), and "behind" means behind in the
     # files the APK ships, not in every docs commit.
@@ -878,6 +946,13 @@ SUITES = [
     ("test_li1_lookback_index.py", 60, "SECURITY"),
     # A367 (2026-10-17): alert push sends held-down condition starts and clears, not log lines.
     ("test_ap1_alert_push.py", 30, "SECURITY"),
+    # A419 (2026-11-09, his "Yes, additive only" to the all-repos audit): two suites in subfolders that no runner
+    # named. The coverage phase globs the root only, so it could not call them orphans; they passed by hand
+    # (M1 203/203 on a free loopback port, ~9 s; the go-live scheme ALL PASS) and were run by nobody. Both are
+    # staged (tools/ and ai_memory_system/ are in STAGE_DIRS) and set up their own sys.path from their own dir.
+    # The go-live scheme ends "ALL PASS" with no number, so it joins "passed, counted 0" -- named, not hidden.
+    ("ai_memory_system/test_memory_system.py", 180, "SECURITY"),
+    ("tools/test_golive_scheme.py", 60, "SECURITY"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
@@ -1385,6 +1460,8 @@ def phase_coverage(say):
         if out.returncode == 0:
             tracked = {os.path.basename(l.strip()) for l in
                        out.stdout.splitlines() if l.strip()}
+            # A419: a suite listed by its subfolder path is tracked under that path, not its basename.
+            tracked |= {l.strip() for l in out.stdout.splitlines() if l.strip()}
         unshipped = sorted(s for s in listed
                            if s not in tracked
                            and os.path.isfile(os.path.join(HERE, s)))
@@ -1702,6 +1779,7 @@ def phase_sweep(say, only=None, repeat=1, verbose=False):
             continue
         clean_dbs(work)
         log = os.path.join(work, "logs", suite + ".log")
+        os.makedirs(os.path.dirname(log), exist_ok=True)     # A419: a suite in a subfolder logs in a subfolder
         t0 = time.time()
         with open(log, "w", encoding="utf8", errors="replace") as lf:
             p = subprocess.Popen([sys.executable, suite], cwd=work, env=env,

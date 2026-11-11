@@ -170,6 +170,11 @@ coinbase_balance.txt
 # the file is absent, so ignoring it fails in the safe direction.
 trader_config.json
 TRADER_HALT
+
+# TETSU model-door addresses (covenant_tetsu_client). The node IPs are the operator's
+# private tailnet identifiers and this repo is public, so the real config stays untracked;
+# ops/tetsu_doors.example.json (placeholders) is the tracked template.
+ops/tetsu_doors.json
 # The scheduled run's log: portfolio totals, position sizes, orders placed.
 # That is holdings by another name, and holdings are not published.
 trader_log.txt
@@ -287,13 +292,23 @@ ops/pause/
 # Node A's off-box peers (the phone's tailnet address), read by covenant_watchdog.py
 # and covenant_prod.bat alike, so neither public file carries the address.
 ops/local_peers.txt
+# The per-leg road lists for covenant_legpaths.py (2026-11-07): each leg's ordered
+# roads (hosted tailnet, our headscale, TETSU's own plane) are host:port addresses,
+# so the real file is gitignored and ops/leg_roads.example.json ships placeholders.
+ops/leg_roads.json
+ops/local_relays.txt
 # the AUTO_GATED auto-onboard lane's LOCAL state (covenant_onboard.py): the operator's
-# arm/trust-root switch and the tasks the lane has armed. Both machine-local decisions,
-# not repo content -- the lane ships DARK (no arm file) and writes armed_tasks only once
-# armed. NODE_ROSTER.json and node_refusals.json ARE tracked (the whois trust root needs
-# the roster committed; a refusal only tightens).
+# arm/trust-root switch, the tasks the lane has armed, and -- on the chosen SIGNATURE
+# trust root -- the signed node roster. All machine-local decisions, not repo content:
+# the lane ships DARK (no arm file) and writes armed_tasks only once armed. NODE_ROSTER.json
+# carries device names + tailnet IPs the opsec push guard refuses, so it is ignored here to
+# make an accidental commit impossible (fail-at-commit, not only fail-at-push). If the WHOIS
+# trust root is ever chosen instead -- that path needs the roster repo-committed -- add it
+# deliberately with `git add -f ops/NODE_ROSTER.json`. node_refusals.json stays TRACKED
+# (a refusal only tightens, and is meant to ride the repo).
 ops/AUTO_ONBOARD_ARMED
 ops/armed_tasks.json
+ops/NODE_ROSTER.json
 # the laptop site auto-deploy job's per-pass record (tools/site_autodeploy.py), machine-local
 ops/site_autodeploy.jsonl
 ops/local_unison_feed.txt
@@ -428,6 +443,15 @@ ops/code_consensus.jsonl
 ops/tetsu_strategy.jsonl
 ops/tetsu_live.jsonl
 ops/tetsu_immunity.jsonl
+# A416: his conversation reflex's memory -- topic words from his asks, private ones included; was neither tracked nor ignored
+ops/tetsu_conv_reflex.json
+ops/tetsu_conv_reflex.jsonl
+ops/tetsu_conv_encoder.json
+# A416 fix: each caller/privacy partition keeps its own files (hashed scope in the name), and a save goes via .tmp
+ops/tetsu_conv_reflex.scope-*
+ops/tetsu_conv_encoder.scope-*
+ops/tetsu_conv_reflex.json.tmp
+ops/tetsu_conv_encoder.json.tmp
 ops/tetsu_about_him.json
 ops/refine_loop_state.json
 ops/mycelium.jsonl
@@ -549,6 +573,24 @@ ops/tetsu_reflex.json
 # improvement-mining generated state (regenerable; baseline seen-set is 51k ids)
 ops/improve_mined_seen.json
 ops/improve_candidates.jsonl
+# the re-queue (2026-11-04, A409): append-only runtime state beside the seen-set, machine-specific
+ops/improve_requeue.jsonl
 
 # VC2 verdict-cache disk store (runtime state, machine-specific, never committed)
 ops/verdict_cache/
+
+# local retired-scratch bin (tombstone rule 10) -- kept on disk, never shipped; origin/main does not track it
+.trash/
+ops/head_commitments.jsonl
+ops/improve_backlog.jsonl
+ops/pc3d_slow.jsonl
+ops/security_probes_retired.jsonl
+ops/students/RETIRED.jsonl
+ops/study/web_sources.jsonl
+ops/HF_JANGWOO_REPLY4_DRAFT_2026-11-02.md
+ops/HIGHWAY_AUTONOMY_LOOSEN_2026-11-02.md
+
+# retired-student-model tombstone snapshots: kept on disk + on the local backup branch,
+# not shipped on main (keeps the canonical branch lean / joinable). A dedicated archive
+# store is the proper long-term home (PR #42 review, 2026-11-08).
+ops/students/fallback_model*.json

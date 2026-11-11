@@ -23,6 +23,11 @@ WHAT THIS STORE PROMISES, in covenant terms:
     agent wrote, another may retire but may not erase.
   * SELF-DESCRIPTION. state() reports the count, the newest write, and the
     chain head, so a reader can know WHAT it is reading before trusting it.
+  * INTENT PROVENANCE. Every write carries why it was made (intent), who for
+    (beneficiary) and what it conflicts with (divergence), screened before the
+    append; a divergence cross-links the record it diverges from, so a later
+    agent can QUERY divergence instead of inferring it. No backfill -- see
+    screen_provenance(), put(), backfill() and tombstone_unprovenanced().
 
 Stdlib only, deliberately: this must run wherever a python does, with no
 environment to assemble -- the same constraint that shaped the semantic
@@ -76,6 +81,89 @@ def _sha(text: str) -> str:
 # Fields that recall bookkeeping is allowed to move without it counting as a
 # change to what the memory SAYS. Everything outside this set is the claim.
 _VOLATILE = ("uses", "last_used", "tier")
+
+# ------------------------------------------------------------ PROVENANCE --
+# INTENT PROVENANCE. Every write carries three fields that say WHY it was made,
+# not just what it says, so a later agent can query divergence instead of
+# inferring it:
+#   intent       -- one sentence, present tense: what the writer intends this
+#                   record to CAUSE. Not a restatement of the body.
+#   beneficiary  -- who or what this is for. "future unknown agent" is valid.
+#   divergence   -- the value or prior claim this write conflicts with, or
+#                   the literal "none". When it is not "none", the write must
+#                   name the record it diverges from (diverges_from) so the
+#                   conflict chain is traversable, never inferred.
+#
+# These live in metadata, so content_digest() and claim_digest() cover them
+# automatically (they are outside _VOLATILE) -- a provenance field cannot be
+# edited after the fact without verify_integrity() naming the file. They are
+# REQUIRED: a write missing any of the three, or whose intent merely restates
+# the payload, is refused by the gate below before anything is written. There
+# is no backfill -- see MemoryStore.backfill (always refused) and
+# tombstone_unprovenanced (marks a pre-schema record's absence, never fills it).
+PROVENANCE_FIELDS = ("intent", "beneficiary", "divergence")
+
+_PWORD = re.compile(r"[a-z0-9]+")
+
+
+def _norm_tokens(s: str) -> List[str]:
+    return _PWORD.findall(str(s).lower())
+
+
+def _intent_restates(intent: str, payload: str) -> bool:
+    """True iff `intent` reads as a restatement of `payload` rather than a
+    statement of purpose. SURFACE ONLY, and that limit is the point: this is
+    not a grammar or mood parser (regex-as-measurement is how a check lies about
+    the part it never looked at). It catches two shapes a human reviewer would
+    also call a restatement -- the normalized intent appearing verbatim inside
+    the payload, and the intent being almost entirely the payload's own words --
+    and nothing subtler. A purpose statement ("warn future agents off this
+    source") shares few words with the fact it is about; a restatement ("the
+    user prefers dark roast") is mostly the body's words in a new order.
+    """
+    it = _norm_tokens(intent)
+    if not it:
+        return False
+    iset, pset = set(it), set(_norm_tokens(payload))
+    ni, npl = " ".join(it), " ".join(_norm_tokens(payload))
+    if ni and ni in npl:                       # intent is literally a span of the payload
+        return True
+    if len(iset) < 3:                          # too short to judge by overlap; emptiness is caught elsewhere
+        return False
+    return len(iset & pset) / len(iset) >= 0.8  # ~all of intent's words are the payload's
+
+
+def screen_provenance(intent: str, beneficiary: str, divergence: str,
+                      diverges_from: str, description: str, body: str,
+                      known_name: Optional[Any] = None) -> Optional[str]:
+    """Return a refusal reason, or None if the provenance is well-formed.
+
+    `known_name(name) -> bool` answers whether a record exists, for the
+    divergence cross-link check; omit it to skip only that check (the server
+    and store always pass it). Pure otherwise -- the store calls it under its
+    lock and audits+raises on any non-None return.
+    """
+    for k, v in (("intent", intent), ("beneficiary", beneficiary),
+                 ("divergence", divergence)):
+        if not str(v or "").strip():
+            return f"missing provenance field: {k} is required and may not be empty"
+        if any(c in str(v) for c in "\r\n\x00"):
+            return f"provenance field {k!r} must be a single line (no newlines or NULs)"
+    if _intent_restates(intent, body) or _intent_restates(intent, description):
+        return ("intent restates the payload instead of stating its purpose; "
+                "say what this record is meant to CAUSE, not what it says")
+    dv = str(divergence).strip().lower()
+    df = str(diverges_from or "").strip()
+    if dv == "none":
+        if df:
+            return "divergence is 'none' but diverges_from names a record; one or the other"
+    else:
+        if not df:
+            return ("divergence is not 'none' but no diverges_from record is given; "
+                    "name the record this write conflicts with so the chain is traversable")
+        if known_name is not None and not known_name(df):
+            return f"diverges_from names a record not in the ledger: {df!r}"
+    return None
 
 
 def content_digest(rec: Dict[str, Any]) -> str:
@@ -610,7 +698,9 @@ class MemoryStore:
 
     def put(self, name: str, description: str, mtype: str, body: str,
             agent: str, tier: str = "archival",
-            extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+            extra: Optional[Dict[str, Any]] = None,
+            intent: str = "", beneficiary: str = "", divergence: str = "",
+            diverges_from: str = "") -> Dict[str, Any]:
         if mtype not in ("user", "feedback", "project", "reference"):
             raise ValueError(f"bad type {mtype!r}")
         if tier not in ("core", "archival"):
@@ -647,6 +737,32 @@ class MemoryStore:
                 # could not say how old it was. Verified missing 2026-08-29.
                 meta["created"] = old.get("created", meta["created"])
                 prior_digest = content_digest(prior)
+            # THE PROVENANCE SCREEN RUNS FIRST, BEFORE THE ETHICS GATE AND
+            # BEFORE ANY WRITE. Every record must say why it was made (intent),
+            # who for (beneficiary) and what it conflicts with (divergence); a
+            # write missing any of these, or whose intent merely restates the
+            # body, is refused here. Like the ethics refusal below, a refused
+            # write leaves no trace except the audit line that records it.
+            # There is NO backfill: see backfill() and tombstone_unprovenanced().
+            prov_reason = screen_provenance(
+                intent, beneficiary, divergence, diverges_from,
+                description, body, known_name=lambda nm: self.get(nm) is not None)
+            if prov_reason is not None:
+                from ethics_gate import MemoryRefused, Verdict, BLOCK
+                verdict_p = Verdict(verdict=BLOCK, by="provenance",
+                                    reason=prov_reason)
+                self._audit("refused", name, agent, _sha(prov_reason),
+                            {"verdict": dict(verdict_p), "provenance_refused": prov_reason})
+                raise MemoryRefused(verdict_p)
+            meta["intent"] = intent.strip()
+            meta["beneficiary"] = beneficiary.strip()
+            meta["divergence"] = divergence.strip()
+            if str(diverges_from or "").strip():
+                # The cross-link to the record this write diverges from, so the
+                # conflict chain is traversable (intent_check and any reader
+                # follow it by name). Covered by content_digest() like the rest.
+                meta["diverges_from"] = diverges_from.strip()
+
             # THE GATE RUNS BEFORE ANYTHING IS WRITTEN OR ARCHIVED.
             #
             # A memory is the highest-leverage untrusted input here: it is
@@ -766,6 +882,43 @@ class MemoryStore:
                          "superseded_by": new_name})
             self.index.upsert(rec, len(text.encode("utf-8")))
         return True
+
+    def backfill(self, name: str, agent: str, **_fields: Any) -> None:
+        """REFUSED BY DESIGN, always. Provenance is written WITH a record, in
+        the same write the gate screened; it is never stamped onto an existing
+        record afterward. A silent backfill would let any later editor invent an
+        intent the original writer never stated and have it read as original --
+        the exact laundering intent provenance exists to prevent. An old record
+        that predates the schema gets its absence MARKED (tombstone_unprovenanced),
+        not filled. This records the refusal in the chain and raises."""
+        reason = ("backfill is not allowed: provenance cannot be added to an "
+                  "existing record after the fact; rewrite it with a real intent "
+                  "via put(), or mark its absence with tombstone_unprovenanced()")
+        with self._lock:
+            self._audit("refused", name, agent, _sha(reason),
+                        {"backfill_refused": reason})
+        from ethics_gate import MemoryRefused, Verdict, BLOCK
+        raise MemoryRefused(Verdict(verdict=BLOCK, by="provenance", reason=reason))
+
+    def tombstone_unprovenanced(self, agent: str) -> List[str]:
+        """Mark every stored record that LACKS intent provenance -- a record
+        written before this schema -- with a durable, tamper-evident line in the
+        audit chain noting the absence. It does NOT fill the fields (that would
+        be a backfill) and does NOT remove the record from recall (a pre-schema
+        memory is still a valid memory): the marker is the chain line, not an
+        erasure. Returns the names marked. Idempotent is not promised -- each
+        call appends a line per still-unprovenanced record, which is honest: the
+        absence is still true until the record is rewritten with a real intent."""
+        marked: List[str] = []
+        with self._lock:
+            for rec in self._list_from_files():
+                meta = rec.get("metadata") or {}
+                if any(not str(meta.get(k) or "").strip() for k in PROVENANCE_FIELDS):
+                    self._audit("provenance_tombstone", rec["name"], agent,
+                                _sha("pre-schema: no intent provenance"),
+                                {"provenance_absent": True})
+                    marked.append(rec["name"])
+        return marked
 
     def rereview(self, name: str, agent: str) -> Optional[Dict[str, Any]]:
         """Put a memory the gate never passed back in front of it.

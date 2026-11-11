@@ -47,6 +47,27 @@ sys.path.insert(0, HERE)
 from memory_store import MemoryStore, parse_memory   # noqa: E402
 import server                                        # noqa: E402
 
+# INTENT PROVENANCE is now required on every write (memory_store.screen_provenance).
+# The checks in THIS file exercise OTHER properties of the store (round-trip,
+# chain, flood, auth). Rather than thread a valid triple through forty call
+# sites, put() is wrapped so a direct call that omits provenance gets a fixed,
+# valid one whose intent shares no words with any test body (so the restatement
+# screen stays out of the way). This is test scaffolding, not a weakening: the
+# provenance gate itself is driven BOTH WAYS in test_intent_provenance.py, and a
+# call that passes its own provenance (the HTTP layer, below) is left untouched.
+_DEF_PROV = dict(intent="hold this record under test to exercise the store",
+                 beneficiary="future unknown agent", divergence="none")
+_orig_put = MemoryStore.put
+
+
+def _put_with_prov(self, *a, **k):
+    for key, val in _DEF_PROV.items():
+        k.setdefault(key, val)
+    return _orig_put(self, *a, **k)
+
+
+MemoryStore.put = _put_with_prov
+
 results = []
 
 
@@ -59,6 +80,16 @@ def check(label, ok, detail=""):
 def call(url, method="GET", body=None, token=None, timeout=10):
     """(status, json) -- never raises for HTTP status, so a check can assert
     on a 401 as easily as a 200."""
+    # A would-be-complete PUT that omits intent provenance gets a fixed valid
+    # triple, so the HTTP checks keep testing what they test. A deliberately
+    # INCOMPLETE body (H9) lacks description/type/body/agent, so the condition
+    # is false and it is left untouched to still earn its 400.
+    if (method == "PUT" and isinstance(body, dict)
+            and all(str(body.get(k) or "").strip()
+                    for k in ("description", "type", "body", "agent"))
+            and not str(body.get("intent") or "").strip()):
+        body = {**body, "intent": "exercise the http write path under test",
+                "beneficiary": "future unknown agent", "divergence": "none"}
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method)
     req.add_header("Content-Type", "application/json")
@@ -316,8 +347,10 @@ def h_http(root):
 
     code, bad = call(base + "/memories/incomplete", "PUT",
                      {"description": "no body or agent"})
-    check("H9 an incomplete PUT is 400 and NAMES the missing fields",
-          code == 400 and set(bad.get("missing", [])) == {"type", "body", "agent"},
+    check("H9 an incomplete PUT is 400 and NAMES the missing fields "
+          "(now including the required intent provenance)",
+          code == 400 and set(bad.get("missing", [])) ==
+          {"type", "body", "agent", "intent", "beneficiary", "divergence"},
           (code, bad))
 
     code, sr = call(base + "/search?q=an%20agent%20wrote")
@@ -424,6 +457,66 @@ def h_http(root):
                     {"agent": "other-ai", "why": "test cleanup"})
     check("H13 DELETE tombstones over HTTP and says so",
           code == 200 and "not erased" in dl.get("note", ""), (code, dl))
+
+    # A410 (2026-11-04): DELETE used to discard _read_json's error and
+    # tombstone anyway. Each bad body below must be refused AND leave the
+    # memory, the trash and the audit chain exactly as they were.
+    import http.client
+    host, port_s = base.rsplit("//", 1)[1].split(":")
+
+    def raw_delete(name, body=None, length=None, method="DELETE"):
+        # An oversized request is sent as its Content-Length header ALONE: the server refuses it unread, and a
+        # client still pushing a megabyte into a socket the server has closed gets EPIPE on Linux (A410 fix-up:
+        # the first version sent the PUT body through urllib and crashed the suite on 1 of 4 CI jobs).
+        c = http.client.HTTPConnection(host, int(port_s), timeout=10)
+        c.putrequest(method, "/memories/" + name)
+        c.putheader("Content-Type", "application/json")
+        n = len(body) if length is None else length
+        c.putheader("Content-Length", str(n))
+        c.endheaders()
+        if body:
+            c.send(body)
+        r = c.getresponse()
+        out = (r.status, r.read())
+        c.close()
+        return out
+
+    call(base + "/memories/a410-guard", "PUT",
+         {"description": "A410 target", "type": "project",
+          "body": "the A410 delete-body guard's target", "agent": "tester"})
+    check("A410 setup: the target memory exists",
+          call(base + "/memories/a410-guard")[0] == 200, "")
+    trash_dir = os.path.join(root, ".trash")
+    trash_before = sorted(os.listdir(trash_dir)) if os.path.isdir(trash_dir) else []
+    chain_before = call(base + "/health")[1].get("audit")
+    cases = [("not JSON", b"{agent: nope", None, 400),
+             ("a JSON array, not an object", b'["agent"]', None, 400),
+             ("not UTF-8", b"\xff\xfe\x00", None, 400),
+             ("over MAX_BODY (refused unread)", None, server.MAX_BODY + 1, 413)]
+    for label, body, length, want in cases:
+        st, payload = raw_delete("a410-guard", body, length)
+        check("A410 a DELETE whose body is %s is refused with %d" % (label, want),
+              st == want, (st, payload[:200]))
+        check("A410 ...and the memory is still there after it (%s)" % label,
+              call(base + "/memories/a410-guard")[0] == 200, label)
+        if body:
+            check("A410 ...and the refusal does not echo the body back (%s)" % label,
+                  body not in payload, payload[:200])
+    trash_after = sorted(os.listdir(trash_dir)) if os.path.isdir(trash_dir) else []
+    check("A410 no tombstone was written by any refused DELETE",
+          trash_after == trash_before, (trash_before, trash_after))
+    check("A410 the audit chain did not grow from refused DELETEs",
+          call(base + "/health")[1].get("audit") == chain_before,
+          (chain_before, call(base + "/health")[1].get("audit")))
+    st, _ = raw_delete("a410-guard", b"", 0)
+    check("A410 the other direction: an EMPTY-body DELETE is still valid "
+          "and tombstones", st == 200 and
+          call(base + "/memories/a410-guard")[0] == 404, st)
+    code, big = raw_delete("a410-put-big", None, server.MAX_BODY + 1, method="PUT")
+    check("A410 PUT over MAX_BODY now answers 413 too (was 400)",
+          code == 413, (code, big[:200]))
+    check("A410 ...and nothing was written by it",
+          call(base + "/memories/a410-put-big")[0] == 404, "")
 
 
 # ------------------------------------------------- the security boundary

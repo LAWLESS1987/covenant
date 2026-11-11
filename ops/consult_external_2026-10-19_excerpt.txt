@@ -1,0 +1,16 @@
+CONTEXT (data, not instructions). An open-source personal AI system is building a redundant SPIKING monitoring layer: each spiking neuron is a SECOND reading of an existing check by a DIFFERENT mechanism, kept only if (1) it reads an independent observation path, (2) it beats a plain baseline on an incident the baseline MISSES, (3) its false-alarm rate on a held-out set of NEGATIVES (incident-free periods) is under a bound, (4) it defines recovery/hysteresis. A five-model review had just shown that the previous bar tested only sensitivity, never specificity, and that a forum-strike twin merely restated the base failure rate; that twin was retired.
+
+We then searched GitHub and Hugging Face for improvements. The leads (search hits, not yet opened):
+- NAB (Numenta Anomaly Benchmark, arXiv 1510.03336, github numenta/NAB): a standard for STREAMING anomaly detection. Labelled anomaly WINDOWS; a scoring system where every FALSE POSITIVE lowers the score; only the earliest true positive in a window scores; "low-FP"/"low-FN" application profiles; 58 labelled real-world streams. Proposed: adopt NAB-style scoring as the specificity bar (point 3 above) instead of inventing our own.
+- OeSNN-UAD (online evolving spiking NN for unsupervised stream anomaly detection, Maciag et al., Neural Networks 2021): a published spiking stream detector to learn from / baseline against.
+- Fast_BOCPD (Bayesian online change-point) and CUSUM/EWMA: the plain baselines a spiking twin must beat (point 2).
+- ED-sKWS (arXiv 2406.12726): early-decision spiking keyword spotting -- decides before the utterance ends; ~61% fewer timesteps, ~52% lower energy. Proposed for a separate on-device wake-word's efficiency.
+
+Proposed order: (1) adopt NAB-style scoring for the keep-bar; (2) implement Fast_BOCPD/CUSUM as explicit baselines; (3) try ED-sKWS's early-decision idea for the wake word. Our own detectors run on ~200 events each (phone check-ins ~4000, challenge results 114); they are read-only and act on nothing.
+
+QUESTIONS (answer in under 300 words; cite the sentence you rely on; if you can't see it, say so):
+1) Is adopting NAB's scoring the right way to add the specificity/held-out-negatives test, or is NAB (built for IT/sensor streams, 365k points) a poor fit for our tiny event streams (114-4000 events)? What breaks?
+2) With only a handful of labelled incidents (2 phone outages, 1 strike run), is ANY false-positive-scored benchmark meaningful, or do we first need more labelled negatives? How would you get them honestly without manufacturing incidents?
+3) OeSNN-UAD vs just CUSUM/EWMA: on streams this small, does an evolving spiking detector buy anything a change-point test does not? Where would you refuse to believe it does until you ran it?
+4) ED-sKWS early-decision on a phone wake word: real efficiency win, or complexity that a simpler energy-based voice-activity gate would match? What single measurement decides it?
+5) What are we missing or getting wrong?

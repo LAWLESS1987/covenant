@@ -52,9 +52,11 @@ pip install -r requirements.txt
 ## 3. Start a node
 
 ```
-python run_with_ollama_judge.py --port 5000 --node-id <your-name> \
+python run_node.py --port 5000 --node-id <your-name> \
     --genesis genesis.json --peers <owner-address>:5001
 ```
+
+*(Launcher corrected 2026-11-09: `run_with_ollama_judge.py` was deleted 2026-09-12 (commit 865c0bd) along with the local model server it was named for, so the old name fails on a clone. `run_node.py` seats the two distilled students and the semantic judge with no model server — see the README's A257-SHIM note.)*
 
 - **Do not run `--export-genesis`.** `genesis.json` is tracked and canonical.
   Minting your own is the single most common way to end up unable to converge

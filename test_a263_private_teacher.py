@@ -75,6 +75,13 @@ def main():
     os.environ["COVENANT_PAUSE_DIR"] = tempfile.mkdtemp(prefix="a263_pause_")
     os.environ.pop("COVENANT_HOLD_PRIVATE", None)
     d = fresh_env()
+    import covenant_tetsu_conv_reflex as CR
+    # A416: the real door's advisory reflex persists into this test's own files, never ops/ (and A401 would otherwise
+    # keep it quiet, so the scope checks below would pass vacuously).
+    _cr_default = (CR.STATE, CR.LOG, CR.ENC_STATE)   # handed back after D2 (A401 keeps those quiet under a test)
+    CR.STATE = os.path.join(d, "cue.json")
+    CR.LOG = os.path.join(d, "cue.jsonl")
+    CR.ENC_STATE = os.path.join(d, "recall.json")
     import covenant_daily_plan as DP
     import covenant_teacher_queue as TQ
     import covenant_unified_v8 as cov
@@ -155,6 +162,11 @@ def main():
         lrow = [x for x in rows_of(log) if CANARY in x.get("text", "")]
         check("D1 ...and its memory row is marked private", len(lrow) == 1 and lrow[0].get("private") is True, lrow)
         private_answered = bool(lrow and lrow[0].get("answer"))
+        check("D1 ...its advisory reflex memory is the partition of this caller in private mode, not the shared one (A416)",
+              os.path.isfile(CR._scoped_path(CR.STATE, CR.conversation_scope(A, True)))
+              and os.path.isfile(CR._scoped_path(CR.ENC_STATE, CR.conversation_scope(A, True)))
+              and not os.path.exists(CR.STATE) and not os.path.exists(CR.ENC_STATE),
+              sorted(os.listdir(os.path.dirname(CR.STATE))))
 
         r = post("/m/agent", A, {"text": "an ordinary question afterwards"})
         j = r.get_json() or {}
@@ -164,6 +176,13 @@ def main():
         check("D2 ...and the private exchange was not replayed into it (cold: 2 messages; private answered=%s)" % private_answered,
               "(2 messages)" in str(j.get("answer", "")) and CANARY not in json.dumps(rows_of(q)), j.get("answer"))
         ordinary_answered = bool(j.get("answer"))
+        check("D2 ...and its reflex memory is the same caller's ordinary partition, separate from the private one (A416)",
+              os.path.isfile(CR._scoped_path(CR.STATE, CR.conversation_scope(A, False)))
+              and not os.path.exists(CR.STATE) and not os.path.exists(CR.LOG),
+              sorted(os.listdir(os.path.dirname(CR.STATE))))
+        # The firing reflex puts its line ahead of the text in the message (A400), which the stand-in model then
+        # cannot read as a STUB>> directive; D3 onward test other things, so the reflex goes quiet again here.
+        CR.STATE, CR.LOG, CR.ENC_STATE = _cr_default
         r = post("/m/agent", A, {"text": "a second private question", "private": True})
         j = r.get_json() or {}
         want = 2 + 2 * (int(private_answered) + int(ordinary_answered))

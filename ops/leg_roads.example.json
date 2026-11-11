@@ -1,0 +1,20 @@
+{
+  "_README": "Copy this to ops/leg_roads.json (gitignored) and fill the roads with REAL host:port addresses. This repository is public, so the real file is never committed -- the same rule as ops/local_peers.txt. covenant_legpaths.py reads it. Each leg lists its roads IN PREFERENCE ORDER: the first that answers is used, the rest are fall-through. Within a leg roads are tried in order; legs are read in parallel. Any HTTP reply (incl. 429) counts as the leg answering (A115).",
+  "legs": {
+    "node_D": {
+      "path": "/health",
+      "roads": [
+        "<hosted-tailnet-ip>:<p2p-port>",
+        "127.0.0.1:15082",
+        "127.0.0.1:16082"
+      ],
+      "_roads_note": "road 0 = hosted tailnet (direct); road 1 = our headscale, served by laptop_hs_relay.py (127.0.0.1:15082 -> SOCKS 127.0.0.1:1057 -> tetsu-hs -> node D); road 2 = TETSU's own plane, served by a second relay instance to its SOCKS. Keep the REAL file out of git."
+    },
+    "phone": {
+      "path": "/health",
+      "roads": [
+        "<phone-tailnet-ip>:<phone-port>"
+      ]
+    }
+  }
+}

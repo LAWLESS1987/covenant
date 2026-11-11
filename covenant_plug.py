@@ -63,7 +63,7 @@ if HERE not in sys.path:
 # test_na1_never_automatic.py. If the two ever disagree, the highway's tuple wins; _never_automatic()
 # reads the live tuple so this plug can never quietly narrow it.
 _NEVER_AUTOMATIC_DOC = ("money", "holdings", "wallet", "trader", "venue", "order",
-                        "rule", "principle", "judge", "seat", "model", "phone", "consent", "key",
+                        "rule", "principle", "judge", "seat", "model", "phone", "consent", "key", "grant",
                         # grid / ICS-OT actuation (2026-10-30, covenant_grid_guard.py) -- joined the
                         # highway's tuple that day; this copy lagged it and PG1 caught it.
                         "grid", "breaker", "relay", "feeder", "substation",

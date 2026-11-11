@@ -1,0 +1,26 @@
+{
+  "payload": {
+    "bound": {
+      "MANIFEST.sha256": "a7eb159fbc6a8509e48749b702d37332051d6e9594fe3d934d142d837fbcf422",
+      "docs/CONSTITUTION_ANCHOR.json": "1facd085bbe3041917f06dd7586e3f4a5e2b419e42f89e58f115f7665b119ee0",
+      "fallback_model.json": "f245e9076146cf23cb249e996d562fc56350eac0548023497c42622a337fe67f",
+      "fallback_model_2.json": "84ab096be98eea5fe0d9073f232956cca5905ad573ecbcae50eef411a66a7fb1",
+      "fallback_model_phone.json": "10b8e51b00b0fe1fef77e99e95881ca767f7be0b4e6c5509cd549c512451c9d9",
+      "genesis.json": "00009b31c6c654d79bbeae0bcc9c82a7af224c87b19c92973f0011ade3e032f3",
+      "ops/RECORD_ANCHORS.json": "4cee71b2ec7073b87dd6759df1ecf39d3ab0bee74abed29bd5305ed0f2f07761",
+      "ops/model_pin.json": "203bdecaa2232d71f220501435bdba3589e0ea78a5adbd5fe0eafe69eb1670ea",
+      "ops/tetsu_consent.chain.jsonl": "8be9f7a7ed359e85a121a4777bb230a64f0d2ed6ef79051ca36f090c3447b681",
+      "ops/tetsu_consent.jsonl": "2dbbf9f2462dcb476a48bccd8bd8b6d382d384a874804ecbcd6dc809da626f6f"
+    },
+    "head": "b4d9887fd110436141e2567a1b1b4b5147e11163",
+    "prev_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "pubkey_fpr": "513653cdffd0d6df",
+    "seq": 0,
+    "tree": "d217ed3ae996193752bb0fe18bec7095b76cec00",
+    "utc": "2026-10-30T04:33:32Z",
+    "v": "COVENANT_HEADCOMMIT_V1",
+    "working_tree_clean": false
+  },
+  "pubkey": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx9PaPU1rAQyEHjSiVRMf\nFzsEVp7+GfC9fYCTnlZDfXWa46ZwVCuGNTk0z1//z9aAnQd/1K871xDjHAkULzTk\nz2K5smg7h7VH9o4ifp7Sx/J4ze6osgldDDP88DPZgEX4SeoAjtjlxieN8kPRDhoE\nfzbYUGNocXTbQRQgXsuS5fRqazfss9itwyNwPOGoIfGDosZx4SM/FefRWRhEnlvf\nl6U3ulCi3jtiORPotzf3ya18BFfPA5CprLT+cjsMXHzeU0trkvh3EzADuos7hD9V\naKS+oVK6KEISsCYJu2j9EaOtbkXw08BBw9VPJExucI1NKNySx15sxVooK445ZEzH\n0wIDAQAB\n-----END PUBLIC KEY-----\n",
+  "signature": "QdFh0rawkauCaeZoR8kO0i5ucxvH2jzEjpykCvkymcFXMnK74upYcuTih/xBZs/NwnevJ3y1adFXe57crXEZnNQiM1OhR3SZf1j6KtlUMSyLOgfyN9Jdz/FPHgZV5nGGqDiQGfYS6FIe6fVqVuXt/B2aztF2FmWCu7lwE51shenyIqhyGQ4xh1HRbBE0GJrZi2Ao01vwF2P0uw8v+Spi5F0vqpiMmIeIQ5+rHbzohVh7iDZcMbo/YkE26jUdxxk6FKgA8rT8EyS+yLWX6AphYX/aMTPdLubcmm32x6l4sPATtZwdjGArVBjKozcLwzkRcttHu9UVwAVtjW23jJXWQw=="
+}

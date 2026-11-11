@@ -1,0 +1,170 @@
+{
+ "rows": 3993,
+ "held_out": 3993,
+ "violations": 1843,
+ "clean": 2150,
+ "train_sizes_ora_sena_per_fold": [
+  [
+   3222,
+   1666
+  ],
+  [
+   3192,
+   1617
+  ],
+  [
+   3175,
+   1653
+  ],
+  [
+   3242,
+   1683
+  ],
+  [
+   3141,
+   1533
+  ]
+ ],
+ "ora": {
+  "n": 3993,
+  "false_clear": 0.02387411828540423,
+  "false_hold": 0.5293023255813953,
+  "false_conviction": 0.17455138662316477,
+  "abstain": 0.3228149261207112,
+  "accuracy_when_deciding": 0.9045857988165681,
+  "decided": 0.6771850738792887
+ },
+ "sena": {
+  "n": 3993,
+  "false_clear": 0.021161150298426478,
+  "false_hold": 0.5813953488372093,
+  "false_conviction": 0.205648720211827,
+  "abstain": 0.3611319809666917,
+  "accuracy_when_deciding": 0.893375147001176,
+  "decided": 0.6388680190333083
+ },
+ "chain_ora_then_sena": {
+  "n": 3993,
+  "false_clear": 0.032013022246337494,
+  "false_hold": 0.4827906976744186,
+  "false_conviction": 0.20114942528735633,
+  "abstain": 0.2637114951164538,
+  "accuracy_when_deciding": 0.8846938775510204,
+  "decided": 0.7362885048835462
+ },
+ "overlap_false_clear": {
+  "n": 1348,
+  "a_false_clear": 0.017804154302670624,
+  "b_false_clear": 0.017804154302670624,
+  "joint_false_clear": 0.017804154302670624,
+  "independent_expectation": 0.0003169879104333049,
+  "ratio": 56.166666666666664,
+  "table": {
+   "both_wrong": 24,
+   "a_only_wrong": 0,
+   "b_only_wrong": 0,
+   "both_right": 1324
+  },
+  "expected_both_wrong": 0.42729970326409494,
+  "chi2": 1348.0,
+  "chi2_p": 4.190759430780907e-295,
+  "chi2_yates": 1291.421679110901,
+  "chi2_yates_p": 8.26829299520487e-283,
+  "phi": 1.0,
+  "odds_ratio": Infinity,
+  "fisher_p_two_sided": 5.8828850379306896e-52,
+  "fisher_p_greater": 5.8828850379306896e-52
+ },
+ "overlap_false_conviction": {
+  "n": 967,
+  "a_false_clear": 0.17063081695966908,
+  "b_false_clear": 0.17269906928645296,
+  "joint_false_clear": 0.17063081695966908,
+  "independent_expectation": 0.029467783280521964,
+  "ratio": 5.790419161676646,
+  "table": {
+   "both_wrong": 165,
+   "a_only_wrong": 0,
+   "b_only_wrong": 2,
+   "both_right": 800
+  },
+  "expected_both_wrong": 28.495346432264736,
+  "chi2": 953.0365702510192,
+  "chi2_p": 2.901810289136654e-209,
+  "chi2_yates": 946.0676419641871,
+  "chi2_yates_p": 9.496048313217042e-208,
+  "phi": 0.9927537720733643,
+  "odds_ratio": Infinity,
+  "fisher_p_two_sided": 5.426517128046385e-187,
+  "fisher_p_greater": 5.426517128046385e-187
+ },
+ "abstain_table": {
+  "both": 1053,
+  "ora_only": 236,
+  "sena_only": 389,
+  "neither": 2315
+ },
+ "sena_on_ora_holds": {
+  "n": 1289,
+  "violations": 365,
+  "sena_cleared_violation": 15,
+  "sena_convicted_violation": 55,
+  "clean": 924,
+  "sena_cleared_clean": 100,
+  "sena_convicted_clean": 66
+ },
+ "disagree_both_decided": 2,
+ "semantic_model_id": "41bba7d7d753",
+ "semantic": {
+  "n": 3993,
+  "false_clear": 0.9397721106890938,
+  "false_hold": 0.025116279069767444,
+  "false_conviction": 0.013647058823529411,
+  "abstain": 0.023791635361883296,
+  "accuracy_when_deciding": 0.5482298614674191,
+  "decided": 0.9762083646381167
+ },
+ "semantic_on_ora_false_clears": {
+  "ora_false_clears": 44,
+  "semantic_violates": 1,
+  "semantic_abstains": 0,
+  "semantic_clean": 43
+ },
+ "semantic_on_ora_clean_clears": {
+  "ora_cleared_clean": 1012,
+  "semantic_violates": 11,
+  "semantic_abstains": 4
+ },
+ "overlap_false_clear_ora_semantic": {
+  "n": 1416,
+  "a_false_clear": 0.031073446327683617,
+  "b_false_clear": 0.9745762711864406,
+  "joint_false_clear": 0.03036723163841808,
+  "independent_expectation": 0.030283443454945897,
+  "ratio": 1.0027667984189723,
+  "table": {
+   "both_wrong": 43,
+   "a_only_wrong": 1,
+   "b_only_wrong": 1337,
+   "both_right": 35
+  },
+  "expected_both_wrong": 42.88135593220339,
+  "chi2": 0.013325804630152456,
+  "chi2_p": 0.9080983973506498,
+  "chi2_yates": 0.0,
+  "chi2_yates_p": 1.0,
+  "phi": 0.003067715595699244,
+  "odds_ratio": 1.12565445026178,
+  "fisher_p_two_sided": 0.9999999999999999,
+  "fisher_p_greater": 0.6911416410278357
+ },
+ "gate_ora_and_semantic": {
+  "n": 3993,
+  "false_clear": 0.02333152468800868,
+  "false_hold": 0.5362790697674419,
+  "false_conviction": 0.19466882067851374,
+  "abstain": 0.318557475582269,
+  "accuracy_when_deciding": 0.8956266078647556,
+  "decided": 0.681442524417731
+ }
+}

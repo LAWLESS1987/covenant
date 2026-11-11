@@ -63,13 +63,13 @@ jobs:
       # (1.7-4.7 GB) is the entry that matters. Restore of a 4.27 GB entry
       # measured 26-42 s on 2026-09-12.
       - name: Cache the llama.cpp runtime
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/llama-bin
           key: llamacpp-${{ env.LLAMA_BUILD }}-ubuntu-x64-v1
 
       - name: Cache the model
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/llama-models/${{ inputs.model }}
           key: gguf-${{ inputs.model }}-v1
@@ -252,7 +252,7 @@ jobs:
         run: tail -n 120 llama.log 2>/dev/null || true
 
       - name: Hand the answer back
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: "judge-${{ inputs.tag }}"
           path: answer.json

@@ -1,0 +1,9 @@
+A small spiking-neural-network lab (snnTorch, CPU) builds a wake word for a phone. Encoders: E1 = recurrent LIF layers, embedding = L2-normalised spike counts; B1 = GRU baseline of matched size; B2 = DTW template matching. Every amendment was written before its result. One outside reviewer filed five findings; Claude checked each against the data:
+
+F1. Claim: a spike-sparsity penalty (lambda 0.5) cut synaptic events 38% with validation few-shot 90.5% -> 90.0%. Reviewer: the count leaves out the dense input layer (98 x 40 x 128 = 501,760 ops per window). Checked: counted in full, 1,842,284 -> 1,331,267 = -27.7%, below the pre-registered 30% bar if the bar is read as total work. Verdict: confirmed overstatement.
+F2. Reviewer: 90.5 vs 90.0 is within about one standard error (1,000 decisions), it is best-of-epochs on the same episodes that chose the checkpoint, and there is no lambda = 0 control. Checked: the learning rate was as declared; the rest stands.
+F3. Claim: an always-on spiking gate in front of a fused spiking+DTW detector costs "about half". Checked: true only on a noise stream, without the shared front end. With it, 62% on the stream and 74% on the owner's own speech (the gate passes 33% of his speech).
+F4. Checked: the gate setting used later (1%) was picked on the 15 test takes; the plan had declared 2%.
+F5. Checked: the false-wake test stream includes 2,845 training-split clips beside 19,150 test/validation clips, never stated.
+
+Session-1 detection on the owner's voice: fused 10/15, DTW 9/15, spiking 8/15, GRU 8/15 (15 held-out takes, three amendments scored on them).

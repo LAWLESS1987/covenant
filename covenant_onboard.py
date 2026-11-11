@@ -357,14 +357,24 @@ def roster_trust_root(roster=None, pubkey=None, committed=None):
 
 
 def _roster_is_committed(path=None):
-    """True only if NODE_ROSTER.json is tracked by git (the whois anchor requires
-    the roster's authenticity to ride the repo, not a file anyone could drop in)."""
+    """True only if NODE_ROSTER.json is tracked by git AND its working tree matches the
+    commit -- the whois anchor requires the roster's authenticity to ride the repo, and a
+    file anyone could drop in OR silently edit must not pass."""
     path = path or ROSTER
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    rel = os.path.relpath(path, HERE)
     try:
-        r = subprocess.run(["git", "-C", HERE, "ls-files", "--error-unmatch", os.path.relpath(path, HERE)],
-                           capture_output=True, text=True, timeout=20, env=env, creationflags=_NOWIN)
-        return r.returncode == 0
+        tracked = subprocess.run(["git", "-C", HERE, "ls-files", "--error-unmatch", rel],
+                                 capture_output=True, text=True, timeout=20, env=env, creationflags=_NOWIN)
+        if tracked.returncode != 0:
+            return False
+        # Tracked is NOT enough: ls-files --error-unmatch still passes on a tracked file whose
+        # working tree has been silently edited, so the anchor would ride a roster nobody
+        # committed. diff --quiet HEAD exits non-zero iff the working tree differs from the
+        # commit for this path (git normalises line endings, so a CRLF-only diff is no diff).
+        clean = subprocess.run(["git", "-C", HERE, "diff", "--quiet", "HEAD", "--", rel],
+                               capture_output=True, text=True, timeout=20, env=env, creationflags=_NOWIN)
+        return clean.returncode == 0
     except Exception:                                           # noqa: BLE001
         return False
 
@@ -418,19 +428,28 @@ def verify_identity(node_id, entry, operator_account, whois_fn=None, status_fn=N
     ip = entry.get("ip")
     if not ip:
         return False, "roster entry for %s has no ip" % node_id
+    # Identity fields are MANDATORY, not checked-only-if-present. An entry with just an ip is
+    # not an identity -- whois can be made to answer for an IP -- so the owning account, the
+    # machine id and the node key must all be pinned in the roster, or this is False. (Before,
+    # each check was conditional on the entry carrying the field, so a bare-ip entry verified.)
+    if not operator_account:
+        return False, "no operator account to verify %s against -- fail closed" % node_id
+    if not entry.get("machine_id"):
+        return False, "roster entry for %s pins no machine_id -- identity, not an IP, is required" % node_id
+    if not entry.get("pubkey"):
+        return False, "roster entry for %s pins no pubkey -- identity, not an IP, is required" % node_id
     who = _tailscale_whois(ip, whois_fn=whois_fn)
     if not who:
         return False, "whois failed for %s (%s) -- fail closed" % (node_id, ip)
-    if operator_account and str(who.get("user")) != str(operator_account):
+    if str(who.get("user")) != str(operator_account):
         return False, "whois owner %r != operator %r" % (who.get("user"), operator_account)
-    if entry.get("machine_id") and str(who.get("machine_id")) != str(entry["machine_id"]):
+    if str(who.get("machine_id")) != str(entry["machine_id"]):
         return False, "whois machine id %r != rostered %r" % (who.get("machine_id"), entry["machine_id"])
     pinned = _tailscale_nodekey(ip, status_fn=status_fn)
-    if entry.get("pubkey"):
-        if not pinned:
-            return False, "could not pin a node key for %s -- fail closed" % node_id
-        if str(pinned) != str(entry["pubkey"]):
-            return False, "pinned node key != rostered node key for %s" % node_id
+    if not pinned:
+        return False, "could not pin a node key for %s -- fail closed" % node_id
+    if str(pinned) != str(entry["pubkey"]):
+        return False, "pinned node key != rostered node key for %s" % node_id
     return True, "identity verified by whois (owner, machine id) and pinned node key"
 
 
@@ -555,6 +574,21 @@ def evaluate(action, target, trigger, *, roster=None, choices=None, refusals=Non
     ok, idreason = verify_identity(node_id, entry, acct, whois_fn=whois_fn, status_fn=status_fn)
     if not ok:
         return out(REFUSE, "identity not verified: %s" % idreason)
+
+    # 10b. the address acted on must BE the verified node. Identity is verified against
+    # entry["ip"]; peer_addr is a SEPARATE field, so without this a roster entry could pass
+    # identity on one ip and have the engine peer a different host. The address is resolved
+    # FROM the verified roster entry (not the caller): the entry's peer_addr host must equal
+    # its verified ip, and a caller-supplied peer_addr may not differ from the roster's.
+    if action == "peer":
+        _rpa = str(entry.get("peer_addr") or "")
+        _rhost = _rpa.rsplit(":", 1)[0] if ":" in _rpa else ""
+        if not _rhost or _rhost != str(entry.get("ip")):
+            return out(REFUSE, "roster peer_addr %r is not the identity-verified ip %r for %s"
+                       % (_rpa, entry.get("ip"), node_id))
+        _tpa = str((target or {}).get("peer_addr") or "")
+        if _tpa and _tpa != _rpa:
+            return out(REFUSE, "requested peer_addr %r != the roster's verified %r for %s" % (_tpa, _rpa, node_id))
 
     # 11. the operator's explicit choices are untouchable
     choices = _operator_choices() if choices is None else choices

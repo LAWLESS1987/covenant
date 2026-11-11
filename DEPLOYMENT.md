@@ -9,7 +9,7 @@ Everything here was verified by running the system, not inferred from the source
 ```bash
 pip install -r requirements.txt
 python3 preflight.py --genesis genesis.json --db covenant_unified_A.db   # ALWAYS run this first
-python3 covenant_unified_v8.py --port 5000 --node-id A --genesis genesis.json
+python3 run_node.py --port 5000 --node-id A --genesis genesis.json   # NOT covenant_unified_v8.py directly
 ```
 
 `preflight.py` exits **0** ready, **1** blocking, **2** degraded-but-launchable.
@@ -27,7 +27,7 @@ A node binds **three** ports: `--port` for HTTP, `--port + 1` for P2P, and
 Peer at startup:
 
 ```bash
-python3 covenant_unified_v8.py --port 5000 --node-id A --peers 127.0.0.1:5101
+python3 run_node.py --port 5000 --node-id A --peers 127.0.0.1:5101
 ```
 
 Verify: `curl http://127.0.0.1:5000/chain` should return a chain of height 1.
@@ -37,6 +37,14 @@ Verify: `curl http://127.0.0.1:5000/chain` should return a chain of height 1.
 ## The three things that will surprise you
 
 ### 1. A node without a judge API key rejects every transaction
+
+*(Corrected 2026-11-09: this describes the raw `covenant_unified_v8.py` path, not
+the shipped launcher. `run_node.py` — used in the "Install and run" block above —
+seats the two git-tracked distilled students plus the semantic judge with no key,
+so a keyless clone ADMITS an ordinary send and REJECTS theft, deception and
+coercion offline (README A37). The behaviour below is real on the raw path, which
+is why the README says not to launch `covenant_unified_v8.py` directly; the API
+key is optional, not required.)*
 
 The ethics gate fails **closed**. With no `ANTHROPIC_API_KEY`, a node boots,
 serves `/chain`, peers correctly, reports normal alignment — and denies 100% of
@@ -89,8 +97,8 @@ The founder mints once and distributes the file:
 ```bash
 # genesis.json is TRACKED and CANONICAL. Do not mint one -- a joiner never does.
 # (The founder minted once; export_genesis now refuses to overwrite an existing file.)
-python3 covenant_unified_v8.py --port 5000 --node-id A --genesis genesis.json
-python3 covenant_unified_v8.py --port 5020 --node-id B --genesis genesis.json
+python3 run_node.py --port 5000 --node-id A --genesis genesis.json
+python3 run_node.py --port 5020 --node-id B --genesis genesis.json
 ```
 
 Both then hold an identical genesis and supply is 1000 NETWORK-WIDE. A file, not

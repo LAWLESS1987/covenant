@@ -17,7 +17,7 @@ returns nothing.
 Usage: python covenant_improve_mine.py            # print new replies since last run, update the seen-set
        python covenant_improve_mine.py --dry-run  # print them WITHOUT updating the seen-set (safe to re-run)
 """
-import json, os, sys, hashlib, tempfile
+import json, os, sys, hashlib, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CANDIDATES = os.path.join(HERE, "ops", "moltbook_candidates.jsonl")
@@ -66,6 +66,52 @@ def mark_seen(ids, seen_path=None):
         _save_seen(seen_path, _load_seen(seen_path) | ids)
 
 
+# RE-QUEUE (2026-11-04, A409 follow-up). A reply the v1 extractor answered with our own prompt ("echo") was marked
+# seen, so its REAL idea could never be mined again (Tien, Claude: "every echo loses that reply's real idea for
+# good"). The re-queue is an APPEND-ONLY ledger, never an edit of the seen-set: {"id","reason","t"} puts a seen reply
+# back in line; {"id","done":true,"t"} records that it was re-extracted. A reply is pending while its LAST row is not
+# done. harvest() offers pending ones FIRST, ahead of new replies, even though they are in the seen-set.
+REQUEUE = os.path.join(HERE, "ops", "improve_requeue.jsonl")
+
+
+def _append_requeue(rows, path=None):
+    if path is None:
+        path = REQUEUE                                         # IM8: call time
+    if not rows:
+        return
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+
+
+def requeue(ids, reason, path=None):
+    """Put already-seen replies back in line for extraction. Returns how many were newly queued."""
+    pend = pending_requeue(path)
+    t = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    rows = [{"id": i, "reason": reason, "t": t} for i in dict.fromkeys(ids) if i not in pend]
+    _append_requeue(rows, path)
+    return len(rows)
+
+
+def mark_requeue_done(ids, path=None):
+    pend = pending_requeue(path)
+    t = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    _append_requeue([{"id": i, "done": True, "t": t} for i in ids if i in pend], path)
+
+
+def pending_requeue(path=None):
+    """Ids whose last re-queue row is not 'done', in the order they were queued."""
+    if path is None:
+        path = REQUEUE
+    last = {}
+    for d in _rows(path):
+        if d.get("id"):
+            last.pop(d["id"], None)                            # re-insert so order = latest queueing
+            last[d["id"]] = bool(d.get("done"))
+    return [i for i, done in last.items() if not done]
+
+
 def _rows(path):
     if not os.path.exists(path):
         return
@@ -81,18 +127,40 @@ def _rows(path):
             yield d
 
 
-def harvest(candidates=None, seen_path=None, min_chars=MIN_CHARS, update=True):
+def harvest(candidates=None, seen_path=None, min_chars=MIN_CHARS, update=True, requeue_first=False,
+            sends_path=None, stats=None):
     """Return the list of NEW substantive replies since the last run. When update=True, record them as seen.
 
     'New' = its stable id is not in the seen-set. 'Substantive' = eligible, not a directive, >= min_chars.
-    Dedupes within a single run too (the same comment can appear in more than one round)."""
+    Dedupes within a single run too (the same comment can appear in more than one round).
+
+    NEVER OURS (A418, 2026-11-09; the A280 rule, shared): a comment by our own account is not an outside idea.
+    On 11-08 this harvest offered u/covenant-node -- our own reply -- to the extractor, which mined it into the
+    backlog; 294 more of ours were queued. Every row by an author covenant_own_account recognises as us is
+    skipped (not marked seen: it is not mined, ever). `stats`, when a dict, receives what was skipped and whether
+    the sends ledger was read -- a missing ledger means no one can be recognised, and the caller must say so."""
+    import covenant_own_account as OA
     if candidates is None:                                     # resolved at call time, not frozen at def time, so a
         candidates = CANDIDATES                                # test (or a reassigned global) actually takes effect
     if seen_path is None:
         seen_path = SEEN
     seen = _load_seen(seen_path)
+    send_rows = OA.load_sends(sends_path)                      # None when the ledger is missing
+    ours = OA.our_texts(send_rows)
+    own = OA.own_authors(_rows(candidates), ours) if ours else set()
+    n_own = 0
+    pend = set(pending_requeue()) if requeue_first else set()
+    back = {}                                                  # re-queued replies, offered ahead of new ones
     new, new_ids = [], set()
     for row in _rows(candidates):
+        if row.get("author") in own:
+            n_own += 1
+            continue
+        if pend and (row.get("eligible") is not False):
+            rid0 = _row_id(row)
+            if rid0 in pend and rid0 not in back:
+                back[rid0] = {"id": rid0, "author": row.get("author"), "url": row.get("url"),
+                              "source": row.get("source"), "text": str(row.get("text") or ""), "requeued": True}
         if row.get("eligible") is False:
             continue
         if (row.get("flags") or {}).get("directive") is True:
@@ -108,15 +176,29 @@ def harvest(candidates=None, seen_path=None, min_chars=MIN_CHARS, update=True):
                     "source": row.get("source"), "text": text})
     if update and new_ids:
         _save_seen(seen_path, seen | new_ids)
-    return new
+    if isinstance(stats, dict):
+        stats.update({"sends_ledger": "missing" if send_rows is None else "read",
+                      "own_authors": sorted(own), "own_rows_skipped": n_own})
+    order = [i for i in pending_requeue() if i in back] if back else []
+    return [back[i] for i in order] + [x for x in new if x["id"] not in back]
+
+
+def own_line(st):
+    """One line saying what the own-account rule did -- including when it could not run (A418)."""
+    if st.get("sends_ledger") == "missing":
+        return "own-account rule NOT applied: the sends ledger is missing, so our own replies cannot be recognised"
+    return "own-account rule: %d row(s) by %s skipped" % (st.get("own_rows_skipped", 0),
+                                                        ", ".join("u/" + a for a in st.get("own_authors") or []) or "no one")
 
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     dry = "--dry-run" in argv
-    new = harvest(update=not dry)
+    st = {}
+    new = harvest(update=not dry, stats=st)
     print("improve-mine: %d new substantive repl%s since last run%s"
           % (len(new), "y" if len(new) == 1 else "ies", " (dry run: seen-set unchanged)" if dry else ""))
+    print("  " + own_line(st))
     for r in new[:40]:
         who = r["author"] or "?"
         print("  - u/%s  %s" % (who, (r["text"][:140].replace("\n", " "))))

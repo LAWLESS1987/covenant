@@ -21,6 +21,14 @@ WHAT IT PINS.
       exact false comfort this file exists to prevent. This also means deleting
       the record breaks the build, which is the intent: the record is load
       bearing, not decorative.
+      [Retracted 2026-11-07, A415 / R1-LEDGER-SELF-RECORD-2026-11-07; the two
+      sentences above are kept as written.] Measured on a fresh clone: with
+      docs/CORRECTIONS.md and docs/KNOWN_ISSUES.md deleted, 87 of 99 retractions
+      stayed green, because every entry allows docs/RETRACTED.json, which holds
+      its own wording; the 12 that went red did so only because JSON escaping
+      kept their patterns from matching the ledger's raw text. Now: L1, every
+      pattern fits its verbatim or a record file other than the ledger; L2, an
+      entry that names `records` fails when any of them stops holding a pattern.
   C*  CONTAINMENT. A retracted phrasing may appear anywhere, in any framing, on
       one condition -- the retraction's id (e.g. "A121") must appear within
       `window` lines of it. A regex cannot separate an assertion from a
@@ -61,6 +69,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LEDGER = os.path.join(HERE, "docs", "RETRACTED.json")
+LEDGER_REL = "docs/RETRACTED.json"
 SCAN_EXT = {".md", ".py", ".sh", ".ps1", ".json", ".txt", ".bat", ".html",
             # A255 (2026-10-04): the tracked git hooks (ops/pre-commit.synchold,
             # ops/post-commit.autosync, ops/pre-push.opsec) carry claims too, and
@@ -248,9 +257,14 @@ def main():
               % rid,
               bool(pats) and bool(allow) and bool(r.get("truth")))
 
-        dead, violations, bad_lit = [], [], []
+        # The ledger always "contains" its own wording, so a match there proves nothing about the record
+        # (A415, R1-LEDGER-SELF-RECORD-2026-11-07). L1 and L2 count only files OTHER than the ledger.
+        records = r.get("records", [])
+        verbatim = r.get("verbatim", [])
+        dead, violations, bad_lit, unrecorded = [], [], [], []
         for src, rx in pats:
             in_record = 0
+            held = {a: False for a in records}
             lit = required_literal(src)
             if lit is not None:
                 # The shortcut's own guard: in the ledger itself, which holds every claim's verbatim wording, every
@@ -264,8 +278,12 @@ def main():
                     continue                                     # it cannot match here: the regex is not needed
                 rp = rels[p]
                 hit = rx.search(text)
-                if hit and allowed(rp, allow):
+                if hit and allowed(rp, allow) and rp != LEDGER_REL:
                     in_record += 1
+                if hit:
+                    for a in records:
+                        if rp == a or rp.startswith(a):
+                            held[a] = True
                 if not hit or allowed(rp, allow):
                     continue
                 lines = text.splitlines()
@@ -276,14 +294,21 @@ def main():
                         continue
                     violations.append((rp, ln + 1,
                                        lines[ln].strip()[:110], src))
-            if in_record == 0:
+            if in_record == 0 and not any(rx.search(v) for v in verbatim):
                 dead.append(src)
+            unrecorded += ["%s (not in %s)" % (src, a) for a, ok in held.items() if not ok]
 
-        # L* -- a pattern that matches nothing is a silent green.
-        check("R1.%s.L every pattern still matches inside the record, so none "
+        # L1 -- a pattern that fits neither its own verbatim wording nor any record file other than the ledger
+        # is a dead regex, a silent green. (Plus the literal shortcut's own guard, as before.)
+        check("R1.%s.L1 every pattern fits its verbatim wording or a record file other than the ledger, so none "
               "is a dead regex quietly passing" % rid,
               not dead and not bad_lit,
               "dead patterns: %s; shortcut literal absent from a match: %s" % (dead, bad_lit))
+        # L2 -- each record file the entry names still holds every pattern, so deleting or emptying a record breaks
+        # the build. Entries naming no record keep their wording in the ledger and an as-written branch only.
+        if records:
+            check("R1.%s.L2 each named record (%s) still holds every pattern" % (rid, ", ".join(records)),
+                  not unrecorded, "missing: %s" % unrecorded)
 
         # C* -- the actual guard.
         if violations:
@@ -297,6 +322,9 @@ def main():
               "citing %s within %d lines" % (rid, rid, window),
               not violations, "%d violation(s)" % len(violations))
 
+    no_record = [r["id"] for r in retractions if not r.get("records")]
+    print("\n      %d of %d retractions name a record file other than the ledger (L2); %d keep their wording in the"
+          " ledger and an as-written branch only" % (len(retractions) - len(no_record), len(retractions), len(no_record)))
     ok = sum(1 for r in results if r)
     print("\nR1: %d/%d passed" % (ok, len(results)))
     return 0 if ok == len(results) else 1

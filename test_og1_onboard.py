@@ -269,6 +269,75 @@ def main():
     finally:
         O.ARMED_TASKS = real_tasks
 
+    # ---- OG1k (defect 2): identity fields are MANDATORY, not checked-only-if-present.
+    be = roster["nodes"]["known"]
+    ok, _why = O.verify_identity("known", be, OPERATOR, whois_fn=good_whois, status_fn=good_status)
+    check("OG1k verify_identity: a full entry verifies", ok)
+    ok, why = O.verify_identity("known", {k: v for k, v in be.items() if k != "machine_id"},
+                                OPERATOR, whois_fn=good_whois, status_fn=good_status)
+    check("OG1k no machine_id -> False (identity mandatory)", not ok and "machine_id" in why, why)
+    ok, why = O.verify_identity("known", {k: v for k, v in be.items() if k != "pubkey"},
+                                OPERATOR, whois_fn=good_whois, status_fn=good_status)
+    check("OG1k no pubkey -> False (identity mandatory)", not ok and "pubkey" in why, why)
+    ok, why = O.verify_identity("known", be, "", whois_fn=good_whois, status_fn=good_status)
+    check("OG1k no operator account -> False (fail closed)", not ok and "operator account" in why, why)
+
+    # ---- OG1l (defect 3): the peered address must BE the identity-verified ip.
+    from cryptography.hazmat.primitives.asymmetric import ed25519 as _ed
+
+    def _signed_pa(pa):
+        priv = _ed.Ed25519PrivateKey.generate()
+        body = {"operator_account": OPERATOR, "nodes": {"known": {
+            "ip": "198.51.100.56", "machine_id": MACHINE_ID, "pubkey": NODEKEY,
+            "peer_addr": pa, "allowed": ["peer"]}}}
+        sig, p = _sign(body, priv)
+        return dict(body, signature=sig, signed_by="operator", alg="ed25519"), p
+    mis, mpem = _signed_pa("203.0.113.9:5001")                 # host != the verified ip
+    d = O.evaluate("peer", {"node": "known", "peer_addr": "203.0.113.9:5001"}, scan, **base_gate(mis, mpem))
+    check("OG1l peer_addr host != verified ip -> REFUSE",
+          d["decision"] == O.REFUSE and "not the identity-verified ip" in d["reason"], d["reason"])
+    okr, okpem = _signed_pa("198.51.100.56:5001")              # mutation: host == ip
+    d = O.evaluate("peer", {"node": "known", "peer_addr": "198.51.100.56:5001"}, scan, **base_gate(okr, okpem))
+    check("OG1l mutation: peer_addr host == verified ip -> ACT", d["decision"] == O.ACT, d["decision"])
+
+    # ---- OG1m (defect 1): _roster_is_committed needs tracked AND unmodified vs the commit.
+    import subprocess as _sp
+    gdir = tempfile.mkdtemp(suffix="_rostergit")
+
+    def _git(*a):
+        _sp.run(["git", "-C", gdir, *a], capture_output=True, text=True)
+    _git("init", "-q"); _git("config", "user.email", "t@t"); _git("config", "user.name", "t")
+    rp = os.path.join(gdir, "roster.json")
+    with open(rp, "w", encoding="utf-8") as fh:
+        fh.write('{"nodes":{}}\n')
+    real_here = O.HERE
+    try:
+        O.HERE = gdir
+        check("OG1m untracked roster -> not committed", not O._roster_is_committed(rp))
+        _git("add", "roster.json"); _git("commit", "-q", "-m", "r")
+        check("OG1m tracked + clean -> committed", O._roster_is_committed(rp))
+        with open(rp, "a", encoding="utf-8") as fh:
+            fh.write(" ")                                       # silent working-tree edit (the defect-1 case)
+        check("OG1m tracked + MODIFIED -> NOT committed (defect 1)", not O._roster_is_committed(rp))
+        _git("checkout", "--", "roster.json")
+        check("OG1m mutation: restored to the commit -> committed again", O._roster_is_committed(rp))
+    finally:
+        O.HERE = real_here
+
+    # ---- OG1n (defect 4): build_roster writes peer_addr = <verified ip>:<peer_port>.
+    import importlib.util as _ilu
+    _ap = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools", "arm_onboard_golive.py")
+    _spec = _ilu.spec_from_file_location("arm_onboard_golive", _ap)
+    ARM = _ilu.module_from_spec(_spec); _spec.loader.exec_module(ARM)
+    sj = {"Self": {"HostName": "known", "TailscaleIPs": ["198.51.100.56"], "PublicKey": NODEKEY}}
+    rb = ARM.build_roster(OPERATOR, ["known"], ["peer"], status_json=sj, whois_fn=good_whois)
+    pa = rb["nodes"]["known"].get("peer_addr")
+    check("OG1n build_roster writes peer_addr (defect 4), host == verified ip",
+          pa == "198.51.100.56:5001", pa)
+    rb2 = ARM.build_roster(OPERATOR, ["known"], ["peer"], status_json=sj, whois_fn=good_whois, peer_port=5055)
+    check("OG1n mutation: --peer-port is honoured", rb2["nodes"]["known"].get("peer_addr") == "198.51.100.56:5055",
+          rb2["nodes"]["known"].get("peer_addr"))
+
     failed = [n for n, ok in results if not ok]
     print(f"\nOG1: {len(results) - len(failed)}/{len(results)} passed")
     if failed:

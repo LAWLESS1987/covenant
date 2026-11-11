@@ -121,6 +121,12 @@ _NAME = re.compile(r"^/memories/([a-z0-9][a-z0-9-]{0,79})$")
 LOOPBACK = ("127.0.0.1", "::1", "localhost")
 
 
+def _body_error_status(err: str) -> int:
+    """413 for a body over MAX_BODY, 400 for any other unreadable body (A410).
+    A caller told 413 knows a retry of the same bytes cannot succeed."""
+    return 413 if err.startswith("body over ") else 400
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = VERSION
     store: MemoryStore = None          # set by serve()
@@ -420,8 +426,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, {"error": "PUT /memories/<kebab-name>"})
         data, err = self._read_json()
         if err:
-            return self._send(400, {"error": err})
-        missing = [k for k in ("description", "type", "body", "agent")
+            return self._send(_body_error_status(err), {"error": err})
+        missing = [k for k in ("description", "type", "body", "agent",
+                                "intent", "beneficiary", "divergence")
                    if not str(data.get(k) or "").strip()]
         if missing:
             return self._send(400, {
@@ -429,7 +436,15 @@ class Handler(BaseHTTPRequestHandler):
                 "required": {"description": "one line, used for recall",
                              "type": "user|feedback|project|reference",
                              "body": "the fact itself",
-                             "agent": "who is writing (recorded verbatim)"}})
+                             "agent": "who is writing (recorded verbatim)",
+                             "intent": "one sentence, present tense: what this "
+                                       "record is meant to cause (not a restatement "
+                                       "of the body)",
+                             "beneficiary": "who or what this is for; "
+                                            "'future unknown agent' is valid",
+                             "divergence": "the value or prior claim this write "
+                                           "conflicts with, or 'none'; when not "
+                                           "'none', also send diverges_from"}})
         # RECONCILE FIRST (Mem0's decision loop, non-destructive form).
         # The caller is TOLD what this write does to what is already stored,
         # and a superseded memory is marked, never overwritten. Pass
@@ -453,7 +468,11 @@ class Handler(BaseHTTPRequestHandler):
             out = self.store.put(
                 m.group(1), str(data["description"]), str(data["type"]),
                 str(data["body"]), str(data["agent"]),
-                tier=str(data.get("tier", "archival")))
+                tier=str(data.get("tier", "archival")),
+                intent=str(data.get("intent", "")),
+                beneficiary=str(data.get("beneficiary", "")),
+                divergence=str(data.get("divergence", "")),
+                diverges_from=str(data.get("diverges_from", "")))
         except StoreFull as e:
             # 507, not 400 and not 500: the request was well-formed and the
             # server is fine -- the STORE is full. A caller that reads the
@@ -479,7 +498,11 @@ class Handler(BaseHTTPRequestHandler):
                 m.group(1), str(data["description"]), str(data["type"]),
                 str(data["body"]), str(data["agent"]),
                 tier=str(data.get("tier", "archival")),
-                extra={"supersedes": verdict["target"]})
+                extra={"supersedes": verdict["target"]},
+                intent=str(data.get("intent", "")),
+                beneficiary=str(data.get("beneficiary", "")),
+                divergence=str(data.get("divergence", "")),
+                diverges_from=str(data.get("diverges_from", "")))
         return self._send(200, {"written": True, "memory": out,
                                 "reconcile": verdict})
 
@@ -491,7 +514,15 @@ class Handler(BaseHTTPRequestHandler):
         m = _NAME.match(urllib.parse.urlparse(self.path).path.rstrip("/"))
         if not m:
             return self._send(404, {"error": "DELETE /memories/<name>"})
-        data, _ = self._read_json()
+        # A410 (2026-11-04): the error used to be discarded here, so a body
+        # that was not JSON, not an object, or over MAX_BODY still tombstoned
+        # the memory -- recorded in the audit chain as agent "unknown", with
+        # no reason, from a request the server had already judged malformed.
+        # Refuse it before anything moves. An EMPTY body stays valid (the
+        # agent is then "unknown", as it always was for a bare DELETE).
+        data, err = self._read_json()
+        if err:
+            return self._send(_body_error_status(err), {"error": err})
         agent = str(data.get("agent") or "unknown")
         why = str(data.get("why") or "")
         if not self.store.delete(m.group(1), agent, why):
@@ -520,14 +551,29 @@ OPENAPI = {
             "put": {"summary": "write one memory",
                     "requestBody": {"content": {"application/json": {"schema": {
                         "type": "object",
-                        "required": ["description", "type", "body", "agent"],
+                        "required": ["description", "type", "body", "agent",
+                                     "intent", "beneficiary", "divergence"],
                         "properties": {
                             "description": {"type": "string"},
                             "type": {"type": "string",
                                      "enum": ["user", "feedback", "project",
                                               "reference"]},
                             "body": {"type": "string"},
-                            "agent": {"type": "string"}}}}}}},
+                            "agent": {"type": "string"},
+                            "intent": {"type": "string",
+                                       "description": "one sentence, present "
+                                       "tense: what this record is meant to "
+                                       "cause; not a restatement of the body"},
+                            "beneficiary": {"type": "string",
+                                            "description": "who or what this is "
+                                            "for; 'future unknown agent' is valid"},
+                            "divergence": {"type": "string",
+                                           "description": "the value or prior "
+                                           "claim this conflicts with, or 'none'"},
+                            "diverges_from": {"type": "string",
+                                              "description": "required when "
+                                              "divergence != 'none': the record "
+                                              "name this write diverges from"}}}}}}},
             "delete": {"summary": "tombstone one memory (never erased)"}},
         "/search": {"get": {"summary": "substring recall",
                             "parameters": [{"name": "q", "in": "query",
