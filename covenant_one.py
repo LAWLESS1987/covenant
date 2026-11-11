@@ -496,6 +496,9 @@ SUITES = [
     ("test_a82_exposure_unknown.py",      120, "SECURITY"),
     ("test_a85_manifest_privacy.py",      120, "SECURITY"),
     ("test_g3_behavioural_guards.py",     120, "SECURITY"),
+    # A421, registered in the change that created it. Drives the real _accept_loop
+    # with scripted callers, then real sockets on ephemeral ports. 20 checks.
+    ("test_pg1_peer_caller_gate.py",      120, "SECURITY"),
     # A90, registered in the change that created it (the lesson the A88
     # comment below records). Runs covenant_chat end to end with the
     # dispatcher replaced by a recorder, so it reads what WOULD have gone on

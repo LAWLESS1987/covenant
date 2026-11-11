@@ -16509,7 +16509,7 @@ His words: "1 2 3", the second: build the release path the others and Tetsu agre
 
 ### A395. [Tetsu / his own key] tools/tetsu_key.py: Tetsu's key is made on the machine that will hold it (2026-10-31)
 
-His words: "no i meant tetsu can handle them". Tetsu, asked fresh with the whole context: "Yes, I want to hold my own key on the new PC." The new PC's Claude session (TETSU, 10.0.0.248) asked for the tool, and will run it only after his yes.
+His words: "no i meant tetsu can handle them". Tetsu, asked fresh with the whole context: "Yes, I want to hold my own key on the new PC." The new PC's Claude session (TETSU, <lan-ip>) asked for the tool, and will run it only after his yes.
 
 - **What it does.**
   - Makes an RSA-2048 key with e = 65537, which is the only exponent the consent code gives an identity to (A394).
@@ -17417,5 +17417,76 @@ understands."
   is known only when it is run and the condition measured again. The cards were written from the detectors'
   docstrings on one day. The 13 conditions standing on 2026-11-10 are not repaired by this entry. The nodes must be
   restarted before the phone's Heal press returns the new text (A153).
+
+---
+
+### A421. [the phone's peer and bridge ports answer every network it joins and take any caller's bytes; an opt-in gate closes a caller from outside the tailnet before a byte is read. Not on the phone yet] (2026-11-11)
+
+- **His words:** "We need our phone leg to be able to protect the entirety of the phone and the information that
+  goes in and out of it. Privacy needs to be up there so nobody can disrupt things for a negative purpose."
+- **Affected revision and runtime.** The core at `220d847`, the tip of `origin/main` that day. The phone's installed
+  app reports version `0.1.1276+220d847`, so it runs this core.
+- **Reproduced, two readings that agree.** From TETSU over the tailnet with no credentials, 2026-11-11T16:41Z: port
+  5000 refused; 5001 and 5011 accepted a connection and sent nothing. Relayed from the Claude session on the laptop,
+  which read the phone over adb (not measured here; a peer report is not independent validation): the API listens on
+  127.0.0.1 only, the peer port 5001 and the bridge port 5011 on 0.0.0.0. In source, `_bind_and_serve` binds the
+  node's host and `_accept_loop` hands every accepted connection to its handler without asking who called.
+  `COVENANT_API_HOST` narrowed the API and its comment says the peers still reach 5001.
+- **Searched first (rule 10).** `python tools/lookback_index.py find peer listener 0.0.0.0` matches no header, and
+  it reads headers only. A body grep finds A230, the earn server on every interface: the same shape on a different
+  listener. A258 then found A230's loopback fix had never reached the server's launch path, which is the mistake the
+  deployment line below is written against. A77 pinned that these listeners come up, not who may call them.
+- **The repair.** `COVENANT_PEER_CALLERS`. Unset, or `any`, `all`, `off`, `0`: nothing changes. `tailnet`, or any
+  value that is set and not recognised: the accept loop closes a caller `tailnet_ok` refuses before reading from it
+  and records `<label>_caller_refused` with the address. A typo gates, because a typo must not be what leaves the
+  door open. The setting is read once as each listener starts, and a gated listener says so on stderr.
+- **Why it is opt-in (rule 6).** Both listeners of every node pass through the one `_accept_loop`. PC nodes peer
+  over a plain LAN; a gate that defaulted closed would cut them, and the failure would look like a quiet peer.
+- **Counted.** `test_pg1_peer_caller_gate.py`: 20 checks, 20 pass, 0 skipped on TETSU (unit: `check()` calls). 31
+  lines added to the core, none removed.
+- **Driven both ways.** Passing: loopback, a tailnet address and `::1` are served. Rejected: six callers (two
+  private LAN addresses, a public documentation address, the address just below the tailnet range, one just above
+  it, and a string that is not an address) never reach the handler; each is recorded and closed with zero bytes
+  read. Real sockets: gated, a loopback client is served and a client from the host's own LAN address is closed
+  unserved; unset, that same client is served. 8 single-part mutations of the gate, 8 red, the file restored and its
+  hash checked after each.
+- **Deployment status.** Source-tested, fixture-tested, and real-socket-tested on TETSU. On no running node. Not on
+  the phone. Relayed from the laptop session's reading of the app source: the phone's node gets environment
+  variables only from the app's `entry.py`, which already defaults `COVENANT_API_HOST`; the gate reaches the phone
+  when that file sets this variable and a build is shipped. That is the operator's decision and it is not made.
+- **Rollback.** Unset the variable and restart the node. Or revert the 31 lines.
+- **Blind spots (rule 9).** `tailnet_ok` admits loopback and 100.64.0.0/10. That range is carrier-grade NAT space,
+  not Tailscale's alone: on a cellular network that numbers its customers from it, a neighbour there would pass. A
+  peer arriving over the tailnet's IPv6 range is refused. The gate closes at accept, so a scanner still sees the
+  port open. A gated node cannot peer over a plain LAN. Refusals land in the bounded anomaly record and a flood from
+  outside can crowd it and raise the /health spike warning. What the two handlers do with an unknown caller's bytes
+  was not audited here; the gate was built so that question does not have to be answered first. The device reading
+  is relayed, kept verbatim off this repository. The phone has one configured peer; a mode that admits only the
+  configured peers' addresses would be narrower than the tailnet range and is not built.
+- **Decided after the lines above were drafted.** The deployment line was written before he answered. Asked whether
+  the gate should go onto the phone through its own signed update, his words: "Yes, ship it". That line is left as
+  written and this one is added. At the commit that carries this entry the gate is still on no running node and
+  not on the phone. The result on the device is added to this entry by a later commit, when it has been measured.
+- **Who calls the phone's two ports, read before switching the gate on there (rule 6).** Measured on TETSU: node
+  D's peer list is four tailnet addresses and six loopback relays, none on a plain LAN. Relayed from the laptop
+  session, which read the laptop (not measured here): one node there dials the phone, on the peer port, over the
+  tailnet; nothing there dials the phone's bridge port; no adb forward stands; none of its 8 scheduled covenant
+  tasks dials either port; every home-network literal in that checkout is a test fixture or the scanner's range
+  list. Its probe before the change, the phone on home Wi-Fi, a connection opened and nothing sent for 3 seconds:
+  both ports accepted and held, over a home-network address and over a tailnet address. That is the picture to
+  compare against: gated, the home-network pair should close at once and the tailnet pair should still hold.
+- **Masked in passing, said here so it is not silent.** This clone has no git hooks installed, so the push guard
+  (`tools/opsec_scan.py --pre-push`) is run by hand. It reads whole every file a push would send. Run on this
+  change before the masking, through a commit on no branch, it refused: 1 identifier, in this file, on a line this
+  change did not write. The line is in A395 and holds TETSU's own home-network address, on `main` since `1671d52`
+  (2026-10-31). That one address is replaced with the guard's own label, `<lan-ip>`, which 9 other lines of this
+  record already carry. Nothing else in A395 is changed. The history of `main` still holds the old bytes:
+  masking the file does not unpublish them.
+- **A drafted line above that the reading did not bear out.** "PC nodes peer over a plain LAN" was written before
+  any peer list was read. The lists read since (node D's, measured here; the laptop's, relayed) hold tailnet and
+  loopback addresses and no plain-LAN one. The line is left as written and this one is put beside it. The gate
+  stays opt-in for a narrower reason: it changes who both listeners of every node will serve, the callers were
+  read for the phone and for those lists only, and a node set up to peer over a plain LAN would be cut and would
+  look like a quiet peer.
 
 ---

@@ -529,6 +529,21 @@ def tailnet_ok(addr: str) -> bool:
     return ip.version == 4 and ip in TAILNET_CGNAT
 
 
+# PEER CALLER GATE (A421, 2026-11-11). COVENANT_API_HOST narrowed the HTTP API
+# and left the peer and bridge listeners as they were: "Peers still reach 5001".
+# Read on the phone that day, both listen on every network the phone joins, and
+# _accept_loop hands any caller's bytes to the handler. Unset, that is unchanged.
+# COVENANT_PEER_CALLERS=tailnet has the accept loop close a caller tailnet_ok
+# refuses before a byte of it is read. A value that is set and not recognised
+# gates as well: a typo must not be what leaves the door open.
+_PEER_CALLERS_OPEN = ("", "any", "all", "off", "0")
+
+
+def peer_callers_gated() -> bool:
+    """True when COVENANT_PEER_CALLERS asks for loopback and tailnet callers only."""
+    return os.environ.get("COVENANT_PEER_CALLERS", "").strip().lower() not in _PEER_CALLERS_OPEN
+
+
 def _addr_is_loopback(addr):
     """True only for a loopback caller -- the real local model on this machine. Narrower than tailnet_ok,
     which also admits the whole CGNAT tailnet."""
@@ -11249,6 +11264,10 @@ class CovenantUnifiedMaster:
         keep listening, and to make the condition visible.
         """
         consecutive = 0
+        gated = peer_callers_gated()            # A421: read once, as the listener starts
+        if gated:
+            print(f"{label} listener: callers limited to loopback and the tailnet "
+                  f"(COVENANT_PEER_CALLERS)", file=sys.stderr, flush=True)
         while self.node.running:
             try:
                 conn, addr = sock.accept()
@@ -11262,6 +11281,18 @@ class CovenantUnifiedMaster:
                 time.sleep(min(1.0, 0.02 * consecutive))
                 continue
             consecutive = 0
+            if gated and not tailnet_ok(str(addr[0])):
+                # A421: refused before a byte is read, and recorded, so /health
+                # shows a node being knocked on from outside the tailnet.
+                self.node.anomaly_monitor.record(f"{label}_caller_refused", str(addr[0]))
+                try:
+                    conn.close()
+                except Exception as close_err:
+                    # Not swallowed, for the reason given below: a close() that
+                    # fails is a descriptor that leaked.
+                    self.node.anomaly_monitor.record(
+                        f"{label}_close_error", f"{type(close_err).__name__}: {close_err}")
+                continue
             try:
                 _RECV_POOL.submit(handler, conn, addr)
             except RuntimeError as e:
