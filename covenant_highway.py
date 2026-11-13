@@ -110,6 +110,60 @@ PRESENT = "PRESENT"
 ABSENT = "ABSENT"
 
 
+# ----------------------------------------------------------------- this machine
+
+MACHINE = os.path.join(HERE, "ops", "machine.json")     # per machine, never tracked (.gitignore)
+
+
+def machine_profile(path=None):
+    """What THIS machine is to the highway: {"acts_here", "not_applicable": {detector: why}, "why", "source"}.
+
+    WHY (2026-11-13, his words: "ensure that we can or rather the covenant can operate any machine that it's
+    running through"). Every detector and remedy here was written on and for one PC: `node_down` asks 127.0.0.1
+    for nodes A, B and C, `sync_task_missing` expects that PC's scheduled tasks, `restart_nodes` relaunches that
+    PC's nodes. The same tree now also runs on a second PC that hosts node D only. Measured there with
+    `covenant_heal.py --dry-run`: 42 conditions looked at, 9 left to a person, and among them A, B and C "down",
+    two "missing" tasks and an "unmanaged" model -- none of them that machine's. A real press there would have
+    tried the first PC's remedies on it.
+
+    So a machine that is not the one this was written for says so, in ops/machine.json (see
+    ops/machine.example.json):
+      - "not_applicable": the detectors that do not describe this machine. sense() reports them ABSENT with
+        measured {"applies_here": False, "why": ...} and never enters their function.
+      - "acts_here": whether the highway may REPAIR on this machine. False -> run_once() senses and reports and
+        starts no remedy, exactly as a paused highway does. It is not the pause: a pause is somebody's choice and
+        can be lifted; this is a fact about the machine.
+
+    NO FILE -> the machine this was written for: everything applies and the highway acts. Nothing changes there.
+    A FILE THAT CANNOT BE READ, or whose shape is wrong -> every detector applies and NOTHING ACTS. The file exists
+    to say "not here"; a broken one must never be read as "here". For the same reason a readable file that does
+    not say "acts_here": true does not act.
+
+    The profile is APPLIED ONLY WHERE A CALLER PASSES IT (the heal button, the watchdog's round, --repair).
+    sense() and run_once() called without it behave as they always have, so a test suite gives the same answer
+    on every machine."""
+    path = path or os.environ.get("COVENANT_MACHINE_PROFILE") or MACHINE
+    home = {"acts_here": True, "not_applicable": {}, "why": "", "source": "none"}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except FileNotFoundError:
+        return home
+    except (OSError, ValueError):
+        return {"acts_here": False, "not_applicable": {}, "source": "unreadable",
+                "why": "ops/machine.json could not be read, so nothing is repaired here until it can"}
+    na = data.get("not_applicable") if isinstance(data, dict) else None
+    if isinstance(na, list) and all(isinstance(n, str) for n in na):
+        na = {n: "this machine's profile says it does not apply here" for n in na}
+    if not isinstance(data, dict) or not isinstance(na, (dict, type(None))) \
+            or not all(isinstance(k, str) and isinstance(v, str) for k, v in (na or {}).items()):
+        return {"acts_here": False, "not_applicable": {}, "source": "unreadable",
+                "why": "ops/machine.json is not in the shape of ops/machine.example.json, so nothing is repaired "
+                       "here until it is"}
+    return {"acts_here": data.get("acts_here") is True, "not_applicable": dict(na or {}), "source": "file",
+            "why": str(data.get("why") or "this machine's profile says the highway does not repair here")[:300]}
+
+
 # ----------------------------------------------------------------- sensing
 
 def _get(url, timeout=6):
@@ -2802,12 +2856,19 @@ DETECTORS = {
 }
 
 
-def sense(only=None, health=None):
-    """{detector: {state, measured}} -- every detector, measured now."""
+def sense(only=None, health=None, machine=None):
+    """{detector: {state, measured}} -- every detector, measured now.
+
+    `machine` is a machine_profile(); a detector it names as not applicable is reported ABSENT with the reason and
+    its function is not entered. None (the default) applies no profile."""
     health = _health() if health is None else health
+    skip = (machine or {}).get("not_applicable") or {}
     out = {}
     for name, fn in DETECTORS.items():
         if only and name not in only:
+            continue
+        if name in skip:
+            out[name] = {"state": ABSENT, "measured": {"applies_here": False, "why": skip[name]}}
             continue
         try:
             out[name] = fn(health=health)
@@ -4456,7 +4517,7 @@ def grade_started(conditions=None, ledger=None, now=None, dry_run=False):
 
 
 def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=None,
-             cooldown_s=None):
+             cooldown_s=None, machine=None):
     """One sense-and-repair pass. (alerts, infos) in the watchdog's shape.
 
     `exclude` defaults to the watchdog's own restart because the intended caller
@@ -4464,7 +4525,7 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
     Run from a shell, pass exclude=() and it will restart the watchdog too.
     """
     alerts, infos = [], []
-    conditions = sense(health=health)
+    conditions = sense(health=health, machine=machine)
     save_last_sense(conditions)
     # GRADE WHAT A PREVIOUS PASS STARTED, before deciding what to start now, and
     # BEFORE the pause check below: grading is sight, not action. A paused highway
@@ -4489,6 +4550,13 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
         present = sorted(k for k, v in conditions.items() if v["state"] == PRESENT)
         infos.append("highway: PAUSED (%s) -- sensing only. Present now: %s"
                      % (why, ", ".join(present) or "nothing"))
+        return alerts, infos
+    # NOT THIS MACHINE'S TO REPAIR (machine_profile). Sight stays, as it does under a pause; what stops is every
+    # remedy, because each one was written for another machine and would be run on this one.
+    if machine is not None and not machine.get("acts_here"):
+        present = sorted(k for k, v in conditions.items() if v["state"] == PRESENT)
+        infos.append("highway: NOT REPAIRING ON THIS MACHINE (%s) -- sensing only. Present now: %s"
+                     % (machine.get("why") or "its profile says so", ", ".join(present) or "nothing"))
         return alerts, infos
     for name, c in sorted(conditions.items()):
         if c["state"] == UNKNOWN:
@@ -4746,7 +4814,11 @@ def main(argv=None):
         print(json.dumps(report(), indent=1))
         return 0
 
-    conditions = sense()
+    here = machine_profile()
+    if a.repair and not here["acts_here"]:
+        print("NOT REPAIRING ON THIS MACHINE (%s) -- this run is a dry run" % here["why"])
+        a.repair = False
+    conditions = sense(machine=here)
     print("SENSE")
     for k, v in sorted(conditions.items()):
         print("  %-16s %-8s %s" % (k, v["state"], json.dumps(v["measured"])[:110]))

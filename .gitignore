@@ -289,6 +289,9 @@ ops/grid_snn_weights.npz
 ops/GRID_SAFE_STATE.json
 ops/GRID_SAFE_STATE.json.tmp
 ops/pause/
+# What this machine is to the highway (covenant_highway.machine_profile). Per machine; the tracked
+# template is ops/machine.example.json.
+ops/machine.json
 # Node A's off-box peers (the phone's tailnet address), read by covenant_watchdog.py
 # and covenant_prod.bat alike, so neither public file carries the address.
 ops/local_peers.txt
