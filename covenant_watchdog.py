@@ -2057,7 +2057,8 @@ def one_pass(strict=False):
             import covenant_highway as _hw
             # DRY outside the production tree (A244) -- see highway_may_act().
             _act = highway_may_act()
-            h_alerts, h_infos = _hw.run_once(dry_run=not _act, exclude=("restart_watchdog",))
+            h_alerts, h_infos = _hw.run_once(dry_run=not _act, exclude=("restart_watchdog",),
+                                             machine=_hw.machine_profile())
             if not _act:
                 c_infos.append("highway ran DRY: this tree (%s) cannot relaunch its own "
                                "nodes, so it is not the production tree (A244)" % HERE)
