@@ -2790,9 +2790,16 @@ def main():
               "calls=%d" % len(_calls))
 
         # The heal button reads the machine's own profile. Pointed at a file through the environment, never the tree's.
+        # heal() hands run_once no ledger, so the pass it starts would write to THIS TREE'S ops/highway.jsonl. The
+        # first version of this block did exactly that: on a second run the spy had two "did not fix" rows against
+        # it there, was quarantined, and the check below went red. The ledger is pointed at a temp file for the
+        # block, and the block checks that the tree's own ledger was not touched.
         del _calls[:]
         _old_env = os.environ.get("COVENANT_MACHINE_PROFILE")
+        _real_ledger = H.LEDGER
+        _ledger_before = os.path.getsize(_real_ledger) if os.path.exists(_real_ledger) else None
         try:
+            H.LEDGER = tmp_ledger()
             os.environ["COVENANT_MACHINE_PROFILE"] = os.path.join(_mp_dir, "machine.json")
             _profile({"acts_here": False, "why": "hosts node D only", "not_applicable": {"fixture_elsewhere": "elsewhere"}})
             out = _heal_mod.heal(dry_run=False, who="h1mp", ledger_path=tmp_ledger())
@@ -2808,10 +2815,13 @@ def main():
                   and "fixture_elsewhere" in [x["condition"] for x in out["still_needs_a_person"]],
                   "%s calls=%d" % (out.get("acts_here"), len(_calls)))
         finally:
+            H.LEDGER = _real_ledger
             if _old_env is None:
                 os.environ.pop("COVENANT_MACHINE_PROFILE", None)
             else:
                 os.environ["COVENANT_MACHINE_PROFILE"] = _old_env
+        check("H1mp the presses above wrote nothing to this tree's own highway ledger",
+              (os.path.getsize(_real_ledger) if os.path.exists(_real_ledger) else None) == _ledger_before)
     finally:
         H.DETECTORS = _saved_dets
         H.REMEDIES["rotate_log"] = _real_rl
