@@ -71,6 +71,40 @@ def main():
     check("O4 every detector the road registers appears in the orb's detail", set(d4) == set(H.DETECTORS),
           sorted(set(H.DETECTORS) - set(d4)))
 
+    # ---- 2026-11-13: the orb reads with the machine's profile, and no reading is never drawn green
+    class FakeHere(FakeH):
+        def __init__(self, names, seen, profile):
+            FakeH.__init__(self, names, seen)
+            self._profile, self.machine_seen = profile, "not passed"
+
+        def machine_profile(self):
+            return self._profile
+
+        def sense(self, only=None, machine=None):
+            self.machine_seen = machine
+            self.sensed_only = list(only or [])
+            skip = (machine or {}).get("not_applicable") or {}
+            return {k: {"state": "ABSENT" if k in skip else "PRESENT"} for k in self.sensed_only}
+
+    away = {"acts_here": False, "not_applicable": {"node_down": "elsewhere", "public_ci_red": "elsewhere"}}
+    h5 = FakeHere(names, None, away)
+    d5, n5 = P.highway_detail(h5)
+    check("O5 with no fresh pass the core is sensed WITH this machine's profile",
+          h5.machine_seen is away and d5["node_down"] == "absent" and d5["sweep_red"] == "present", (h5.machine_seen, d5))
+    check("O5 ...and a detector outside the core that does not apply here is absent, not unknown; one that does is unknown",
+          d5["public_ci_red"] == "absent" and d5["tetsu_asks_failing"] == "unknown" and "1 detector" in (n5 or ""), (d5, n5))
+    h6 = FakeHere(names, None, {"acts_here": True, "not_applicable": {}})
+    d6, _n6 = P.highway_detail(h6)
+    check("O6 mutation: the home profile changes nothing -- the core as sensed, the rest unknown",
+          d6["node_down"] == "present" and d6["public_ci_red"] == "unknown", d6)
+    check("O7 a road object with no machine_profile (an older tree) is read as before", h2.sensed_only and d2["public_ci_red"] == "unknown")
+    page = P.PAGE
+    check("O8 the page draws NO reading as amber ('no reading'), on the Highway orb and on the mycelium",
+          "const hwNone=!Object.keys(hw).length;" in page and "(hu.length||hwNone)?UNK:OK" in page
+          and "CW.setMycelium(myc,hcol);" in page and "hwNone?'no reading'" in page)
+    check("O8 ...and the old rule that drew an empty reading green is gone",
+          "CW.setMycelium(myc,hp.length?BAD:(hu.length?UNK:OK));" not in page)
+
     ok = sum(results)
     print("\nA288: %d/%d passed" % (ok, len(results)))
     return 0 if ok == len(results) else 1

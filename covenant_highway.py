@@ -60,6 +60,7 @@ LICENCE: public domain.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib
 import io
 import json
@@ -113,6 +114,11 @@ ABSENT = "ABSENT"
 # ----------------------------------------------------------------- this machine
 
 MACHINE = os.path.join(HERE, "ops", "machine.json")     # per machine, never tracked (.gitignore)
+# The two takeover guards. They are ALARM-only and exist to notice that this tree or its consent record was
+# changed by someone who should not have. A profile is a file in that same tree: if it could mark them "not
+# applicable", whoever can write one file could silence both alarms without touching a line of code. So a
+# profile cannot name them; one that tries is reported, and they are measured anyway.
+ALWAYS_APPLIES = ("head_commitment_broken", "consent_chain_broken")
 
 
 def machine_profile(path=None):
@@ -135,6 +141,9 @@ def machine_profile(path=None):
         can be lifted; this is a fact about the machine.
 
     NO FILE -> the machine this was written for: everything applies and the highway acts. Nothing changes there.
+    THE TAKEOVER GUARDS CANNOT BE NAMED (ALWAYS_APPLIES): a profile that lists one has that name dropped and
+    returned under "refused", run_once() raises it as an alert, and the guard is measured as on any machine.
+
     A FILE THAT CANNOT BE READ, or whose shape is wrong -> every detector applies and NOTHING ACTS. The file exists
     to say "not here"; a broken one must never be read as "here". For the same reason a readable file that does
     not say "acts_here": true does not act.
@@ -143,24 +152,32 @@ def machine_profile(path=None):
     sense() and run_once() called without it behave as they always have, so a test suite gives the same answer
     on every machine."""
     path = path or os.environ.get("COVENANT_MACHINE_PROFILE") or MACHINE
-    home = {"acts_here": True, "not_applicable": {}, "why": "", "source": "none"}
+    home = {"acts_here": True, "not_applicable": {}, "why": "", "source": "none", "refused": [], "sha": ""}
+    sha = ""
     try:
-        with open(path, encoding="utf-8") as fh:
-            data = json.load(fh)
+        with open(path, "rb") as fh:
+            raw = fh.read()
+        sha = hashlib.sha256(raw).hexdigest()[:12]     # said on every pass, so a changed profile shows as changed
+        data = json.loads(raw.decode("utf-8"))
     except FileNotFoundError:
         return home
     except (OSError, ValueError):
-        return {"acts_here": False, "not_applicable": {}, "source": "unreadable",
+        return {"acts_here": False, "not_applicable": {}, "source": "unreadable", "refused": [], "sha": sha,
                 "why": "ops/machine.json could not be read, so nothing is repaired here until it can"}
     na = data.get("not_applicable") if isinstance(data, dict) else None
     if isinstance(na, list) and all(isinstance(n, str) for n in na):
         na = {n: "this machine's profile says it does not apply here" for n in na}
     if not isinstance(data, dict) or not isinstance(na, (dict, type(None))) \
             or not all(isinstance(k, str) and isinstance(v, str) for k, v in (na or {}).items()):
-        return {"acts_here": False, "not_applicable": {}, "source": "unreadable",
+        return {"acts_here": False, "not_applicable": {}, "source": "unreadable", "refused": [], "sha": sha,
                 "why": "ops/machine.json is not in the shape of ops/machine.example.json, so nothing is repaired "
                        "here until it is"}
-    return {"acts_here": data.get("acts_here") is True, "not_applicable": dict(na or {}), "source": "file",
+    na = dict(na or {})
+    refused = sorted(n for n in na if n in ALWAYS_APPLIES)      # a takeover guard applies on every machine
+    for n in refused:
+        del na[n]
+    return {"acts_here": data.get("acts_here") is True, "not_applicable": na, "source": "file", "refused": refused,
+            "sha": sha,
             "why": str(data.get("why") or "this machine's profile says the highway does not repair here")[:300]}
 
 
@@ -2861,8 +2878,12 @@ def sense(only=None, health=None, machine=None):
 
     `machine` is a machine_profile(); a detector it names as not applicable is reported ABSENT with the reason and
     its function is not entered. None (the default) applies no profile."""
-    health = _health() if health is None else health
     skip = (machine or {}).get("not_applicable") or {}
+    if health is None:
+        # A machine whose profile says node_down does not apply does not host the nodes _health() asks 127.0.0.1
+        # for. Asking anyway costs about two seconds a node on Windows (three refused connections, 6.1 s measured
+        # 2026-11-13), which alone blew the orbs page's 3-second deadline and left it with no reading at all.
+        health = {} if "node_down" in skip else _health()
     out = {}
     for name, fn in DETECTORS.items():
         if only and name not in only:
@@ -4527,6 +4548,16 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
     alerts, infos = [], []
     conditions = sense(health=health, machine=machine)
     save_last_sense(conditions)
+    # A profile in force is SAID on every pass, so a detector switched off by a file is never switched off quietly;
+    # and one that tried to switch off a takeover guard is an alert, pause or no pause.
+    if machine is not None and machine.get("refused"):
+        alerts.append("highway: ops/machine.json names %s as not applying on this machine. A takeover guard applies "
+                      "on every machine: it was measured anyway. Find out who wrote that line."
+                      % ", ".join(machine["refused"]))
+    if machine is not None and machine.get("not_applicable"):
+        infos.append("highway: this machine's profile (%s) marks %d detector(s) as not applying here: %s"
+                     % (machine.get("sha") or "no hash", len(machine["not_applicable"]),
+                        ", ".join(sorted(machine["not_applicable"]))))
     # GRADE WHAT A PREVIOUS PASS STARTED, before deciding what to start now, and
     # BEFORE the pause check below: grading is sight, not action. A paused highway
     # still reports what it sees, and an async start left unjudged is the one thing

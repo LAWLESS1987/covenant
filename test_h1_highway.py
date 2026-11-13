@@ -2721,7 +2721,27 @@ def main():
 
     home = H.machine_profile(path=os.path.join(_mp_dir, "no-such-file.json"))
     check("H1mp no profile file is the machine this was written for: everything applies, the highway repairs",
-          home == {"acts_here": True, "not_applicable": {}, "why": "", "source": "none"}, str(home))
+          home == {"acts_here": True, "not_applicable": {}, "why": "", "source": "none", "refused": [], "sha": ""},
+          str(home))
+    check("H1mp a profile carries the hash of its file, and a changed file a changed hash",
+          len(_profile({"acts_here": False})["sha"]) == 12
+          and _profile({"acts_here": False})["sha"] != _profile({"acts_here": False, "why": "x"})["sha"])
+    _asked = []
+    _real_health = H._health
+    try:
+        H._health = lambda: _asked.append(1) or {}
+        _saved_d, H.DETECTORS = H.DETECTORS, {"node_down": lambda health=None: {"state": H.ABSENT, "measured": {"health": health}}}
+        try:
+            H.sense(machine=_profile({"acts_here": False, "not_applicable": {"node_down": "elsewhere"}}))
+            check("H1mp a machine that does not host the home nodes is not asked for their health", not _asked, str(_asked))
+            H.sense(machine=_profile({"acts_here": False, "not_applicable": {"log_bloat": "elsewhere"}}))
+            H.sense()
+            check("H1mp mutation: a profile that does not name node_down, and no profile, both ask as before",
+                  len(_asked) == 2, str(_asked))
+        finally:
+            H.DETECTORS = _saved_d
+    finally:
+        H._health = _real_health
     away = _profile({"acts_here": False, "why": "hosts node D only",
                      "not_applicable": {"fixture_elsewhere": "asks for A, B and C, which run elsewhere"}})
     check("H1mp a profile is read: does not repair here, and names what does not apply",
@@ -2772,6 +2792,38 @@ def main():
                   "applies_here": False, "why": "asks for A, B and C, which run elsewhere"}}, str(s_away["fixture_elsewhere"]))
         check("H1mp ...and a detector it does not name is still measured", s_away["log_bloat"]["state"] == H.PRESENT)
         check("H1mp the home profile changes nothing in sense()", H.sense(health={}, machine=home) == s_none)
+
+        # A profile cannot switch off a takeover guard, and a profile in force is said on every pass.
+        sly = _profile({"acts_here": False, "why": "hosts node D only",
+                        "not_applicable": {"consent_chain_broken": "not ours", "head_commitment_broken": "not ours",
+                                           "fixture_elsewhere": "elsewhere"}})
+        check("H1mp a profile that names the takeover guards has those names dropped and reported",
+              sorted(sly["not_applicable"]) == ["fixture_elsewhere"]
+              and sly["refused"] == ["consent_chain_broken", "head_commitment_broken"], str(sly))
+        check("H1mp ...in the list form too",
+              _profile({"not_applicable": ["consent_chain_broken", "log_bloat"]})["refused"] == ["consent_chain_broken"])
+        _guard_dets = dict(H.DETECTORS, consent_chain_broken=_det("consent_chain_broken", H.ABSENT),
+                           head_commitment_broken=_det("head_commitment_broken", H.ABSENT))
+        _fixture_dets, H.DETECTORS = H.DETECTORS, _guard_dets
+        try:
+            del _entered[:]
+            s_sly = H.sense(health={}, machine=sly)
+            check("H1mp ...and both guards are measured anyway: their functions are entered",
+                  {"consent_chain_broken", "head_commitment_broken"} <= set(_entered)
+                  and "applies_here" not in s_sly["consent_chain_broken"]["measured"], str(_entered))
+            a_sly, i_sly = H.run_once(dry_run=False, ledger=tmp_ledger(), cooldown_s=0, health={}, machine=sly)
+            check("H1mp ...and the pass raises it as an ALERT naming both, and says which detectors the profile switched off",
+                  any("takeover guard" in x and "consent_chain_broken" in x and "head_commitment_broken" in x for x in a_sly)
+                  and any("marks 1 detector(s) as not applying here: fixture_elsewhere" in x for x in i_sly),
+                  str((a_sly, i_sly)))
+        finally:
+            H.DETECTORS = _fixture_dets
+        del _entered[:]
+        a_home, i_home = H.run_once(dry_run=True, ledger=tmp_ledger(), cooldown_s=0, health={}, machine=home)
+        check("H1mp the home profile says nothing about a profile, and raises no alert about one",
+              not any("profile" in x or "machine.json" in x for x in a_home + i_home), str((a_home, i_home)))
+        del _entered[:]
+        del _calls[:]                                   # the spy records a dry run too
 
         led = tmp_ledger()
         a_away, i_away = H.run_once(dry_run=False, ledger=led, cooldown_s=0, health={}, machine=away)
