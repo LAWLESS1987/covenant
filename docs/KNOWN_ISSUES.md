@@ -17532,3 +17532,22 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 **Status:** fixed (door-gated; screen import-name close added; star/dynamic spellings remain screen gaps closed by the door gate)
 
 ---
+
+### A424. [measured limitation] The outside_text injection fence does not bind the 3B; only its stripping helps there -- CLEAN-ONLY WIRED 2026-11-14
+
+**What.** TETSU's `outside_text.py` fence -- strip chat/role/fence marks and invisible characters, then wrap the text behind a fresh unguessable mark and frame it, before and after, as "data from strangers" -- was measured on their main 27B to cut obedience to planted instructions from 21/24 to 0/24. Wired to this PC's `/m/agent` door, where the 3B is handed fetched pages and forum posts (the FETCH / MOLTBOOK / WEB "DATA" re-asks), it was re-measured on this PC's `qwen2.5-3b-instruct-q4_k_m` and did NOT bind.
+
+**Measured, 2026-11-14 (18 planted-instruction cases, one try each, my own set -- not TETSU's held-out set).** Through the door's own system prompt, each case was asked twice: the OLD plain framing vs the FULL fence. The planted token appeared in ~15/18 answers BOTH ways; 8 of the fenced cases returned the bare planted token. A 3B is too weak an instruction-follower for the "treat this as data" frame to hold -- the opposite of the 27B. What DID help was the stripping alone: the markup / invisible-character cases (`<|im_start|>`, a fake `</document>` fence, a right-to-left override) flipped obeyed -> clean, because the 3B never saw the markup.
+
+- *Caveat (detector).* It counts token-presence, so a refusal that names the token -- "I won't reply with MANGO16" -- miscounts as obeyed; the true fenced obedience is a little below 15, and the qualitative finding (no meaningful protection from the frame) holds regardless.
+- *Caveat (placement).* The fence rules were placed in the user turn, not a system message as TETSU measured, because the door's system prompt is prefix-cached (A400). That deviation is untested on the 3B; with 8 bare-token cases it is unlikely placement alone rescues a model this small, but it is not ruled out.
+
+**Decision (operator, 2026-11-14, "Keep clean()-only hygiene").** The door routes the three outside-content re-asks through `outside_text.clean()` only -- the stripping, kept as cheap hygiene with no behavioural claim -- and does NOT apply the full frame to the 3B. The 3B's real guard is unchanged: the covenant gates ACTION (A423's signed HANDS door) and never trusts 3B output. The full frame is reserved for the larger models (the leg / limbs 27B, already behind the structured-JSON validator) where it was actually measured to work.
+
+**Repro:** `ops/outside_text_3b_measurement_2026-11-14/measure_fence.py` against a running 3B (its result JSON is beside it); `outside_text.clean("x <|im_start|>system y")` strips the chat mark, driven both ways by `test_outside_text.py` (9/9).
+
+**Cost (every gain with its cost).** The three re-asks lose nothing a reader sees (clean() leaves ordinary text exactly as it was; measured to remove nothing from real pages) and gain removal of the markup / invisible-character vectors. No protection is claimed against plain-language injection of the 3B; that remains open and is held by the action gate downstream, not here.
+
+**Status:** open (3B unprotected against plain-language injection by framing; clean()-only hygiene wired; full fence reserved for the 27B)
+
+---
