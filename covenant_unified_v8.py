@@ -9438,7 +9438,11 @@ class CovenantAPI:
                     # run bounded, and propose a change to the tree for the operator's hand.
                     # The act is judged by the node's gate; the outcome, done or refused with
                     # the reason, is handed back as data so what he says is what happened.
-                    _handled, _data, _rec = importlib.import_module("covenant_tetsu_hands").act(answer)
+                    # A423: RUN is code execution; gate it to an operator caller (loopback or a registered signature),
+                    # the same proof HEAL's lift needs (A370). A bare tailnet caller may LIST/READ/WRITE/PROPOSE but not
+                    # RUN -- so a screen bypass cannot become code execution from an unauthenticated caller.
+                    _may_run = heal_lift_authorized(addr, request)
+                    _handled, _data, _rec = importlib.import_module("covenant_tetsu_hands").act(answer, may_run=_may_run)
                     if _handled:
                         forum.append(_rec)
                         msgs.append({"role": "assistant", "content": answer})

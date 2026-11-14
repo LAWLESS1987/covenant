@@ -291,6 +291,9 @@ def screen(source):
             imports.append(top)
             if node.level or top not in ALLOWED_MODULES:
                 return False, "import from %s is refused" % (node.module or "."), imports
+            for a in node.names:                               # A423: `from uuid import os` bound the real os module with
+                if a.name in FORBIDDEN_ATTRS:                   # no attribute read at all, so the FORBIDDEN_ATTRS check
+                    return False, "importing %s from %s is refused" % (a.name, node.module), imports  # never saw it
         elif isinstance(node, ast.Name) and node.id in FORBIDDEN_NAMES:
             return False, "the name %s is refused" % node.id, imports
         elif isinstance(node, ast.Attribute) and (node.attr in FORBIDDEN_NAMES or node.attr in FORBIDDEN_ATTRS):
@@ -491,8 +494,11 @@ def _act_line(d):
     return ""
 
 
-def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=None):
-    """For the door: (handled, data_for_the_model, record). Not a directive -> (False, '', None)."""
+def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=None, may_run=True):
+    """For the door: (handled, data_for_the_model, record). Not a directive -> (False, '', None). may_run gates a RUN
+    (A423): the /m/agent door passes may_run only for an OPERATOR caller (loopback, or a request signed by a registered
+    key), so an unauthenticated tailnet caller cannot run a script even if a screen spelling slips past -- the screen is
+    a screen, not a sandbox. In-process callers (his practice loop, the tests) keep the default True."""
     d = parse(answer)
     if not d:
         return False, "", None
@@ -524,6 +530,11 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
             _append(rec, ledger)
             return True, "DATA: written -- %s, %d bytes, in your workshop%s." % (w["name"], w["bytes"], " (the gate held; your workshop is yours)" if verdict == "held" else ""), rec
         if kind == "run":
+            if not may_run:                                  # A423: RUN is code execution; refused for a caller the door
+                rec["refused"] = True                         # did not authorize (not loopback, not a registered signature)
+                _append(rec, ledger)
+                return True, ("DATA: running a script needs the operator (a request from loopback or signed by a registered "
+                              "key); this caller may not. Nothing was run. Say so plainly."), rec
             r = run(d["target"], d["args"], workshop)
             rec.update({k: r.get(k) for k in ("ok", "why", "code", "ms", "timed_out", "imports", "truncated")})
             rec["out_sha256"] = hashlib.sha256((r.get("out") or "").encode("utf-8")).hexdigest()
