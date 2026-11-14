@@ -579,6 +579,15 @@ or switched off on the record. The runner's figures count suites, not test files
 a few registered suites are not `test_` files at all. Its orphan search skips the
 snapshots by name.
 
+*A425, 2026-11-14: the last sentence was true until this date and is not now.* The
+orphan search no longer skips a file by its name, and it reads the folders the sweep
+stages as well as the root, so a `.PRE-*` snapshot that looks like a suite is named
+ORPHAN on the disk that holds it until it is listed or switched off on the record with
+its reason. The sentence before that one was not so either: counted on this date, five
+tracked `test_*.py` files sat in staged folders and in no list (one is now run, four
+are switched off on the record with reasons), and one more, in a folder the sweep does
+not stage, is still in none (KNOWN_ISSUES A425).
+
 And a green check count is not a green run: the sweep's verdict has read
 **`RESULT: FAIL`** with zero check failures, because it also counts in-place
 gates, and one of those — bundle integrity — blocks pending an owner decision.
