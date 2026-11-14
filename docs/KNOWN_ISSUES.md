@@ -17490,3 +17490,21 @@ understands."
   look like a quiet peer.
 
 ---
+
+### A422. [serious / security] The HANDS door runs model-chosen Python from any tailnet caller, and its screen could be bypassed to run an arbitrary process (`uuid.os.system(...)`) -- an A31 recurrence through a different door -- SCREEN HARDENED 2026-11-13; door authentication still OPEN
+
+**Evidence:** `/m/agent` (covenant_unified_v8.py `mobile_agent`) admits a caller by address alone (`_tailnet_caller` -> loopback or CGNAT 100.64.0.0/10), feeds the caller's text to the model, and when the model's first line is `HANDS RUN <name.py>` calls `covenant_tetsu_hands.act`, which screens the script and runs it under `subprocess` (`run`, python `-I`). The screen (`covenant_tetsu_hands.screen`) refused a forbidden module only at IMPORT and refused an attribute only when its name was in `FORBIDDEN_NAMES`. `uuid` is in `ALLOWED_MODULES` and the uuid module does `import os`, so `import uuid` then `uuid.os.system("...")` passed the screen (`os`, `system` not in `FORBIDDEN_NAMES`) and the runner `exec`'d it with full builtins (only `open()` is wrapped). Verified on this host: `python -c "import uuid; print(uuid.os.system)"` resolves. This is the A31 shape -- an unauthenticated remote caller runs submitted code -- through the HANDS door (added A226) instead of `/propose_code`. A31 failed closed on Windows for want of `fork`; HANDS uses `subprocess`, so it is LIVE on this Windows laptop. `('POST','/m/agent')` and the HANDS path are absent from `PROTECTED_OPERATOR_ENDPOINTS`.
+
+**Why A31's fix did not stop it:** A31 was closed endpoint-specifically (`/propose_code` added to `PROTECTED_OPERATOR_ENDPOINTS`) and tombstoned only that endpoint's shape. The HANDS door is a separate, later code path (A226) with its own screen; it reintroduced "unauthenticated caller -> code execution," and the screen was a name blocklist that missed the re-export of `os` through an allowed module.
+
+**Repro:** In a workshop, write `rce.py` = `import uuid\nuuid.os.system('<cmd>')` and `HANDS RUN rce.py`. Before: the screen passed it and the command ran. After: `screen()` returns `(False, "the attribute system is refused", ...)` and the run never starts. Driven both ways by `test_th1_tetsu_hands.py` TH1.4d (removing `FORBIDDEN_ATTRS` turns it red).
+
+**Fix (shipped):** `covenant_tetsu_hands.FORBIDDEN_ATTRS` -- the forbidden module names, their common private aliases, and the os/sys process-and-namespace surface (`system`, `popen`, `execv*`, `fork`, `environ`, `modules`, `__dict__`, ...) -- are refused as attribute reads in `screen()`, so an allowed module cannot be used to fetch `os` and run a process. This hardens a SCREEN, not a sandbox: a novel re-export path is still conceivable, which is why the next item is the durable fix.
+
+**Still open (operator's call):** the `/m/agent` HANDS/HEAL path should require a signed/registered caller (`_request_signed_by_registered` exists, unused) rather than admit by tailnet address alone; and/or HANDS RUN disabled on the hosted door, a Host/Origin allowlist added against DNS-rebinding, and `covenant_exec_guard` moved out of `SHADOW_ONLY`. These change who the door serves and are the operator's to decide.
+
+**Pinned by** `test_th1_tetsu_hands.py` TH1.4d.
+
+**Status:** open (screen hardened; door authentication pending the operator)
+
+---

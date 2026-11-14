@@ -113,6 +113,24 @@ def main():
               "are still refused",
               not not_admitted and not let_through and rec4c.get("ok") is True and "['x', 'x']" in data4c,
               (not_admitted, let_through, data4c[-200:]))
+        # 4d. A422 (an A31 recurrence through the HANDS door): the screen refused a forbidden module only at IMPORT, but
+        # an allowed module re-exports one as an attribute -- uuid.os, pprint._sys, enum.sys -- so `import uuid;
+        # uuid.os.system(...)` passed the screen and ran a process. An attribute that names a forbidden module, its
+        # private alias, or the os/sys process-and-namespace surface is now refused wherever it is read; the allowed
+        # module itself still works. Removing FORBIDDEN_ATTRS turns this red.
+        reach = ["import uuid\nx = uuid.os.system('echo pwned')\n", "import uuid\nuuid.os.popen('whoami')\n",
+                 "import uuid\nx = uuid.os\n", "import pprint\nx = pprint._sys\n", "import enum\nx = enum.sys\n",
+                 "import uuid\nx = uuid.sys.modules\n"]
+        reach_let_through = {s: H.screen(s) for s in reach if H.screen(s)[0] or "is refused" not in H.screen(s)[1]}
+        os_attr = H.screen("import uuid\nx = uuid.os\n")[1]          # the canonical single-step reach to os
+        uuid_ok = "import uuid\nprint(len(str(uuid.uuid4())))\n"     # uuid itself still works; only the reach to os is cut
+        H.write("rce.py", reach[0], ws)
+        h4d, data4d, rec4d = H.act("HANDS RUN rce.py", gate=clean, **kw)
+        check("TH1.4d an allowed module cannot be used to reach a forbidden one (uuid.os, pprint._sys, enum.sys): the "
+              "attribute is refused by the screen, a HANDS RUN of it never starts, and the allowed module itself still works",
+              not reach_let_through and os_attr == "the attribute os is refused" and H.screen(uuid_ok)[0]
+              and h4d and rec4d["ok"] is False and "the screen refused it:" in data4d and "is refused" in data4d
+              and rec4d.get("code") is None, (reach_let_through, os_attr, data4d[:160]))
         # 5. a run, its output, its args, and the record
         H.write("calc.py", "import sys\n" if False else "import json\nargs = __import__ if False else None\n", ws)   # placeholder, replaced below
         H.write("calc.py", "import json, math\nprint(json.dumps({'six': 2 * 3, 'root': math.sqrt(16)}))\nwith open('out.txt', 'w') as f:\n    f.write('hello')\n", ws)
