@@ -508,10 +508,21 @@ for state, label in (("violates", "a VIOLATES"), ("unreachable", "an unreachable
     check("PP1.6 %s stops it after one round, with nothing written to his workshop" % label,
           r["rounds"] == 1 and "gate refused the write" in (r.get("stop") or "") and r["solved_round"] is None
           and not os.path.exists(os.path.join(w3, "practice", "flatten.py")), r)
+# A426 (2026-11-14). Until this date PP1.6b required the opposite: "a HELD gate does not refuse in his own workshop (an
+# abstention is not a veto, as in his hands)", r["solved_round"] == 1 -- A226's rule. His hands refuse a WRITE or a RUN
+# the gate could not decide now, and the pass must read that as the gate stopping it, not as his file scoring 0 of n
+# and another round being spent. The check as it was written stays runnable at cf9535d.
 w3, l3 = fresh()
-r = PR.practise(PR.BY_ID["flatten"], scripted([good], []), gate=lambda t: ("held", "abstained"), workshop=w3, ledger=l3,
+r = PR.practise(PR.BY_ID["flatten"], scripted([good] * PR.ROUNDS, []), gate=lambda t: ("held", "abstained"), workshop=w3, ledger=l3,
                 hands_ledger=HLED, say=lambda *_a: None)
-check("PP1.6b a HELD gate does not refuse in his own workshop (an abstention is not a veto, as in his hands)", r["solved_round"] == 1, r)
+check("PP1.6b a HELD gate stops it after one round like the other two: the stop names the gate, nothing is written to his "
+      "workshop, and no round is scored against him",
+      r["rounds"] == 1 and "gate refused the write" in (r.get("stop") or "") and r["solved_round"] is None
+      and not os.path.exists(os.path.join(w3, "practice", "flatten.py")), r)
+w3, l3 = fresh()
+r = PR.practise(PR.BY_ID["flatten"], scripted([good], []), gate=gate_clean, workshop=w3, ledger=l3,
+                hands_ledger=HLED, say=lambda *_a: None)
+check("PP1.6c the other way: the same file under a clean gate is written, run and solved in round 1", r["solved_round"] == 1, r)
 
 w4, l4 = fresh()
 told = []

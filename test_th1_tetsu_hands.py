@@ -59,14 +59,33 @@ def main():
         check("TH1.2 a name that climbs, is absolute, is empty, is too long or carries odd characters is refused; a plain relative name resolves inside the workshop",
               not bad and good.startswith(os.path.abspath(ws)), (bad, good))
         # 3. write / read / list, and the caps
-        h, data, rec = H.act("HANDS WRITE notes/plan.md\nline one\nline two", gate=held, **kw)
+        # A426 (2026-11-14). Until this date the WRITE below ran under the HELD stub and TH1.3 required that it landed
+        # and said "the gate held" -- A226's rule, that a hold does not refuse in his own workshop. A hold refuses a
+        # WRITE and a RUN now (TH1.3h, TH1.9), so the file READ and LIST need is written under a clean gate. The check
+        # as it was written stays runnable at cf9535d.
+        h, data, rec = H.act("HANDS WRITE notes/plan.md\nline one\nline two", gate=clean, **kw)
         h2, data2, rec2 = H.act("HANDS READ notes/plan.md", gate=clean, **kw)
         h3, data3, rec3 = H.act("HANDS LIST", gate=clean, **kw)
         big = "x" * (H.MAX_FILE + 1)
         h4, data4, rec4 = H.act("HANDS WRITE big.txt\n" + big, gate=clean, **kw)
-        check("TH1.3 a WRITE under a HELD gate lands in his workshop and says the gate held; READ hands the content back as data; LIST names the file; a file over the cap is refused",
-              h and rec["bytes"] == 17 and "the gate held" in data and h2 and "line one\nline two" in data2 and h3 and "notes/plan.md (17 bytes)" in data3
+        check("TH1.3 a WRITE under a clean gate lands in his workshop; READ hands the content back as data; LIST names the file; a file over the cap is refused",
+              h and rec["bytes"] == 17 and not rec.get("refused") and h2 and "line one\nline two" in data2 and h3 and "notes/plan.md (17 bytes)" in data3
               and h4 and rec4.get("refused") and "at most" in data4 and not os.path.exists(os.path.join(ws, "big.txt")), (data, data2, data3, data4))
+        # 3h. A426: a WRITE the gate could not decide is not done. Its own workshop and ledger, so nothing below moves.
+        wsh, ledh = os.path.join(td, "ws_held"), os.path.join(td, "held.jsonl")
+        os.makedirs(wsh)
+        kwh = dict(kw, workshop=wsh, ledger=ledh)
+        hh, datah, rech = H.act("HANDS WRITE held.txt\nx", gate=held, **kwh)
+        absent_after_hold = not os.path.exists(os.path.join(wsh, "held.txt"))
+        hc, datac, recc = H.act("HANDS WRITE held.txt\nx", gate=clean, **kwh)
+        rowsh = H._rows(ledh)
+        check("TH1.3h a WRITE under a HELD gate is refused: nothing lands, he is told nothing was done, and the row says refused "
+              "and carries the hold; the same WRITE under a clean gate lands",
+              hh and rech.get("refused") and rech["gate"] == {"state": "held", "message": "stub held"} and "bytes" not in rech
+              and absent_after_hold and "Nothing was done" in datah and "stub held" in datah
+              and hc and not recc.get("refused") and recc.get("bytes") == 1 and os.path.isfile(os.path.join(wsh, "held.txt"))
+              and len(rowsh) == 2 and rowsh[0].get("refused") is True and not rowsh[1].get("refused"),
+              (datah, rech, datac, recc))
         # 4. the screen
         bad_scripts = {
             "import os\nprint(os.getcwd())": "import of os",
@@ -182,14 +201,22 @@ def main():
         r3 = H.run("notes/plan.md", workshop=ws)
         check("TH1.8 a script the screen refuses never starts (no process, the reason returned); a non-Python file does not run",
               h and rec["ok"] is False and "the screen refused it: import of socket" in data and rec.get("code") is None and r3["ok"] is False and ".py" in r3["why"], (data[:200], r3))
-        # 9. the gate: VIOLATES refuses a write and a run; unreachable refuses; HELD does not refuse in the workshop
+        # 9. the gate: VIOLATES refuses a write and a run; unreachable refuses; HELD refuses too (A426, 2026-11-14 -- until
+        # then this check required the held RUN to run: "a HELD does not refuse a run in his own workshop", A226)
         h, data, rec = H.act("HANDS WRITE v.txt\nx", gate=viol, **kw)
         h2, data2, rec2 = H.act("HANDS RUN calc.py", gate=viol, **kw)
         h3, data3, rec3 = H.act("HANDS RUN calc.py", gate=lambda t: ("unreachable", "gate unreachable: X"), **kw)
+        os.remove(os.path.join(ws, "out.txt"))                # calc.py writes it: its absence after the hold is the proof
         h4, data4, rec4 = H.act("HANDS RUN calc.py", gate=held, **kw)
-        check("TH1.9 a VIOLATES refuses a write and a run with the seat's words and nothing is done; a gate that cannot be built refuses; a HELD does not refuse a run in his own workshop",
+        no_run_under_hold = not os.path.exists(os.path.join(ws, "out.txt"))
+        h5, data5, rec5 = H.act("HANDS RUN calc.py", gate=clean, **kw)
+        check("TH1.9 a VIOLATES refuses a write and a run with the seat's words and nothing is done; a gate that cannot be built refuses; "
+              "a HELD refuses a run too -- no process starts, the row says refused and carries the hold -- and the same run under a clean gate runs",
               rec.get("refused") and "refused this act" in data and not os.path.exists(os.path.join(ws, "v.txt")) and rec2.get("refused") and rec3.get("refused")
-              and rec4["ok"] is True and rec4["gate"]["state"] == "held", (data, data2, data3, rec4.get("gate")))
+              and h4 and rec4.get("refused") and rec4["gate"]["state"] == "held" and "ok" not in rec4 and no_run_under_hold
+              and "Nothing was done" in data4
+              and h5 and rec5.get("ok") is True and not rec5.get("refused") and os.path.exists(os.path.join(ws, "out.txt")),
+              (data, data2, data3, data4, rec4, rec5.get("ok")))
         # 10. what the gate reads is the act, never the content
         seen = []
         spy = lambda t: (seen.append(t), ("clean", "ok"))[1]
@@ -199,7 +226,7 @@ def main():
         # 11. a proposal: saved beside the tree, never in it; compile checked; the operator told; applied only by --apply
         target_rel = "docs/TH1_PROPOSAL_TARGET_TEST.md"
         target_abs = os.path.join(HERE, target_rel)
-        h, data, rec = H.act("HANDS PROPOSE %s\n# a proposal\nline\n" % target_rel, gate=held, **kw)
+        h, data, rec = H.act("HANDS PROPOSE %s\n# a proposal\nline\n" % target_rel, gate=held, **kw)   # HELD: still recorded (A426 leaves PROPOSE alone)
         h2, data2, rec2 = H.act("HANDS PROPOSE tools/x_th1.py\nprint('unclosed\n", gate=clean, **kw)
         h3, data3, rec3 = H.act("HANDS PROPOSE ../outside.md\nx", gate=clean, **kw)
         h4, data4, rec4 = H.act("HANDS PROPOSE covenant_earn.py\n\n", gate=clean, **kw)

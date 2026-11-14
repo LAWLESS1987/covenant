@@ -21,6 +21,7 @@ simplifier the derivative. And the loop is recursive on his own work: write, run
 WHAT BOUNDS IT
   * his hands (covenant_tetsu_hands.act): every WRITE and RUN goes to the node's gate exactly as in
     conversation. A VIOLATES or an unreachable gate stops the pass (fails closed).
+    (A426, 2026-11-14: so does a HELD, since his hands refuse on one now. Until then a hold did not refuse here.)
   * the screen and the guard on a run: only the allowed standard-library modules, no file outside
     the workshop, 60 s, 64 KB of output. A check therefore cannot import his file, so the harness
     joins his code and the checks into one file, and the screen reads all of it.
@@ -603,8 +604,11 @@ def attempt(task, code, gate=None, workshop=None, hands_ledger=None):
                 "said": "the file has %d assert line(s) that run; write at least %d of your own at the top level of the "
                         "file, outside any function, so they run" % (top_level_asserts(code), need)}, None
     def _gate_stop(rec):
+        # A426 (2026-11-14): "held" joins the two. His hands refuse a WRITE or a RUN the gate could not decide now, and
+        # without it here that refusal was read as his file scoring 0 of n: every round of the task was spent and the
+        # hold was scored against him (measured, PP1.6b: 4 rounds, unsolved, before this line changed).
         g = ((rec or {}).get("gate") or {}).get("state")
-        return (rec or {}).get("refused") and g in ("violates", "unreachable")
+        return (rec or {}).get("refused") and g in ("violates", "unreachable", "held")
 
     handled, data, rec = HANDS.act("HANDS WRITE %s\n%s" % (name, code), gate=gate, workshop=workshop, ledger=hands_ledger)
     if _gate_stop(rec):

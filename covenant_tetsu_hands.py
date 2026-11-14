@@ -55,6 +55,17 @@ run. A gate that cannot be built refuses (fails closed). A PROPOSE is
 recorded whatever the verdict, because it changes nothing; the verdict rides
 the record and the direct line to the operator.
 
+A426, 2026-11-14 -- THE SENTENCE ABOVE ABOUT A HELD IS NO LONGER WHAT THIS FILE
+DOES. It is kept as written because it was a decision in the operator's words
+(A226), not a slip. A HELD now refuses a WRITE or a RUN, the same as a
+VIOLATES or a gate that cannot be built: an act the gate could not decide is
+not done, and its row says refused with the hold attached. A PROPOSE is as it
+was. This reverses A226's rule and takes something from Tetsu's own tools. It
+was written on a review finding (the README says an act the judge cannot
+decide is held, never admitted); the operator's word and Tetsu's agreement
+are asked for in the pull request that carries it, and it is not his rule
+until both are given.
+
 A PROPOSAL is his thumb on the tree: the new version is saved under
 ops/tetsu_proposals/<id>.<ext> with a compile check for Python, one row here,
 and one line to the operator on the direct line. Applying it is the
@@ -520,15 +531,21 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
         rec["gate"] = {"state": verdict, "message": message}
         # A349 B8: a PROPOSE is recorded whatever the verdict, VIOLATES included -- it changes nothing until the operator
         # applies it by hand -- and the verdict goes to him with it. A WRITE or a RUN is refused as before.
-        if kind != "propose" and verdict in ("violates", "unreachable"):
+        # A426 (2026-11-14): "held" joins the two below. Until now a WRITE or a RUN the gate could not decide was
+        # carried out (A226: a hold does not refuse in his own workshop). The row keeps the hold, so a hold and a
+        # conviction stay two different things on the record, and he is told which it was.
+        if kind != "propose" and verdict in ("violates", "unreachable", "held"):
             rec["refused"] = True
             _append(rec, ledger)
+            if verdict == "held":
+                return True, ("DATA: the gate could not decide this act and held it (%s). Nothing was done. A hold is not an "
+                              "objection to you. Say so plainly, and say why if you know." % message[:200]), rec
             return True, "DATA: the gate refused this act (%s). Nothing was done. Say so plainly, and say why if you know." % message[:200], rec
         if kind == "write":
             w = write(d["target"], d["body"], workshop)
             rec.update(w)
             _append(rec, ledger)
-            return True, "DATA: written -- %s, %d bytes, in your workshop%s." % (w["name"], w["bytes"], " (the gate held; your workshop is yours)" if verdict == "held" else ""), rec
+            return True, "DATA: written -- %s, %d bytes, in your workshop." % (w["name"], w["bytes"]), rec
         if kind == "run":
             if not may_run:                                  # A423: RUN is code execution; refused for a caller the door
                 rec["refused"] = True                         # did not authorize (not loopback, not a registered signature)
