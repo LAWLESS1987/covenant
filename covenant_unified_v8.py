@@ -9438,7 +9438,14 @@ class CovenantAPI:
                     # run bounded, and propose a change to the tree for the operator's hand.
                     # The act is judged by the node's gate; the outcome, done or refused with
                     # the reason, is handed back as data so what he says is what happened.
-                    _handled, _data, _rec = importlib.import_module("covenant_tetsu_hands").act(answer)
+                    # A423: RUN is code execution; gate it to a caller holding a registered operator signature. NOT mere
+                    # loopback: _addr_is_loopback admits any LOCAL account on the box (sandboxes, service accounts), and an
+                    # operator at the console can run code directly anyway -- so loopback-may-RUN would only hand code
+                    # execution to other local accounts. A tailnet caller already needed a signature; now a local one does
+                    # too. A bare caller may LIST/READ/WRITE/PROPOSE but not RUN; _request_signed_by_registered fails
+                    # closed (no module / no proof -> no RUN), so a screen bypass cannot become code execution.
+                    _may_run = _request_signed_by_registered(request)
+                    _handled, _data, _rec = importlib.import_module("covenant_tetsu_hands").act(answer, may_run=_may_run)
                     if _handled:
                         forum.append(_rec)
                         msgs.append({"role": "assistant", "content": answer})

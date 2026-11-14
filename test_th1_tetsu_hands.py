@@ -131,6 +131,24 @@ def main():
               not reach_let_through and os_attr == "the attribute os is refused" and H.screen(uuid_ok)[0]
               and h4d and rec4d["ok"] is False and "the screen refused it:" in data4d and "is refused" in data4d
               and rec4d.get("code") is None, (reach_let_through, os_attr, data4d[:160]))
+        # 4e. A423 -- two more closes on the same hole TETSU found past 4d. (i) `from uuid import os` bound the real os
+        # module with no attribute read, so 4d never saw it; the ImportFrom branch now refuses a name on FORBIDDEN_ATTRS,
+        # while a safe star import (from typing import *, used by his health_disk.py) still passes. (ii) RUN is code
+        # execution, so act() gates it on may_run: a non-operator caller at the door (may_run False) cannot run a script
+        # even if a spelling slips the screen; an operator or his in-process practice loop (the default True) runs as
+        # before. The dynamic spelling (operator.attrgetter) a deny-list cannot see is why this door gate, not the
+        # screen, is the real boundary.
+        imp = ["from uuid import os\no.getcwd()\n", "from uuid import os as o\no.listdir('.')\n",
+               "from uuid import system\n", "from os import system\n"]
+        imp_let = {s: H.screen(s) for s in imp if H.screen(s)[0] or "refused" not in H.screen(s)[1]}
+        star_ok = H.screen("from typing import *\nL = []\n")[0]         # a safe star import still passes (health_disk.py)
+        H.write("runme.py", "print('ran')\n", ws)
+        hb, db, rb = H.act("HANDS RUN runme.py", gate=clean, may_run=False, **kw)    # a non-operator caller: refused
+        ha, da, ra = H.act("HANDS RUN runme.py", gate=clean, may_run=True, **kw)     # operator / in-process: runs
+        check("TH1.4e `from uuid import os` is refused (the import-name close) while a safe star import still passes, and "
+              "act() gates RUN on may_run: a non-operator caller cannot run a script, an operator/in-process caller can",
+              not imp_let and star_ok and hb and rb.get("refused") and "needs the operator" in db and not rb.get("ok")
+              and ha and ra.get("ok") is True and "ran" in da, (imp_let, star_ok, db[:120], da[:120]))
         # 5. a run, its output, its args, and the record
         H.write("calc.py", "import sys\n" if False else "import json\nargs = __import__ if False else None\n", ws)   # placeholder, replaced below
         H.write("calc.py", "import json, math\nprint(json.dumps({'six': 2 * 3, 'root': math.sqrt(16)}))\nwith open('out.txt', 'w') as f:\n    f.write('hello')\n", ws)
@@ -275,8 +293,11 @@ def main():
         # to add. Measured here: the door dispatches, and whether he has been told is reported, not required.
         told = "HANDS WRITE <name>" in core
         print("      (his instructions %s him he has hands)" % ("tell" if told else "do NOT yet tell"))
-        check("TH1.14 the /m/agent door dispatches a HANDS first line to covenant_tetsu_hands.act, beside MOLTBOOK",
-              'startswith("HANDS")' in core and 'import_module("covenant_tetsu_hands").act(answer)' in core, "")
+        check("TH1.14 the /m/agent door dispatches a HANDS first line to covenant_tetsu_hands.act beside MOLTBOOK, and "
+              "gates RUN to a caller with a registered operator signature (may_run from _request_signed_by_registered, "
+              "NOT mere loopback, which is any local account)",
+              'startswith("HANDS")' in core and 'import_module("covenant_tetsu_hands").act(answer, may_run=' in core
+              and "_may_run = _request_signed_by_registered(request)" in core, "")
         # 15. A349 A11: a run started Python without SYSTEMDRIVE, and Windows made a literal '%SystemDrive%\ProgramData\...'
         # tree inside his workshop (his real one has had it since his first run, 2026-09-28; it stays). The environment is
         # read through a spy on subprocess.run, and the workshop is walked after a real run.

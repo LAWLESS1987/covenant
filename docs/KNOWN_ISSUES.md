@@ -17505,6 +17505,30 @@ understands."
 
 **Pinned by** `test_th1_tetsu_hands.py` TH1.4d.
 
-**Status:** open (screen hardened; door authentication pending the operator)
+**Update 2026-11-14 (A423):** A422 closed only the attribute spelling. TETSU measured, and this session confirmed against the deployed file, three more spellings past it -- `from uuid import os [as o]`, `from uuid import *`, and `operator.attrgetter("os")(uuid)` (a dynamic string attribute no static deny-list can see). A423 adds the import-name close and, as the real boundary, gates HANDS RUN at the door to an operator caller. See A423.
+
+**Status:** screen hardening extended by A423; the door gate shipped in A423 is the real fix
+
+---
+
+### A423. [serious / security] HANDS RUN executes code for any tailnet caller; a deny-list screen cannot be the boundary (A422 was partial) -- DOOR-GATED 2026-11-14
+
+**Evidence:** A422 hardened `covenant_tetsu_hands.screen()` against `uuid.os.system(...)`, but the same code-execution hole stayed open by other spellings. Measured on main 6222d43 (TETSU), confirmed here against the deployed file:
+- `from uuid import os [as o]` then `o.getcwd()` / `o.listdir(...)` -> PASSED. The `ImportFrom` branch validated only the module (`uuid`, allowed), never the imported NAME, so the real `os` module was bound with no attribute read for `FORBIDDEN_ATTRS` to catch.
+- `from uuid import *` -> PASSED (same branch).
+- `import operator, uuid` then `operator.attrgetter("os")(uuid)` -> PASSED. A string-named attribute never appears as an `ast.Attribute`, so no static deny-list can see it. `functools`/`unittest` offer the same indirection.
+This is the lesson A422's own note anticipated: a screen is a screen, not a sandbox, and a deny-list cannot close dynamic attribute access.
+
+**Fix (shipped):**
+1. **The real boundary -- the door.** `/m/agent`'s HANDS branch now passes `may_run=_request_signed_by_registered(request)` to `covenant_tetsu_hands.act` -- a request signed by a registered operator key. NOT loopback: `_addr_is_loopback` admits any LOCAL account on the box (TETSU found third-party sandbox accounts that could read key copies), so loopback-may-RUN would hand code execution to every local account, while an operator at the console can already run code directly. A tailnet caller already needed a signature (tailnet membership alone never passed), so this change only tightens the LOCAL path. A bare caller may LIST/READ/WRITE/PROPOSE but cannot RUN, so none of the three spellings (or any future one, the dynamic one included) becomes code execution from an unauthorized caller. `_request_signed_by_registered` fails closed (no module / no proof -> no RUN). `act()` refuses a RUN when `may_run` is false, before the script starts. In-process callers (his practice loop at `covenant_tetsu_practice.py:618`, the tests) keep the default `may_run=True`. (The door passes the verdict down because `act()` is given no caller -- deliberately, so the hands module needs no web-request context.) **Cost (every gain with its cost):** Tetsu can no longer RUN in response to an unsigned conversation from the local `/m` web page (it posts `{text}` with no signature); the signed phone app, registered allies and his in-process practice are unaffected, and the operator at the console can run directly. Reversible: re-admit loopback (`heal_lift_authorized`) if the console path is wanted, accepting that it trusts every local account. The decision was the operator's ("use discernment towards mutual benefit", 2026-11-14).
+2. **Defence in depth -- the screen.** The `ImportFrom` branch now also refuses importing a name on `FORBIDDEN_ATTRS` (`from uuid import os/sys/system/...`), closing the import-name spelling. A safe star import (`from typing import *`, used by his `health_disk.py`) still passes; the star spelling and the dynamic spelling remain screen gaps by design -- the door gate is what closes them.
+
+**Repro:** `act("HANDS RUN x.py", may_run=False)` refuses with "running a script needs the operator ...", nothing runs; `may_run=True` runs. `screen("from uuid import os\n...")` -> `(False, "importing os from uuid is refused", ...)`. Driven both ways by `test_th1_tetsu_hands.py` TH1.4e (the gate and the import-name close) and TH1.14 (the door passes `may_run` from `heal_lift_authorized`).
+
+**Related:** node D (TETSU) carries an equivalent interim gate in its own launcher (`noded/hands_gate.py`, not in this tree); once this core fix reaches D by merge, that layer becomes redundant or a second layer, D's operator's call.
+
+**Pinned by** `test_th1_tetsu_hands.py` TH1.4e and TH1.14.
+
+**Status:** fixed (door-gated; screen import-name close added; star/dynamic spellings remain screen gaps closed by the door gate)
 
 ---
