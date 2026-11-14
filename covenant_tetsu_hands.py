@@ -32,7 +32,9 @@ SELF_EVAL alert), so the honest thing is to say what stands between his script
 and the machine: (1) a static screen over the parsed source: only the modules
 in ALLOWED_MODULES may be imported (no os, sys, subprocess, socket, shutil,
 ctypes, importlib, urllib, http, requests, pathlib, threading), no exec/eval/
-compile/__import__/getattr and their kin, no string literal that is an
+compile/__import__/getattr and their kin, no attribute that names one of those
+forbidden modules or the os/sys call surface (so an allowed module cannot be
+used to reach os and run a process -- A422), no string literal that is an
 absolute path or climbs with '..'; (2) a runner that replaces open() before
 his code runs so a path outside the workshop raises; (3) python -I (isolated:
 no user site, no env hooks), the workshop as cwd, a near-empty environment;
@@ -97,6 +99,20 @@ ALLOWED_MODULES = frozenset({
 FORBIDDEN_NAMES = frozenset({"exec", "eval", "compile", "__import__", "globals", "locals", "vars", "getattr", "setattr", "delattr",
                              "breakpoint", "input", "memoryview", "__builtins__", "__loader__", "__spec__", "__subclasses__", "__bases__",
                              "__class__", "__mro__", "__globals__", "__code__"})
+# A422 (an A31 recurrence through the HANDS door): the screen refused a forbidden module only at IMPORT, but an allowed
+# module re-exports one as an attribute -- uuid.os, pprint._sys, enum.sys, typing.sys, dataclasses.sys -- so
+# `import uuid; uuid.os.system(...)` passed the screen and ran a process. These attribute names -- the forbidden modules
+# the import check already refuses, their common private aliases, and the os/sys surface used to run a process or reach
+# another module (all distinctive names, none a common method name) -- are refused wherever they are READ, cutting the
+# reach from an allowed module to a forbidden one. This hardens a SCREEN, not a sandbox (see the module docstring); the
+# durable fix for the remote path is caller authentication on the /m/agent HANDS door, which is the operator's call.
+FORBIDDEN_ATTRS = frozenset({
+    "os", "_os", "sys", "_sys", "subprocess", "_subprocess", "socket", "_socket", "shutil", "ctypes", "importlib", "imp",
+    "urllib", "http", "requests", "pathlib", "threading", "_thread", "multiprocessing", "signal", "_signal", "pickle",
+    "_pickle", "marshal", "ssl", "_ssl", "winreg", "_winreg", "msvcrt", "posix", "nt", "builtins",
+    "system", "popen", "spawn", "spawnl", "spawnv", "spawnve", "spawnvp", "execl", "execv", "execve", "execvp", "execvpe",
+    "fork", "forkpty", "kill", "killpg", "putenv", "unsetenv", "environ", "startfile", "modules",
+    "__dict__", "__getattribute__", "__getattr__"})
 PROPOSABLE_EXT = (".py", ".md", ".json", ".txt", ".html", ".bat", ".sh", ".yml", ".yaml")
 
 RUNNER = r'''
@@ -277,7 +293,7 @@ def screen(source):
                 return False, "import from %s is refused" % (node.module or "."), imports
         elif isinstance(node, ast.Name) and node.id in FORBIDDEN_NAMES:
             return False, "the name %s is refused" % node.id, imports
-        elif isinstance(node, ast.Attribute) and node.attr in FORBIDDEN_NAMES:
+        elif isinstance(node, ast.Attribute) and (node.attr in FORBIDDEN_NAMES or node.attr in FORBIDDEN_ATTRS):
             # A349 B7: re.compile is the allowed re module's own regex compiler, not the builtin compile (his own-choice slot
             # lost 5 of 6 rounds to this refusal, on the line its task showed him). It is admitted only as a read of
             # `compile` on a name `import re` alone binds; the builtin compile, exec and eval, and every other attribute,
