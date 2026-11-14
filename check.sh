@@ -103,10 +103,23 @@ if [ -f verify.sh ] && have awk && [ -n "$SHA" ]; then
     # script exited 1.
     A=$(hashes_of "$OUT" | head -n 1)
     B=$(hashes_of "$OUT" | tail -n 1)
-    if [ $RC -eq 0 ] && [ -n "$A" ] && [ "$A" = "$B" ]; then
+    # EXACTLY TWO, COUNTED (2026-11-14, KNOWN_ISSUES A425). The test above was
+    # "the first hash equals the last", and when a verifier prints ONE hash
+    # the first and the last are the same line: a number compared with
+    # itself. A verify.sh that printed the anchor, computed nothing and
+    # exited 0 passed this check, and with it the "two implementations
+    # agree" line below. A real run prints two: computed, then anchored.
+    N=$(hashes_of "$OUT" | awk 'END { print NR }')
+    if [ $RC -eq 0 ] && [ "$N" -eq 2 ] && [ "$A" = "$B" ]; then
         SH_HASH=$A
         say "  [1] constitution, WITHOUT python   sh + awk + $SHA"
         say "      $SH_HASH"
+    elif [ $RC -eq 0 ] && [ "$N" -ne 2 ]; then
+        say "  [1] constitution, WITHOUT python   NOT VERIFIED (exit 0)"
+        say "      verify.sh printed $N hash line(s). A real run prints two,"
+        say "      the computed one and the anchored one. One hash compared"
+        say "      with itself is not a computation agreeing with an anchor."
+        FAIL=$((FAIL + 1))
     else
         say "  [1] constitution, WITHOUT python   MISMATCH (exit $RC)"
         say "      computed  ${A:-none}"
@@ -126,10 +139,18 @@ if [ -n "$PY" ] && [ -f constitution.py ]; then
     RC=$?
     A=$(hashes_of "$OUT" | head -n 1)
     B=$(hashes_of "$OUT" | tail -n 1)
-    if [ $RC -eq 0 ] && [ -n "$A" ] && [ "$A" = "$B" ]; then
+    # The same count as check 1, for the same reason (A425): anchored, then
+    # current. One line is not two that agree.
+    N=$(hashes_of "$OUT" | awk 'END { print NR }')
+    if [ $RC -eq 0 ] && [ "$N" -eq 2 ] && [ "$A" = "$B" ]; then
         PY_HASH=$A
         say "  [2] constitution, python           constitution.py verify"
         say "      $PY_HASH"
+    elif [ $RC -eq 0 ] && [ "$N" -ne 2 ]; then
+        say "  [2] constitution, python           NOT VERIFIED (exit 0)"
+        say "      constitution.py verify printed $N hash line(s). A real run"
+        say "      prints two, the anchored one and the current one."
+        FAIL=$((FAIL + 1))
     else
         say "  [2] constitution, python           MISMATCH (exit $RC)"
         say "      anchored  ${A:-none}"
@@ -217,21 +238,40 @@ say ""
 # scale.py exits NON-ZERO on success. A dissent three levels down reaching
 # the top is the property being demonstrated, and the exit code is how it
 # reports it. Zero here would mean the disagreement vanished on the way up.
+#
+# NON-ZERO IS NOT ENOUGH, AND NEITHER IS 1 (2026-11-14, KNOWN_ISSUES A425).
+# This check took ANY non-zero exit as the pass, so a scale.py that crashed
+# counted as the dissent surviving. Python exits 1 on an uncaught error,
+# the same code scale.py returns for "not clean", so the code cannot tell
+# the two apart by itself. What only a real run prints is its verdict
+# sentence, on stdout, saying that the dissenting witnesses below the top
+# are named. Both are required now: exit 1, and that sentence. A traceback
+# goes to stderr and is not read.
 
 if [ -n "$PY" ] && [ -f scale.py ]; then
-    "$PY" scale.py >/dev/null 2>&1
+    OUT=$("$PY" scale.py 2>/dev/null)
     RC=$?
-    if [ $RC -ne 0 ]; then
+    NAMED=no
+    case "$OUT" in
+        *"dissenting witness(es) below it are named"*) NAMED=yes ;;
+    esac
+    if [ $RC -eq 1 ] && [ "$NAMED" = yes ]; then
         say "  [4] dissent survives composition   exit $RC, which is the PASS"
         say "      A single node disagreed three levels down and the federation"
         say "      reports it. The obvious implementation forwards the majority"
         say "      and the dissent disappears at exactly the scale where"
         say "      somebody would have acted on it."
         PASS=$((PASS + 1))
-    else
+    elif [ $RC -eq 0 ]; then
         say "  [4] dissent survives composition   FAIL -- exit 0"
         say "      The dissent was absorbed. That is the failure this mechanism"
         say "      exists to prevent."
+        FAIL=$((FAIL + 1))
+    else
+        say "  [4] dissent survives composition   FAIL -- exit $RC, no verdict"
+        say "      scale.py did not say that it named the dissenting witness."
+        say "      A crash exits non-zero too, and a crash is not the dissent"
+        say "      surviving."
         FAIL=$((FAIL + 1))
     fi
 else

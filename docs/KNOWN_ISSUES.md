@@ -17551,3 +17551,40 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 **Status:** open (3B unprotected against plain-language injection by framing; clean()-only hygiene wired; full fence reserved for the 27B)
 
 ---
+
+### A425. [the runner's orphan search read the root only and skipped a name, so a suite nobody ran was not named (A419 a second time); check.sh passed a verifier that printed one hash and a scale.py that crashed] (2026-11-14). FIXED in source for the runner and check.sh; four things found in passing are left as they are, named below.
+
+- **Found** by a three-reviewer read of the repositories on 2026-11-14; the owner asked for the agreed fixes. Two findings, one shape: a check that could pass without the thing it checks having happened.
+
+**1. The intent-provenance suite was run by nobody, and the runner could not say so.**
+
+- **What.** `ai_memory_system/test_intent_provenance.py` (d57ea70, 2026-11-10; 32 checks, each guard driven both ways) was in no runner, so CI never ran the test of the intent-provenance gate. `covenant_one.phase_coverage` asks whether the runner's list matches the disk, but it read the root only, and it skipped any name holding `.PRE-` without printing that it had.
+- **A recurrence, and why the earlier fix did not stop it.** A382 (2026-10-22) registered three root suites the search was already naming; that is the search working. A419 (2026-11-09) is the earlier instance of this shape: it found two suites in subfolders, listed them, and wrote down the cause in the runner's own comment: the coverage phase reads the root only. It repaired the instances and left the search as it was. The next suite added to the same folder, one day later, was not named either.
+- **Counted two ways that could disagree** (unit: files matching `test_*.py`, `sim_*.py`, `probe_*.py` or `verify_*.py` under the folders the sweep stages). A walk of the staged folders in a fresh clone: 8. `git ls-files`: 8. Of the 8, 2 were listed (A419) and 6 were in no list and on no off-record. Files the `.PRE-` skip hid: 0 in a fresh clone (they are gitignored), 0 at the root of the node folder on the PC this was written on (listed read-only).
+- **Each of the 6, dealt with by name.** Run by hand from the clone first.
+  - `ai_memory_system/test_intent_provenance.py`: 32 of 32. **Listed.** Through the runner as it was it read `NO RESULT (no tally line)`, because its last line says "all 32 checks passed" and the runner reads "N/M passed". One line was added to the suite that prints the count in that form; its checks and its two closing lines are as they were.
+  - `pending-v8.38/test_competence.py`, `pending-v8.38/test_sem5_register_coverage.py`, `pending-v8.38/test_semantic_judge.py`: earlier copies of the root suites of the same names, which the sweep runs. By hand: 47/47 with 1 UNKNOWN; 6/6; and the third cannot run from that folder (the held core beside it imports `covenant_path_pattern`, which is at the root). **Switched off on the record**, each with that reason.
+  - `quant/test_backtest_guardrails.py`: byte-identical to the root suite the sweep runs (16 passed in either place). **Switched off on the record**: running both counts the same 16 checks twice.
+  - `sentinel_witness/verify_record.py`: a standalone verifier that needs a running node, not a suite. **Switched off on the record.**
+- **Fixed.** The orphan search walks the staged folders at any depth, with the same leave-outs as the copy (one definition, `_stage_ignore`, used by both), and names a file there by its path. The `.PRE-` skip is removed. README's sentence that the search skips the snapshots by name has a dated note beside it.
+- **Driven both ways.** `test_co1_coverage_orphans.py` (CO1, registered in the sweep) runs the real `phase_coverage` on a scratch tree with small lists. On the runner as it was (cf9535d): 9 of 16, the red ones being the `.PRE-` file, the staged-folder suite, the nested one, the exact set, the transcript lines, and the six real paths. On the fixed runner: 16 of 16. Six single-line mutations of the fixed runner, each red: the skip put back; the staged folders not walked; the leave-outs dropped; the walk stopped at the first level; one off-record entry removed; the listed suite taken off the list. The file was restored byte for byte after each. Through the runner (`--only`): the suite reads `ok ... 32/32 passed`, CO1 16/16, orphaned on disk 0.
+
+**2. `check.sh` passed a verifier that did not verify.**
+
+- **Checks 1 and 2** asked whether the first 64-character hash a verifier printed equals the last. When it prints one, those are the same line. A `verify.sh` (or a `constitution.py`) that printed the anchor once, computed nothing and exited 0 was reported as an implementation that agrees, and the line "TWO IMPLEMENTATIONS SHARING NO CODE AGREE" was printed over it.
+- **Check 4** took any non-zero exit of `scale.py` as "the dissent survived". A `scale.py` that crashed passed. Python exits 1 on an uncaught error, which is the code `scale.py` returns for "not clean", so the exit code cannot tell the two apart by itself.
+- **Fixed.** Checks 1 and 2 count the hash lines and require exactly two. Check 4 requires exit 1 and, on stdout, the verdict sentence `scale.py` prints only when the dissenting witnesses below the top are named; a traceback goes to stderr and is not read. On the real tree `check.sh` prints the same text before and after: 5 passed, 0 disagreed, 0 skipped.
+- **Driven both ways.** `test_v1_verifier_agreement.py` (V1, in place) gained C5 to C8: `check.sh` in a temp copy with one file replaced by a stub. On `check.sh` as it was: 20 of 28, the 8 red being a `verify.sh` that prints the anchor once, one that prints it three times, a `constitution.py` that prints it once, and five `scale.py` stubs (a crash; exit 1 with no output; exit 3; a crash whose message quotes the verdict; the verdict with exit 2). On the fixed script: 28 of 28, with two controls (the real verifiers pass; the real `scale.py` passes check 4). Six single-line mutations of the fixed script, each red; restored byte for byte.
+
+**Found in passing, NOT changed (rule 9).**
+
+- `check.ps1`, the PowerShell twin, has the same check 4 (`$rc -ne 0`). Its checks 1 and 2 ask for at least two hashes, not exactly two. V1's C2b still finds the twins agreeing on this tree; on a stub they would now differ. Not in this change's scope.
+- `.claude/hooks/test_cite_hook.py` (tracked since 2026-09-17) is in no runner. Its folder is not staged, so the new search does not read it: a suite in a folder on `NOT_STAGED` is still not named. CO1's O6b pins that limit so it is not read as covered.
+- README's FRONT-TEST-FILES note of 2026-10-15 says that on a clone every tracked `test_*.py` is registered, run in place, or switched off on the record. At the commit that wrote it (ca4024f) six tracked `test_*.py` files sat outside the root and the runner listed none of them by path. The tombstone's own `refuted_by` carries the same sentence. The README has a dated note now; the tombstone was not edited and no new one was written here.
+- `covenant_selfaudit.py` C1 reads `test_*.py` at the root only and excuses `.PRE-` by pattern (it prints how many it excused).
+
+**Not measured.** Any disk but the two named above. The record names `.PRE-` snapshots of suites kept on the operator's disk; where one exists at the root or in a staged folder, the runner now names it ORPHAN and the run reads INCOMPLETE until it is listed or put on the off-record with its reason. Whether a listed suite checks anything is not something this search reads. CI's shell is not the shell these were run under here.
+
+**Status:** fixed in source (runner and `check.sh`); open for the four items above.
+
+---
