@@ -930,6 +930,10 @@ SUITES = [
     # parsed from a results page, a same-host crawl bounded per page, per answer and per day, every page through the
     # one web door and a refusal reported rather than raised; the door is a stub, no network.
     ("test_tc1_tetsu_crawl.py", 120, "JUDGE"),
+    # outside_text (A424, 2026-11-14): the door strips chat/role/fence marks and invisible characters from outside
+    # content (fetched pages, forum posts) before the 3B reads them (clean()-only hygiene; the full fence frame did
+    # not bind the 3B, KNOWN_ISSUES A424). Pure text in/out: what is taken out and what is left exactly alone.
+    ("test_outside_text.py", 60, "JUDGE"),
     # JE1 (2026-09-26, A231): the judge evaluation's statistics (Fisher, chi-square, phi on the correlated-error
     # table) pinned against scipy's values, and the report's prose taking its figures from the run -- two had been
     # written in from the first dataset and printed beside tables that said otherwise.
