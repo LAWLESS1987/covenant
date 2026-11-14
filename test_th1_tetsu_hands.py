@@ -294,9 +294,10 @@ def main():
         told = "HANDS WRITE <name>" in core
         print("      (his instructions %s him he has hands)" % ("tell" if told else "do NOT yet tell"))
         check("TH1.14 the /m/agent door dispatches a HANDS first line to covenant_tetsu_hands.act beside MOLTBOOK, and "
-              "gates RUN to an operator caller (may_run from heal_lift_authorized: loopback or a registered signature)",
+              "gates RUN to a caller with a registered operator signature (may_run from _request_signed_by_registered, "
+              "NOT mere loopback, which is any local account)",
               'startswith("HANDS")' in core and 'import_module("covenant_tetsu_hands").act(answer, may_run=' in core
-              and "heal_lift_authorized(addr, request)" in core, "")
+              and "_may_run = _request_signed_by_registered(request)" in core, "")
         # 15. A349 A11: a run started Python without SYSTEMDRIVE, and Windows made a literal '%SystemDrive%\ProgramData\...'
         # tree inside his workshop (his real one has had it since his first run, 2026-09-28; it stays). The environment is
         # read through a spy on subprocess.run, and the workshop is walked after a real run.
