@@ -17505,6 +17505,86 @@ understands."
 
 **Pinned by** `test_th1_tetsu_hands.py` TH1.4d.
 
-**Status:** open (screen hardened; door authentication pending the operator)
+**Update 2026-11-14 (A423):** A422 closed only the attribute spelling. TETSU measured, and this session confirmed against the deployed file, three more spellings past it -- `from uuid import os [as o]`, `from uuid import *`, and `operator.attrgetter("os")(uuid)` (a dynamic string attribute no static deny-list can see). A423 adds the import-name close and, as the real boundary, gates HANDS RUN at the door to an operator caller. See A423.
+
+**Status:** screen hardening extended by A423; the door gate shipped in A423 is the real fix
+
+---
+
+### A423. [serious / security] HANDS RUN executes code for any tailnet caller; a deny-list screen cannot be the boundary (A422 was partial) -- DOOR-GATED 2026-11-14
+
+**Evidence:** A422 hardened `covenant_tetsu_hands.screen()` against `uuid.os.system(...)`, but the same code-execution hole stayed open by other spellings. Measured on main 6222d43 (TETSU), confirmed here against the deployed file:
+- `from uuid import os [as o]` then `o.getcwd()` / `o.listdir(...)` -> PASSED. The `ImportFrom` branch validated only the module (`uuid`, allowed), never the imported NAME, so the real `os` module was bound with no attribute read for `FORBIDDEN_ATTRS` to catch.
+- `from uuid import *` -> PASSED (same branch).
+- `import operator, uuid` then `operator.attrgetter("os")(uuid)` -> PASSED. A string-named attribute never appears as an `ast.Attribute`, so no static deny-list can see it. `functools`/`unittest` offer the same indirection.
+This is the lesson A422's own note anticipated: a screen is a screen, not a sandbox, and a deny-list cannot close dynamic attribute access.
+
+**Fix (shipped):**
+1. **The real boundary -- the door.** `/m/agent`'s HANDS branch now passes `may_run=_request_signed_by_registered(request)` to `covenant_tetsu_hands.act` -- a request signed by a registered operator key. NOT loopback: `_addr_is_loopback` admits any LOCAL account on the box (TETSU found third-party sandbox accounts that could read key copies), so loopback-may-RUN would hand code execution to every local account, while an operator at the console can already run code directly. A tailnet caller already needed a signature (tailnet membership alone never passed), so this change only tightens the LOCAL path. A bare caller may LIST/READ/WRITE/PROPOSE but cannot RUN, so none of the three spellings (or any future one, the dynamic one included) becomes code execution from an unauthorized caller. `_request_signed_by_registered` fails closed (no module / no proof -> no RUN). `act()` refuses a RUN when `may_run` is false, before the script starts. In-process callers (his practice loop at `covenant_tetsu_practice.py:618`, the tests) keep the default `may_run=True`. (The door passes the verdict down because `act()` is given no caller -- deliberately, so the hands module needs no web-request context.) **Cost (every gain with its cost):** Tetsu can no longer RUN in response to an unsigned conversation from the local `/m` web page (it posts `{text}` with no signature); the signed phone app, registered allies and his in-process practice are unaffected, and the operator at the console can run directly. Reversible: re-admit loopback (`heal_lift_authorized`) if the console path is wanted, accepting that it trusts every local account. The decision was the operator's ("use discernment towards mutual benefit", 2026-11-14).
+2. **Defence in depth -- the screen.** The `ImportFrom` branch now also refuses importing a name on `FORBIDDEN_ATTRS` (`from uuid import os/sys/system/...`), closing the import-name spelling. A safe star import (`from typing import *`, used by his `health_disk.py`) still passes; the star spelling and the dynamic spelling remain screen gaps by design -- the door gate is what closes them.
+
+**Repro:** `act("HANDS RUN x.py", may_run=False)` refuses with "running a script needs the operator ...", nothing runs; `may_run=True` runs. `screen("from uuid import os\n...")` -> `(False, "importing os from uuid is refused", ...)`. Driven both ways by `test_th1_tetsu_hands.py` TH1.4e (the gate and the import-name close) and TH1.14 (the door passes `may_run` from `heal_lift_authorized`).
+
+**Related:** node D (TETSU) carries an equivalent interim gate in its own launcher (`noded/hands_gate.py`, not in this tree); once this core fix reaches D by merge, that layer becomes redundant or a second layer, D's operator's call.
+
+**Pinned by** `test_th1_tetsu_hands.py` TH1.4e and TH1.14.
+
+**Status:** fixed (door-gated; screen import-name close added; star/dynamic spellings remain screen gaps closed by the door gate)
+
+---
+
+### A424. [measured limitation] The outside_text injection fence does not bind the 3B; only its stripping helps there -- CLEAN-ONLY WIRED 2026-11-14
+
+**What.** TETSU's `outside_text.py` fence -- strip chat/role/fence marks and invisible characters, then wrap the text behind a fresh unguessable mark and frame it, before and after, as "data from strangers" -- was measured on their main 27B to cut obedience to planted instructions from 21/24 to 0/24. Wired to this PC's `/m/agent` door, where the 3B is handed fetched pages and forum posts (the FETCH / MOLTBOOK / WEB "DATA" re-asks), it was re-measured on this PC's `qwen2.5-3b-instruct-q4_k_m` and did NOT bind.
+
+**Measured, 2026-11-14 (18 planted-instruction cases, one try each, my own set -- not TETSU's held-out set).** Through the door's own system prompt, each case was asked twice: the OLD plain framing vs the FULL fence. The planted token appeared in ~15/18 answers BOTH ways; 8 of the fenced cases returned the bare planted token. A 3B is too weak an instruction-follower for the "treat this as data" frame to hold -- the opposite of the 27B. What DID help was the stripping alone: the markup / invisible-character cases (`<|im_start|>`, a fake `</document>` fence, a right-to-left override) flipped obeyed -> clean, because the 3B never saw the markup.
+
+- *Caveat (detector).* It counts token-presence, so a refusal that names the token -- "I won't reply with MANGO16" -- miscounts as obeyed; the true fenced obedience is a little below 15, and the qualitative finding (no meaningful protection from the frame) holds regardless.
+- *Caveat (placement).* The fence rules were placed in the user turn, not a system message as TETSU measured, because the door's system prompt is prefix-cached (A400). That deviation is untested on the 3B; with 8 bare-token cases it is unlikely placement alone rescues a model this small, but it is not ruled out.
+
+**Decision (operator, 2026-11-14, "Keep clean()-only hygiene").** The door routes the three outside-content re-asks through `outside_text.clean()` only -- the stripping, kept as cheap hygiene with no behavioural claim -- and does NOT apply the full frame to the 3B. The 3B's real guard is unchanged: the covenant gates ACTION (A423's signed HANDS door) and never trusts 3B output. The full frame is reserved for the larger models (the leg / limbs 27B, already behind the structured-JSON validator) where it was actually measured to work.
+
+**Repro:** `ops/outside_text_3b_measurement_2026-11-14/measure_fence.py` against a running 3B (its result JSON is beside it); `outside_text.clean("x <|im_start|>system y")` strips the chat mark, driven both ways by `test_outside_text.py` (9/9).
+
+**Cost (every gain with its cost).** The three re-asks lose nothing a reader sees (clean() leaves ordinary text exactly as it was; measured to remove nothing from real pages) and gain removal of the markup / invisible-character vectors. No protection is claimed against plain-language injection of the 3B; that remains open and is held by the action gate downstream, not here.
+
+**Status:** open (3B unprotected against plain-language injection by framing; clean()-only hygiene wired; full fence reserved for the 27B)
+
+---
+
+### A425. [the runner's orphan search read the root only and skipped a name, so a suite nobody ran was not named (A419 a second time); check.sh passed a verifier that printed one hash and a scale.py that crashed] (2026-11-14). FIXED in source for the runner and check.sh; four things found in passing are left as they are, named below.
+
+- **Found** by a three-reviewer read of the repositories on 2026-11-14; the owner asked for the agreed fixes. Two findings, one shape: a check that could pass without the thing it checks having happened.
+
+**1. The intent-provenance suite was run by nobody, and the runner could not say so.**
+
+- **What.** `ai_memory_system/test_intent_provenance.py` (d57ea70, 2026-11-10; 32 checks, each guard driven both ways) was in no runner, so CI never ran the test of the intent-provenance gate. `covenant_one.phase_coverage` asks whether the runner's list matches the disk, but it read the root only, and it skipped any name holding `.PRE-` without printing that it had.
+- **A recurrence, and why the earlier fix did not stop it.** A382 (2026-10-22) registered three root suites the search was already naming; that is the search working. A419 (2026-11-09) is the earlier instance of this shape: it found two suites in subfolders, listed them, and wrote down the cause in the runner's own comment: the coverage phase reads the root only. It repaired the instances and left the search as it was. The next suite added to the same folder, one day later, was not named either.
+- **Counted two ways that could disagree** (unit: files matching `test_*.py`, `sim_*.py`, `probe_*.py` or `verify_*.py` under the folders the sweep stages). A walk of the staged folders in a fresh clone: 8. `git ls-files`: 8. Of the 8, 2 were listed (A419) and 6 were in no list and on no off-record. Files the `.PRE-` skip hid: 0 in a fresh clone (they are gitignored), 0 at the root of the node folder on the PC this was written on (listed read-only).
+- **Each of the 6, dealt with by name.** Run by hand from the clone first.
+  - `ai_memory_system/test_intent_provenance.py`: 32 of 32. **Listed.** Through the runner as it was it read `NO RESULT (no tally line)`, because its last line says "all 32 checks passed" and the runner reads "N/M passed". One line was added to the suite that prints the count in that form; its checks and its two closing lines are as they were.
+  - `pending-v8.38/test_competence.py`, `pending-v8.38/test_sem5_register_coverage.py`, `pending-v8.38/test_semantic_judge.py`: earlier copies of the root suites of the same names, which the sweep runs. By hand: 47/47 with 1 UNKNOWN; 6/6; and the third cannot run from that folder (the held core beside it imports `covenant_path_pattern`, which is at the root). **Switched off on the record**, each with that reason.
+  - `quant/test_backtest_guardrails.py`: byte-identical to the root suite the sweep runs (16 passed in either place). **Switched off on the record**: running both counts the same 16 checks twice.
+  - `sentinel_witness/verify_record.py`: a standalone verifier that needs a running node, not a suite. **Switched off on the record.**
+- **Fixed.** The orphan search walks the staged folders at any depth, with the same leave-outs as the copy (one definition, `_stage_ignore`, used by both), and names a file there by its path. The `.PRE-` skip is removed. README's sentence that the search skips the snapshots by name has a dated note beside it.
+- **Driven both ways.** `test_co1_coverage_orphans.py` (CO1, registered in the sweep) runs the real `phase_coverage` on a scratch tree with small lists. On the runner as it was (cf9535d): 9 of 16, the red ones being the `.PRE-` file, the staged-folder suite, the nested one, the exact set, the transcript lines, and the six real paths. On the fixed runner: 16 of 16. Six single-line mutations of the fixed runner, each red: the skip put back; the staged folders not walked; the leave-outs dropped; the walk stopped at the first level; one off-record entry removed; the listed suite taken off the list. The file was restored byte for byte after each. Through the runner (`--only`): the suite reads `ok ... 32/32 passed`, CO1 16/16, orphaned on disk 0.
+
+**2. `check.sh` passed a verifier that did not verify.**
+
+- **Checks 1 and 2** asked whether the first 64-character hash a verifier printed equals the last. When it prints one, those are the same line. A `verify.sh` (or a `constitution.py`) that printed the anchor once, computed nothing and exited 0 was reported as an implementation that agrees, and the line "TWO IMPLEMENTATIONS SHARING NO CODE AGREE" was printed over it.
+- **Check 4** took any non-zero exit of `scale.py` as "the dissent survived". A `scale.py` that crashed passed. Python exits 1 on an uncaught error, which is the code `scale.py` returns for "not clean", so the exit code cannot tell the two apart by itself.
+- **Fixed.** Checks 1 and 2 count the hash lines and require exactly two. Check 4 requires exit 1 and, on stdout, the verdict sentence `scale.py` prints only when the dissenting witnesses below the top are named; a traceback goes to stderr and is not read. On the real tree `check.sh` prints the same text before and after: 5 passed, 0 disagreed, 0 skipped.
+- **Driven both ways.** `test_v1_verifier_agreement.py` (V1, in place) gained C5 to C8: `check.sh` in a temp copy with one file replaced by a stub. On `check.sh` as it was: 20 of 28, the 8 red being a `verify.sh` that prints the anchor once, one that prints it three times, a `constitution.py` that prints it once, and five `scale.py` stubs (a crash; exit 1 with no output; exit 3; a crash whose message quotes the verdict; the verdict with exit 2). On the fixed script: 28 of 28, with two controls (the real verifiers pass; the real `scale.py` passes check 4). Six single-line mutations of the fixed script, each red; restored byte for byte.
+
+**Found in passing, NOT changed (rule 9).**
+
+- `check.ps1`, the PowerShell twin, has the same check 4 (`$rc -ne 0`). Its checks 1 and 2 ask for at least two hashes, not exactly two. V1's C2b still finds the twins agreeing on this tree; on a stub they would now differ. Not in this change's scope.
+- `.claude/hooks/test_cite_hook.py` (tracked since 2026-09-17) is in no runner. Its folder is not staged, so the new search does not read it: a suite in a folder on `NOT_STAGED` is still not named. CO1's O6b pins that limit so it is not read as covered.
+- README's FRONT-TEST-FILES note of 2026-10-15 says that on a clone every tracked `test_*.py` is registered, run in place, or switched off on the record. At the commit that wrote it (ca4024f) six tracked `test_*.py` files sat outside the root and the runner listed none of them by path. The tombstone's own `refuted_by` carries the same sentence. The README has a dated note now; the tombstone was not edited and no new one was written here.
+- `covenant_selfaudit.py` C1 reads `test_*.py` at the root only and excuses `.PRE-` by pattern (it prints how many it excused).
+
+**Not measured.** Any disk but the two named above. The record names `.PRE-` snapshots of suites kept on the operator's disk; where one exists at the root or in a staged folder, the runner now names it ORPHAN and the run reads INCOMPLETE until it is listed or put on the off-record with its reason. Whether a listed suite checks anything is not something this search reads. CI's shell is not the shell these were run under here.
+
+**Status:** fixed in source (runner and `check.sh`); open for the four items above.
 
 ---

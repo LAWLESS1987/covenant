@@ -50,6 +50,7 @@ EXIT CODES
     2   nothing failed, something could not be measured -- NOT a pass
 """
 import argparse
+import fnmatch
 import glob
 import hashlib
 import os
@@ -930,6 +931,10 @@ SUITES = [
     # parsed from a results page, a same-host crawl bounded per page, per answer and per day, every page through the
     # one web door and a refusal reported rather than raised; the door is a stub, no network.
     ("test_tc1_tetsu_crawl.py", 120, "JUDGE"),
+    # outside_text (A424, 2026-11-14): the door strips chat/role/fence marks and invisible characters from outside
+    # content (fetched pages, forum posts) before the 3B reads them (clean()-only hygiene; the full fence frame did
+    # not bind the 3B, KNOWN_ISSUES A424). Pure text in/out: what is taken out and what is left exactly alone.
+    ("test_outside_text.py", 60, "JUDGE"),
     # JE1 (2026-09-26, A231): the judge evaluation's statistics (Fisher, chi-square, phi on the correlated-error
     # table) pinned against scipy's values, and the report's prose taking its figures from the run -- two had been
     # written in from the first dataset and printed beside tables that said otherwise.
@@ -956,6 +961,14 @@ SUITES = [
     # The go-live scheme ends "ALL PASS" with no number, so it joins "passed, counted 0" -- named, not hidden.
     ("ai_memory_system/test_memory_system.py", 180, "SECURITY"),
     ("tools/test_golive_scheme.py", 60, "SECURITY"),
+    # A425 (2026-11-14), A419 a second time: the intent-provenance gate's own suite (d57ea70, 32 checks, every
+    # guard driven both ways) sat beside M1 in the same folder and was in no runner, so CI never ran it. A419
+    # listed the two suites it found and left the coverage phase reading the root only, so the next one was not
+    # called an orphan either. Listed here; the coverage phase now reads the staged folders too (CO1 below).
+    ("ai_memory_system/test_intent_provenance.py", 60, "SECURITY"),
+    # CO1 (2026-11-14, A425): the coverage phase itself, on a scratch tree -- an unlisted suite in a staged
+    # folder and one with ".PRE-" in its name are both called orphans; a listed or switched-off one is not.
+    ("test_co1_coverage_orphans.py", 60, "SECURITY"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
@@ -1005,6 +1018,28 @@ DELIBERATELY_OFF = {
         "ledger, not a suite. Driven both ways inside HC1 (rows) and HC2 "
         "(stale vs tamper).",
     "trace_runner.py":      "helper, not a suite",
+    # A425 (2026-11-14). The five files below are in folders the sweep stages and match the suite patterns. The
+    # coverage phase read the root only, so none was run and none was named. Counted two ways that could
+    # disagree (a walk of the staged folders, and git ls-files): 8 such files, 2 listed since A419, 1 listed
+    # by A425, and these 5. Each was run by hand on 2026-11-14 from a fresh clone before it was written down.
+    "pending-v8.38/test_competence.py":
+        "an EARLIER COPY of the root suite of the same name (36,580 bytes against the root's 37,085), kept "
+        "beside the held semantic-judge files. The sweep runs the root one. By hand from this folder: 47/47 "
+        "passed, 1 UNKNOWN (the node-level checks cannot import the core from here).",
+    "pending-v8.38/test_sem5_register_coverage.py":
+        "an EARLIER COPY of the root suite of the same name (7,220 bytes against 9,628). The sweep runs the "
+        "root one. By hand from this folder: SEM5 6/6.",
+    "pending-v8.38/test_semantic_judge.py":
+        "an EARLIER COPY of the root suite of the same name (17,467 bytes against 18,903). The sweep runs the "
+        "root one. It CANNOT run from this folder: the held core beside it imports covenant_path_pattern, "
+        "which is at the root (ModuleNotFoundError, measured).",
+    "quant/test_backtest_guardrails.py":
+        "BYTE-IDENTICAL to the root test_backtest_guardrails.py, which the sweep runs (16 passed by hand in "
+        "either place); the module it tests, quant/covenant_backtest.py, is byte-identical to the root's too. "
+        "Running both would count the same 16 checks twice.",
+    "sentinel_witness/verify_record.py":
+        "a STANDALONE verifier that reads a record back from a RUNNING node's /chain (--node URL), not a "
+        "suite. test_e3_witness_loop.py imports it, and that suite is itself on this record.",
     # NOT a wiring oversight. run_all_tests.sh names this suite; it exists
     # NOWHERE on the production PC, and the fix it tests exists nowhere either:
     # grep for _fair_share / _compact_locked / last_eviction_age_seconds in the
@@ -1273,12 +1308,17 @@ def stage(say):
             # A201 (2026-09-21): the untracked runtimes under tools/ (llama, sd -- binaries and an
             # 18 MB zip) are never staged: a staged copy of one tripped Defender, and no suite
             # runs them (the model and image doors are stubbed in every suite).
-            shutil.copytree(s, os.path.join(work, d), dirs_exist_ok=True,
-                            ignore=shutil.ignore_patterns("llama", "sd") if d == "tools"
-                            else _eval_ignore if d == "eval"
-                            else shutil.ignore_patterns("__pycache__"))
+            shutil.copytree(s, os.path.join(work, d), dirs_exist_ok=True, ignore=_stage_ignore(d))
     say("   staged into %s" % work)
     return work
+
+
+def _stage_ignore(d):
+    """What the copy leaves out of staged folder d. One definition (A425, 2026-11-14): stage() copies with it and
+    the coverage phase walks with it, so the orphan search reads the folders the sweep carries and no others."""
+    return (shutil.ignore_patterns("llama", "sd") if d == "tools"
+            else _eval_ignore if d == "eval"
+            else shutil.ignore_patterns("__pycache__"))
 
 
 # WHICH FOLDERS THE COPY CARRIES, AND WHY THE OTHERS ARE LEFT OUT (A298, 2026-10-07).
@@ -1389,11 +1429,24 @@ def phase_coverage(say):
     listed = [s for s, _, _ in SUITES] + [n for n, _, _ in IN_PLACE]
     absent = [s for s in listed if not os.path.isfile(os.path.join(HERE, s))]
     on_disk = set()
-    for pat in ("test_*.py", "sim_*.py", "probe_*.py", "verify_*.py"):
+    pats = ("test_*.py", "sim_*.py", "probe_*.py", "verify_*.py")
+    # A425 (2026-11-14). Two holes, closed here. (1) This loop skipped any name holding ".PRE-" and said nothing:
+    # a file the search leaves out by its name is neither run nor reported. Counted before the skip was removed:
+    # 0 such files in a clone (they are gitignored) and 0 on the PC this was written on. On a disk that holds
+    # one it is now an ORPHAN, by name, until it is listed or put on the off-record with its reason.
+    for pat in pats:
         for p in glob.glob(os.path.join(HERE, pat)):
-            n = os.path.basename(p)
-            if ".PRE-" not in n:
-                on_disk.add(n)
+            on_disk.add(os.path.basename(p))
+    # (2) The search read the root only (A382, A419), so a suite in a folder the sweep stages could be in no
+    # list and never be called an orphan: ai_memory_system/test_intent_provenance.py was. The staged folders
+    # are walked now, at any depth, with the same leave-outs as the copy, and a file there is named by its path.
+    for d in STAGE_DIRS:
+        ignore = _stage_ignore(d)
+        for dp, dns, fns in os.walk(os.path.join(HERE, d)):
+            dns[:] = sorted(set(dns) - set(ignore(dp, dns)))
+            for n in fns:
+                if any(fnmatch.fnmatch(n, pat) for pat in pats):
+                    on_disk.add(os.path.relpath(os.path.join(dp, n), HERE).replace(os.sep, "/"))
     orphans = sorted(on_disk - set(listed) - set(DELIBERATELY_OFF))
 
     say("  listed in this runner   %d suites (%d in the sweep, %d in place)"
