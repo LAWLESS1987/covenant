@@ -108,6 +108,19 @@ seats a judge off this PC (github_when_local_down, or a remote provider) sends
 it there, as it already sends the one sentence, and the runner path writes
 what it judged to the TRACKED ops/verdicts.jsonl.]
 
+[A430, 2026-11-15. THE OPERATOR'S SIGNATURE NAMES THE EXACT SCRIPT. His words: "Tie the signature." Until
+this date a registered signature on a /m/agent request let the model run whatever workshop script it named. Now
+the door reads `run_sha256` (the sha256 of the script's raw bytes, 64 lowercase hex characters) from the
+request's JSON body -- only when that body's signature verified, so the hash is inside the signed bytes -- and
+passes it to act(), which binds run() to it. run() reads the file's bytes ONCE, refuses unless they hash to
+run_sha256 (a missing or malformed value is refused, naming the field), screens those same bytes, and hands those
+same bytes to the child on its standard input: nothing reopens the file between the check and the execution,
+and the runner is no longer a file in the workshop that a script could overwrite. A file over MAX_FILE is
+refused (the screen used to read only its first MAX_FILE characters while the child ran the whole file).
+NOT BOUND by this: an in-process caller that passes no binding -- his practice loop (owner-started; it passes no
+signature), the command line, tests. Bounding the practice loop (a run count and an expiry per loop) is the open
+next step. The script's arguments are the model's and are not bound either.]
+
 A PROPOSAL is his thumb on the tree: the new version is saved under
 ops/tetsu_proposals/<id>.<ext> with a compile check for Python, one row here,
 and one line to the operator on the direct line. Applying it is the
@@ -124,6 +137,7 @@ USE
   python covenant_tetsu_hands.py --unjudged      (read-only: the acts carried out without a judgement, A428)
 """
 import ast
+import contextvars
 import hashlib
 import json
 import os
@@ -181,10 +195,21 @@ FORBIDDEN_ATTRS = frozenset({
     "fork", "forkpty", "kill", "killpg", "putenv", "unsetenv", "environ", "startfile", "modules",
     "__dict__", "__getattribute__", "__getattr__"})
 PROPOSABLE_EXT = (".py", ".md", ".json", ".txt", ".html", ".bat", ".sh", ".yml", ".yaml")
+# A430: a run bound to the operator's approval. UNBOUND is "no binding was given" (an in-process caller: his practice
+# loop, the command line); anything else, None included, is a binding and is enforced. act() hands the door's value
+# to run() through _RUN_BINDING (run() also takes it by keyword), so a launcher that wraps run() with the older
+# four-argument signature (node D's hands_gate) still sees the call and the binding still reaches the real run().
+UNBOUND = object()
+_RUN_BINDING = contextvars.ContextVar("covenant_tetsu_hands_run_sha256", default=UNBOUND)
+RUN_SHA256 = re.compile(r"[0-9a-f]{64}")
 
+# A430: the runner is handed to python -c (never a file in his workshop, which a script running beside it could
+# overwrite between the parent writing it and the child starting it), and the script's bytes come on standard input:
+# the same bytes the parent hashed and screened, never a second read of the file.
 RUNNER = r'''
 import builtins, io, os, sys
 WS = os.path.abspath(sys.argv[1]); script = sys.argv[2]; sys.argv = [script] + sys.argv[3:]
+code = sys.stdin.buffer.read()
 def guarded_open(file, *a, _real=builtins.open, _ws=WS, **k):
     if isinstance(file, int):
         raise PermissionError("file descriptors are not opened here")
@@ -193,7 +218,6 @@ def guarded_open(file, *a, _real=builtins.open, _ws=WS, **k):
     if os.path.commonpath([_ws, p]) != _ws:
         raise PermissionError("outside the workshop: %s" % s)
     return _real(p, *a, **k)
-code = builtins.open(os.path.join(WS, script), encoding="utf-8").read()
 builtins.open = guarded_open
 io.open = guarded_open
 exec(compile(code, script, "exec"), {"__name__": "__main__", "__file__": script})
@@ -378,23 +402,49 @@ def screen(source):
     return True, "clean: imports %s" % (", ".join(sorted(set(imports))) or "none"), sorted(set(imports))
 
 
-def run(name, args=None, workshop=None, timeout_s=None):
-    """Run one of his Python files, bounded. Returns the outcome; never raises for his code's sake."""
+def _binding_refusal(run_sha256, digest):
+    """A430: None when the bytes about to run hash to the approved run_sha256; else why the run is refused."""
+    if run_sha256 is None or run_sha256 == "":
+        return ("running a script needs run_sha256 in the operator's signed request: the sha256 of the exact script, "
+                "64 lowercase hexadecimal characters, inside the signed JSON body. This request carries none")
+    if not isinstance(run_sha256, str) or not RUN_SHA256.fullmatch(run_sha256):
+        return "run_sha256 must be 64 lowercase hexadecimal characters; the signed request's value is not"
+    if run_sha256 != digest:
+        return ("the script's sha256 is %s, not the run_sha256 the operator signed (%s): it is not the file he approved, "
+                "or it changed after he signed" % (digest, run_sha256))
+    return None
+
+
+def run(name, args=None, workshop=None, timeout_s=None, run_sha256=UNBOUND):
+    """Run one of his Python files, bounded. Returns the outcome; never raises for his code's sake.
+    A430: the file's bytes are read ONCE, and those bytes are hashed, screened and handed to the child; nothing
+    reopens the file. run_sha256, when a binding is given (by keyword, or by act() for the door), must equal the
+    sha256 of those bytes or nothing runs; a missing one is refused, naming the field. No binding: as before."""
+    if run_sha256 is UNBOUND:
+        run_sha256 = _RUN_BINDING.get()
+    bound = run_sha256 is not UNBOUND
     ws = os.path.abspath(workshop or WORKSHOP)
     p = _path(name, ws)
     if not name.endswith(".py"):
         return {"ok": False, "why": "only a .py file runs", "out": "", "err": "", "code": None, "ms": 0}
     try:
-        with open(p, encoding="utf-8") as fh:
-            src = fh.read(MAX_FILE)
+        with open(p, "rb") as fh:
+            raw = fh.read(MAX_FILE + 1)
     except OSError as e:
         return {"ok": False, "why": "cannot read %s: %s" % (name, type(e).__name__), "out": "", "err": "", "code": None, "ms": 0}
-    ok, why, imports = screen(src)
+    if len(raw) > MAX_FILE:
+        return {"ok": False, "refused": True, "why": "a script is at most %d bytes; this one is longer, so it is not run" % MAX_FILE,
+                "out": "", "err": "", "code": None, "ms": 0}
+    digest = hashlib.sha256(raw).hexdigest()
+    seal = {"script_sha256": digest}
+    if bound:
+        seal["run_sha256"] = run_sha256 if isinstance(run_sha256, str) else None
+        refusal = _binding_refusal(run_sha256, digest)
+        if refusal:
+            return dict(seal, ok=False, refused=True, why=refusal, out="", err="", code=None, ms=0)
+    ok, why, imports = screen(raw)
     if not ok:
-        return {"ok": False, "why": "the screen refused it: " + why, "out": "", "err": "", "code": None, "ms": 0, "imports": imports}
-    runner = os.path.join(ws, ".runner.py")
-    with open(runner, "w", encoding="utf-8", newline="\n") as fh:
-        fh.write(RUNNER)
+        return dict(seal, ok=False, why="the screen refused it: " + why, out="", err="", code=None, ms=0, imports=imports)
     # A349 A11: without SYSTEMDRIVE, Windows made a literal '%SystemDrive%\ProgramData\...' tree inside his workshop at his
     # first run (reproduced in a temp workshop; with it, nothing). The tree already in his workshop is left as it is.
     env = {k: os.environ[k] for k in ("SYSTEMROOT", "SystemRoot", "PATH", "TEMP", "TMP", "COMSPEC", "WINDIR", "SYSTEMDRIVE")
@@ -402,17 +452,17 @@ def run(name, args=None, workshop=None, timeout_s=None):
     env["PYTHONIOENCODING"] = "utf-8"
     t0 = time.time()
     try:
-        cp = subprocess.run([sys.executable, "-I", runner, ws, name] + [str(a) for a in (args or [])][:16], cwd=ws, env=env,
-                            capture_output=True, timeout=timeout_s or RUN_TIMEOUT_S)
+        cp = subprocess.run([sys.executable, "-I", "-c", RUNNER, ws, name] + [str(a) for a in (args or [])][:16], cwd=ws,
+                            env=env, input=raw, capture_output=True, timeout=timeout_s or RUN_TIMEOUT_S)
         out, err, code, timed_out = cp.stdout.decode("utf-8", "replace"), cp.stderr.decode("utf-8", "replace"), cp.returncode, False
     except subprocess.TimeoutExpired as e:
         out = (e.stdout or b"").decode("utf-8", "replace")
         err = (e.stderr or b"").decode("utf-8", "replace")
         code, timed_out = None, True
     ms = int((time.time() - t0) * 1000)
-    return {"ok": bool(code == 0 and not timed_out), "why": ("stopped after %.0f s" % (timeout_s or RUN_TIMEOUT_S)) if timed_out else ("exit %s" % code),
-            "out": out[:MAX_OUT], "err": err[-MAX_OUT:], "code": code, "ms": ms, "timed_out": timed_out, "imports": imports,
-            "truncated": len(out) > MAX_OUT}
+    return dict(seal, ok=bool(code == 0 and not timed_out), why=("stopped after %.0f s" % (timeout_s or RUN_TIMEOUT_S)) if timed_out else ("exit %s" % code),
+                out=out[:MAX_OUT], err=err[-MAX_OUT:], code=code, ms=ms, timed_out=timed_out, imports=imports,
+                truncated=len(out) > MAX_OUT)
 
 
 # ------------------------------------------------------------------ proposals
@@ -632,11 +682,13 @@ def _act_line(d, workshop=None):
     return ""
 
 
-def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=None, may_run=True):
+def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=None, may_run=True, run_sha256=UNBOUND):
     """For the door: (handled, data_for_the_model, record). Not a directive -> (False, '', None). may_run gates a RUN
     (A423): the /m/agent door passes may_run only for an OPERATOR caller (loopback, or a request signed by a registered
     key), so an unauthenticated tailnet caller cannot run a script even if a screen spelling slips past -- the screen is
-    a screen, not a sandbox. In-process callers (his practice loop, the tests) keep the default True."""
+    a screen, not a sandbox. In-process callers (his practice loop, the tests) keep the default True.
+    run_sha256 (A430): the door passes the value from the signed body (None when it has none), and a RUN then runs
+    only the file whose bytes hash to it. Not passed (UNBOUND): an in-process caller, not bound."""
     d = parse(answer)
     if not d:
         return False, "", None
@@ -680,7 +732,24 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
                 _append(rec, ledger)
                 return True, ("DATA: running a script needs the operator (a request from loopback or signed by a registered "
                               "key); this caller may not. Nothing was run. Say so plainly."), rec
-            r = run(d["target"], d["args"], workshop)
+            # A430: the binding rides a context variable, not a new positional argument, so a launcher's wrapper of
+            # run() with the older signature still sees this call and passes it on; run() reads it there.
+            token = _RUN_BINDING.set(run_sha256)
+            try:
+                r = run(d["target"], d["args"], workshop)
+            finally:
+                _RUN_BINDING.reset(token)
+            for k in ("script_sha256", "run_sha256"):
+                if k in r:
+                    rec[k] = r[k]
+            if r.get("refused"):
+                rec.update({"ok": False, "refused": True, "why": str(r.get("why"))[:300]})
+                _append(rec, ledger)
+                return True, "DATA: the run was refused -- %s. Nothing was run. Say so plainly." % str(r.get("why"))[:400], rec
+            if run_sha256 is not UNBOUND and "timed_out" in r and r.get("run_sha256") != run_sha256:
+                # a process started for a bound request without run() reporting the binding it enforced: a wrapper lost
+                # it. Not silent: the row says so.
+                rec["binding_lost"] = True
             rec.update({k: r.get(k) for k in ("ok", "why", "code", "ms", "timed_out", "imports", "truncated")})
             rec["out_sha256"] = hashlib.sha256((r.get("out") or "").encode("utf-8")).hexdigest()
             if no_judgement and "timed_out" in r:                # a process was started (run() sets timed_out only then); a

@@ -939,6 +939,12 @@ SUITES = [
     # word the caller's own message spells out (in CAPITALS / as the whole act line / in quotes); TETSU's check, 0
     # false positives measured. covenant_model gains a stub-answer queue so suites drive acts without naming them.
     ("test_a427_actword.py", 60, "JUDGE"),
+    # A430 (2026-11-15, his words "Tie the signature."): a HANDS RUN through the door runs only the script whose bytes
+    # hash to the run_sha256 inside the operator's signed body -- the door's real HANDS branch, real signatures, real
+    # runs; read once, hashed, screened and executed from the same bytes; the practice loop unbound. Then the signing
+    # client: the hash goes in before signing and survives mycelium and spore unchanged.
+    ("test_a430_run_sha256.py", 120, "JUDGE"),
+    ("test_a430_run_signing.py", 60, "JUDGE"),
     # JE1 (2026-09-26, A231): the judge evaluation's statistics (Fisher, chi-square, phi on the correlated-error
     # table) pinned against scipy's values, and the report's prose taking its figures from the run -- two had been
     # written in from the first dataset and printed beside tables that said otherwise.

@@ -9501,7 +9501,14 @@ class CovenantAPI:
                     # too. A bare caller may LIST/READ/WRITE/PROPOSE but not RUN; _request_signed_by_registered fails
                     # closed (no module / no proof -> no RUN), so a screen bypass cannot become code execution.
                     _may_run = _request_signed_by_registered(request)
-                    _handled, _data, _rec = importlib.import_module("covenant_tetsu_hands").act(answer, may_run=_may_run)
+                    # A430 ("Tie the signature."): the signature must name the exact script. run_sha256 is read from the
+                    # JSON body ONLY when that body's signature verified, so the hash is inside the signed bytes; the
+                    # hands then run only a file whose bytes hash to it, and refuse a RUN that carries none.
+                    _run_sha256 = None
+                    if _may_run:
+                        _signed_body = request.get_json(silent=True)
+                        _run_sha256 = _signed_body.get("run_sha256") if isinstance(_signed_body, dict) else None
+                    _handled, _data, _rec = importlib.import_module("covenant_tetsu_hands").act(answer, may_run=_may_run, run_sha256=_run_sha256)
                     if _handled:
                         forum.append(_rec)
                         msgs.append({"role": "assistant", "content": answer})

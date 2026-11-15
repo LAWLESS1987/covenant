@@ -17664,3 +17664,44 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 **Status:** in source for the state, the mark and the lister; open for the content (built, measured, switched off) and the three items after it.
 
 ---
+
+### A430. [serious / security] An operator's signature let the model run any workshop script it named, and the script the child ran was read again after it was screened -- the signature now names the exact script (`run_sha256`), and the bytes hashed are the bytes screened and run -- IN SOURCE 2026-11-15
+
+**His words, 2026-11-15:** "Show the judge the content. Tie the signature. And deploy." This entry is the second: tie the signature. A428's open item 3 (binding the operator's authorisation for a RUN to the script's content hash, which three seats of the panel asked for) is this. Astra (Codex) began it from the handoff and stopped mid-way; Claude finished it.
+
+**Evidence (on main 3e914c3).**
+- `/m/agent`'s HANDS branch set `_may_run = _request_signed_by_registered(request)` and passed only that to `covenant_tetsu_hands.act`. A registered signature on a request made the request's RUN allowed, whatever script the model then named: the signature covered the request's bytes, and the request's bytes said nothing about the script.
+- `run()` read the file (text, `MAX_FILE` characters) and screened that, then wrote the runner to `.runner.py` inside his workshop, and the child opened the file again by name and executed the whole of it. Three gaps: a file changed between the screen and the child's read ran unscreened; a file longer than `MAX_FILE` was screened on its first part and run whole; and the runner itself was a workshop file that a script running beside it could overwrite after the parent wrote it and before the child started.
+
+**Fix (in source).**
+1. **The door** reads `run_sha256` from the request's JSON body only when `_may_run` is true -- the body's signature verified, so the field is inside the signed bytes -- and passes it to `act(answer, may_run=_may_run, run_sha256=...)`. An unsigned body is never read for it. Nothing else in `covenant_unified_v8.py` changed.
+2. **The hands.** `act()` and `run()` take `run_sha256`. Not passed at all (`UNBOUND`): an in-process caller, as before. Passed (None included): a binding, enforced. `run()` reads the file's bytes once (at most `MAX_FILE + 1`); a file over `MAX_FILE` is refused; a missing hash is refused naming the field (`running a script needs run_sha256 in the operator's signed request ...`); a value that is not 64 lowercase hex characters is refused; a hash that is not the sha256 of those bytes is refused, saying both. Then those same bytes are screened (`screen()` parses bytes, so a coding line is honoured the same way the child honours it) and handed to the child on its standard input; the runner is given to `python -I -c` and is no longer written into the workshop. Nothing reopens the file. A refused run is `refused` in its ledger row and starts no process; every run's row now carries `script_sha256` (the bytes that ran) and, when bound, `run_sha256`.
+3. **Node D's second lock still sees the call.** Node D's launcher wraps `covenant_tetsu_hands.run` with the older four-argument signature and calls the original with those four. `act()` hands the binding to `run()` through a context variable as well, so the wrapper is left in the path and the binding still arrives. If a wrapper ever ran the original on another thread, the binding would not arrive; that cannot be prevented from here, so it is not silent: the row is marked `binding_lost`.
+4. **The signing client.** `covenant_daily_plan.sign_json_request(key, method, path, payload, run_sha256=None)` (Astra's) puts the hash into the JSON body before signing and returns the body and headers together, refusing a malformed or conflicting hash. `covenant_mycelium.admit` and `covenant_spore.wrap_request` verify and carry the signed bytes unchanged; their docstrings say so (Astra's notes, kept). The other covenant clients that sign (`covenant_anchor`, `covenant_app`, `covenant_client`, `covenant_trader`, `covenant_watchdog`, `witness_memory_root`) sign `/mine` only, never a RUN, and are unchanged.
+
+**Repro.** `python test_a430_run_sha256.py` (the door's real HANDS branch, taken from the core's syntax tree and run in a Flask request context with real signatures, real runs; model and judge stubbed) and `python test_a430_run_signing.py`.
+
+**Driven both ways.**
+- On main's code: A430 4 of 17, A430S 1 of 13. The ones green on main are the preservation controls: an unsigned request still cannot run, a body changed after signing is still refused, an unverified body is not read, the practice loop runs (A430); the core's raw signer already covers the hash's bytes (A430S). Here: 17 of 17 and 13 of 13.
+- `test_th1_tetsu_hands.py` TH1.15 expected the runner file in the workshop after a run; it now expects only the script (the runner is not written there any more), said in the check. 31 of 31 here; on main's code the new TH1.15 is red (30 of 31).
+- Twelve mutations, each in a scratch copy, each caught: the refusal removed; the child reopening the file; the door not passing the hash; the door reading an unverified body; the binding passed by keyword only (lost through a four-argument wrapper); a missing hash read as no binding; the size cap dropped; act() bound by default (breaks the practice loop: PP1 red as well); the hash check made case- and space-blind; the runner a workshop file again; the client signing before adding the hash; the door turning a missing field into no binding.
+- Node D's launcher tests (`noded/test_hands_gate.py`, `noded/test_act_gate.py`, not in this tree), read-only: 11 of 11 and 11 of 11 against node D's own folder, and 11 of 11 and 11 of 11 from a scratch copy whose real-core test loads this branch.
+
+**Not bound by this.**
+- **The practice loop** (`covenant_tetsu_practice.attempt`) is owner-started and passes no signature and no hash; its runs are unbound, exactly as before. Bounding it -- a run count and an expiry per loop -- is the open next step the panel seats asked for. Also unbound: `python covenant_tetsu_hands.py --run`, which is the operator at the console.
+- **The script's arguments** (`HANDS RUN name.py ARGS`) are the model's; the hash names the bytes, not the arguments.
+- **The judge's view.** With `JUDGE_SEES_CONTENT` on (A428, A429), the judge reads the file when the gate is asked; the run reads it again afterwards. The run is bound, so only the signed bytes can run, but if the file changed between the two the judge saw something else. Unchanged here; it is part 1's code.
+
+**What a signer needs.** The hash is the sha256 of the workshop file's raw bytes, 64 lowercase hex characters, as `"run_sha256"` in the JSON body, added before the `X-Operator-*` headers are made, and the same bytes sent. A file written by `HANDS WRITE` is UTF-8 with `\n` line endings, so the text `HANDS READ` returns, encoded as UTF-8, hashes to the same value -- but only when the whole file came back (the door hands back at most `MAX_OUT` characters of it) and it has no `\r`. Not measured on a real phone or a real file.
+
+**The phone (private repository, not changed).** Its conversation turn builds a body with the text only and signs that body on each road (direct and through spore). It would need: an optional `run_sha256` added to that body before signing; a screen where the owner sees the whole script he is approving and the app computes the hash over those exact bytes; and nothing else on the road, since spore already carries the signed bytes unchanged. Until then, a RUN asked from the phone is refused with the message naming `run_sha256`, and LIST, READ, WRITE and PROPOSE are unchanged.
+
+**Noticed and left.** Under `python -I` the child ignores `PYTHONIOENCODING`, so on Windows a non-ASCII print comes back in the console's code page and is decoded as UTF-8 with replacement characters. It was so before this change.
+
+**Not changed.** Everything in `covenant_unified_v8.py` outside the HANDS branch; `covenant_tetsu_practice.py`; `JUDGE_SEES_CONTENT` and `_act_line` (part 1, A429); node D; the phone. No tombstone: no earlier claim is made untrue (A423 said a registered signature gates RUN, and it still does).
+
+**Pinned by** `test_a430_run_sha256.py`, `test_a430_run_signing.py`, `test_th1_tetsu_hands.py` TH1.14 and TH1.15.
+
+**Status:** in source on its branch; not deployed. Open: the phone's signer; bounding the practice loop; the arguments.
+
+---
