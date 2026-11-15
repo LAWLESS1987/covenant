@@ -249,6 +249,31 @@ Three things, in one process:
   *A257-130KB, 2026-10-04: "130 KB" is no longer so.* There are two students, and as
   committed they are 247,576 and 137,316 bytes; the nightly retrain grows them.
   A size copied into prose rots, so measure it: `ls -l fallback_model*.json`.
+
+  *A428, 2026-11-14: one gated act goes ahead undecided, and this page did not say so.*
+  The resident model's hands (`covenant_tetsu_hands.py`: a workshop folder of its own,
+  where it writes files and runs its own scripts) put a WRITE or a RUN to this same
+  quorum, and there a hold is not a refusal. A workshop write **proceeds** when the judge
+  holds and when nobody judged (the operator's decision, KNOWN_ISSUES A226). What bounds
+  it is not the judge: the workshop folder (a name that leaves it is refused) and the
+  size limits (`MAX_FILE` a file, `MAX_TOTAL` in all, in that file). A run under either
+  state also needs the operator's authority (a request signed by a registered key, or
+  the model's own in-process practice loop: A423), and then runs behind a screen, a
+  guard and a clock. A VIOLATES, or a gate that cannot be built, refuses both. Since
+  this date "nobody judged" is recorded as `not_judged` and no longer as `held`, and
+  every act that went ahead without a judgement carries `"unjudged": true` in its row,
+  listed by `python covenant_tetsu_hands.py --unjudged`. The sentences above are about
+  ledger transactions and are unchanged: a transaction the judge cannot decide is held,
+  never admitted.
+
+  **The judge of those acts is given one sentence about the act and not its content.**
+  Showing it the content (the text of the write, or the script's source, cut to fit
+  and said to be cut) is built and switched off, because of what it cost when it was
+  measured on the seats a clone has: the student seat convicts ordinary Python when it
+  is shown it, and a conviction refuses, so the practice curriculum's ten reference
+  solutions went through the gate 10 of 10 with the sentence and 0 of 10 with the
+  content. `python tools/hands_content_measure.py` is that measurement; switching it on
+  is the operator's decision (KNOWN_ISSUES A428, which says what is open).
 - **A propagation layer built as an address-event network.** A block announce is
   148 bytes because it carries an address, not a payload; the receiver fetches
   what it does not have. Link conductance is Hebbian, redundant announces are
