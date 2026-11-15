@@ -17664,3 +17664,19 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 **Status:** in source for the state, the mark and the lister; open for the content (built, measured, switched off) and the three items after it.
 
 ---
+
+### A431. [FIXED. WB1.14 went red on main and on every pull request from 2026-11-15 17:19 UTC: Gutenberg answered HTTP 403 to the public CI runner. A 403 stays a failure (A337); the door now proves itself on a second public page instead]
+
+**Evidence:** the scheduled sweep of main at 3e914c3 at 17:19 UTC, and the sweeps of pull requests #61 and #62, all read `B1: 40/41 passed`, the one failure `WB1.14`, the read of `https://www.gutenberg.org/ebooks/1497` answered `HTTP 403`. The same commit was green at 16:29. Nothing in the web door had changed: the far host had started refusing this runner.
+
+**Why A337 and A371 did not cover it:** A337 (his words: "make WB1.14 count a Gutenberg timeout as not run if the most logical") made a far host's 502/503/504 and a timeout NOT RUN and kept every 4xx a failure on purpose; WB1.15 pins that, 403 included. A371 added the runner's own "network unreachable". A far host that answers and refuses this machine is neither.
+
+**Fix:** A337's rule is unchanged: a 403 is not "the far host is down". When the first read is refused with exactly HTTP 403, the same door reads a second, unrelated public page (`https://www.iana.org/help/example-domains`) with the suite's own grant. If that page is read (title "Example Domains", more than 100 characters), the door is shown to work, Gutenberg's refusal is NOT RUN and named, and WB1.14b passes. If the second page is not read, WB1.14b fails. So a door that cannot read the public web still turns the suite red. `refused_this_machine` and `judge_refused_read` in `test_wb1_web.py`.
+
+**Driven both ways, no network:** WB1.26: a 403 plus a real second page is NOT RUN; a 403 with a second 403, a second page with the wrong title or too little text, no second read, a 401, 404 or 429, a door refusal, and an "ok" answer with status 403 are all "fail"; and a 403 is still not `far_host_unavailable`. Seven deliberate breaks of the rule: five turn WB1.26 or WB1.15 red by name, one crashes the suite (red), one (dropping the redundant `far_host_unavailable` guard inside WB1.26) is equivalent and is still caught by WB1.15.
+
+**Not measured:** whether the second page is readable from the CI runner (the pull request's own sweep says). On the PC this was written on, the real read is NOT RUN for a local certificate-chain reason, as before.
+
+**Status:** fixed (test-only change; the door's code is untouched).
+
+---

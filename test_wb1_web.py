@@ -300,6 +300,50 @@ def _scripted(*answers):
     return (lambda: asked.append(1) or next(it)), asked
 
 
+# A431 (2026-11-15): from 2026-11-15 Gutenberg answered HTTP 403 to the public CI runner, so WB1.14 failed on main
+# and on every pull request although nothing in the door had changed. A337 decided a 403 is NOT the far host being
+# unavailable, and that stays. Instead a 403 is answered by proving the door on a second, unrelated public page: if
+# that page is read, the door works and only Gutenberg's refusal of this machine is NOT RUN; if it is not, WB1.14
+# fails as before. So a door that cannot read the public web still turns the suite red.
+SECOND_PUBLIC = "https://www.iana.org/help/example-domains"
+
+
+def refused_this_machine(r):
+    """The far host answered, and refused this machine: HTTP 403 only (not 401, 404, 429 or a door refusal)."""
+    return not (r or {}).get("ok") and (r or {}).get("status") == 403
+
+
+def judge_refused_read(r, r2):
+    """(kind, detail) for a first read the far host refused with 403, given the read of the second public page.
+    kind is "not_run" only when the second page was really read (title and text); anything else is "fail"."""
+    if not refused_this_machine(r):
+        return "fail", "not a 403 from the far host: %s" % (r or {}).get("reason")
+    if (r2 or {}).get("ok") and "Example Domains" in (r2 or {}).get("title", "") and (r2 or {}).get("chars", 0) > 100:
+        return "not_run", ("Gutenberg refused this machine (HTTP 403); the same door read a second public page "
+                           "(%d characters, title %r), so the door works and the refusal is the far host's (A431)"
+                           % (r2["chars"], r2.get("title")))
+    return "fail", "Gutenberg refused this machine (HTTP 403) and the second public page was not read either: %s" % (
+        (r2 or {}).get("reason") or "no title or text")
+
+
+_refused = {"ok": False, "status": 403, "reason": "HTTP 403"}
+_second = {"ok": True, "status": 200, "title": "Example Domains", "chars": 900}
+_jcases = [((_refused, _second), "not_run"),
+           ((_refused, {"ok": False, "status": 403, "reason": "HTTP 403"}), "fail"),
+           ((_refused, {"ok": True, "status": 200, "title": "Something else", "chars": 900}), "fail"),
+           ((_refused, {"ok": True, "status": 200, "title": "Example Domains", "chars": 20}), "fail"),
+           ((_refused, None), "fail"),
+           (({"ok": False, "status": 404, "reason": "HTTP 404"}, _second), "fail"),
+           (({"ok": False, "status": 401, "reason": "HTTP 401"}, _second), "fail"),
+           (({"ok": False, "status": 429, "reason": "HTTP 429"}, _second), "fail"),
+           (({"ok": False, "reason": "redirect to a refused address (x): loopback"}, _second), "fail"),
+           (({"ok": True, "status": 403, "title": "x", "chars": 200}, _second), "fail")]
+_jwrong = [(c, want) for c, want in _jcases if judge_refused_read(*c)[0] != want]
+check("WB1.26 (A431) a far host's 403 is NOT RUN only when the same door reads a second public page; a 403 with no "
+      "second read, a wrong or empty second page, a 401/404/429, a door refusal or an ok answer is not",
+      not _jwrong and not far_host_unavailable(_refused), _jwrong)
+
+
 _good = {"ok": True, "status": 200, "title": "The Republic by Plato", "chars": 500}
 _far = {"ok": False, "status": 504, "reason": "HTTP 504"}
 _f1, _a1 = _scripted(_far, _good)
@@ -567,6 +611,15 @@ try:
         not_run("WB1.14 a real public read", "the far host's TLS chain did not verify (%s): the far host or the "
                 "network between is not serving a verifiable certificate; the door still refused to read over it, "
                 "so nothing was read -- it says nothing about this door (2026-10-19)" % r.get("reason"))
+    elif refused_this_machine(r):
+        # A431: Gutenberg answers 403 to this machine. A 403 is NOT the far host being down (A337 keeps it a failure),
+        # so it is not excused: the door must prove itself on a second public page instead, or WB1.14 fails.
+        r2 = W.read(SECOND_PUBLIC, grant_path=GRANT, ledger_path=LEDGER, max_chars=500)
+        kind, detail = judge_refused_read(r, r2)
+        if kind == "not_run":
+            not_run("WB1.14 a real public read (Gutenberg)", detail)
+        check("WB1.14b the door reads a second public page when the first host refuses this machine (A431)",
+              kind == "not_run", detail)
     else:
         check("WB1.14 a real public page is read (Gutenberg's Republic page), title and text", r.get("ok") and "Republic" in r.get("title", "") and r["chars"] > 100, r.get("reason"))
 except OSError:
