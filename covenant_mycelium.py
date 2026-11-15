@@ -112,7 +112,12 @@ def _record(row, path=None):
 
 
 def admit(req, body, tailnet_ok, signers_path=None, peers_path=None, ledger_path=None, now=None, seen=None):
-    """(ok, addr, who, how). The tailnet first; then a registered signer over any road; then an ally on its doors."""
+    """(ok, addr, who, how). The tailnet first; then a registered signer over any road; then an ally on its doors.
+
+    Clients can use covenant_daily_plan.sign_json_request(..., run_sha256=...)
+    to bind a hands RUN to approved bytes. This verifier consumes the returned
+    body unchanged; it must never add a hash after the caller has signed it.
+    """
     addr = (getattr(req, "remote_addr", "") or "").strip()
     if tailnet_ok(addr):
         return True, addr, "tailnet", "tailnet"

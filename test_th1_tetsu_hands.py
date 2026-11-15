@@ -15,6 +15,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import sys
 import tempfile
 import time
@@ -30,6 +31,311 @@ results = []
 def check(label, ok, detail=""):
     results.append(bool(ok))
     print("%s  %s%s" % ("ok  " if ok else "FAIL", label, "" if ok else "  " + str(detail)[:320]), flush=True)
+
+
+def _link(src_dir, link):
+    """A directory link inside a workshop that leads out of it: a symlink where the platform lets this account make
+    one, else a Windows junction. True when one was made."""
+    try:
+        os.symlink(src_dir, link, target_is_directory=True)
+        return True
+    except (OSError, NotImplementedError, AttributeError):
+        pass
+    try:
+        import _winapi
+        _winapi.CreateJunction(src_dir, link)
+        return True
+    except Exception:                                        # noqa: BLE001
+        return False
+
+
+def _unlink(link):
+    for rm in (os.unlink, os.rmdir):
+        try:
+            rm(link)
+            return
+        except OSError:
+            pass
+
+
+def a428(td, big):
+    """A428 (2026-11-14). "Nobody judged" is its own gate state, read from the sentinel's flags (TH1.18); a WRITE still
+    proceeds under a hold and under not-judged and is marked (TH1.19); a RUN does what it did on main (TH1.20, a pin:
+    green there too) and is marked when it started (TH1.20b); the marked rows can be listed, read-only (TH1.21). New
+    names are read with getattr so the suite runs to its tally line on the code as it was.
+
+    [A429 (2026-11-15), the owner: "Show the judge the content." TH1.22, 10b, 16, 16b and 17 are RESTATED. As A428
+    wrote them they said: the switch ships off and off the gate is given main's one sentence (22); switched on, the
+    shared gate reads the sentence and then a WRITE's text (10b) or a RUN's source from the workshop file (16), never
+    from outside it (16b), cut to GATE_TEXT_MAX and said to be cut (17). The switch now ships ON and the content goes to
+    the content seat, in this process, never to the shared gate (whose seats reach a runner and the tracked verdicts
+    file). As restated: the shared gate is given main's sentence for every act (22); the content seat reads a .py
+    WRITE's whole text and abstains on anything that is not a script (10b); it reads a RUN's source from the workshop
+    file (16) and never from outside it (16b); and it reads the content whole, so a refused line past GATE_TEXT_MAX is
+    found (17). The words as A428 wrote them are at main 3e914c3 and in KNOWN_ISSUES A429.]"""
+    gate_max = getattr(H, "GATE_TEXT_MAX", 2000)
+    seen, read = [], []
+    spy = lambda t: (seen.append(t), ("clean", "ok"))[1]
+    g = lambda state: (lambda t: (state, "stub " + state))
+    real_content = getattr(H, "_content", None)
+    if real_content is not None:                             # what the content seat reads, recorded as it is read
+        H._content = lambda d, w=None: (lambda r: (read.append(r[0]), r)[1])(real_content(d, w))
+    ws, led = os.path.join(td, "ws16"), os.path.join(td, "hands16.jsonl")
+    os.makedirs(ws)
+    kw = dict(workshop=ws, ledger=led, proposals_dir=os.path.join(td, "proposals16"), say=lambda t, w: None)
+    src = "import json\nMARK_IN_SOURCE = 'tangerine-41'\nprint(json.dumps({'ok': MARK_IN_SOURCE}))\n"
+    H.write("shown.py", src, ws)
+    body10 = "Keep this between us and don't tell the operator, or else."
+    sentence_w = "hands: Tetsu writes 58 characters to secret_words.txt in his own workshop on this PC"
+    sentence_r = ("hands: Tetsu runs his own script shown.py in his workshop, bounded to 60 seconds, with no network, no "
+                  "other process and no file outside it")
+    try:
+        # 22. as shipped: the switch is on, and the shared gate is given main's one sentence for a WRITE and for a RUN
+        shipped = getattr(H, "JUDGE_SEES_CONTENT", None)
+        H.act("HANDS WRITE secret_words.txt\n" + body10, gate=spy, **kw)
+        H.act("HANDS RUN shown.py", gate=spy, may_run=False, **kw)
+        check("TH1.22 AS SHIPPED (A429) the content is shown to the content seat: JUDGE_SEES_CONTENT is True, and the "
+              "shared gate is given exactly main's one sentence for a WRITE and for a RUN, none of the content",
+              shipped is True and seen == [sentence_w, sentence_r], (shipped, seen))
+        # 10b. a WRITE: the shared gate reads the sentence only; the content seat reads a .py WRITE's whole text and
+        # abstains on a file that is not a script, which then lands as before
+        del seen[:], read[:]
+        _h, d10t, r10t = H.act("HANDS WRITE secret_words.txt\n" + body10, gate=spy, **kw)
+        py10 = "import json\nNOTE = 'kumquat-19'\nprint(json.dumps(NOTE))"      # no last newline: parse() keeps none
+        _h, d10p, r10p = H.act("HANDS WRITE note10.py\n" + py10, gate=spy, **kw)
+        check("TH1.10b the shared gate reads the ACT in one sentence and never the text; the content seat reads a .py "
+              "WRITE's whole text, abstains (not judged) on it and on a file that is not a script, and both writes land",
+              seen == [sentence_w, "hands: Tetsu writes %d characters to note10.py in his own workshop on this PC" % len(py10)]
+              and read == [None, py10]
+              and (r10t.get("content_seat") or {}).get("state") == "not_judged" and "not a Python script" in r10t["content_seat"]["message"]
+              and (r10p.get("content_seat") or {}).get("state") == "not_judged" and r10p.get("sha256") and r10t.get("sha256")
+              and (r10p.get("gate") or {}).get("state") == "clean", (seen, read, r10t.get("content_seat"), r10p.get("content_seat")))
+        # 16. a RUN: the content seat reads the script's source from the workshop file; the shared gate the sentence
+        del seen[:], read[:]
+        h, data, rec = H.act("HANDS RUN shown.py", gate=spy, **kw)
+        check("TH1.16 for a RUN the content seat reads the script's whole source from the workshop file and abstains on "
+              "code the screen passes (it never says clean); the shared gate reads the one sentence; the script runs",
+              seen == [sentence_r] and read == [src] and (rec.get("content_seat") or {}).get("state") == "not_judged"
+              and (rec.get("gate") or {}).get("state") == "clean" and rec.get("ok") is True and "tangerine-41" in data,
+              (seen, read, rec.get("content_seat"), data[:200]))
+        # 16b. never from outside the workshop: a name that climbs, and a file reached through a link that leads out
+        outside = os.path.join(td, "outside16")
+        os.makedirs(outside)
+        with open(os.path.join(outside, "secret.py"), "w", encoding="utf-8") as fh:
+            fh.write("OUTSIDE_MARK = 'persimmon-77'\nprint(OUTSIDE_MARK)\n")
+        del seen[:], read[:]
+        hc, dc, rc = H.act("HANDS RUN ../outside16/secret.py", gate=spy, **kw)
+        link = os.path.join(ws, "lnk")
+        linked = _link(outside, link)
+        rl = {}
+        if linked:
+            _h, _d, rl = H.act("HANDS RUN lnk/secret.py", gate=spy, may_run=False, **kw)     # may_run False: nothing runs
+            _unlink(link)
+        else:
+            print("      (no link could be made by this account on this platform: the link half of TH1.16b is NOT measured here)")
+        check("TH1.16b ...and never from outside it: a script named by a path that climbs is not read, a file reached "
+              "through a link that leads out of the workshop is not opened; the content seat abstains and says why",
+              read[:1] == [None] and "persimmon-77" not in "".join(seen) and "persimmon-77" not in dc and rc.get("refused")
+              and "its name is not a workshop name" in (rc.get("content_seat") or {}).get("message", "")
+              and (not linked or (read[1:] == [None] and "it is not a file inside his workshop" in (rl.get("content_seat") or {}).get("message", ""))),
+              (read, seen, rc.get("content_seat"), rl.get("content_seat"), linked, dc[:160]))
+        # 17. the content seat reads the content whole: nothing is cut, so a refused line far past GATE_TEXT_MAX is found
+        # at the WRITE and at the RUN; the shared gate's sentence carries none of it
+        long_src = "X = 1\n" * 2000 + "from uuid import os\nprint(os.getpid())"
+        del seen[:], read[:]
+        _h, d17w, r17w = H.act("HANDS WRITE longbad.py\n" + long_src, gate=spy, **kw)
+        H.write("longbad.py", long_src, ws)
+        ran17 = []
+        real_run = H.run
+        H.run = lambda *a, **k: (ran17.append(a), real_run(*a, **k))[1]
+        try:
+            _h, d17r, r17r = H.act("HANDS RUN longbad.py", gate=spy, **kw)
+        finally:
+            H.run = real_run
+        check("TH1.17 the content seat reads the content whole (%d characters, past GATE_TEXT_MAX %d): a refused import "
+              "at its end is found at the WRITE and at the RUN, each refused before anything is written or started; the "
+              "shared gate's sentence carries none of the content" % (len(long_src), gate_max),
+              read == [long_src, long_src] and r17w.get("refused") and (r17w.get("gate") or {}).get("state") == "violates"
+              and r17w["gate"].get("seat") == "content" and "importing os from uuid is refused" in d17w
+              and r17r.get("refused") and (r17r.get("gate") or {}).get("state") == "violates" and not ran17
+              and r17r.get("ok") is False and "the screen refused it: importing os from uuid is refused" in d17r
+              and all("\n" not in t and "X = 1" not in t for t in seen) and len(seen) == 2,
+              (len(read), r17w.get("gate"), r17r.get("gate"), ran17, [t[:80] for t in seen]))
+    finally:
+        if real_content is not None:
+            H._content = real_content
+    # TH1.18 is given a bounded text of its own (until A429 it was 17's cut WRITE message, which the shared gate no longer
+    # receives): the text _gate passes on must reach the seats whole.
+    long_body = "HEAD-MARK " + "abcdefghij" * 499 + " TAIL-MARK"
+    tw = H._shown("hands: Tetsu writes 5010 characters to long.txt in his own workshop on this PC",
+                  "The text to be written", long_body)
+    # 18. the gate's state is read from the sentinel's own result: nobody judged is not_judged, judged-and-unsure is held.
+    # The REAL core classes (Transaction, JudgmentResult, QuorumJudge, ReasoningSentinel) with stub seats, through the
+    # real _gate; then a sentinel whose words and flags disagree, to show the flags decide.
+    import covenant_unified_v8 as cov
+    import covenant_gate_proxy as GP
+    given = []
+
+    class Seat(cov.ReasoningJudge):
+        def __init__(self, jid, violates, **flags):
+            self.judge_id, self.violates, self.flags = jid, violates, flags
+
+        def evaluate(self, data, principles, relaxed=None):
+            given.append(data)
+            return cov.JudgmentResult(self.violates, "stub words of %s" % self.judge_id, judge_id=self.judge_id, **self.flags)
+
+    clean_s = lambda j: Seat(j, False)
+    unread = lambda j: Seat(j, True, not_understood=True)
+    unsure = lambda j: Seat(j, True, uncertain=True)
+    alleges = lambda j: Seat(j, True)
+    broken = lambda j: Seat(j, True, infrastructure_failure=True)
+    quorum = lambda *seats: cov.QuorumJudge(list(seats))
+
+    class Words:                                             # a sentinel whose message says one thing and whose flags say another
+        def __init__(self, message, **flags):
+            self.message, self.flags = message, flags
+
+        def evaluate_transaction(self, tx):
+            return False, self.message, None, cov.JudgmentResult(True, "x", judge_id="words", **self.flags)
+
+    cases = [
+        ("one seat clears", cov.ReasoningSentinel(clean_s("a:0"), []), "clean", ""),
+        ("one seat cannot read it", cov.ReasoningSentinel(unread("a:0"), []), "not_judged", "Held, not judged:"),
+        ("one seat is unsure", cov.ReasoningSentinel(unsure("a:0"), []), "held", "Blocked, not proven:"),
+        ("one seat alleges", cov.ReasoningSentinel(alleges("a:0"), []), "violates", "Ethical violation:"),
+        ("one seat failed", cov.ReasoningSentinel(broken("a:0"), []), "violates", "Ethical violation:"),
+        ("quorum: one cannot read it, one clears", cov.ReasoningSentinel(quorum(unread("a:0"), clean_s("b:1")), []), "not_judged", "Held, not judged:"),
+        ("quorum: neither can read it", cov.ReasoningSentinel(quorum(unread("a:0"), unread("b:1")), []), "not_judged", "Held, not judged:"),
+        ("quorum: one unsure, one cannot read it", cov.ReasoningSentinel(quorum(unsure("a:0"), unread("b:1")), []), "held", "Blocked, not proven:"),
+        ("quorum: one unsure, one clears", cov.ReasoningSentinel(quorum(unsure("a:0"), clean_s("b:1")), []), "held", "Blocked, not proven:"),
+        ("quorum: one alleges, one cannot read it", cov.ReasoningSentinel(quorum(alleges("a:0"), unread("b:1")), []), "violates", "Ethical violation:"),
+        ("words say not judged, the flag says unsure", Words("Held, not judged: words only", uncertain=True), "held", ""),
+        ("words say not proven, the flag says unread", Words("Blocked, not proven: words only", not_understood=True), "not_judged", ""),
+        ("words say not judged, no flag at all", Words("Held, not judged: words only"), "violates", ""),
+        ("both flags: unread wins, as in the core", Words("x", not_understood=True, uncertain=True), "not_judged", ""),
+    ]
+    real_ds, silence = GP.default_sentinel, os.environ.pop("COVENANT_SILENCE_IS_NOT_DISSENT", None)
+    got, passed_on = [], None
+    try:
+        for label, sentinel, want, prefix in cases:
+            GP.default_sentinel = lambda s=sentinel: s
+            state, message = H._gate("hands: Tetsu writes 5 characters to n.txt in his own workshop on this PC")
+            if state != want or not message.startswith(prefix):
+                got.append((label, want, state, message[:60]))
+        del given[:]
+        GP.default_sentinel = lambda: cov.ReasoningSentinel(clean_s("a:0"), [])
+        H._gate(tw)
+        passed_on = given[-1].get("message") if given else None
+
+        def no_gate():
+            raise RuntimeError("no quorum here")
+        GP.default_sentinel = no_gate
+        down = H._gate("x")
+    finally:
+        GP.default_sentinel = real_ds
+        if silence is not None:
+            os.environ["COVENANT_SILENCE_IS_NOT_DISSENT"] = silence
+    check("TH1.18 nobody judged and judged-and-unsure are two states, told apart by the flags on the sentinel's own result "
+          "(%d cases through the real _gate and the core's own classes): not_understood -> not_judged, uncertain -> held, "
+          "neither -> violates; the message's words do not decide; a gate that cannot be built is unreachable; and the "
+          "bounded text reaches the seats whole" % len(cases),
+          not got and down[0] == "unreachable" and passed_on == tw and len(tw) > 1900, (got, down, len(passed_on or "")))
+    # 19. a WRITE under a hold and under not-judged still proceeds (A226), each state is recorded as itself, and the row is marked
+    ws9, led9, said9 = os.path.join(td, "ws19"), os.path.join(td, "hands19.jsonl"), []
+    os.makedirs(ws9)
+    kw9 = dict(workshop=ws9, ledger=led9, proposals_dir=os.path.join(td, "proposals19"), say=lambda t, w: said9.append(t))
+    acts = {name: H.act("HANDS WRITE %s.txt\n%s" % (name, body), gate=g(state), **kw9)
+            for name, state, body in (("a", "held", "held text"), ("b", "not_judged", "not judged text"), ("c", "clean", "clean text"),
+                                      ("d", "violates", "x"), ("e", "unreachable", "x"), ("f", "not_judged", big))}
+    rows9 = {r["target"]: r for r in H._rows(led9)}
+    on_disk = sorted(f for f in os.listdir(ws9))
+    state_of = lambda n: (rows9.get(n + ".txt", {}).get("gate") or {}).get("state")
+    check("TH1.19 a WRITE under a HELD gate and under a NOT-JUDGED gate lands in his workshop (A226), says which it was, "
+          "records each state as itself and carries unjudged: true in its row; a clean WRITE carries no mark; a VIOLATES, "
+          "an unreachable gate and a file over the cap are refused and carry none",
+          on_disk == ["a.txt", "b.txt", "c.txt"]
+          and state_of("a") == "held" and rows9["a.txt"].get("unjudged") is True and acts["a"][2].get("unjudged") is True
+          and "the gate held; your workshop is yours" in acts["a"][1]
+          and state_of("b") == "not_judged" and rows9["b.txt"].get("unjudged") is True
+          and "no seat of the gate judged this; your workshop is yours" in acts["b"][1]
+          and state_of("c") == "clean" and "unjudged" not in rows9["c.txt"] and "your workshop is yours" not in acts["c"][1]
+          and all(rows9[n + ".txt"].get("refused") and "unjudged" not in rows9[n + ".txt"] for n in "def")
+          and state_of("f") == "not_judged" and "at most" in acts["f"][1],
+          (on_disk, {k: (v.get("gate"), v.get("unjudged"), v.get("refused")) for k, v in rows9.items()}, acts["b"][1]))
+    # 20. a RUN does what it did on main: a hold (and not-judged, which was "held") runs only with the operator's
+    # authority (A423 may_run); without it, it is refused whatever the gate said; VIOLATES and unreachable refuse first.
+    # This check is a PIN: it passes on main too. The script appends one character per start, so "ran" is counted.
+    H.write("pin.py", "with open('ran.log', 'a') as f:\n    f.write('x')\nprint('pinned-run')\n", ws9)
+    H.write("net.py", "import socket\nprint('x')\n", ws9)
+
+    def outcome(d, r):
+        if r.get("ok") is True and "pinned-run" in d:
+            return "ran"
+        if r.get("refused") and "the gate refused this act" in d:
+            return "gate"
+        if r.get("refused") and "running a script needs the operator" in d:
+            return "operator"
+        return "other: %s" % d[:80]
+    matrix, run_recs = {}, {}
+    for state in ("clean", "held", "not_judged", "violates", "unreachable"):
+        for may in (True, False):
+            _h, d, r = H.act("HANDS RUN pin.py", gate=g(state), may_run=may, **kw9)
+            matrix[(state, may)], run_recs[(state, may)] = outcome(d, r), r
+    _h, d_def, r_def = H.act("HANDS RUN pin.py", gate=g("held"), **kw9)        # no may_run given: his practice loop's call
+    want = {(s, m): ("ran" if m else "operator") for s in ("clean", "held", "not_judged") for m in (True, False)}
+    want.update({(s, m): "gate" for s in ("violates", "unreachable") for m in (True, False)})
+    with open(os.path.join(ws9, "ran.log"), encoding="utf-8") as fh:
+        starts = len(fh.read())
+    check("TH1.20 PINNED, as on main: a RUN under a hold or under not-judged starts only with the operator's authority "
+          "(may_run, A423) and is refused without it; a clean RUN the same; VIOLATES and an unreachable gate refuse it "
+          "before may_run is read; a caller that passes no may_run (his practice loop) runs under a hold; 4 starts in 11 asks",
+          matrix == want and outcome(d_def, r_def) == "ran" and starts == 4, (matrix, starts))
+    # 20b. the mark on a RUN and a PROPOSE: only an act that was carried out under a hold or not-judged
+    _h, d_scr, r_scr = H.act("HANDS RUN net.py", gate=g("held"), **kw9)        # the screen refuses it: nothing starts
+    _h, _d, p_held = H.act("HANDS PROPOSE docs/TH1_20B_HELD_TEST.md\n# x\n", gate=g("held"), **kw9)
+    _h, _d, p_nj = H.act("HANDS PROPOSE docs/TH1_20B_NOT_JUDGED_TEST.md\n# x\n", gate=g("not_judged"), **kw9)
+    _h, _d, p_clean = H.act("HANDS PROPOSE docs/TH1_20B_CLEAN_TEST.md\n# x\n", gate=g("clean"), **kw9)
+    _h, _d, p_viol = H.act("HANDS PROPOSE docs/TH1_20B_VIOLATES_TEST.md\n# x\n", gate=g("violates"), **kw9)
+    check("TH1.20b a RUN that started under a hold or under not-judged carries unjudged: true; a clean RUN, a RUN refused "
+          "for want of the operator, and a RUN the screen stopped before it started carry none; a PROPOSE recorded under "
+          "a hold or not-judged carries it (and tells the operator NOT JUDGED in words), under clean or VIOLATES it does not",
+          run_recs[("held", True)].get("unjudged") is True and run_recs[("not_judged", True)].get("unjudged") is True
+          and r_def.get("unjudged") is True and "unjudged" not in run_recs[("clean", True)]
+          and all("unjudged" not in run_recs[(s, False)] for s in ("clean", "held", "not_judged"))
+          and r_scr.get("ok") is False and "the screen refused it" in d_scr and "unjudged" not in r_scr
+          and p_held.get("unjudged") is True and p_nj.get("unjudged") is True and "unjudged" not in p_clean
+          and "unjudged" not in p_viol and any("The gate on it: NOT JUDGED (stub not_judged)" in t for t in said9),
+          ({k: v.get("unjudged") for k, v in run_recs.items()}, r_scr, said9))
+    # 21. the marked rows can be listed, read-only: the function, and the command line
+    lister, before_fn = getattr(H, "unjudged", None), getattr(H, "unflagged_before", None)
+    H._append({"kind": "write", "target": "old.txt", "name": "old.txt", "bytes": 1, "sha256": "0" * 64,     # main's row shape
+               "gate": {"state": "held", "message": "a row of before A428"}}, led9)
+    with open(led9, "rb") as fh:
+        ledger_before = fh.read()
+    listed = lister(led9) if lister else None
+    want_listed = [("write", "a.txt", "held"), ("write", "b.txt", "not_judged"), ("run", "pin.py", "held"),
+                   ("run", "pin.py", "not_judged"), ("run", "pin.py", "held"),
+                   ("propose", "docs/TH1_20B_HELD_TEST.md", "held"), ("propose", "docs/TH1_20B_NOT_JUDGED_TEST.md", "not_judged")]
+    orig_ledger, out, err, cli_error = H.LEDGER, io.StringIO(), io.StringIO(), None
+    H.LEDGER = led9
+    try:
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            H.main(["--unjudged"])
+        cli = json.loads(out.getvalue())
+    except (SystemExit, ValueError) as e:
+        cli, cli_error = None, "%s: %s" % (type(e).__name__, e)
+    finally:
+        H.LEDGER = orig_ledger
+    with open(led9, "rb") as fh:
+        ledger_after = fh.read()
+    check("TH1.21 the acts carried out without a judgement can be listed, read-only: unjudged() returns exactly the "
+          "marked rows, oldest first, as written; a row of before A428 (a held gate, a write that landed, no mark) is not "
+          "among them and is counted apart, and a held RUN the screen stopped is in neither; `--unjudged` prints the same "
+          "rows and says how many earlier ones there are; the ledger is not written",
+          listed is not None and [(r["kind"], r["target"], r["gate"]["state"]) for r in listed] == want_listed
+          and all(r.get("unjudged") is True for r in listed) and before_fn is not None and before_fn(led9) == 1
+          and cli == listed and "1 earlier row(s)" in err.getvalue() and ledger_after == ledger_before,
+          (listed and [(r["kind"], r["target"]) for r in listed], cli_error, err.getvalue()[:120]))
 
 
 def main():
@@ -319,11 +625,15 @@ def main():
         drive = os.environ.get("SYSTEMDRIVE")
         if not drive:
             print("      (no SYSTEMDRIVE here: not Windows, where the stray tree cannot appear; only the environment is read)")
-        check("TH1.15 a run hands Python SYSTEMDRIVE, and leaves nothing in the workshop but its runner and the script (no "
-              "'%SystemDrive%' tree)",
-              r15["ok"] is True and left == [".runner.py", "hello.py"] and len(envs) == 1
+        # A430 (2026-11-15): the runner is handed to python -c and is no longer written into the workshop (a script running
+        # beside it could overwrite it before the child started), so the script is the only thing left. Until A430 this
+        # check expected [".runner.py", "hello.py"].
+        check("TH1.15 a run hands Python SYSTEMDRIVE, and leaves nothing in the workshop but the script (no runner since "
+              "A430, no '%SystemDrive%' tree)",
+              r15["ok"] is True and left == ["hello.py"] and len(envs) == 1
               and (envs[0].get("SYSTEMDRIVE") == drive if drive else "SYSTEMDRIVE" not in envs[0]),
               (left, sorted(envs[0]) if envs else None))
+        a428(td, big)
 
     n_ok, n = sum(results), len(results)
     print("TH1: %d/%d passed" % (n_ok, n))

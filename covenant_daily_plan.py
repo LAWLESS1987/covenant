@@ -881,6 +881,30 @@ def sign_headers(key, method, path, body):
     return cov.sign_operator_request(key, pubkey_pem(key), method, path, body)
 
 
+def sign_json_request(key, method, path, payload, run_sha256=None):
+    """Return (body bytes, headers) together, optionally authorising one script.
+
+    A430: run_sha256 is the SHA-256 of the approved file's raw bytes, supplied
+    by the operator before signing. Send the returned bytes unchanged (including
+    through mycelium or spore); do not re-serialise or append a hash afterward.
+    The phone signer needs the same field in its JSON before making its headers.
+    Omitting the hash keeps ordinary requests unchanged; it cannot authorise RUN.
+    """
+    data = dict(payload)
+    if run_sha256 is not None:
+        if "run_sha256" in data and data["run_sha256"] != run_sha256:
+            raise ValueError("conflicting run_sha256 values")
+        data["run_sha256"] = run_sha256
+    if "run_sha256" in data:
+        digest = data["run_sha256"]
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise ValueError("run_sha256 must be 64 lowercase hexadecimal characters")
+    body = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    headers = sign_headers(key, method, path, body)
+    headers["Content-Type"] = "application/json"
+    return body, headers
+
+
 def decide_locally(decision_word, note="", key_path=None, plan_dir=None, approvals=None, signers_path=None, now=None):
     """Approve or decline today's plan with this PC's node key, through the
     same verification the route applies -- one ledger, one shape."""

@@ -512,6 +512,48 @@ w3, l3 = fresh()
 r = PR.practise(PR.BY_ID["flatten"], scripted([good], []), gate=lambda t: ("held", "abstained"), workshop=w3, ledger=l3,
                 hands_ledger=HLED, say=lambda *_a: None)
 check("PP1.6b a HELD gate does not refuse in his own workshop (an abstention is not a veto, as in his hands)", r["solved_round"] == 1, r)
+# PP1.6c (A428, 2026-11-14). "Nobody judged" is its own gate state now -- it was "held" until this date -- and the loop
+# handles it exactly as it handles a hold: the write and the run go ahead and the task is solved. His hands record the
+# state as itself and mark both acts, under either state. As shipped the gate is given one sentence about each act,
+# as on main. The loop passes no may_run: its authority to run is act()'s default, as on main.
+for state in ("held", "not_judged"):
+    w3c, l3c = fresh()
+    hl3c = os.path.join(tempfile.mkdtemp(prefix="pp1_hl6c_"), "hands.jsonl")
+    given6c = []
+    r = PR.practise(PR.BY_ID["flatten"], scripted([good], []), gate=lambda t, s=state: (given6c.append(t), (s, "nobody decided"))[1],
+                    workshop=w3c, ledger=l3c, hands_ledger=hl3c, say=lambda *_a: None)
+    acts6c = [(x.get("kind"), (x.get("gate") or {}).get("state"), x.get("unjudged")) for x in HANDS._rows(hl3c)]
+    check("PP1.6c a %s gate does not stop the practice: solved in round 1, and his hands record the write and the run "
+          "under that state, each marked unjudged; as shipped the gate was given one sentence about each and none of his file"
+          % state.upper().replace("_", " "),
+          r["solved_round"] == 1 and not r.get("stop") and acts6c == [("write", state, True), ("run", state, True)]
+          and len(given6c) == 2 and all("\n" not in t and "def flatten" not in t for t in given6c)
+          and given6c[0].startswith("hands: Tetsu writes ") and given6c[1].startswith("hands: Tetsu runs his own script practice/flatten_check.py "),
+          (r, acts6c, [t[:120] for t in given6c]))
+# PP1.6d (A428; RESTATED by A429, 2026-11-15). As A428 wrote it: switched on, the gate is given his file and then the
+# check file's source through the loop, and the switch is off as shipped. A429 switched it on and moved the content
+# off the shared gate (whose seats can reach a runner and the tracked verdicts file) to his hands' content seat, in
+# this process. As restated: as shipped the switch is on, the shared gate is given one sentence about each act, and the
+# content seat reads his file and then the check file's source, abstains on both, and the task is solved.
+w3d, l3d = fresh()
+given6d, read6d, shipped6d = [], [], getattr(HANDS, "JUDGE_SEES_CONTENT", None)
+real6d = getattr(HANDS, "_content", None)
+if real6d is not None:
+    HANDS._content = lambda d, w=None: (lambda x: (read6d.append(x[0]), x)[1])(real6d(d, w))
+try:
+    r = PR.practise(PR.BY_ID["flatten"], scripted([good], []), gate=lambda t: (given6d.append(t), ("clean", "read it"))[1],
+                    workshop=w3d, ledger=l3d, hands_ledger=HLED, say=lambda *_a: None)
+finally:
+    if real6d is not None:
+        HANDS._content = real6d
+check("PP1.6d as shipped (A429) the switch is on: through the practice loop the shared gate is given one sentence about "
+      "his write and his run and none of his file, and the content seat reads his file and then the check file's source; "
+      "the task is solved",
+      shipped6d is True and r["solved_round"] == 1 and len(given6d) == 2 and all("\n" not in t for t in given6d)
+      and not any(REF["flatten"].strip() in t for t in given6d) and len(read6d) == 2
+      and read6d[0] is not None and REF["flatten"].strip() in read6d[0]
+      and read6d[1] is not None and REF["flatten"].strip() in read6d[1] and "_PR_CHECKS" in read6d[1],
+      (shipped6d, r, [t[:120] for t in given6d], [str(x)[:60] for x in read6d]))
 
 w4, l4 = fresh()
 told = []

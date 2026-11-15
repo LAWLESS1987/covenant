@@ -694,6 +694,10 @@ def _rates(d):
             out[name + "_tps"] = round(float(n) * 1000.0 / float(ms), 2)
     return out
 
+# A427 (2026-11-14): under COVENANT_MODEL_STUB, a suite may queue exact answers here (one popped per ask), so it
+# can drive a door act without spelling the act word in the caller's message. Empty in production and by default.
+_STUB_ANSWERS = []
+
 
 def ask(messages, max_tokens=700, temperature=0.3, timeout=180, logprobs=False):
     """One chat completion. messages: [{"role","content"}...]. Returns (text, meta) or raises.
@@ -703,6 +707,12 @@ def ask(messages, max_tokens=700, temperature=0.3, timeout=180, logprobs=False):
     inference -- to decide whether to reach the octopus leg out (covenant_leg)."""
     if os.environ.get("COVENANT_MODEL_STUB"):
         last = messages[-1]["content"] if messages else ""
+        # A427 (2026-11-14): a scripted-answer QUEUE. A suite can make the stub emit an act (MOLTBOOK, HANDS, ...)
+        # WITHOUT spelling the act word in the caller's own text -- which the act-word door guard (A427) would hold.
+        # Each ask pops the next queued answer; when the queue is empty the "STUB>> " echo and the default below are
+        # unchanged, so existing suites are untouched.
+        if _STUB_ANSWERS:
+            return _STUB_ANSWERS.pop(0), {"model": "stub", "tokens": 0, "ms": 0}
         # A scripted answer (2026-09-21, A175): a user line beginning "STUB>> " is
         # returned verbatim, so a suite can make the stub "decide" a directive
         # (FETCH, MOLTBOOK) and drive the door's own handling of it.
