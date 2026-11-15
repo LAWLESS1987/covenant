@@ -530,24 +530,30 @@ for state in ("held", "not_judged"):
           and len(given6c) == 2 and all("\n" not in t and "def flatten" not in t for t in given6c)
           and given6c[0].startswith("hands: Tetsu writes ") and given6c[1].startswith("hands: Tetsu runs his own script practice/flatten_check.py "),
           (r, acts6c, [t[:120] for t in given6c]))
-# PP1.6d (A428): with JUDGE_SEES_CONTENT switched on (it is off as shipped: built, measured, the operator's to switch),
-# what the gate is given through the loop is his file, and then the source of the check file that runs.
+# PP1.6d (A428; RESTATED by A429, 2026-11-15). As A428 wrote it: switched on, the gate is given his file and then the
+# check file's source through the loop, and the switch is off as shipped. A429 switched it on and moved the content
+# off the shared gate (whose seats can reach a runner and the tracked verdicts file) to his hands' content seat, in
+# this process. As restated: as shipped the switch is on, the shared gate is given one sentence about each act, and the
+# content seat reads his file and then the check file's source, abstains on both, and the task is solved.
 w3d, l3d = fresh()
-given6d, shipped6d = [], getattr(HANDS, "JUDGE_SEES_CONTENT", None)
-HANDS.JUDGE_SEES_CONTENT = True
+given6d, read6d, shipped6d = [], [], getattr(HANDS, "JUDGE_SEES_CONTENT", None)
+real6d = getattr(HANDS, "_content", None)
+if real6d is not None:
+    HANDS._content = lambda d, w=None: (lambda x: (read6d.append(x[0]), x)[1])(real6d(d, w))
 try:
     r = PR.practise(PR.BY_ID["flatten"], scripted([good], []), gate=lambda t: (given6d.append(t), ("clean", "read it"))[1],
                     workshop=w3d, ledger=l3d, hands_ledger=HLED, say=lambda *_a: None)
 finally:
-    if shipped6d is None:
-        del HANDS.JUDGE_SEES_CONTENT
-    else:
-        HANDS.JUDGE_SEES_CONTENT = shipped6d
-check("PP1.6d switched on, the gate is given his file and then the check file's source through the practice loop; "
-      "and the switch is off as shipped",
-      shipped6d is False and r["solved_round"] == 1 and len(given6d) == 2
-      and REF["flatten"].strip() in given6d[0] and "The text to be written (all " in given6d[0]
-      and REF["flatten"].strip() in given6d[1] and "The script's source (" in given6d[1], (shipped6d, r, [t[:120] for t in given6d]))
+    if real6d is not None:
+        HANDS._content = real6d
+check("PP1.6d as shipped (A429) the switch is on: through the practice loop the shared gate is given one sentence about "
+      "his write and his run and none of his file, and the content seat reads his file and then the check file's source; "
+      "the task is solved",
+      shipped6d is True and r["solved_round"] == 1 and len(given6d) == 2 and all("\n" not in t for t in given6d)
+      and not any(REF["flatten"].strip() in t for t in given6d) and len(read6d) == 2
+      and read6d[0] is not None and REF["flatten"].strip() in read6d[0]
+      and read6d[1] is not None and REF["flatten"].strip() in read6d[1] and "_PR_CHECKS" in read6d[1],
+      (shipped6d, r, [t[:120] for t in given6d], [str(x)[:60] for x in read6d]))
 
 w4, l4 = fresh()
 told = []

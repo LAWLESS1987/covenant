@@ -274,6 +274,13 @@ Three things, in one process:
   solutions went through the gate 10 of 10 with the sentence and 0 of 10 with the
   content. `python tools/hands_content_measure.py` is that measurement; switching it on
   is the operator's decision (KNOWN_ISSUES A428, which says what is open).
+  [A429, 2026-11-15, the owner: "Show the judge the content." The paragraph above is as
+  it was. The content is now shown, to a seat of its own: the shared judge is still given
+  the one sentence, and the text of a `.py` write or a run's source goes to the hands'
+  content seat, in the same process, which refuses what the script screen refuses and
+  otherwise abstains. Measured with the same tool: 10 of 10 reference solutions pass,
+  and a script that reaches `os` through `uuid` is refused at its write and its run.
+  The content of prose (a `.txt`, a `.md`) is read by no judge.]
 - **A propagation layer built as an address-event network.** A block announce is
   148 bytes because it carries an address, not a payload; the receiver fetches
   what it does not have. Link conductance is Hebbian, redundant announces are

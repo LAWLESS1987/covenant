@@ -939,6 +939,10 @@ SUITES = [
     # word the caller's own message spells out (in CAPITALS / as the whole act line / in quotes); TETSU's check, 0
     # false positives measured. covenant_model gains a stub-answer queue so suites drive acts without naming them.
     ("test_a427_actword.py", 60, "JUDGE"),
+    # A429 (2026-11-15, the owner: "Show the judge the content."): his hands' content goes to a content seat in this
+    # process, never through the shared quorum (whose seats reach a runner and the tracked verdicts file); the seat
+    # refuses what the screen refuses and otherwise abstains. Stub quorums and a stub runner; red on main 0/6.
+    ("test_a429_hands_content_seat.py", 240, "JUDGE"),
     # JE1 (2026-09-26, A231): the judge evaluation's statistics (Fisher, chi-square, phi on the correlated-error
     # table) pinned against scipy's values, and the report's prose taking its figures from the run -- two had been
     # written in from the first dataset and printed beside tables that said otherwise.

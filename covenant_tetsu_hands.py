@@ -108,6 +108,18 @@ seats a judge off this PC (github_when_local_down, or a remote provider) sends
 it there, as it already sends the one sentence, and the runner path writes
 what it judged to the TRACKED ops/verdicts.jsonl.]
 
+[A429, 2026-11-15, the owner: "Show the judge the content." THE CONTENT IS SHOWN, TO A SEAT OF ITS OWN.
+The A428 paragraph above is kept as written; its "as shipped it is not" was true until this date.
+JUDGE_SEES_CONTENT is on. The shared quorum is given the one sentence and nothing more, as on main, so the content
+never takes the road above to a runner or to ops/verdicts.jsonl. The content goes to the CONTENT SEAT
+(_content_seat), in this process: it reads the whole text of a WRITE whose name ends in .py and the whole source of
+a RUN, and it can find one thing, what screen() refuses. Then the act is VIOLATES and refused, before anything is
+written or run, with the screen's reason. Otherwise it ABSTAINS (not_judged), and an abstention changes nothing:
+the quorum's state stands, so a WRITE proceeds on held or not judged (A226) and a RUN still needs may_run. It
+never says clean. What it does not judge: prose (a WRITE of a .txt or .md is read by nobody for its content), and
+code the screen passes. Measured with tools/hands_content_measure.py: the ten reference solutions 10 of 10, and
+`from uuid import os` with a call on it refused at its WRITE and at its RUN. KNOWN_ISSUES A429.]
+
 A PROPOSAL is his thumb on the tree: the new version is saved under
 ops/tetsu_proposals/<id>.<ext> with a compile check for Python, one row here,
 and one line to the operator on the direct line. Applying it is the
@@ -156,7 +168,12 @@ UNJUDGED = ("held", "not_judged")       # A428: the two states under which an ac
 # ordinary Python when shown it and a VIOLATES refuses: his practice went from 10 of 10 tasks to 0 of 10 (the module
 # header and KNOWN_ISSUES A428). A constant and not an environment switch, so that turning it on is a commit somebody
 # reads. It is the operator's line to change; TH1.22 pins it and the tests switch it on for themselves.
-JUDGE_SEES_CONTENT = False
+# [A429, 2026-11-15, the owner: "Show the judge the content." It is ON, and what it switches is no longer what the
+# paragraph above describes: the shared quorum is given the one sentence only, as on main, and the content goes to the
+# CONTENT SEAT (_content_seat), in this process and nowhere else. That seat finds what the screen refuses in a script
+# and otherwise abstains. Measured: 10 of 10 reference solutions pass, and `from uuid import os` with a call on it is
+# refused (KNOWN_ISSUES A429). The paragraph above is kept as written.]
+JUDGE_SEES_CONTENT = True
 NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]*(?:/[A-Za-z0-9_][A-Za-z0-9_.\-]*)*$")
 _FIRST = re.compile(r"^\s*HANDS\s+(LIST|READ|WRITE|RUN|PROPOSE)\b\s*(.*)$", re.I)
 ALLOWED_MODULES = frozenset({
@@ -581,7 +598,8 @@ _CUT = " (the first %d of %d characters; the remainder was cut to fit):"
 def _shown(summary, what, content):
     """A428: the act's one sentence, then the content the judge is to read, the whole inside GATE_TEXT_MAX. When the
     content does not fit it is cut at the end, and the line BEFORE it says so, with how much is shown and how long it
-    is -- before, so the notice itself is never what gets cut. What a cut costs: the judge reads the beginning only."""
+    is -- before, so the notice itself is never what gets cut. What a cut costs: the judge reads the beginning only.
+    [A429, 2026-11-15: on no path since the content went to _content_seat, which reads it whole. Kept as built.]"""
     content = str(content)
     n = len(content)
     whole = "%s\n%s (all %d characters):\n%s" % (summary, what, n, content)
@@ -613,23 +631,54 @@ def _script_source(name, workshop=None):
 
 
 def _act_line(d, workshop=None):
-    """What the gate is given: the act in one sentence and, when JUDGE_SEES_CONTENT is on (it is off as shipped: see
-    it), the content of a WRITE or the source of a RUN after it (A428). Off, this is main's one sentence exactly."""
+    """What the SHARED quorum is given: the act in one sentence, main's sentence exactly, whatever JUDGE_SEES_CONTENT
+    says. [A429, 2026-11-15: until this date, with the switch on, the content followed the sentence here (A428, built
+    with _shown). That road led to every seat the node's policy seats -- the GitHub runner under
+    github_when_local_down, and the runner path's rows in the TRACKED ops/verdicts.jsonl -- and the student seat
+    convicted ordinary Python on it (10 of 10 reference tasks passed with the sentence, 0 of 10 with the content). The
+    content now goes to _content_seat, in this process only; _shown and _CUT are kept as built and are on no path.]"""
     if d["kind"] == "write":
-        summary = "hands: Tetsu writes %d characters to %s in his own workshop on this PC" % (len(d["body"]), d["target"])
-        return _shown(summary, "The text to be written", d["body"]) if JUDGE_SEES_CONTENT else summary
+        return "hands: Tetsu writes %d characters to %s in his own workshop on this PC" % (len(d["body"]), d["target"])
     if d["kind"] == "run":
-        summary = ("hands: Tetsu runs his own script %s in his workshop, bounded to %.0f seconds, with no network, no other "
-                   "process and no file outside it" % (d["target"], RUN_TIMEOUT_S))
-        if not JUDGE_SEES_CONTENT:
-            return summary
-        src, why = _script_source(d["target"], workshop)
-        if src is None:
-            return "%s\nThe script's source is NOT shown to the judge: %s." % (summary, why)
-        return _shown(summary, "The script's source", src)
+        return ("hands: Tetsu runs his own script %s in his workshop, bounded to %.0f seconds, with no network, no other "
+                "process and no file outside it" % (d["target"], RUN_TIMEOUT_S))
     if d["kind"] == "propose":
         return "hands: Tetsu proposes a new version of %s (%d characters) for the operator to review; nothing in the tree changes" % (d["target"], len(d["body"]))
     return ""
+
+
+def _content(d, workshop=None):
+    """A429: (text, None) or (None, why) -- what the content seat reads. A RUN: the script's whole source, from the
+    workshop file and from nowhere else (_script_source: a name that climbs or a link out is not opened). A WRITE whose
+    name ends in .py (the only files run() will run): the whole text to be written. Anything else is not a script."""
+    if d["kind"] == "run":
+        return _script_source(d["target"], workshop)
+    if d["kind"] == "write" and str(d["target"]).endswith(".py"):
+        return str(d["body"]), None
+    return None, "it is not a Python script"
+
+
+def _content_seat(d, workshop=None):
+    """A429, 2026-11-15 (the owner: "Show the judge the content."). The hands' CONTENT SEAT: {"state", "message", "why"}.
+
+    It reads the whole content (_content: never cut, so a line past GATE_TEXT_MAX is read like the first) in this
+    process. It sends it nowhere and writes it nowhere: no socket, no subprocess, no ledger, no other judge. It can find
+    one thing -- what this module's own screen() refuses -- and says "violates" with the screen's reason, the same
+    refusal run() would make. On anything else it ABSTAINS ("not_judged", as A428 defines it): code the screen passes
+    (it cannot judge code beyond the screen), a script that does not parse (a draft is not a fault), a file that is not
+    a script, a source it cannot read. It never says "clean"."""
+    text, why_not = _content(d, workshop)
+    if text is None:
+        return {"state": "not_judged", "why": "", "message": "content seat: abstains -- %s" % why_not}
+    try:
+        ast.parse(text)
+    except (SyntaxError, ValueError):
+        return {"state": "not_judged", "why": "", "message": "content seat: abstains -- the script does not parse"}
+    ok, why, _imports = screen(text)
+    if ok:
+        return {"state": "not_judged", "why": "",
+                "message": "content seat: abstains -- the screen finds nothing in it, and this seat judges nothing else"}
+    return {"state": "violates", "why": why, "message": "content seat: the screen refused it: %s" % why}
 
 
 def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=None, may_run=True):
@@ -656,6 +705,21 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
             return True, "DATA (your file %s, %d characters):\n%s" % (d["target"], len(content), content[:MAX_OUT]), rec
         verdict, message = (gate or _gate)(_act_line(d, workshop))
         rec["gate"] = {"state": verdict, "message": message}
+        # A429: with the switch on, the content seat reads a WRITE's script or a RUN's source here, in this process. Its
+        # own answer rides the row. It decides only when it finds what the screen refuses and the quorum has not already
+        # refused: then the act's state is VIOLATES, marked as the content seat's. An abstention changes nothing, so
+        # what the quorum said stands, and a WRITE still proceeds on held or not judged (A226).
+        if JUDGE_SEES_CONTENT and kind in ("write", "run"):
+            seat = _content_seat(d, workshop)
+            rec["content_seat"] = {"state": seat["state"], "message": seat["message"][:300]}
+            if seat["state"] == "violates" and verdict not in ("violates", "unreachable"):
+                verdict, message = "violates", seat["message"][:300]
+                rec["gate"] = {"state": verdict, "message": message, "seat": "content", "quorum": rec["gate"]["state"]}
+                # the row reads as the screen's refusal always read (run() returned these), so a reader of "why" -- his
+                # practice loop, the door's data -- is told the same thing, earlier: nothing was written or started
+                rec["why"] = "the screen refused it: " + seat["why"]
+                if kind == "run":
+                    rec.update({"ok": False, "code": None})
         # A428: what his hands may do under each state is as it was -- "not_judged" was "held" until this date and is
         # handled as "held" is, everywhere. What is new is that an act which goes ahead under either is marked in its row.
         no_judgement = verdict in UNJUDGED
