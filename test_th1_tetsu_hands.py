@@ -625,9 +625,12 @@ def main():
         drive = os.environ.get("SYSTEMDRIVE")
         if not drive:
             print("      (no SYSTEMDRIVE here: not Windows, where the stray tree cannot appear; only the environment is read)")
-        check("TH1.15 a run hands Python SYSTEMDRIVE, and leaves nothing in the workshop but its runner and the script (no "
-              "'%SystemDrive%' tree)",
-              r15["ok"] is True and left == [".runner.py", "hello.py"] and len(envs) == 1
+        # A430 (2026-11-15): the runner is handed to python -c and is no longer written into the workshop (a script running
+        # beside it could overwrite it before the child started), so the script is the only thing left. Until A430 this
+        # check expected [".runner.py", "hello.py"].
+        check("TH1.15 a run hands Python SYSTEMDRIVE, and leaves nothing in the workshop but the script (no runner since "
+              "A430, no '%SystemDrive%' tree)",
+              r15["ok"] is True and left == ["hello.py"] and len(envs) == 1
               and (envs[0].get("SYSTEMDRIVE") == drive if drive else "SYSTEMDRIVE" not in envs[0]),
               (left, sorted(envs[0]) if envs else None))
         a428(td, big)

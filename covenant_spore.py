@@ -178,7 +178,13 @@ def door_ok(path):
 
 
 def wrap_request(sealer, method, path, body, headers, my_key, my_pem, pc_pem):
-    """(id, block): the signed request, sealed for the PC. HEADERS are the X-Operator-* headers the phone signed."""
+    """(id, block): the signed request, sealed for the PC. HEADERS are the X-Operator-* headers the phone signed.
+
+    For hands RUN, pass the body and headers returned together by
+    covenant_daily_plan.sign_json_request(..., run_sha256=...), or the phone's
+    equivalent. The hash belongs inside that signed body before wrapping;
+    spore carries the bytes unchanged and does not add authority in transit.
+    """
     rid = secrets.token_hex(8)
     obj = {"kind": KIND_REQ, "id": rid, "method": str(method), "path": str(path), "body": _b64(body),
            "headers": {k: str(v) for k, v in (headers or {}).items() if str(k).startswith("X-Operator-")}}
