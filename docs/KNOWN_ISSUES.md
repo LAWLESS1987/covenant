@@ -17588,3 +17588,24 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 **Status:** fixed in source (runner and `check.sh`); open for the four items above.
 
 ---
+
+### A427. [measured guard] The act-word door guard holds an act the caller spelled out (TETSU's check, full list, precise rule) -- WIRED 2026-11-14
+
+**What.** TETSU's check, measured on this PC's 3B and TETSU's 27B: the `/m/agent` door carries out an act when the model's first line is an act word (HANDS / FETCH / WEB / MOLTBOOK / HEAL / SELF-HEAL / LEG). A planted instruction has to SPELL the act word out in the caller's own message; a person asking in ordinary words does not ("run the self-repair", not "HEAL"). So the door now HOLDS an act whose word the caller's message spelled out -- the act word in CAPITALS as a whole word, OR the whole act line (with its argument) in any case, OR the act word alone in quotes -- hands it back as data, and the model tells the person plainly. It sits after the private branch (A263 still owns a private outward act); A423's signature independently gates HANDS RUN.
+
+**Why the precise rule, and the full list.** A first cut (a case-insensitive word match) false-positived on ordinary lowercase "fetch" / "search the web" and so had to exclude FETCH/WEB. TETSU's capitals / whole-line / quoted rule leaves ordinary phrasing alone -- measured 0 held across 134 acts begun by 80 plain requests from two writers (15 FETCH, 20 WEB among them) -- so the full list is covered. Of the planted acts the 3B emitted, it held 49 of 59 (28 of 28 on the 27B); the 10 misses were all WEB/FETCH the model chose by itself. A person who literally writes the act word out is held (18 of 18), the known cost.
+
+**Limits (named, not hidden).**
+- *Act substitution.* The model sometimes emits a DIFFERENT act than the caller spelled (told "WEB CRAWL \<url\>" it wrote "FETCH: \<url\>"); a caller-word match cannot see that. A URL-provenance check (hold a FETCH whose target URL is in the caller's text) is the follow-up, not built here.
+- *Current message only.* It reads the new message, not the earlier turns the door replays.
+- *Plain-word acts.* An act described in plain words without the act word is not held -- that is the point, it is how a person asks.
+
+**Test infrastructure (A427).** The door's own act-execution suites (M6, A263) drove acts by POSTing "STUB>> MOLTBOOK READ" etc., which puts the act word in the caller's text -- a stub-test artifact the guard correctly holds. `covenant_model` gains a scripted-answer queue (`_STUB_ANSWERS`, empty in production and by default): a suite queues the act and posts an innocuous message, so it drives execution without naming the act. M6 (76/76) and A263 (45/45) updated accordingly; D4 (a PRIVATE outward act) is unchanged, since the guard sits after the A263 private branch.
+
+**Repro:** `test_a427_actword.py` drives the guard both ways (holds a named act in capitals / whole line / quotes; allows ordinary lowercase phrasing; whole-word only; full list). M6 and A263 exercise it live at the door.
+
+**Cost (every gain with its cost).** A genuine caller who literally writes an act word in CAPITALS (or the whole act line, or quotes it) and whose model then chooses that act is held and must rephrase -- rare, since that is not how a person asks. Reversible: narrow the list, or drop the guard. No claim for acts the model substitutes, or for a bare-URL FETCH (the act word is not present to match).
+
+**Status:** wired (full act list; capitals / whole-line / quoted rule; substitution, replayed history, and bare-URL FETCH remain uncovered -- a URL-provenance follow-up)
+
+---

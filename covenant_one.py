@@ -935,6 +935,10 @@ SUITES = [
     # content (fetched pages, forum posts) before the 3B reads them (clean()-only hygiene; the full fence frame did
     # not bind the 3B, KNOWN_ISSUES A424). Pure text in/out: what is taken out and what is left exactly alone.
     ("test_outside_text.py", 60, "JUDGE"),
+    # A427 (2026-11-14): the act-word door guard -- hold an act (HANDS/FETCH/WEB/MOLTBOOK/HEAL/SELF-HEAL/LEG) whose
+    # word the caller's own message spells out (in CAPITALS / as the whole act line / in quotes); TETSU's check, 0
+    # false positives measured. covenant_model gains a stub-answer queue so suites drive acts without naming them.
+    ("test_a427_actword.py", 60, "JUDGE"),
     # JE1 (2026-09-26, A231): the judge evaluation's statistics (Fisher, chi-square, phi on the correlated-error
     # table) pinned against scipy's values, and the report's prose taking its figures from the run -- two had been
     # written in from the first dataset and printed beside tables that said otherwise.
