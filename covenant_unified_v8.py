@@ -9734,6 +9734,36 @@ class CovenantAPI:
                 return (jsonify({"status": "error", "ok": False, "message": "the heal could not run: %s: %s" % (type(e).__name__, str(e)[:200])}), 503)
             return jsonify(dict(out, status="success" if out.get("ok") else "error")), (200 if out.get("ok") else 503)
 
+        # THE WORKSHOP READ DOOR (A432, 2026-11-15, the owner: "Sounds like a good plan. Get it done."). A430 runs only
+        # the script whose bytes hash to the signed run_sha256, so the phone must show the owner those exact bytes. This
+        # door hands back one workshop file's exact bytes and their sha256, and does nothing else: it never writes, runs
+        # or lists, and reads nothing outside the workshop (covenant_tetsu_hands.read_exact keeps the one rule for that).
+        # WHO: only a request signed by a registered operator key -- _request_signed_by_registered, A423's check for a
+        # RUN. The tailnet alone is not enough, and loopback alone is not either (any local account is loopback). NOT in
+        # PROTECTED_OPERATOR_ENDPOINTS: that hook admits only node.operator_pubkeys (this node's own key), answers 401 and
+        # writes no hands row; the phone's key is a registered signer (ops/daily_plan_signers.json), and the contract
+        # answers 403 with a row. Every answer, refused or not, is one row in the hands ledger, never the content.
+        @self.app.route("/m/workshop/read", methods=["POST"])
+        def mobile_workshop_read():
+            _H = importlib.import_module("covenant_tetsu_hands")
+            if not _request_signed_by_registered(request):
+                self.node.anomaly_monitor.record("workshop_read_refused", request.remote_addr or "unknown")
+                _H.record_operator_read(403, why="not signed by a registered operator key")
+                return (jsonify({"error": "reading a workshop file needs a request signed by a registered operator key"}), 403)
+            try:                                                  # who: the verified key's id (DP.record_decision's form)
+                who = "key:" + hashlib.sha256("".join(base64.b64decode(request.headers.get("X-Operator-Pubkey", "")).decode().split()).encode()).hexdigest()[:16]
+            except Exception:                                     # noqa: BLE001 -- verified above; an id is a nicety
+                who = "signed"
+            body = request.get_json(silent=True)
+            name = body.get("name") if isinstance(body, dict) else None
+            code, got = _H.read_exact(name)
+            if code != 200:
+                _H.record_operator_read(code, name=name, who=who, why=got.get("error", ""))
+                return jsonify({"error": got.get("error", "refused")}), code
+            _H.record_operator_read(200, name=got["name"], who=who, size=got["size"], sha256=got["sha256"])
+            return jsonify({"name": got["name"], "size": got["size"], "sha256": got["sha256"],
+                            "bytes_b64": base64.b64encode(got["bytes"]).decode("ascii")}), 200
+
         @self.app.route("/m/image", methods=["POST"])
         def mobile_image():
             ok, addr = _tailnet_caller()

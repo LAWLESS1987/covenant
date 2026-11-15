@@ -322,6 +322,52 @@ def read(name, workshop=None):
         return fh.read(MAX_FILE)
 
 
+def read_exact(name, workshop=None):
+    """A432, the workshop read door (POST /m/workshop/read, for a request signed by a registered operator key):
+    (status, answer). 200 and {"name", "size", "sha256", "bytes"} -- the file's exact bytes, read once, and the
+    sha256 of exactly those bytes -- or 400 / 404 / 413 and {"error": why}. One rule for what is in the workshop: the
+    name goes through _path (the rule every act uses), and the file's real location, links resolved, must be inside
+    the workshop (the rule _capture uses before a RUN). It never writes, runs or lists, never raises, and reads at
+    most MAX_FILE + 1 bytes, so a file over MAX_FILE is told apart and refused."""
+    if not isinstance(name, str):
+        return 400, {"error": "the request needs \"name\": a workshop file name, as a string"}
+    try:
+        p = _path(name, workshop)
+    except ValueError as e:
+        return 400, {"error": str(e)}
+    try:
+        ws = os.path.realpath(os.path.abspath(workshop or WORKSHOP))
+        real = os.path.realpath(p)
+        if os.path.commonpath([ws, real]) != ws:
+            return 400, {"error": "its real location is outside the workshop"}
+    except ValueError:                                            # commonpath: another drive, so not inside
+        return 400, {"error": "its real location is outside the workshop"}
+    shown = str(name).strip().replace("\\", "/")
+    if not os.path.isfile(real):
+        return 404, {"error": "there is no file %s in the workshop" % shown}
+    try:
+        with open(real, "rb") as fh:
+            raw = fh.read(MAX_FILE + 1)
+    except FileNotFoundError:
+        return 404, {"error": "there is no file %s in the workshop" % shown}
+    except OSError as e:
+        return 404, {"error": "%s could not be read (%s)" % (shown, type(e).__name__)}
+    if len(raw) > MAX_FILE:
+        return 413, {"error": "a workshop file is read only up to %d bytes; %s is longer" % (MAX_FILE, shown)}
+    return 200, {"name": shown, "size": len(raw), "sha256": hashlib.sha256(raw).hexdigest(), "bytes": raw}
+
+
+def record_operator_read(status, name=None, who="", size=None, sha256=None, why="", ledger=None):
+    """A432: the one row in his hands' ledger for every answer of the read door, refused or not -- kind
+    "operator_read", the name, the size, the sha256, who asked (the signer's key id when the signature verified), the
+    status and the outcome. Never the content. A name that is not a string is not written; one that is, is cut to
+    120 characters (it may be a refused stranger's)."""
+    return _append({"kind": "operator_read", "actor": "operator",
+                    "name": name[:120] if isinstance(name, str) else None,
+                    "size": size, "sha256": sha256, "who": str(who or "")[:80], "status": int(status),
+                    "outcome": "read" if int(status) == 200 else "refused", "why": str(why or "")[:200]}, ledger)
+
+
 def history_dir(workshop=None):
     """Earlier versions of his workshop files, BESIDE the workshop (never inside it: it does not count against
     his space, and no name of his can reach it)."""
