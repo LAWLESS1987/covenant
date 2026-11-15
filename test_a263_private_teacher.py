@@ -197,9 +197,14 @@ def main():
                   r.status_code == 200 and "NOT done: this ask is marked private" in str(j.get("answer", "")), j.get("answer"))
         check("D4 ...no crawl, fetch or forum call was made for any of the three", acts == [], acts)
         acts.clear()
-        post("/m/agent", "100.72.0.33", {"text": "STUB>> WEB SEARCH an ordinary query"})
-        post("/m/agent", "100.72.0.34", {"text": "STUB>> FETCH: https://github.com/LAWLESS1987/covenant"})
-        post("/m/agent", "100.72.0.35", {"text": "STUB>> MOLTBOOK READ"})
+        import covenant_model as _CM   # A427: queue the model's act so the caller's text need not (and must not)
+        _CM._STUB_ANSWERS[:] = ["WEB SEARCH an ordinary query"]        # name it -- the door guard holds a named act.
+        post("/m/agent", "100.72.0.33", {"text": "look something up for me"})
+        _CM._STUB_ANSWERS[:] = ["FETCH: https://github.com/LAWLESS1987/covenant"]
+        post("/m/agent", "100.72.0.34", {"text": "read that page for me"})
+        _CM._STUB_ANSWERS[:] = ["MOLTBOOK READ"]
+        post("/m/agent", "100.72.0.35", {"text": "anything new on the forum?"})
+        _CM._STUB_ANSWERS[:] = []
         check("D5 the same three acts in an ordinary ask are made as before (web, fetch, moltbook)",
               [a for a, _ in acts] == ["web", "fetch", "moltbook"], acts)
         r = post("/m/agent", A, {"text": "   ", "private": True})
@@ -363,7 +368,10 @@ def main():
             cov.private_ask = lambda body: False
             acts.clear()
             post("/m/agent", "100.72.0.52", {"text": CANARY + " mutation three", "private": True})
-            post("/m/agent", "100.72.0.53", {"text": "STUB>> WEB SEARCH " + CANARY, "private": True})
+            import covenant_model as _CM   # A427: queue the act; the caller's text does not name it
+            _CM._STUB_ANSWERS[:] = ["WEB SEARCH " + CANARY]
+            post("/m/agent", "100.72.0.53", {"text": "look up something for me", "private": True})
+            _CM._STUB_ANSWERS[:] = []
             post("/pc/council", "100.72.0.54", {"text": CANARY + " council mutation", "private": True})
             check("M3 door marker ignored (private_ask False): agent AND council queue the private text, and the act is made -- so D1, D4, K1 can fail",
                   has(q, "mutation three") and has(q, "council mutation") and [a for a, _ in acts] == ["web"], (rows_of(q), acts))
