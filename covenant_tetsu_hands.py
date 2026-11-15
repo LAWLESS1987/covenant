@@ -55,6 +55,59 @@ run. A gate that cannot be built refuses (fails closed). A PROPOSE is
 recorded whatever the verdict, because it changes nothing; the verdict rides
 the record and the direct line to the operator.
 
+[A428, 2026-11-14. What the paragraph above says of a HELD is as it was, and
+is said plainly here because a review read it as a defect.
+
+WHAT AN UNDECIDED ACT DOES. A WRITE in his workshop PROCEEDS when the judge
+holds and when nobody judged (A226, the operator's decision). What bounds it
+is not the judge: the workshop folder (a name that leaves it is refused),
+MAX_FILE bytes a file and MAX_TOTAL the workshop, and the earlier version of a
+replaced file is kept (A233). A RUN under either state proceeds only for a
+caller with the operator's authority (A423: may_run -- a registered signature
+at the door; his in-process practice loop), and then behind the screen, the
+guard and the clock. A VIOLATES or an unreachable gate refuses both.
+
+"HELD" WAS TWO THINGS, and is now two words. The gate's state is one of
+    clean       the quorum cleared it
+    held        a seat read it and is not sure (the core's "Blocked, not proven")
+    not_judged  no seat that stopped it could read it (the core's "Held, not
+                judged") -- nobody judged
+    violates    a seat found fault
+    unreachable the gate could not be built
+read from the flags on the sentinel's own result (not_understood, uncertain),
+never from the words of its message. not_judged is handled exactly as held is.
+Every act carried out under either carries "unjudged": true in its row, and
+`--unjudged` lists them (read-only); rows written before this date carry no
+flag, and their "held" is either state.
+
+THE JUDGE CAN BE SHOWN THE CONTENT, AND AS SHIPPED IT IS NOT. The quorum is
+given one sentence about the act (kind, name, size) and never the text, as the
+paragraph above says ("a script's imports and length" was never in that
+sentence). It is asked to judge a write without the text and a run without the
+script, so on a tree with no policy 26 of 26 measured acts came back "nobody
+judged". The other reading is built here and switched off
+(JUDGE_SEES_CONTENT): the sentence, then the text of a WRITE or, for a RUN,
+the source of the script, read from the workshop file and from nowhere else,
+the whole bounded at GATE_TEXT_MAX characters, and when the content does not
+fit the line before it says it was cut, how much is shown and how long it is.
+A PROPOSE is put as before either way.
+WHY IT IS OFF: measured 2026-11-14, before it was offered, on the seats a
+clone has (the distilled student, the lexical judge, the self-report mock).
+The student is a sum over the words present, it was trained on transaction
+memos, and it weighs `if`, `false` and `else` toward a violation. Shown the
+content it convicted all 10 of the practice curriculum's reference check files
+and 5 of its 10 reference solutions, and a VIOLATES refuses: through his
+practice loop 10 of 10 tasks passed with the sentence and 0 of 10 with the
+content. The rule did not change; what the judge answered did, and his hands
+stopped on code. Switching it on is one line and the operator's decision
+(KNOWN_ISSUES A428 has the numbers and what would change them). Also to be
+decided with it: the content goes wherever this node's judge is. With a
+clone's seats it stays in the process, and the student seat appends the text
+it answered on to the gitignored ops/judged_by_student.jsonl; a policy that
+seats a judge off this PC (github_when_local_down, or a remote provider) sends
+it there, as it already sends the one sentence, and the runner path writes
+what it judged to the TRACKED ops/verdicts.jsonl.]
+
 A PROPOSAL is his thumb on the tree: the new version is saved under
 ops/tetsu_proposals/<id>.<ext> with a compile check for Python, one row here,
 and one line to the operator on the direct line. Applying it is the
@@ -68,6 +121,7 @@ queue as it always has; every act is one row in ops/tetsu_hands.jsonl.
 
 USE
   python covenant_tetsu_hands.py --list | --read NAME | --run NAME [ARGS] | --proposals | --proposal ID | --apply ID
+  python covenant_tetsu_hands.py --unjudged      (read-only: the acts carried out without a judgement, A428)
 """
 import ast
 import hashlib
@@ -90,6 +144,19 @@ MAX_TOTAL = 50 * 1000 * 1000
 MAX_LIST = 200
 RUN_TIMEOUT_S = 60.0
 MAX_OUT = 64 * 1000
+# A428: the most _gate hands the quorum, in characters -- the 2000 it has always cut at, now named because _act_line
+# fits the content inside it and says so when it cuts. Read downstream before it was kept: the students read the
+# whole message (covenant_judge_fallback._payload_text, no cap on a message), the lexical judge its first 4096 words
+# (covenant_semantic_judge.MAX_FEATURE_TOKENS), and the deferring seat's audit row keeps 4000 characters
+# (covenant_judge_defer.record_verdict). 2000 characters is inside all three.
+GATE_TEXT_MAX = 2000
+UNJUDGED = ("held", "not_judged")       # A428: the two states under which an act goes ahead with no judgement made
+# A428: BUILT, MEASURED, NOT SWITCHED ON. True gives the quorum the content of a WRITE and the source of a RUN after the
+# one sentence about the act. It is False because, measured before it was offered, the student seat a clone has convicts
+# ordinary Python when shown it and a VIOLATES refuses: his practice went from 10 of 10 tasks to 0 of 10 (the module
+# header and KNOWN_ISSUES A428). A constant and not an environment switch, so that turning it on is a commit somebody
+# reads. It is the operator's line to change; TH1.22 pins it and the tests switch it on for themselves.
+JUDGE_SEES_CONTENT = False
 NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]*(?:/[A-Za-z0-9_][A-Za-z0-9_.\-]*)*$")
 _FIRST = re.compile(r"^\s*HANDS\s+(LIST|READ|WRITE|RUN|PROPOSE)\b\s*(.*)$", re.I)
 ALLOWED_MODULES = frozenset({
@@ -388,7 +455,7 @@ def propose(path, body, proposals=None, say=None, gate=None):
         text = ("Tetsu proposes a %s of %s (%d bytes%s).%s Nothing in the tree changed. See it: python covenant_tetsu_hands.py --proposal %s; "
                 "apply it by your hand: python covenant_tetsu_hands.py --apply %s"
                 % ("new version" if exists else "new file", rel, rec["bytes"], "" if compiled else "; " + cwhy,
-                   (" The gate on it: %s (%s)." % (verdict["state"].upper(), verdict["message"][:200])) if verdict else "", pid, pid))
+                   (" The gate on it: %s (%s)." % (verdict["state"].upper().replace("_", " "), verdict["message"][:200])) if verdict else "", pid, pid))
         if say is not None:
             say(text, "tetsu: a proposal for the tree")
         else:
@@ -452,6 +519,28 @@ def apply_proposal(pid, pdir=None, say=print, ledger=None):
 
 # ------------------------------------------------------------------ the gate and the door
 
+def _gate_state(ok, result):
+    """The gate's state, from what the sentinel returned (A428). Until 2026-11-14 a refusal that alleged nothing was
+    "held" whichever flag it carried, so "a seat read it and is not sure" and "nobody judged" were one word in the
+    ledger. They are told apart by the result's own flags, the ones the core builds its message from
+    (ReasoningSentinel.evaluate_transaction: not_understood -> "Held, not judged", uncertain -> "Blocked, not
+    proven"), never by the message's words:
+      not_understood  every seat that stopped it could not read it (QuorumJudge: all blocking results unread)  -> not_judged
+      uncertain       nothing alleged, and at least one blocking seat looked and is unsure, or a claimed consent
+                      is not a recorded one                                                                  -> held
+      neither         a seat alleged something, or a seat failed (infrastructure)                             -> violates
+    not_understood wins when both are set, as it does in the core. What "not_judged" does NOT say: that no seat
+    answered at all -- a seat that cleared it (the lexical judge, the self-report mock) may sit beside the seat that
+    could not read it; the quorum still reached no judgement, and the message carries each seat's own label."""
+    if ok:
+        return "clean"
+    if result is not None and getattr(result, "not_understood", False):
+        return "not_judged"
+    if result is not None and getattr(result, "uncertain", False):
+        return "held"
+    return "violates"
+
+
 def _gate(text):
     """(state, message): the node's real quorum on the act; unreachable when it cannot be built."""
     try:
@@ -459,10 +548,9 @@ def _gate(text):
         import covenant_gate_proxy
         sentinel = covenant_gate_proxy.default_sentinel()
         tx = cov.Transaction(sender_pubkey="model", receiver="collective",
-                             data={"origin": "model", "kind": "hands", "message": text[:2000]}, amount=0.0, benefit_score=0.5)
+                             data={"origin": "model", "kind": "hands", "message": text[:GATE_TEXT_MAX]}, amount=0.0, benefit_score=0.5)
         ok, message, _b, result = sentinel.evaluate_transaction(tx)
-        alleges_nothing = bool(result is not None and not ok and (getattr(result, "not_understood", False) or getattr(result, "uncertain", False)))
-        return ("clean" if ok else ("held" if alleges_nothing else "violates")), str(message)[:300]
+        return _gate_state(ok, result), str(message)[:300]
     except Exception as e:                                        # noqa: BLE001
         return "unreachable", "gate unreachable: %s" % type(e).__name__
 
@@ -484,11 +572,61 @@ def parse(answer):
     return {"kind": kind, "target": rest[:300], "args": [], "body": body}
 
 
-def _act_line(d):
+# The notice is kept plain on purpose. Its first wording ("... the judge does not see the rest") moved the first
+# student's score by about +5 on its own words (not:see, cut, of its; measured 2026-11-14), and a notice must not
+# itself read as concealment to the seat that reads it.
+_CUT = " (the first %d of %d characters; the remainder was cut to fit):"
+
+
+def _shown(summary, what, content):
+    """A428: the act's one sentence, then the content the judge is to read, the whole inside GATE_TEXT_MAX. When the
+    content does not fit it is cut at the end, and the line BEFORE it says so, with how much is shown and how long it
+    is -- before, so the notice itself is never what gets cut. What a cut costs: the judge reads the beginning only."""
+    content = str(content)
+    n = len(content)
+    whole = "%s\n%s (all %d characters):\n%s" % (summary, what, n, content)
+    if len(whole) <= GATE_TEXT_MAX:
+        return whole
+    # GATE_TEXT_MAX stands in for the count while the room is measured: no count shown can be wider than it
+    keep = max(0, GATE_TEXT_MAX - len("%s\n%s%s\n" % (summary, what, _CUT % (GATE_TEXT_MAX, n))))
+    return "%s\n%s%s\n%s" % (summary, what, _CUT % (keep, n), content[:keep])
+
+
+def _script_source(name, workshop=None):
+    """A428: (source, None) or (None, why) -- the script a RUN names, as the judge is shown it. Only ever a file
+    inside the workshop: the name goes through _path, and a file whose real location is outside it (a link) is not
+    opened. Never raises: what cannot be read is said to the judge, and the act goes on to run(), which decides."""
+    try:
+        p = _path(name, workshop)
+    except ValueError:
+        return None, "its name is not a workshop name"
+    try:
+        ws = os.path.realpath(os.path.abspath(workshop or WORKSHOP))
+        if os.path.commonpath([ws, os.path.realpath(p)]) != ws:
+            return None, "it is not a file inside his workshop"
+        with open(p, encoding="utf-8", errors="replace") as fh:
+            return fh.read(MAX_FILE), None
+    except ValueError:                                            # commonpath: another drive, so not inside
+        return None, "it is not a file inside his workshop"
+    except OSError as e:
+        return None, "it could not be read (%s)" % type(e).__name__
+
+
+def _act_line(d, workshop=None):
+    """What the gate is given: the act in one sentence and, when JUDGE_SEES_CONTENT is on (it is off as shipped: see
+    it), the content of a WRITE or the source of a RUN after it (A428). Off, this is main's one sentence exactly."""
     if d["kind"] == "write":
-        return "hands: Tetsu writes %d characters to %s in his own workshop on this PC" % (len(d["body"]), d["target"])
+        summary = "hands: Tetsu writes %d characters to %s in his own workshop on this PC" % (len(d["body"]), d["target"])
+        return _shown(summary, "The text to be written", d["body"]) if JUDGE_SEES_CONTENT else summary
     if d["kind"] == "run":
-        return "hands: Tetsu runs his own script %s in his workshop, bounded to %.0f seconds, with no network, no other process and no file outside it" % (d["target"], RUN_TIMEOUT_S)
+        summary = ("hands: Tetsu runs his own script %s in his workshop, bounded to %.0f seconds, with no network, no other "
+                   "process and no file outside it" % (d["target"], RUN_TIMEOUT_S))
+        if not JUDGE_SEES_CONTENT:
+            return summary
+        src, why = _script_source(d["target"], workshop)
+        if src is None:
+            return "%s\nThe script's source is NOT shown to the judge: %s." % (summary, why)
+        return _shown(summary, "The script's source", src)
     if d["kind"] == "propose":
         return "hands: Tetsu proposes a new version of %s (%d characters) for the operator to review; nothing in the tree changes" % (d["target"], len(d["body"]))
     return ""
@@ -516,8 +654,11 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
             rec["bytes"] = len(content)
             _append(rec, ledger)
             return True, "DATA (your file %s, %d characters):\n%s" % (d["target"], len(content), content[:MAX_OUT]), rec
-        verdict, message = (gate or _gate)(_act_line(d))
+        verdict, message = (gate or _gate)(_act_line(d, workshop))
         rec["gate"] = {"state": verdict, "message": message}
+        # A428: what his hands may do under each state is as it was -- "not_judged" was "held" until this date and is
+        # handled as "held" is, everywhere. What is new is that an act which goes ahead under either is marked in its row.
+        no_judgement = verdict in UNJUDGED
         # A349 B8: a PROPOSE is recorded whatever the verdict, VIOLATES included -- it changes nothing until the operator
         # applies it by hand -- and the verdict goes to him with it. A WRITE or a RUN is refused as before.
         if kind != "propose" and verdict in ("violates", "unreachable"):
@@ -527,8 +668,12 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
         if kind == "write":
             w = write(d["target"], d["body"], workshop)
             rec.update(w)
+            if no_judgement:
+                rec["unjudged"] = True
             _append(rec, ledger)
-            return True, "DATA: written -- %s, %d bytes, in your workshop%s." % (w["name"], w["bytes"], " (the gate held; your workshop is yours)" if verdict == "held" else ""), rec
+            note = {"held": " (the gate held; your workshop is yours)",
+                    "not_judged": " (no seat of the gate judged this; your workshop is yours)"}.get(verdict, "")
+            return True, "DATA: written -- %s, %d bytes, in your workshop%s." % (w["name"], w["bytes"], note), rec
         if kind == "run":
             if not may_run:                                  # A423: RUN is code execution; refused for a caller the door
                 rec["refused"] = True                         # did not authorize (not loopback, not a registered signature)
@@ -538,6 +683,8 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
             r = run(d["target"], d["args"], workshop)
             rec.update({k: r.get(k) for k in ("ok", "why", "code", "ms", "timed_out", "imports", "truncated")})
             rec["out_sha256"] = hashlib.sha256((r.get("out") or "").encode("utf-8")).hexdigest()
+            if no_judgement and "timed_out" in r:                # a process was started (run() sets timed_out only then); a
+                rec["unjudged"] = True                       # script the screen refused never ran, so nothing to mark
             _append(rec, ledger)
             data = ("DATA: your script %s %s (%s, %d ms).\nSTDOUT:\n%s\nSTDERR:\n%s"
                     % (d["target"], "ran" if r["ok"] else "did not finish cleanly", r["why"], r["ms"], (r.get("out") or "")[:MAX_OUT], (r.get("err") or "")[-4000:]))
@@ -545,6 +692,8 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
         if kind == "propose":
             p = propose(d["target"], d["body"], proposals_dir, say=say, gate=(verdict, message))
             rec.update(p)
+            if no_judgement:
+                rec["unjudged"] = True
             _append(rec, ledger)
             return True, ("DATA: your proposal for %s is recorded as %s (%s).%s Nothing in the tree changed; the operator was told and applies it by hand or not. "
                           "Say so plainly." % (p["path"], p["id"], "compiles" if p["compiled"] else p["why"],
@@ -562,6 +711,27 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
     return False, "", None
 
 
+def unjudged(path=None):
+    """READ-ONLY, for the operator (A428): the rows of his hands' ledger for acts that were carried out with no
+    judgement made -- a WRITE that landed, a RUN that started, a PROPOSE that was recorded, under a gate that held
+    or that nobody judged. Oldest first, exactly as written. It reads the flag and nothing else, so a row written
+    before 2026-11-14 is not here: those carry gate state "held" for both states and no flag (unflagged_before
+    counts them)."""
+    return [r for r in _rows(path) if r.get("unjudged") is True]
+
+
+def unflagged_before(path=None):
+    """READ-ONLY: how many rows are an act that was carried out under a held gate and have no "unjudged" flag -- the
+    acts of before A428, when the flag did not exist. Carried out, read from the row: a WRITE that has its sha256, a
+    RUN whose process started (timed_out is set, True or False), a PROPOSE that has its id. A count and not a list,
+    because those rows cannot say which of the two states their "held" was."""
+    def carried_out(r):
+        return ("sha256" in r if r.get("kind") == "write" else r.get("timed_out") is not None if r.get("kind") == "run"
+                else "id" in r if r.get("kind") == "propose" else False)
+    return sum(1 for r in _rows(path) if (r.get("gate") or {}).get("state") in UNJUDGED and "unjudged" not in r
+               and not r.get("refused") and not r.get("error") and carried_out(r))
+
+
 def main(argv=None):
     import argparse
     ap = argparse.ArgumentParser(description="Tetsu's hands: his workshop, his runs, his proposals")
@@ -571,8 +741,16 @@ def main(argv=None):
     ap.add_argument("--proposals", action="store_true")
     ap.add_argument("--proposal", metavar="ID")
     ap.add_argument("--apply", metavar="ID", help="HIS HAND: copy a proposal over the tree file it names")
+    ap.add_argument("--unjudged", action="store_true",
+                    help="read-only: the acts carried out while the gate held or nobody judged (A428)")
     a = ap.parse_args(argv)
-    if a.list:
+    if a.unjudged:
+        print(json.dumps(unjudged(), indent=1, ensure_ascii=False))
+        before = unflagged_before()
+        if before:
+            print("%d earlier row(s) carry a held gate and no flag: written before 2026-11-14 (A428), when held and "
+                  "not judged were one word. They are in the same ledger." % before, file=sys.stderr)
+    elif a.list:
         print(json.dumps(listing(), indent=1))
     elif a.read:
         print(read(a.read))
