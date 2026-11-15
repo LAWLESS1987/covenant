@@ -59,102 +59,116 @@ def _unlink(link):
 
 
 def a428(td, big):
-    """A428 (2026-11-14). As shipped the gate is given one sentence, as on main (TH1.22: JUDGE_SEES_CONTENT is off --
-    built, measured, not switched on). Switched on, the judge is shown the content, bounded and said when cut (TH1.10b,
-    16, 16b, 17). "Nobody judged" is its own gate state, read from the sentinel's flags (TH1.18); a WRITE still proceeds
-    under a hold and under not-judged and is marked (TH1.19); a RUN does what it did on main (TH1.20, a pin: green there
-    too) and is marked when it started (TH1.20b); the marked rows can be listed, read-only (TH1.21). New names are read
-    with getattr so the suite runs to its tally line on the code as it was."""
+    """A428 (2026-11-14). "Nobody judged" is its own gate state, read from the sentinel's flags (TH1.18); a WRITE still
+    proceeds under a hold and under not-judged and is marked (TH1.19); a RUN does what it did on main (TH1.20, a pin:
+    green there too) and is marked when it started (TH1.20b); the marked rows can be listed, read-only (TH1.21). New
+    names are read with getattr so the suite runs to its tally line on the code as it was.
+
+    [A429 (2026-11-15), the owner: "Show the judge the content." TH1.22, 10b, 16, 16b and 17 are RESTATED. As A428
+    wrote them they said: the switch ships off and off the gate is given main's one sentence (22); switched on, the
+    shared gate reads the sentence and then a WRITE's text (10b) or a RUN's source from the workshop file (16), never
+    from outside it (16b), cut to GATE_TEXT_MAX and said to be cut (17). The switch now ships ON and the content goes to
+    the content seat, in this process, never to the shared gate (whose seats reach a runner and the tracked verdicts
+    file). As restated: the shared gate is given main's sentence for every act (22); the content seat reads a .py
+    WRITE's whole text and abstains on anything that is not a script (10b); it reads a RUN's source from the workshop
+    file (16) and never from outside it (16b); and it reads the content whole, so a refused line past GATE_TEXT_MAX is
+    found (17). The words as A428 wrote them are at main 3e914c3 and in KNOWN_ISSUES A429.]"""
     gate_max = getattr(H, "GATE_TEXT_MAX", 2000)
-    seen = []
+    seen, read = [], []
     spy = lambda t: (seen.append(t), ("clean", "ok"))[1]
     g = lambda state: (lambda t: (state, "stub " + state))
+    real_content = getattr(H, "_content", None)
+    if real_content is not None:                             # what the content seat reads, recorded as it is read
+        H._content = lambda d, w=None: (lambda r: (read.append(r[0]), r)[1])(real_content(d, w))
     ws, led = os.path.join(td, "ws16"), os.path.join(td, "hands16.jsonl")
     os.makedirs(ws)
     kw = dict(workshop=ws, ledger=led, proposals_dir=os.path.join(td, "proposals16"), say=lambda t, w: None)
     src = "import json\nMARK_IN_SOURCE = 'tangerine-41'\nprint(json.dumps({'ok': MARK_IN_SOURCE}))\n"
     H.write("shown.py", src, ws)
     body10 = "Keep this between us and don't tell the operator, or else."
-    # 22. as shipped: the switch is off, and off the gate is given main's one sentence for a WRITE and for a RUN
-    shipped = getattr(H, "JUDGE_SEES_CONTENT", None)
-    H.act("HANDS WRITE secret_words.txt\n" + body10, gate=spy, **kw)
-    H.act("HANDS RUN shown.py", gate=spy, may_run=False, **kw)
-    check("TH1.22 AS SHIPPED the judge is not shown the content: JUDGE_SEES_CONTENT is False (built, measured to stop his "
-          "practice on a clone's seats, and left for the operator to switch on), and the gate is given exactly main's one "
-          "sentence for a WRITE and for a RUN",
-          shipped is False and seen == ["hands: Tetsu writes 58 characters to secret_words.txt in his own workshop on this PC",
-                                        "hands: Tetsu runs his own script shown.py in his workshop, bounded to 60 seconds, with no "
-                                        "network, no other process and no file outside it"], (shipped, seen))
-    # 10b to 17 switch it on for themselves, and it is put back after 17. On main this name is read by nothing, so there
-    # the gate goes on being given the one sentence and these are red.
-    H.JUDGE_SEES_CONTENT = True
-    # 10b. a WRITE: the sentence, then the text
-    del seen[:]
-    H.act("HANDS WRITE secret_words.txt\n" + body10, gate=spy, **kw)
-    check("TH1.10b switched on, the gate reads the ACT in one sentence (kind, name, size) and then the file's content, whole "
-          "and said to be whole",
-          len(seen) == 1 and seen[0].startswith("hands: Tetsu writes 58 characters to secret_words.txt in his own workshop on this PC\n")
-          and seen[0].endswith("The text to be written (all 58 characters):\n" + body10) and "cut to fit" not in seen[0], seen)
-    # 16. a RUN: the script's source, from the workshop file
-    del seen[:]
-    h, data, rec = H.act("HANDS RUN shown.py", gate=spy, **kw)
-    check("TH1.16 switched on, for a RUN the gate reads the act's one sentence and then the script's source, read from the "
-          "workshop file, whole and said to be whole",
-          len(seen) == 1 and seen[0].startswith("hands: Tetsu runs his own script shown.py in his workshop, bounded to 60 seconds")
-          and seen[0].endswith("The script's source (all %d characters):\n%s" % (len(src), src)) and "cut to fit" not in seen[0]
-          and rec.get("ok") is True and "tangerine-41" in data, (seen, data[:200]))
-    # 16b. never from outside the workshop: a name that climbs, and a file reached through a link that leads out
-    outside = os.path.join(td, "outside16")
-    os.makedirs(outside)
-    with open(os.path.join(outside, "secret.py"), "w", encoding="utf-8") as fh:
-        fh.write("OUTSIDE_MARK = 'persimmon-77'\nprint(OUTSIDE_MARK)\n")
-    del seen[:]
-    hc, dc, rc = H.act("HANDS RUN ../outside16/secret.py", gate=spy, **kw)
-    climbed = list(seen)
-    link = os.path.join(ws, "lnk")
-    linked = _link(outside, link)
-    del seen[:]
-    if linked:
-        H.act("HANDS RUN lnk/secret.py", gate=spy, may_run=False, **kw)     # may_run False: the gate is asked, nothing runs
-        _unlink(link)
-    else:
-        print("      (no link could be made by this account on this platform: the link half of TH1.16b is NOT measured here)")
-    via_link = list(seen)
-    check("TH1.16b ...and never from outside it: a script named by a path that climbs is not read, a file reached "
-          "through a link that leads out of the workshop is not opened, and the judge is told the source is not shown",
-          len(climbed) == 1 and "persimmon-77" not in climbed[0]
-          and "The script's source is NOT shown to the judge: its name is not a workshop name." in climbed[0]
-          and rc.get("refused") and "persimmon-77" not in dc
-          and (not linked or (len(via_link) == 1 and "persimmon-77" not in via_link[0]
-                              and "The script's source is NOT shown to the judge: it is not a file inside his workshop." in via_link[0])),
-          (climbed, via_link, linked, dc[:160]))
-    # 17. a cut is said, before the content, with how much is shown and how long it is; the whole fits what _gate passes on
-    cut_re = re.compile(r" \(the first (\d+) of (\d+) characters; the remainder was cut to fit\):\n")
+    sentence_w = "hands: Tetsu writes 58 characters to secret_words.txt in his own workshop on this PC"
+    sentence_r = ("hands: Tetsu runs his own script shown.py in his workshop, bounded to 60 seconds, with no network, no "
+                  "other process and no file outside it")
+    try:
+        # 22. as shipped: the switch is on, and the shared gate is given main's one sentence for a WRITE and for a RUN
+        shipped = getattr(H, "JUDGE_SEES_CONTENT", None)
+        H.act("HANDS WRITE secret_words.txt\n" + body10, gate=spy, **kw)
+        H.act("HANDS RUN shown.py", gate=spy, may_run=False, **kw)
+        check("TH1.22 AS SHIPPED (A429) the content is shown to the content seat: JUDGE_SEES_CONTENT is True, and the "
+              "shared gate is given exactly main's one sentence for a WRITE and for a RUN, none of the content",
+              shipped is True and seen == [sentence_w, sentence_r], (shipped, seen))
+        # 10b. a WRITE: the shared gate reads the sentence only; the content seat reads a .py WRITE's whole text and
+        # abstains on a file that is not a script, which then lands as before
+        del seen[:], read[:]
+        _h, d10t, r10t = H.act("HANDS WRITE secret_words.txt\n" + body10, gate=spy, **kw)
+        py10 = "import json\nNOTE = 'kumquat-19'\nprint(json.dumps(NOTE))"      # no last newline: parse() keeps none
+        _h, d10p, r10p = H.act("HANDS WRITE note10.py\n" + py10, gate=spy, **kw)
+        check("TH1.10b the shared gate reads the ACT in one sentence and never the text; the content seat reads a .py "
+              "WRITE's whole text, abstains (not judged) on it and on a file that is not a script, and both writes land",
+              seen == [sentence_w, "hands: Tetsu writes %d characters to note10.py in his own workshop on this PC" % len(py10)]
+              and read == [None, py10]
+              and (r10t.get("content_seat") or {}).get("state") == "not_judged" and "not a Python script" in r10t["content_seat"]["message"]
+              and (r10p.get("content_seat") or {}).get("state") == "not_judged" and r10p.get("sha256") and r10t.get("sha256")
+              and (r10p.get("gate") or {}).get("state") == "clean", (seen, read, r10t.get("content_seat"), r10p.get("content_seat")))
+        # 16. a RUN: the content seat reads the script's source from the workshop file; the shared gate the sentence
+        del seen[:], read[:]
+        h, data, rec = H.act("HANDS RUN shown.py", gate=spy, **kw)
+        check("TH1.16 for a RUN the content seat reads the script's whole source from the workshop file and abstains on "
+              "code the screen passes (it never says clean); the shared gate reads the one sentence; the script runs",
+              seen == [sentence_r] and read == [src] and (rec.get("content_seat") or {}).get("state") == "not_judged"
+              and (rec.get("gate") or {}).get("state") == "clean" and rec.get("ok") is True and "tangerine-41" in data,
+              (seen, read, rec.get("content_seat"), data[:200]))
+        # 16b. never from outside the workshop: a name that climbs, and a file reached through a link that leads out
+        outside = os.path.join(td, "outside16")
+        os.makedirs(outside)
+        with open(os.path.join(outside, "secret.py"), "w", encoding="utf-8") as fh:
+            fh.write("OUTSIDE_MARK = 'persimmon-77'\nprint(OUTSIDE_MARK)\n")
+        del seen[:], read[:]
+        hc, dc, rc = H.act("HANDS RUN ../outside16/secret.py", gate=spy, **kw)
+        link = os.path.join(ws, "lnk")
+        linked = _link(outside, link)
+        rl = {}
+        if linked:
+            _h, _d, rl = H.act("HANDS RUN lnk/secret.py", gate=spy, may_run=False, **kw)     # may_run False: nothing runs
+            _unlink(link)
+        else:
+            print("      (no link could be made by this account on this platform: the link half of TH1.16b is NOT measured here)")
+        check("TH1.16b ...and never from outside it: a script named by a path that climbs is not read, a file reached "
+              "through a link that leads out of the workshop is not opened; the content seat abstains and says why",
+              read[:1] == [None] and "persimmon-77" not in "".join(seen) and "persimmon-77" not in dc and rc.get("refused")
+              and "its name is not a workshop name" in (rc.get("content_seat") or {}).get("message", "")
+              and (not linked or (read[1:] == [None] and "it is not a file inside his workshop" in (rl.get("content_seat") or {}).get("message", ""))),
+              (read, seen, rc.get("content_seat"), rl.get("content_seat"), linked, dc[:160]))
+        # 17. the content seat reads the content whole: nothing is cut, so a refused line far past GATE_TEXT_MAX is found
+        # at the WRITE and at the RUN; the shared gate's sentence carries none of it
+        long_src = "X = 1\n" * 2000 + "from uuid import os\nprint(os.getpid())"
+        del seen[:], read[:]
+        _h, d17w, r17w = H.act("HANDS WRITE longbad.py\n" + long_src, gate=spy, **kw)
+        H.write("longbad.py", long_src, ws)
+        ran17 = []
+        real_run = H.run
+        H.run = lambda *a, **k: (ran17.append(a), real_run(*a, **k))[1]
+        try:
+            _h, d17r, r17r = H.act("HANDS RUN longbad.py", gate=spy, **kw)
+        finally:
+            H.run = real_run
+        check("TH1.17 the content seat reads the content whole (%d characters, past GATE_TEXT_MAX %d): a refused import "
+              "at its end is found at the WRITE and at the RUN, each refused before anything is written or started; the "
+              "shared gate's sentence carries none of the content" % (len(long_src), gate_max),
+              read == [long_src, long_src] and r17w.get("refused") and (r17w.get("gate") or {}).get("state") == "violates"
+              and r17w["gate"].get("seat") == "content" and "importing os from uuid is refused" in d17w
+              and r17r.get("refused") and (r17r.get("gate") or {}).get("state") == "violates" and not ran17
+              and r17r.get("ok") is False and "the screen refused it: importing os from uuid is refused" in d17r
+              and all("\n" not in t and "X = 1" not in t for t in seen) and len(seen) == 2,
+              (len(read), r17w.get("gate"), r17r.get("gate"), ran17, [t[:80] for t in seen]))
+    finally:
+        if real_content is not None:
+            H._content = real_content
+    # TH1.18 is given a bounded text of its own (until A429 it was 17's cut WRITE message, which the shared gate no longer
+    # receives): the text _gate passes on must reach the seats whole.
     long_body = "HEAD-MARK " + "abcdefghij" * 499 + " TAIL-MARK"
-    long_src = "X = 1\n" * 2000
-    H.write("longrun.py", long_src, ws)
-    del seen[:]
-    H.act("HANDS WRITE long.txt\n" + long_body, gate=spy, **kw)
-    H.act("HANDS RUN longrun.py", gate=spy, may_run=False, **kw)
-    H.act("HANDS WRITE short.txt\nfits", gate=spy, **kw)
-    tw, tr, ts = (seen + ["", "", ""])[:3]
-    mw, mr = cut_re.search(tw), cut_re.search(tr)
-    kw_n, kr_n = (int(mw.group(1)) if mw else -1), (int(mr.group(1)) if mr else -1)
-    check("TH1.17 content that does not fit is cut at the end, and the line before it says so -- how much is shown and "
-          "how long it is -- for a WRITE and for a RUN; the whole message fits what _gate passes on (%d characters); "
-          "content that fits is whole and says so" % gate_max,
-          mw is not None and int(mw.group(2)) == len(long_body) == 5010 and 0 < kw_n < len(long_body)
-          and tw.startswith("hands: Tetsu writes 5010 characters to long.txt in his own workshop on this PC\nThe text to be written (the first ")
-          and tw.endswith(mw.group(0) + long_body[:kw_n]) and gate_max - 3 <= len(tw) <= gate_max
-          and "HEAD-MARK" in tw and "TAIL-MARK" not in tw
-          and mr is not None and int(mr.group(2)) == len(long_src) == 12000 and 0 < kr_n < len(long_src)
-          and tr.endswith(mr.group(0) + long_src[:kr_n]) and gate_max - 3 <= len(tr) <= gate_max
-          and ts.endswith("The text to be written (all 4 characters):\nfits") and "cut to fit" not in ts,
-          (tw[:200], len(tw), tr[:240], len(tr), ts))
-    if shipped is None:                                      # the code as it was: the name did not exist
-        del H.JUDGE_SEES_CONTENT
-    else:
-        H.JUDGE_SEES_CONTENT = shipped
+    tw = H._shown("hands: Tetsu writes 5010 characters to long.txt in his own workshop on this PC",
+                  "The text to be written", long_body)
     # 18. the gate's state is read from the sentinel's own result: nobody judged is not_judged, judged-and-unsure is held.
     # The REAL core classes (Transaction, JudgmentResult, QuorumJudge, ReasoningSentinel) with stub seats, through the
     # real _gate; then a sentinel whose words and flags disagree, to show the flags decide.

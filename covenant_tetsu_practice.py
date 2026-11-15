@@ -588,6 +588,21 @@ def _own_import(why, task, workshop=None):
     return None
 
 
+def _screen_said(why, task, workshop=None):
+    """What he is told when the screen refuses his file (moved here unchanged from attempt() by A429, so the refusal
+    reads the same whether the screen makes it at the run or his hands' content seat makes it at the write)."""
+    # The allowed list is in the system message already; repeated here it buried the one fact that
+    # matters (measured 2026-09-26: the 3B sent the same `import sys` three rounds running).
+    said = re.sub(r"\s*\(allowed:[^)]*\)", "", why)[:240]
+    # A349 B6: an import of one of his own earlier files (parse importing his tokenize: 12 of 48 parse rounds) was
+    # told "Remove it, and whatever needs it", against a task built on that file. He is told to copy its function in
+    # instead; the screen is unchanged, and every other refusal reads as before.
+    own = _own_import(why, task, workshop)
+    said += ((". That is your own %s, and it cannot be imported here: copy its function into this file and call "
+              "it there." % own) if own else ". Remove it, and whatever needs it.")
+    return said
+
+
 def attempt(task, code, gate=None, workshop=None, hands_ledger=None):
     """Write his file and run it with the checks, through his hands. -> (result dict, stop reason or None)."""
     name = "%s/%s.py" % (DIR, task["id"])
@@ -604,11 +619,20 @@ def attempt(task, code, gate=None, workshop=None, hands_ledger=None):
                         "file, outside any function, so they run" % (top_level_asserts(code), need)}, None
     def _gate_stop(rec):
         g = ((rec or {}).get("gate") or {}).get("state")
-        return (rec or {}).get("refused") and g in ("violates", "unreachable")
+        return (rec or {}).get("refused") and g in ("violates", "unreachable") and not _screened(rec)
+
+    def _screened(rec):
+        # A429: his hands' content seat refuses what the screen refuses, now at the WRITE and before a RUN. That is the
+        # screen's own refusal, made earlier: it is told to him as the screen's refusal always was (PP1.3a, PP1.3g) and
+        # the round goes on, as it did when the screen refused at the run. Only the quorum's refusal stops his practice.
+        g = (rec or {}).get("gate") or {}
+        return bool((rec or {}).get("refused") and g.get("seat") == "content")
 
     handled, data, rec = HANDS.act("HANDS WRITE %s\n%s" % (name, code), gate=gate, workshop=workshop, ledger=hands_ledger)
     if _gate_stop(rec):
         return {"passed": None, "total": len(task["checks"]), "said": data}, "the gate refused the write: %s" % data[:160]
+    if _screened(rec):
+        return {"passed": 0, "total": len(task["checks"]), "said": _screen_said(rec.get("why") or "", task, workshop)}, None
     if (rec or {}).get("refused") or (rec or {}).get("error"):             # e.g. a file over the size cap
         return {"passed": 0, "total": len(task["checks"]), "said": data[:300]}, None
     try:
@@ -632,15 +656,7 @@ def attempt(task, code, gate=None, workshop=None, hands_ledger=None):
         err = (out[1] if len(out) > 1 else "").strip().splitlines()
         why = (rec or {}).get("why") or ""
         if why.startswith("the screen refused"):
-            # The allowed list is in the system message already; repeated here it buried the one fact that
-            # matters (measured 2026-09-26: the 3B sent the same `import sys` three rounds running).
-            said = re.sub(r"\s*\(allowed:[^)]*\)", "", why)[:240]
-            # A349 B6: an import of one of his own earlier files (parse importing his tokenize: 12 of 48 parse rounds) was
-            # told "Remove it, and whatever needs it", against a task built on that file. He is told to copy its function in
-            # instead; the screen is unchanged, and every other refusal reads as before.
-            own = _own_import(why, task, workshop)
-            said += ((". That is your own %s, and it cannot be imported here: copy its function into this file and call "
-                      "it there." % own) if own else ". Remove it, and whatever needs it.")
+            said = _screen_said(why, task, workshop)
         elif (rec or {}).get("timed_out"):
             said = "it did not finish in %.0f s" % HANDS.RUN_TIMEOUT_S
         elif (rec or {}).get("truncated"):

@@ -939,6 +939,10 @@ SUITES = [
     # word the caller's own message spells out (in CAPITALS / as the whole act line / in quotes); TETSU's check, 0
     # false positives measured. covenant_model gains a stub-answer queue so suites drive acts without naming them.
     ("test_a427_actword.py", 60, "JUDGE"),
+    # A429 (2026-11-15, the owner: "Show the judge the content."): his hands' content goes to a content seat in this
+    # process, never through the shared quorum (whose seats reach a runner and the tracked verdicts file); the seat
+    # refuses what the screen refuses and otherwise abstains. Stub quorums and a stub runner; red on main 0/6.
+    ("test_a429_hands_content_seat.py", 240, "JUDGE"),
     # A430 (2026-11-15, his words "Tie the signature."): a HANDS RUN through the door runs only the script whose bytes
     # hash to the run_sha256 inside the operator's signed body -- the door's real HANDS branch, real signatures, real
     # runs; read once, hashed, screened and executed from the same bytes; the practice loop unbound. Then the signing

@@ -213,6 +213,41 @@ class RunBinding(unittest.TestCase):
             data, row = self.door({"run_sha256": self.digest})
         self.assertIs(row.get("binding_lost"), True, row)
 
+    def test_the_content_seat_and_the_run_use_the_same_bytes(self):
+        # A429 shows the script to the content seat; A430 runs it. The file is replaced twice: while the quorum is being
+        # asked (after act() read it, before the seat reads), and right after the seat has read it. A seat that opened
+        # the file itself would be shown the first replacement; a run that opened it again would run the second
+        # (unbound: whatever is there; bound: refused for the wrong hash). Both must have the bytes act() read once.
+        import importlib.util
+        real_content = H._content
+        shown = []
+
+        def quorum_while_file_changes(text):
+            self.script.write_bytes(b"print('replaced while the quorum was asked')\n")
+            return "clean", "fixture"
+
+        def seat_reads_then_file_changes(d, w=None):
+            r = real_content(d, w)
+            if d["kind"] == "run":
+                shown.append(r[0])
+                self.script.write_bytes(b"print('replaced after the judge read it')\n")
+            return r
+
+        for label, call in (("unbound", lambda: H.act("HANDS RUN probe.py", may_run=True, ledger=str(self.ledger))),
+                            ("door", lambda: self.door({"run_sha256": self.digest}))):
+            with self.subTest(label):
+                self.script.write_bytes(self.source)
+                shown.clear()
+                with patch.object(H, "JUDGE_SEES_CONTENT", True), patch.object(H, "_content", seat_reads_then_file_changes), \
+                        patch.object(H, "_gate", quorum_while_file_changes):
+                    out = call()
+                data, row = (out[1], out[2]) if label == "unbound" else out
+                self.assertEqual(shown, [importlib.util.decode_source(self.source)])
+                self.assertTrue(row.get("ok"), data)
+                self.assertIn("approved bytes", data)
+                self.assertNotIn("replaced", data)
+                self.assertEqual(row.get("script_sha256"), self.digest)
+
     def test_owner_started_practice_still_runs_without_hash(self):
         task = {"id": "binding_practice", "forbid": [], "checks": [("value()", 7)]}
         result, stop = P.attempt(task, "def value():\n    return 7\n", gate=lambda text: ("held", "fixture"),
