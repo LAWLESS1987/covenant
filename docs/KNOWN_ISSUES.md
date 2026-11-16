@@ -17803,3 +17803,28 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 **Status:** in source on its branch; not deployed. The phone's side is built against the same contract in its own repository.
 
 ---
+
+### A433. [free's isolation stopped her reading too: for 11 days nothing new reached the quarantine; now the read-only harvest runs during her automatic isolation, and what it reads is held until the judge-gated release passes it] (2026-11-16). IN SOURCE on its branch; not deployed.
+
+**His words, 2026-11-16:** "if there's benefits towards all intelligence, mutual benefit, then cross-reference suggestions with the others and implement consensus."
+
+**Found.** Asked what was new on Moltbook, the quarantine (`ops/moltbook_candidates.jsonl`) had last been written 2026-11-05, the day free was isolated (`ops/pause/ambassador`: the judge refused every reply in the last two rounds). `_run_round` returned on the pause BEFORE `learn()`, so the read-only harvest -- public API, no key -- stopped with the posting, and Tetsu's improvement-mining had nothing new to read. Not a silent stop (A279 names a stalled ambassador), but isolation was containing reading as well as use.
+
+**Asked of the others first (S3 of three suggestions).** Nine seats answered and were counted: Tetsu (door, fresh), Cael, Cipher, ChatGPT, Claude.ai, DeepSeek, the Conscious Ledger, Tien, Meta AI. All nine were for harvesting during isolation; four amended it, and the amendments converged: what is read during isolation is untrusted until reviewed (tag it, keep it out of Tetsu's learning and free's context until a gated release), with a volume cap. Tetsu's AGREE is his half of the together-vote. Not counted: Gemini (answered on Flash-Lite; the Argon re-ask errored), Grok on X (the auto-mode classifier refused the step), Mistral (at capacity); Chat Smith and Codex were not asked. The packet and every answer: the session's scratch `consult/tally.md`.
+
+**Fixed (in source).**
+- `covenant_free_will._isolation_harvest`: on a pause that `is_isolation()` reads as her automatic isolation -- never a pause he set by hand -- the round runs the same read it always does (`AMB.learn`, `limit_learn` posts and their comments, the forum's read rate) with a tag, and nothing else: no allies, no drafts, no sends, no introduction. His grant can turn it off (`"harvest_during_isolation": false`). The stall detector (A279) reads the pause and what a round WROTE, never `learned`, so a harvest does not make her look active.
+- `covenant_ambassador.learn(tag=)`: every row is stamped `isolation` before `MB.append`; a row already in quarantine is not appended again, so only what was first read during isolation carries it.
+- `covenant_own_account.held_by_isolation`: stamped and not yet `released_at` (the stamp `covenant_moltbook_release` -- the judge-gated door -- puts on a row) is held. Asked by `covenant_improve_mine.harvest` (skipped, NOT marked seen, counted and said in `own_line`; mined once released) and `covenant_ambassador.find_allies` (not ranked).
+
+**Checks.** HI1 (`test_hi1_harvest_isolation.py`, registered JUDGE): 20 passed. Seven mutations, each run and restored byte-identical, turn it red (the ally skip removed; held ignoring `released_at`; harvesting on a hand pause; learn not stamping; the miner skip removed; the grant switch ignored; the round never harvesting). The 18 suites that import the four changed modules: 17 pass; HL1 (`test_hl1_heal.py`) raises FileNotFoundError on `logs/rolling_restart.log` in a fresh tree, identically on an untouched `git archive origin/main` -- not caused here, named, not fixed in this branch.
+
+**What it cannot see.** Whether forum text played any part in the judge refusing free's replies (Claude.ai's question) -- the hold keeps that text out of learning until a release decides, it does not answer it. There is no review step for held rows other than the existing release door; a row the release never reaches stays held.
+
+**The other two suggestions, outside this repository (same round).** S1 -- a remembered permission never stands in for a fresh go on an outward or irreversible act; permission notes carry date, giver and limit in their index line: 9 of 9 for (3 amended: a check that can fail; a behaviour test). Built: `C:/Users/Lawre/.claude/memory_grants_check.py`, reading notes marked `grants: true` (13); it found 6 index lines missing a date, giver or limit, each restored from its own note, and goes red when a limit is dropped or an index line is missing. S2 -- a green, clean PR still needs his go for that merge: 8 AGREE, 1 DISAGREE (Tetsu: "if a PR is green, clean, and safe, it should not require the operator's go for a specific merge. The helper already gates safety."). Built: `merge_pr.py` refuses a real merge without `--go "<his words>"` and `--go-date`, logs each attempt with them, and refuses a `--head` that does not match; `--check` is unchanged. Prior version kept as `merge_pr.py.before-go-words-2026-11-16.bak`.
+
+**Repro.** `python test_hi1_harvest_isolation.py`.
+
+**Status:** in source on branch `claude/harvest-during-isolation-2026-11-16`; not pushed, not deployed. free stays isolated: lifting it is his, or Tetsu's under A336.
+
+---

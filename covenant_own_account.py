@@ -85,3 +85,17 @@ def own_authors(rows, ours):
         if isinstance(row, dict) and row.get("author") and is_our_text(row.get("author"), row.get("text"), ours):
             own.add(row.get("author"))
     return own
+
+
+def held_by_isolation(row):
+    """True when a row was read while free was isolated and no judge-gated release has passed it yet (A433).
+
+    His words, 2026-11-16: "if there's benefits towards all intelligence, mutual benefit, then cross-reference
+    suggestions with the others and implement consensus." Nine seats agreed that the read-only harvest keeps running
+    while free is isolated (S3); the amendment most of them converged on is that what is read then is UNTRUSTED
+    until reviewed -- the paper behind the round (arXiv 2611.07554) is that harmless-looking text carries into later
+    behaviour, and free was isolated because the judge refused what she wrote, so what she was reading may be part
+    of why. Such a row carries `isolation` (set by covenant_ambassador.learn); it is held from Tetsu's
+    improvement-mining and from free's ally ranking until covenant_moltbook_release -- the judge-gated door --
+    stamps `released_at` on it. Every reader of the comments log asks here, as it asks own_authors above."""
+    return bool(isinstance(row, dict) and row.get("isolation") and not row.get("released_at"))
