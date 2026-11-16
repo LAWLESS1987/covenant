@@ -17956,3 +17956,23 @@ Confirmed by running it: `StakingPool.stake(pk, float('nan'), ...)` raised `Inte
 **Status:** in source on its branch, with its test both ways. This touches runtime code (`covenant_unified_v8.py`), so `source_sha256` changes; it is NOT deployed -- no change to A/B/C without the operator's word.
 
 ---
+
+### A442. [security hunt -- fourth catch from the A438 queue] Succession registration did not validate the dead-man's-switch timing -- a negative interval fired a false succession on a live primary -- FIXED 2026-11-16
+
+Hunting the A438 queue at `/succession/register` (CONTROL -- the takeover-resistance surface). `SuccessionGuardianSystem.register` was already well-hardened where it counts: the threshold is bounded (`1 <= threshold <= N`, so the M-of-N cannot be set to 0), guardians are capped and must be 2+ distinct, every key is PEM-validated. But it validated NONE of `heartbeat_interval_days` / `grace_period_days`.
+
+**The defect, measured.** `check_dead_mans_switch` computes `deadline = last_heartbeat + interval*86400 + grace*86400` and fires a PENDING succession episode when `now > deadline`. A NEGATIVE interval or grace makes the deadline land in the PAST, so the switch fires IMMEDIATELY -- and the primary's heartbeat cannot stop it, because a fresh heartbeat only resets `last_heartbeat`, which is still behind the negative offset. Confirmed: `register(interval=-100000, grace=0)` was accepted, and `check_dead_mans_switch` on a just-registered LIVE primary returned `PENDING triggered, episode 1`. A non-finite value instead raises at the db's `NOT NULL` REAL column (`nan -> NULL`) and 500s.
+
+**Severity -- bounded, checked before claiming.** Succession here is a guardian key-RECOVERY scheme: recovery material is sealed to the ORIGINAL guardians (`seal_recovery_material`), so a false trigger -- even followed by attacker-chosen guardians confirming -- does not hand over the primary's sealed material or assets. So this is a false-trigger / griefing of a security-critical mechanism (a bogus "primary incapacitated" episode), not a direct takeover. Still worth closing: a dead-man's-switch that fires on a live, heartbeating primary is broken.
+
+**Fix.** `register` rejects a non-finite or non-positive `heartbeat_interval_days` and a non-finite or negative `grace_period_days` at write time -- the same U-invariant discipline as /stake (A441).
+
+**Repro:** `python test_a442_succession_timing.py` (6/6), exploit-first both ways: pre-A442 `register(-100000)` succeeds and the switch fires PENDING on a live primary; after, register refuses it (and there is no config to fire). inf/nan/zero are refused; a valid 30/15 config registers and does NOT false-trigger.
+
+**Noted, not changed (the operator's design calls, not mine).**
+- `/succession/register` is self-attested (no signature) and `save_succession_config` overwrites by `primary_pubkey`, so an attacker can overwrite a victim's succession CONFIG (a griefing vector). The route docstring defends the self-attested model and the recovery material stays sealed to the original guardians; changing this is a design decision, flagged for review, not patched blind.
+- `/succession/heartbeat` and `/succession/confirm` also read `float(timestamp)`; their freshness/replay handling is a separate check, a later hunt item.
+
+**Status:** in source on its branch, with its test both ways. Runtime code (`covenant_unified_v8.py`) -> `source_sha256` changes; NOT deployed (no change to A/B/C without the operator's word).
+
+---
