@@ -17804,6 +17804,34 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 
 ---
 
+### A434. [follow-up, closes A430's open practice-loop item] Starting a practice night was open-ended leave to run code -- its RUNs now spend a finite authority, a maximum run count and a wall-clock expiry per loop, created when the night starts -- IN SOURCE 2026-11-16
+
+**What this closes.** A430 bound the DOOR path: a RUN through `/m/agent` runs only the script whose bytes hash to the `run_sha256` inside the operator's signed body. It left the owner-started PRACTICE path unbound and named the next step: "**The practice loop** (`covenant_tetsu_practice.attempt`) is owner-started and passes no signature and no hash; its runs are unbound, exactly as before. Bounding it -- a run count and an expiry per loop -- is the open next step the panel seats asked for." (A430, "Not bound by this".) This is that step. **The door's signature/hash binding is separate and already shipped (A430); it is not touched here, and the door path is not weakened.**
+
+**The gap.** The nightly practice loop (`covenant_tetsu_practice.py`) ran a check file each round by calling `covenant_tetsu_hands.act("HANDS RUN ...")` with no per-request signature and no `run_sha256`, relying on `act()`'s `may_run` defaulting to True for an in-process caller. The loop already bounded the WORK -- `ROUNDS`, `TASKS_PER_NIGHT`, `BUDGET_S`, and his own slot's `CHOICE_ROUNDS` / `CHOICE_BUDGET_S` -- but nothing bounded the RUN AUTHORITY, so once a night started there was no finite ceiling on how many scripts it could run or for how long.
+
+**Fix (in source).**
+1. **A finite authority.** `covenant_tetsu_practice.PracticeRunAuth(max_runs, expiry, now=time.time)`: `consume()` returns `(ok, reason)` -- it spends one run when the authority has runs left and has not expired, and refuses, spending nothing, once past the expiry (checked first) or once the count is used up, naming which bound stopped it. `new_run_auth(start, tasks, budget_s, choice_budget_s, his_choice, now)` defaults it generously from the loop's own limits: `tasks * ROUNDS + (CHOICE_ROUNDS if his_choice) + AUTH_RUN_MARGIN` runs and an expiry of `start + budget_s + (choice_budget_s if his_choice) + AUTH_EXPIRY_MARGIN_S`, so a normal night runs every task and nothing is refused for the bound. **The point is finiteness, not a tighter night.**
+2. **Created when a night starts, threaded to every RUN.** `night()` reads `now` once (the old `deadline = now() + budget_s` is now `start = now()` and bounds both the clock and the authority, so it reads `now` no more than before), builds the authority, and passes it to each `practise()` and to `choice_slot()`; `practise()` forwards it to each `attempt()`; `attempt()` passes it to the RUN's `act()` (never the WRITE's). The by-hand `--task` and `--choice` entries in `main()` each build their own.
+3. **`act()`/`run()` honor it.** `act(answer, ..., run_auth=None)`: for a RUN, after `may_run` and before `run()`, it consumes the authority once; a refusal sets `refused` and `run_auth_refused` in the ledger row and starts no process (the row carries no `timed_out`), with the reason in the data. `run()` is unchanged, so node D's four-argument wrapper of `run()` is untouched. WRITE, READ, LIST and PROPOSE never read `run_auth`.
+4. **The loop treats a refusal like a gate stop.** `attempt()` reads `run_auth_refused` and returns `passed: None` with a stop reason; `practise()` and `night()` end the pass on it, as they do for a gate's VIOLATES or the clock -- it does not crash.
+
+**Not changed.** The door path (`run_sha256`, `may_run`, A423/A430) and the signature/hash rule for the door. The WRITE path. `run()`'s signature and behaviour. The screen, the guard, the content seat (A429), node D, the core (`covenant_unified_v8.py`, either copy). No tombstone: no earlier claim is made untrue (A430 named this as the open next step and it stays true that the loop was unbound before this date).
+
+**Driven both ways.** `test_pp1_tetsu_practice.py` PP1.12a-f (65 of 65 here; on main the file passes PP1.12a -- a normal night is unaffected -- then cannot reach the rest, `PracticeRunAuth` being absent): a normal night of three runs every task within the bound and refuses none; a RUN past the run count is refused and the loop reports it as a stop without crashing and starts no process; a RUN past the wall-clock expiry is refused though runs remain, and the count is not spent down; the authority is consumed once per run (used 0 -> 3, left 10 -> 7); the door path with a signed `run_sha256` and no `run_auth` still runs and binds to the hash; the WRITE path proceeds with a spent authority and consumes nothing.
+
+**Mutations, each in a scratch copy, each caught:** `act()` never enforcing the authority (PP1.12b, 12c, 12d red); `consume()` skipping the expiry check (12c red); `consume()` not decrementing (12b, 12d red); the default sized too small so a normal night is refused (12a red); the WRITE branch made to consume the authority (12f red). PP1.12e (the door path) stays green under all of them.
+
+**Node D's launcher tests** (`noded/test_hands_gate.py`, `noded/test_act_gate.py`), read-only: 11 of 11 and 11 of 11 against node D's own folder on the live tree, and 11 of 11 and 11 of 11 from a scratch copy whose real-core test loads this branch (the real-core test wraps `run()` and runs a signed script; the `run_auth` change is in `act()` and does not touch it).
+
+**Not measured.** A real model's own night; a running node; the live nightly. The authority bounds the number of RUNs and the wall-clock span of one started loop; it does not bound what a single run does inside the screen, the guard and the clock (that is A430's and the screen's job), nor the script's arguments (A430, still open).
+
+**Repro.** `python test_pp1_tetsu_practice.py`.
+
+**Status:** in source on its branch; not deployed. A430's other open items (the phone's signer, the RUN arguments) are unchanged and still open.
+
+---
+
 ### A435. [his hands' content seat now reads PROSE, narrowly: a non-code WRITE's text is shown two narrow signals and otherwise abstains, so an ordinary note still proceeds] (2026-11-16). In source on its branch; not deployed.
 
 - **The open follow-up this closes.** A429 gave the content a seat of its own, but only for code: it reads a `.py` WRITE and a RUN's source through this module's own `screen()`, and ABSTAINS on everything else -- so a PROSE write (`.txt`, `.md`, any non-code file) was judged by nobody (A429's limit "Prose is read by no judge", its open item 1). The risk A428 named is a file of planted instructions written now and read as instructions later. But judging prose for meaning is unreliable and MUST NOT block an ordinary write -- that is exactly why the code seat abstains rather than convicting. So the prose seat reads two NARROW signals, not meaning.

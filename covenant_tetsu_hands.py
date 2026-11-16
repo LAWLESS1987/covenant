@@ -902,13 +902,19 @@ def _content_seat(d, workshop=None):
     return {"state": "violates", "why": why, "message": "content seat: the screen refused it: %s" % why}
 
 
-def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=None, may_run=True, run_sha256=UNBOUND):
+def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=None, may_run=True, run_sha256=UNBOUND,
+        run_auth=None):
     """For the door: (handled, data_for_the_model, record). Not a directive -> (False, '', None). may_run gates a RUN
     (A423): the /m/agent door passes may_run only for an OPERATOR caller (loopback, or a request signed by a registered
     key), so an unauthenticated tailnet caller cannot run a script even if a screen spelling slips past -- the screen is
     a screen, not a sandbox. In-process callers (his practice loop, the tests) keep the default True.
     run_sha256 (A430): the door passes the value from the signed body (None when it has none), and a RUN then runs
-    only the file whose bytes hash to it. Not passed (UNBOUND): an in-process caller, not bound."""
+    only the file whose bytes hash to it. Not passed (UNBOUND): an in-process caller, not bound.
+    run_auth (A434): a finite authority to RUN for one started practice loop (covenant_tetsu_practice.PracticeRunAuth),
+    threaded by his practice loop so that starting a loop is never open-ended permission to run code. When one is given,
+    a RUN consumes it once (after may_run, before run()); once the authority is spent or past its wall-clock expiry a RUN
+    is refused with the reason and nothing is started, marked run_auth_refused in its row. The door passes none
+    (None): the door path is bound by may_run and run_sha256, not by this. WRITE, READ, LIST and PROPOSE never read it."""
     d = parse(answer)
     if not d:
         return False, "", None
@@ -971,6 +977,19 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
                 _append(rec, ledger)
                 return True, ("DATA: running a script needs the operator (a request from loopback or signed by a registered "
                               "key); this caller may not. Nothing was run. Say so plainly."), rec
+            # A434: his practice loop's finite run authority. A RUN spends one of it, after may_run and before run(); once
+            # the authority is exhausted or past its wall-clock expiry it is refused here, so nothing is started. The row
+            # is marked run_auth_refused, which the loop (attempt) reads as a stop -- it ends the pass, it does not crash.
+            # No authority given (None): an unbound caller, as before (the door, which is bound by may_run and run_sha256).
+            if run_auth is not None:
+                ok_auth, why_auth = run_auth.consume()
+                if not ok_auth:
+                    rec["refused"] = True
+                    rec["run_auth_refused"] = True
+                    rec["why"] = str(why_auth)[:300]
+                    rec.update({"ok": False, "code": None})
+                    _append(rec, ledger)
+                    return True, ("DATA: the run was refused -- %s. Nothing was run. Say so plainly." % str(why_auth)[:400]), rec
             # A430: the binding rides a context variable, not a new positional argument, so a launcher's wrapper of
             # run() with the older signature still sees this call and passes it on; run() reads it there.
             token = _RUN_BINDING.set(run_sha256)
