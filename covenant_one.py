@@ -104,6 +104,13 @@ SUITES = [
     # if classification regresses to raw substring matching) and smoke-tests the
     # real tree so the mapper cannot silently stop finding routes.
     ("test_asm1_attack_surface.py",       60,  "SECURITY"),
+    # A439 (2026-11-16): first catch of the A438 hunt, at /actuator_learn. The
+    # shared operator-request gate (covenant_daily_plan.verify_signed) let a
+    # NON-FINITE timestamp slip the freshness window (abs(now-nan) > WINDOW_S is
+    # False); the nonce store resets on restart, so a captured nan request could
+    # replay. Rejected now at the ingress (the U invariant). Exploit-first both
+    # ways: the nan request verifies on the pre-A439 code, is refused after.
+    ("test_a439_nonfinite_timestamp.py",  60,  "SECURITY"),
     ("test_k1_runner_key_preservation.py",120, "SECURITY"),
     ("test_k3_p9_owner_only_guard.py",   120,  "SECURITY"),
     # Arrived on main 2026-08-27 from fix/tally-counts-failures-as-passes,
