@@ -17831,3 +17831,21 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 **Status:** in source on its branch; not deployed. A430's other open items (the phone's signer, the RUN arguments) are unchanged and still open.
 
 ---
+
+### A436. [security, follows A430] A signed-door HANDS RUN bound the script file but not its arguments -- ARG-BOUND 2026-11-16
+
+**What.** A430 ties a signed RUN to run_sha256, the sha256 of the script's bytes, so the operator's signature names the exact FILE. But a RUN's ARGUMENTS come from the model's answer line ("HANDS RUN name arg1 arg2"), not the signed body -- so run_sha256 bound the file and not the invocation: the operator signed "run file-hash-H" and the model, which a planted instruction can steer, supplied the arguments. The full quorum (the bots, Grok on X, DeepSeek, Meta AI, ChatGPT, Gemini, Claude.ai, Mistral, Codex, the local 27Bs) was unanimous on this (their C3); the laptop seat flagged it in the A430 review.
+
+**The fix.** On the signed door (run_sha256 bound, in `act()`), a RUN that carries any arguments is refused with a clear message, before it runs; it runs with no arguments. The practice path (in-process: run_auth set, run_sha256 UNBOUND) and any unsigned / plain caller are untouched -- only the signed door binds run_sha256, so only it is tightened. A423 still refuses an unsigned RUN before this is reached.
+
+**Severity (the gap was bounded).** Weaker-than-stated, not broken: a script runs in the workshop sandbox (python -I, the screen deny-list -- no network, no subprocess, no file outside the workshop -- and time / memory / process limits), so arguments could not make the approved script escape; they could only change what it did within the workshop. This closes the gap so the operator's signature names the exact run, not just the file.
+
+**Repro:** `test_a436_run_args_bind.py` drives it both ways -- a signed RUN with arguments is refused (run_args_refused), a signed RUN with none is left to A430's hash check, the practice path and a plain in-process caller with arguments are untouched, and an unsigned RUN is refused by A423 first.
+
+**Cost (every gain with its cost).** A signed run can no longer pass arguments on the answer line; if an operator-approved workshop script ever needs arguments, they must be baked into the script or bound in the signed body (hash the invocation) as a later change -- an operator-approved run from the phone carries none today.
+
+**Still open (recorded by the quorum, not built):** a runtime sandbox / network-egress / descendant-process containment for a script that runs, and operator-key theft with no revocation. Both are the operator's call, not fixed blind.
+
+**Status:** fixed (a signed-door RUN forbids arguments; the practice and unsigned paths are untouched)
+
+---

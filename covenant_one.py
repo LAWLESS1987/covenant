@@ -846,6 +846,10 @@ SUITES = [
     # TH1 (2026-09-26, A226): Tetsu's hands -- his workshop, bounded runs behind a screen and a
     # guard, proposals beside the tree and never in it; the door dispatches HANDS beside MOLTBOOK.
     ("test_th1_tetsu_hands.py", 180, "JUDGE"),
+    # A436 (2026-11-16, follows A430): a signed-door HANDS RUN approves the exact script (run_sha256), not an
+    # invocation; a RUN carrying arguments is refused. The practice path (in-process run_auth) and unsigned callers
+    # are untouched. Drives both ways. Closes the quorum's C3.
+    ("test_a436_run_args_bind.py", 60, "JUDGE"),
     # PP1 (2026-09-26, his words: "train tetsu to code at a high recursive level"; he chose the practice loop, nightly and
     # bounded): the curriculum solvable under his screen, a wrong file caught, the failure fed back, what he solves and
     # learns kept in his workshop, and the gate, the model and the clock each stopping it. Real runs; model and gate stubbed.
