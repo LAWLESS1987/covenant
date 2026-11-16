@@ -141,8 +141,11 @@ def main():
     check("stops the older pair (stub and child), keeps itself, its parent and the newer one",
           W._twins_to_evict(rows, my_pid=201, my_ppid=200) == [100, 101],
           str(W._twins_to_evict(rows, my_pid=201, my_ppid=200)))
-    check("a tie is left alone -- two evicting each other would leave nothing",
+    check("same tick, the HIGHER pid defers -- it evicts nobody, so two never kill each other (A437)",
           W._twins_to_evict([(100, t0), (201, t0)], my_pid=201, my_ppid=200) == [])
+    check("same tick, the LOWER pid stops the higher -- exactly one survives, never both (A437)",
+          W._twins_to_evict([(100, t0), (201, t0)], my_pid=100, my_ppid=1) == [201],
+          str(W._twins_to_evict([(100, t0), (201, t0)], my_pid=100, my_ppid=1)))
     check("nothing is evicted when the measurement cannot see this process",
           W._twins_to_evict([(100, t0), (101, t0)], my_pid=999, my_ppid=998) == [])
     check("the newest process evicts every older watchdog of the tree",

@@ -17884,3 +17884,19 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 **Status:** in source on its branch, with its measurement and tests; meaning beyond the pattern list not judged (by design); not deployed.
 
 ---
+
+### A437. [watchdog / launcher] Two watchdogs started in the SAME tick both survived and persisted -- one tree, one watchdog now holds for a same-tick race too -- IN SOURCE 2026-11-16
+
+**What.** "Fix the launcher bug" (the operator, after a deploy left extra `covenant_watchdog.py` processes). The launcher (`covenant_prod.bat`) was NOT the defect: its "one only" guard matches the watchdog by ABSOLUTE PATH, identical to the highway's two restart remedies (`remedy_restart_watchdog`, `remedy_schedule_watchdog_restart`) and the watchdog's own A160 self-check (`_watchdog_like()` / `_evict_twins`). All four actors agree. The real gap was in A160 itself: `_twins_to_evict` spared EVERY same-tick tie (two evicting each other would leave nothing running -- a real outage, measured 2026-09-20), and `_evict_twins` ran only at daemon START. So two watchdogs started in the same second by racing launchers (a manual restart plus the three nodes' scheduled restarts landing together) were each spared by the other and then persisted, with nothing to come back and cull them. Two live watchdogs each mine the pool once a minute, rate-limit each other into HTTP 429, and append contradictory verdicts to `ops/SELF_EVAL.md` (the A160 history).
+
+**Fix.** A deterministic, one-sided pid tiebreak: of a same-tick pair the LOWER pid stops the higher and survives (never both -- the persistent duplicate; never neither -- the outage the old rule guarded, since two equal pids cannot exist). And the A160 cull now runs EVERY round, not only at start (`_daemon_round`), so a same-tick twin that neither start-time scan could see -- it appeared just after this watchdog's own scan and was spared by the higher-pid twin's tiebreak -- is stopped within one interval instead of persisting.
+
+**Repro:** `python test_a437_twin_tiebreak.py` drives it both ways -- same-tick lower pid evicts the higher, higher pid defers (no mutual kill), three-in-a-tick collapse to the lowest, a younger/self/parent twin is never evicted, and `_daemon_round` re-culls every round even when the health pass raises. Each marked case fails on the pre-A437 code (same-tick spared; no per-round cull). `test_p22_watchdog_restart_verifies.py` P22h updated to the new semantics.
+
+**Not changed.** The launcher (`covenant_prod.bat`) -- its guard was already correct. `_watchdog_like()` and the highway's restart remedies. The absolute-path match. The `--once` and status paths (they never reach the daemon loop).
+
+**Residual (bounded).** A same-tick twin spared by a start-time race is culled by the next periodic pass, so it can live up to one interval (~60 s) before it is stopped -- defense-in-depth for a rare race, not an instant kill. The underlying cause (several uncoordinated launchers with no shared lock) is unchanged; A160+A437 are the eventual-consistency net over it.
+
+**Status:** in source on its branch, with its test both ways; not deployed (no change to A/B/C without the operator's word).
+
+---

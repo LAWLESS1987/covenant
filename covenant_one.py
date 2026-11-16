@@ -306,6 +306,12 @@ SUITES = [
     # (A135). P21h and P22's parser check both drive the failing direction.
     ("test_p21_self_eval_persist.py",    120,  "IDENTITY"),
     ("test_p22_watchdog_restart_verifies.py", 180, "IDENTITY"),
+    # A437 (2026-11-16): one tree, one watchdog even when two start in the SAME
+    # tick. A160 spared every tie and _evict_twins ran only at start, so a
+    # same-tick pair from racing launchers both survived and persisted. A pid
+    # tiebreak (lower pid stops the higher, one-sided) plus a per-round re-cull.
+    # Drives both ways: each new case fails on the pre-A437 code.
+    ("test_a437_twin_tiebreak.py", 60, "IDENTITY"),
     # P23 (2026-09-16): the three second-operator security findings -- A31
     # (/propose_code RCE), A21 (implicit credential grab), A44 (key ACL).
     # Added because a back-door audit pointed out that all three fixes existed
