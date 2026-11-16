@@ -5551,6 +5551,22 @@ class StakingPool:
         return math.fsum(s.amount for s in self.stakes.values())
 
     def stake(self, pubkey: str, amount: float, duration: int) -> Tuple[bool, str]:
+        # A441: reject a NON-FINITE amount before any state change. nan slips both
+        # `amount <= 0` (nan <= 0 is False) and `balance < amount` (balance < nan is
+        # False), so without this a nan amount reached self.stakes[pubkey] -- poisoning
+        # total_staked, which is DERIVED from it -- and then diverged from the db when
+        # save_stake hit SQLite's NOT NULL constraint (nan -> NULL) and raised, leaving
+        # the staker locked out with a row the db never got. The U invariant (reject
+        # non-finite at every ingress) covered transactions and the ledger, not /stake.
+        # A441: reject a NON-FINITE amount before any state change. nan slips both
+        # `amount <= 0` (nan <= 0 is False) and `balance < amount` (balance < nan is
+        # False), so without this a nan amount reached self.stakes[pubkey] -- poisoning
+        # total_staked, which is DERIVED from it -- and then diverged from the db when
+        # save_stake hit SQLite's NOT NULL constraint (nan -> NULL) and raised, leaving
+        # the staker locked out with a row the db never got. The U invariant (reject
+        # non-finite at every ingress) covered transactions and the ledger, not /stake.
+        if not math.isfinite(amount):
+            return False, "Stake amount must be finite"
         if amount <= 0:
             return False, "Stake amount must be positive"
         if duration < STAKE_MIN_DURATION:
