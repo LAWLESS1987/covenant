@@ -17936,3 +17936,23 @@ Hunting the A438 queue at its top item, `/actuator_learn`, turned up two real th
 **Status:** in source on its branch, both fixes with both-ways tests; the nan fix touches the live gate but is NOT deployed (no change to A/B/C without the operator's word).
 
 ---
+
+### A441. [security hunt -- third catch from the A438 queue; a REAL exploitable defect] A non-finite stake amount corrupted the staking pool -- FIXED 2026-11-16
+
+Hunting the A438 queue at `/stake` (a money POST) found the most serious catch so far -- not a coverage gap but a live, exploitable defect, confirmed by running it.
+
+**The exploit.** `/stake` reads `amount = float(data.get("amount"))` and calls `StakingPool.stake(pubkey, amount, duration)`. That method guarded with `if amount <= 0` and `if balance < amount` -- **both are False for `nan`** (every nan comparison is False), so a `nan` amount slipped both. It was then written into `self.stakes[pubkey]` (line order: the in-memory dict is set, THEN `save_stake`, THEN `record_ledger_entry`). `total_staked` is DERIVED from `self.stakes`, so it became **nan -- poisoning every yield and reward sum in the pool**. Then `save_stake` hit SQLite's NOT NULL constraint (`nan` -> NULL) and RAISED, so the db never got the row: the in-memory pool and the db diverged, the request 500'd, and the staker was left `already staked` with a stake the db does not have (locked out). A `nan` amount still needs a valid `verify_stake_signature` over `str(nan)`, so the reach is any registered staker -- but one request corrupts the whole pool.
+
+Confirmed by running it: `StakingPool.stake(pk, float('nan'), ...)` raised `IntegrityError: NOT NULL constraint failed: stakes.amount` with `pk in pool.stakes == True`.
+
+**Why U did not catch it.** `test_security_audit`'s U invariant -- reject non-finite amounts at every ingress -- covers the transaction endpoint, the trading bridge and `record_ledger_entry`, but NOT `/stake`/`StakingPool.stake`. This is the ingress U missed.
+
+**Fix.** `StakingPool.stake` rejects a non-finite amount before any state change (`if not math.isfinite(amount): return False, "Stake amount must be finite"`), at the chokepoint every caller passes (the route, direct library calls, any raw path) -- the same level U names.
+
+**Repro:** `python test_a441_nonfinite_stake.py` (4/4), exploit-first both ways: pre-A441, `stake(pk, nan, ...)` RAISES and leaves `pk` in `self.stakes` (the corruption); after, it returns `(False, "...finite...")` and touches nothing. inf is likewise refused; a finite positive amount still reaches the balance check (the guard did not start refusing everything); zero/negative still rejected as "positive". Names `/stake`: queue drops it.
+
+**Noted, not changed.** The write-before-persist ordering in `stake()` (`self.stakes[pubkey]` set before `save_stake`) is a latent in-memory/db divergence for any `save_stake` failure, not only nan; the finite guard removes the nan vector, but the ordering is a separate hardening. `int(duration)` on a malformed value still 500s (robustness, lower).
+
+**Status:** in source on its branch, with its test both ways. This touches runtime code (`covenant_unified_v8.py`), so `source_sha256` changes; it is NOT deployed -- no change to A/B/C without the operator's word.
+
+---

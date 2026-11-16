@@ -111,6 +111,13 @@ SUITES = [
     # replay. Rejected now at the ingress (the U invariant). Exploit-first both
     # ways: the nan request verifies on the pre-A439 code, is refused after.
     ("test_a439_nonfinite_timestamp.py",  60,  "SECURITY"),
+    # A441 (2026-11-16): third A438-hunt catch, at /stake -- a REAL defect. A nan
+    # amount slipped `amount <= 0` and `balance < amount` (both False for nan),
+    # reached self.stakes (poisoning total_staked, derived from it) and diverged
+    # from the db when save_stake hit the NOT NULL constraint -- one authenticated
+    # /stake could corrupt the pool and lock the staker out. The U invariant missed
+    # /stake. stake() now rejects non-finite before any state change; both ways.
+    ("test_a441_nonfinite_stake.py",      60,  "SECURITY"),
     ("test_k1_runner_key_preservation.py",120, "SECURITY"),
     ("test_k3_p9_owner_only_guard.py",   120,  "SECURITY"),
     # Arrived on main 2026-08-27 from fix/tally-counts-failures-as-passes,
