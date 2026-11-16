@@ -990,6 +990,21 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
                     rec.update({"ok": False, "code": None})
                     _append(rec, ledger)
                     return True, ("DATA: the run was refused -- %s. Nothing was run. Say so plainly." % str(why_auth)[:400]), rec
+            # A436 (2026-11-16, follows A430; closes the quorum's C3): a SIGNED-DOOR RUN approves the EXACT script (its
+            # run_sha256), not an invocation. run_sha256 binds the file's bytes but not the arguments, which come from
+            # the model's answer line -- so the operator's signature names the script, and a planted instruction could
+            # append arguments the operator never saw. On the door path (run_sha256 bound) a RUN that carries arguments
+            # is refused; it runs with no arguments. The practice path (in-process: run_auth set, run_sha256 UNBOUND)
+            # and any unsigned/plain caller are untouched -- only the signed door binds run_sha256.
+            if run_sha256 is not UNBOUND and d["args"]:
+                rec["refused"] = True
+                rec["run_args_refused"] = True
+                rec["why"] = "a signed run names the exact script, not arguments"
+                rec.update({"ok": False, "code": None})
+                _append(rec, ledger)
+                return True, ("DATA: a signed run of a workshop script runs it with NO arguments -- the operator's "
+                              "signature names the script (its sha256), not an invocation with arguments. Nothing was "
+                              "run. Say so plainly."), rec
             # A430: the binding rides a context variable, not a new positional argument, so a launcher's wrapper of
             # run() with the older signature still sees this call and passes it on; run() reads it there.
             token = _RUN_BINDING.set(run_sha256)
