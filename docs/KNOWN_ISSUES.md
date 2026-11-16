@@ -17900,3 +17900,23 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 **Status:** in source on its branch, with its test both ways; not deployed (no change to A/B/C without the operator's word).
 
 ---
+
+### A438. [security / white-hat] The hunt had no denominator -- a standing map of the attack surface and what of it has ever been adversarially tested -- IN SOURCE 2026-11-16
+
+**What.** His words, 2026-11-16: "we need the ultimate White Hat technology", then he chose a systematic self-audit. The covenant already has a strong regression net (80 SECURITY + 114 JUDGE suites swept daily; `mutation_probe.py` proving guards real; a live exec-guard shadow; `opsec_scan.py`), but every one of those locks in a KNOWN finding. Nothing computed the DENOMINATOR -- the whole ingress surface and which of it has ever had an adversarial test -- so the hunt was driven by memory, not by a map. That is the first-pass blind spot CLAUDE.md names ("establish the denominators by discovery").
+
+**Increment 1.** `tools/attack_surface_map.py` (read-only, defensive, his systems). It walks the source, discovers every Flask route by DISCOVERY (47 today, never a hardcoded list), classifies each by exposure (method-first: GET=READ; a mutating route's category by path-segment keyword), reads each handler for the gating calls PRESENT in it, cross-references each path to the test suites (adversarial = named by a suite in a security-relevant family: SECURITY/IDENTITY/ADVERSARIAL/JUDGE/MONEY/TRADER/HTTP/LEDGER), and emits a RANKED HUNT QUEUE: the mutating routes with no (adversarial test AND gating call), highest exposure first. Today: **18 of 47 routes queued**, led by `/actuator_learn` (EXEC) and the money POSTs (`/claim_rewards`, `/stake`, `/unstake`, `/trading/report_profit`).
+
+**It is a map, never a verdict.** It never says a route is safe. "has a test" = a test file mentions the path literal; "gated" = a gating call appears in the handler body; neither is proof. Every limit is printed under BLIND SPOTS and the report refuses to hide them.
+
+**Recorded, not yet covered (the surface this increment does NOT map -- the next increments):**
+- Non-Flask ingress: raw P2P / socket handlers, file-fed daemons (`ops/*.jsonl` consumers), the cross-process hands door, CLI entry points, routes in other modules.
+- Info-disclosure on GET routes (e.g. `/trading/net_pnl`, `/stakes` leaking value state) -- scored READ here, a separate lens.
+- Whether a gating call is correct, reached on every branch, or unbypassable -- presence is not a clearance.
+- The standing cadence (run it in `covenant_daily`, track the queue over time) and closing each top-of-queue item with a both-ways guard -- the loop A438 seeds.
+
+**Repro:** `python tools/attack_surface_map.py` (the map); `python test_asm1_attack_surface.py` drives its pure functions both ways (ASM1 12/12 -- e.g. `/health` must classify READ, which breaks if matching regresses to raw substring and "heal" catches "health") plus a real-tree smoke.
+
+**Status:** in source on its branch, with its test both ways; a read-only tool, nothing deployed.
+
+---
