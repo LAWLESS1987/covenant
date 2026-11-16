@@ -17770,3 +17770,36 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 **Status:** in source on its branch; not deployed. Open: the phone's signer; bounding the practice loop; the arguments.
 
 ---
+
+### A432. [deliberate access change] A read of his workshop's files is opened to requests signed by a registered operator key, and to nobody else: `POST /m/workshop/read` hands back one file's exact bytes and their sha256, so the phone shows exactly the script it approves (A430) -- IN SOURCE 2026-11-15
+
+**His words, 2026-11-15:** "Sounds like a good plan. Get it done.", answering whether to build a read-only door on the PC that returns a workshop file's exact bytes, so the phone shows exactly what it approves. The contract was agreed the same day so the PC side (this repository) and the phone side (its own repository and record, also A432) could be built at the same time.
+
+**Why.** A430 runs only the script whose bytes hash to the `run_sha256` inside the operator's signed body. The phone shows the owner the script, then hashes what it showed. With no exact read the phone could only ask the 3B model to quote the script, and one byte off means the run is refused. This door returns the file's exact bytes and the sha256 of exactly those bytes.
+
+**What it opens, said plainly.** Until this date the core's only road into his workshop was the HANDS branch of `/m/agent` (counted: the core names `covenant_tetsu_hands` there and nowhere else), and its `HANDS READ` returns a file's text, as decoded by the hands and cut at `MAX_OUT` characters, into the model's conversation, at the model's choice. Now a request signed by a registered operator key (`ops/daily_plan_signers.json`) can read any one file inside his workshop, whole, as bytes. That is a new reader of his files over the wire, and it is deliberate: the reader is the operator, who could already read them at the console (`python covenant_tetsu_hands.py --read`), and the purpose is that what the operator approves is what runs.
+
+**The door.**
+- `POST /m/workshop/read`, body `{"name": "<workshop file name>"}`, in `covenant_unified_v8.py` beside `/m/heal`. Nothing else in the core changed.
+- **Who.** `_request_signed_by_registered(request)` -- A423's check for a RUN: the operator-request signature (method, path, body, nonce, timestamp) by a key in the signer registry, nonce unseen, inside the window. Everyone else gets 403 `reading a workshop file needs a request signed by a registered operator key` and nothing is read: an unsigned request, a loopback-only request (loopback admits any local account, A423's reason), a tailnet-only request, a key not registered, a signature made for another door or another body, a replay. The door does not call `_tailnet_caller()` first, which would spend the request's nonce before the signature check reads it.
+- **Not in `PROTECTED_OPERATOR_ENDPOINTS`, on purpose.** That list's hook admits only `node.operator_pubkeys` (seeded with this node's own key), answers 401, and writes no hands row. The phone's key is a registered signer, not a node operator key, so listed there the door would refuse the phone before it ran; the contract answers 403 with a row; and `test_security_audit.py` requires every listed path to answer 401 unauthenticated. A423's signed RUN in `/m/agent` is not listed there either.
+- **What it reads.** `covenant_tetsu_hands.read_exact(name, workshop=None)`: the name through `_path` (the rule every act uses), the file's real location with links resolved inside the workshop (the rule `_capture` uses before a RUN), at most `MAX_FILE + 1` bytes read once, as bytes. 400 for a missing or malformed name or one that leaves the workshop (a link out included), 404 for no such file (a folder included), 413 over `MAX_FILE`. A name with folders inside the workshop (`tasks/t1.py`) is read, because the hands' one rule allows it and a RUN can name it. It never writes, runs, lists or raises.
+- **The record.** Every answer, refused or not, is one row in the hands ledger (`covenant_tetsu_hands.record_operator_read`): `kind: "operator_read"`, the name, the size, the sha256, who (`key:` and 16 hex of the verified key's sha256, the form `covenant_daily_plan.record_decision` uses), the status and the outcome. Never the content. A 403 row carries no name: the body of a request that is not signed is not read.
+- **The relay.** `/m/workshop/read` is in `covenant_spore.SPORE_DOORS`. The largest answer (a `MAX_FILE` file, base64 in JSON) is under the spore road's `MAX_BODY`.
+- **Node D's launcher.** `noded/hands_gate.py` and `noded/act_gate.py` wrap `act`, `run` and the page fetch; this door calls neither, so neither gate is involved.
+
+**Driven both ways.**
+- `test_a432_workshop_read.py`, 18 checks, the real node app through Flask's test client, real signatures, a fixture workshop and registry: on main's code 0 of 18 (the route is a 404, `read_exact` does not exist, the relay refuses the path); here 18 of 18.
+- Fourteen breaks, each in a scratch copy, each caught: the signature check skipped; loopback admitted without a signature; the tailnet admitted without one; the name rule dropped; links not resolved; the size limit dropped; a missing file answered 400; the file read as text and re-encoded; the hash taken from a second read; the content written into the row; no row for a 403; no row for a refusal; the relay without the door; the answer's hash taken over the base64 text.
+- Unchanged and green here: TH1 31/31, A430 18/18, A430S 13/13, SP1 32 passed, HS1 6/6, PP1 59/59, A22 26/26, P23 20 passed, M6 76/76.
+- Node D's launcher tests (`noded/test_hands_gate.py`, `noded/test_act_gate.py`, not in this tree), read-only: 11 of 11 and 11 of 11 against node D's own folder, and 11 of 11 and 11 of 11 from a scratch copy whose real-core test loads this branch.
+
+**Not measured.** A real phone, a real signer key, the spore road end to end, a running node. On Windows a file link cannot be made without a privilege on the PC this was written on, so a link out was driven there as a folder junction; the CI runner (Linux) drives both forms. Between the location check and the open, a folder of the path swapped for a link could still redirect the read; nothing his scripts can do makes a link (the screen refuses `os`), and that is not proved here. A body refused by the node's global JSON hook (not an object, or a non-finite number) and a rate-limited request are answered before the door runs and get no hands row.
+
+**Not changed.** Everything in `covenant_unified_v8.py` outside the new route; `PROTECTED_OPERATOR_ENDPOINTS`; `HANDS READ`; node D; the phone. No tombstone: no earlier claim is made untrue.
+
+**Repro.** `python test_a432_workshop_read.py`.
+
+**Status:** in source on its branch; not deployed. The phone's side is built against the same contract in its own repository.
+
+---

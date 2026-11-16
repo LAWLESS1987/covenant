@@ -949,6 +949,12 @@ SUITES = [
     # client: the hash goes in before signing and survives mycelium and spore unchanged.
     ("test_a430_run_sha256.py", 120, "JUDGE"),
     ("test_a430_run_signing.py", 60, "JUDGE"),
+    # A432 (2026-11-15, the owner: "Sounds like a good plan. Get it done."): POST /m/workshop/read hands back one
+    # workshop file's exact bytes and their sha256 to a request signed by a registered operator key, and to nobody
+    # else (unsigned, loopback-only and tailnet-only callers 403); a bad name, a name or link leaving the workshop, a
+    # missing and an oversized file refused with the contract's status; one ledger row per answer, never the content;
+    # the spore relay carries the door. The real node app, real signatures, fixture workshop. Red on main 0/18.
+    ("test_a432_workshop_read.py", 120, "JUDGE"),
     # JE1 (2026-09-26, A231): the judge evaluation's statistics (Fisher, chi-square, phi on the correlated-error
     # table) pinned against scipy's values, and the report's prose taking its figures from the run -- two had been
     # written in from the first dataset and printed beside tables that said otherwise.
