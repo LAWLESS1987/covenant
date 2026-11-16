@@ -12,10 +12,12 @@ solutions below pin every expected value in the curriculum: each one is run thro
 Tetsu's files are, and must pass all of its task's checks.
 LICENCE: public domain.
 """
+import hashlib
 import json
 import os
 import sys
 import tempfile
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
 sys.path.insert(0, HERE)
@@ -706,6 +708,77 @@ _main = next(n for n in ast.parse(open(NIGHT.__file__, encoding="utf-8").read())
 _direct = [s for s in _main.body if isinstance(s, ast.Expr) and isinstance(s.value, ast.Call)
            and getattr(s.value.func, "id", "") == "practice_step"]
 check("PP1.11d the nightly's main() calls practice_step unconditionally, at its own top level", len(_direct) == 1, len(_direct))
+
+# ---- PP1.12 (A434, closes A430's open practice-loop item): the loop's RUN authority is finite. A night (or a by-hand
+# slot) creates an explicit authorization with a maximum run count and a wall-clock expiry; it is consumed once per RUN
+# and refuses once spent or past its expiry, and the loop treats a refusal like a gate stop. A430 bound the DOOR path
+# (run_sha256); that is separate and unchanged here. The WRITE path is unchanged. These exercise both ways: a normal
+# night runs every task within the bound, and the count, the expiry and the per-run consumption each refuse by name.
+w12a, l12a = fresh()
+hl12a = os.path.join(tempfile.mkdtemp(prefix="pp1_12a_"), "hands.jsonl")
+answers12 = ["```python\n" + REF[t[0]["id"]].strip() + "\n```" for t in PR.plan(3, l12a)]
+s12a = PR.night(ask=scripted(answers12, []), gate=gate_clean, workshop=w12a, ledger=l12a, hands_ledger=hl12a, tasks=3,
+                tell=lambda t, w: None, say=lambda *_a: None)
+runs12a = [r for r in HANDS._rows(hl12a) if r.get("kind") == "run"]
+check("PP1.12a a normal night of three runs every task within the finite run authority: all three solved on the first "
+      "try, no stop, three runs made and none refused for the bound (finiteness, not a tighter night)",
+      s12a["tried"] == 3 and s12a["within"] == 3 and s12a["first_try"] == 3 and not s12a["stop"]
+      and len(runs12a) == 3 and not any(r.get("run_auth_refused") for r in runs12a), (s12a, len(runs12a)))
+
+w12b, l12b = fresh()
+hl12b = os.path.join(tempfile.mkdtemp(prefix="pp1_12b_"), "hands.jsonl")
+auth_b = PR.PracticeRunAuth(1, time.time() + 10_000)                  # one run allowed, the expiry far off
+r12b = PR.practise(PR.BY_ID["flatten"], scripted([bad, good], []), gate=gate_clean, workshop=w12b, ledger=l12b,
+                   hands_ledger=hl12b, say=lambda *_a: None, run_auth=auth_b)
+runs12b = [x for x in HANDS._rows(hl12b) if x.get("kind") == "run"]
+check("PP1.12b broken the other way -- a RUN past the authority's run count is refused: the first run is allowed, the "
+      "second refused, the loop reports it as a stop and does not crash, and no process was started for the refused run",
+      r12b.get("solved_round") is None and "run authorization refused" in (r12b.get("stop") or "") and auth_b.used == 1
+      and len(runs12b) == 2 and runs12b[1].get("run_auth_refused") is True and runs12b[1].get("timed_out") is None,
+      (r12b, [x.get("run_auth_refused") for x in runs12b]))
+
+w12c, l12c = fresh()
+hl12c = os.path.join(tempfile.mkdtemp(prefix="pp1_12c_"), "hands.jsonl")
+auth_c = PR.PracticeRunAuth(100, 1000.0, now=lambda: 2000.0)          # runs to spare, but the wall-clock has passed
+r12c = PR.practise(PR.BY_ID["flatten"], scripted([good, good, good, good], []), gate=gate_clean, workshop=w12c,
+                   ledger=l12c, hands_ledger=hl12c, say=lambda *_a: None, run_auth=auth_c)
+runs12c = [x for x in HANDS._rows(hl12c) if x.get("kind") == "run"]
+check("PP1.12c broken the other way -- a RUN past the authority's wall-clock expiry is refused though runs remain: the "
+      "first run is refused, the loop stops, and nothing was spent (the count held) or started",
+      r12c.get("solved_round") is None and "run authorization refused" in (r12c.get("stop") or "")
+      and "expired" in (r12c.get("stop") or "") and auth_c.used == 0 and len(runs12c) == 1
+      and runs12c[0].get("run_auth_refused") is True, (r12c, auth_c.used))
+
+w12d, l12d = fresh()
+auth_d = PR.PracticeRunAuth(10, time.time() + 10_000)
+r12d = PR.practise(PR.BY_ID["flatten"], scripted([bad, bad, good, "fixed by recursing into each list"], []),
+                   gate=gate_clean, workshop=w12d, ledger=l12d, hands_ledger=HLED, say=lambda *_a: None, run_auth=auth_d)
+check("PP1.12d the authority is consumed once per run: three rounds ran three scripts, so used went 0 -> 3 and left fell "
+      "10 -> 7, and used + left equals the maximum throughout",
+      r12d["solved_round"] == 3 and auth_d.used == 3 and auth_d.left == 7
+      and auth_d.used + auth_d.left == auth_d.max_runs == 10, (r12d, auth_d.used, auth_d.left))
+
+w12e = tempfile.mkdtemp(prefix="pp1_12e_")
+hl12e = os.path.join(tempfile.mkdtemp(prefix="pp1_12e_hl_"), "hands.jsonl")
+src12e = "print('bound run ok')\n"
+HANDS.write("b.py", src12e, w12e)
+sha12e = hashlib.sha256(src12e.encode("utf-8")).hexdigest()
+_h12e, d12e, rec12e = HANDS.act("HANDS RUN b.py", gate=lambda t: ("clean", "ok"), workshop=w12e, ledger=hl12e,
+                               may_run=True, run_sha256=sha12e)
+check("PP1.12e the door path is unaffected: a signed run_sha256 RUN with no run_auth (the door passes none) still runs, "
+      "binds to the hash, and is not marked run_auth_refused",
+      rec12e.get("ok") is True and rec12e.get("run_sha256") == sha12e and rec12e.get("script_sha256") == sha12e
+      and not rec12e.get("run_auth_refused") and "bound run ok" in d12e, rec12e)
+
+w12f = tempfile.mkdtemp(prefix="pp1_12f_")
+hl12f = os.path.join(tempfile.mkdtemp(prefix="pp1_12f_hl_"), "hands.jsonl")
+spent12f = PR.PracticeRunAuth(0, time.time() + 10_000)                # no runs left at all
+_h12f, d12f, rec12f = HANDS.act("HANDS WRITE notes.py\nx = 1\n", gate=lambda t: ("clean", "ok"), workshop=w12f,
+                               ledger=hl12f, run_auth=spent12f)
+check("PP1.12f the WRITE path is unchanged: a WRITE proceeds even with a spent run authority (WRITE never reads it), the "
+      "file lands with its bytes, and nothing is consumed",
+      rec12f.get("kind") == "write" and not rec12f.get("refused") and "written" in d12f
+      and HANDS.read("notes.py", w12f) == "x = 1" and spent12f.used == 0, (rec12f, d12f[:80]))
 
 print("\nnot measured here: how a real model does. That is what the nightly measures, and the record says it.")
 print("\nPP1: %d/%d passed" % (sum(ok), len(ok)))
