@@ -97,6 +97,13 @@ SUITES = [
     # against a PC that has 6: a check moved to a copy answers about the copy.
     # They run in phase_integrity, in the live folder, before anything else.
     ("test_security_audit.py",           300,  "SECURITY"),
+    # A438 (2026-11-16): tools/attack_surface_map.py is the defensive COUNT PASS
+    # -- it discovers the Flask route surface by walking the source and emits a
+    # ranked hunt queue of routes with no (adversarial test AND gating call). ASM1
+    # drives its pure functions both ways (e.g. /health must be READ, which breaks
+    # if classification regresses to raw substring matching) and smoke-tests the
+    # real tree so the mapper cannot silently stop finding routes.
+    ("test_asm1_attack_surface.py",       60,  "SECURITY"),
     ("test_k1_runner_key_preservation.py",120, "SECURITY"),
     ("test_k3_p9_owner_only_guard.py",   120,  "SECURITY"),
     # Arrived on main 2026-08-27 from fix/tally-counts-failures-as-passes,
