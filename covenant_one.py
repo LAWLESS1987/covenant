@@ -111,6 +111,12 @@ SUITES = [
     # replay. Rejected now at the ingress (the U invariant). Exploit-first both
     # ways: the nan request verifies on the pre-A439 code, is refused after.
     ("test_a439_nonfinite_timestamp.py",  60,  "SECURITY"),
+    # A440 (2026-11-16): second A438-hunt catch, at /claim_rewards. The v8.4 fix
+    # (verify_stake_action_signature) binds the ACTION and the KEY into the signed
+    # frame, but only "bad signature -> 400" was tested (A1a); the domain
+    # separation (a claim-sig is not an unstake-sig) and ownership had no runner.
+    # This pins them both ways. Guards /claim_rewards and /unstake.
+    ("test_a440_stake_action_auth.py",    60,  "SECURITY"),
     ("test_k1_runner_key_preservation.py",120, "SECURITY"),
     ("test_k3_p9_owner_only_guard.py",   120,  "SECURITY"),
     # Arrived on main 2026-08-27 from fix/tally-counts-failures-as-passes,

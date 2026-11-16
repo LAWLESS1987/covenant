@@ -17936,3 +17936,18 @@ Hunting the A438 queue at its top item, `/actuator_learn`, turned up two real th
 **Status:** in source on its branch, both fixes with both-ways tests; the nan fix touches the live gate but is NOT deployed (no change to A/B/C without the operator's word).
 
 ---
+
+### A440. [security hunt -- second catch from the A438 queue] /claim_rewards' auth was sound but its domain-separation and ownership had no runner -- GUARDED 2026-11-16
+
+Hunting the A438 queue at `/claim_rewards` (a money POST). No new exploitable gap -- the v8.4 fix (`verify_stake_action_signature`, PATCH LOG item L) is sound: a signature required, the ACTION bound into the signed frame so a "claim" authorization is not an "unstake" one, the KEY bound so only the owner acts, and route-level replay via a persistent DB nonce. Unlike A439 there is NO freshness window here, so the non-finite-timestamp class does not apply. **The honest finding is a coverage gap, not a bug:** `test_a1a_a2` already proved a BAD signature is refused (400), but the two properties the v8.4 fix is actually FOR -- action domain separation and key ownership -- had no test. A fix whose key property has no runner is the A65 gap.
+
+**Closed.** `test_a440_stake_action_auth.py` (6/6) pins, both ways: a claim-sig authorizes claim (control) but is refused for unstake and vice versa (domain separation holds only because `action` is inside the frame -- drop it and this fails); another key's signature over the same frame is refused (ownership); a tampered timestamp and a garbage signature are refused. Names `/claim_rewards` and `/unstake`, SECURITY-tagged, so the map credits both: queue **17 -> 15**.
+
+**Not covered / still open.**
+- The route-level REPLAY nonce (`/claim_rewards`, `/unstake` reject a resubmitted signature) is proven by code read, not by a test -- it needs a booted node + staking pool; a node-boot test is the next step.
+- `/stake` stays in the queue: it gates on a DIFFERENT function (`verify_stake_signature`), a separate item.
+- **A map-accuracy limitation, noted not fixed:** the map OVER-reported `/claim_rewards` because its tag parser reads only single-word tags, so it could not see `test_a1a_a2`'s compound tag "ROUTES + BOUNDS" (nor opsec's "DAILY + GUARDS"). Over-reporting is the safe direction (a covered route flagged, not an uncovered one hidden -- the opposite of A439's self-coverage bug), so it is recorded for a later map increment rather than rushed. Even fixed, those two tag families are not in the adversarial set, so the judgement of whether a ROUTES/GUARDS suite counts as route-defense is the operator's, not the map's.
+
+**Status:** in source on its branch, with its test both ways; a test-only change (no runtime code touched), nothing deployed.
+
+---
