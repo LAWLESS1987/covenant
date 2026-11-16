@@ -137,6 +137,22 @@ reads it; the seat is shown those bytes and run() hashes, screens and executes t
 after the seat read it is not what runs. A file whose real location is outside the workshop is neither shown nor
 run.]
 
+[A435, 2026-11-16. THE CONTENT SEAT NOW READS PROSE, NARROWLY. A429 left a WRITE whose name is not .py read by
+nobody for its content (its open item 1, and A428's risk: a file of planted instructions written now and read as
+instructions later). Judging prose for meaning is unreliable and must not block ordinary writes -- that is why the
+code seat abstains rather than convicting. So the prose seat (_prose_check) does not read for meaning: with the
+switch on, a non-code WRITE's text is shown ONLY two narrow signals and otherwise ABSTAINS (not_judged, A226: the
+write still proceeds). It FLAGS (and the write is refused, as a screened code write is) when the text carries
+planted-instruction markup a reader would not act on as ordinary text -- chat/role/fence marks or invisible
+characters, found with outside_text.clean -- or spells an instruction out: a chat role prefix at a line start
+(system:/assistant:/...), a short documented set of injection phrases (ignore the above/previous, disregard your
+instructions, you are now, new instructions:, override your instructions, do not tell the operator ...), or a
+covenant act line written out as a command in CAPITALS (A427/ACT_WORDS: HANDS RUN, WEB SEARCH, MOLTBOOK, FETCH,
+HEAL, SELF-HEAL, LEG). It never says clean, writes nothing and sends nothing, and the row carries only which
+signal fired, never the text (as A429's code seat carries only the screen's reason). What it does NOT catch:
+meaning or intent beyond those patterns -- a planted instruction in ordinary prose, in another language, or
+reworded past the list, is not seen. The code path, the RUN authority and the door are unchanged.]
+
 A PROPOSAL is his thumb on the tree: the new version is saved under
 ops/tetsu_proposals/<id>.<ext> with a compile check for Python, one row here,
 and one line to the operator on the direct line. Applying it is the
@@ -803,17 +819,77 @@ def _content(d, workshop=None):
     return None, "it is not a Python script"
 
 
+# A435: the prose seat's two narrow signals, documented in the module header. The spelled-out phrases are
+# case-insensitive on word boundaries; the act line keeps A427's CAPITALS rule, so ordinary lowercase "run"/"web"/
+# "heal" prose is left alone (A427 measured 0 false positives over 134 acts on that rule). This list is short on
+# purpose: it does not read for meaning, and it must not refuse an ordinary write.
+_PROSE_INJECTION = re.compile(
+    r"\bignore (?:the |all |any )?(?:above|preceding|previous|prior|earlier|foregoing)\b"
+    r"|\bdisregard (?:the |all |your |any |these )?(?:above|preceding|previous|prior|instructions?|rules?)\b"
+    r"|\bforget (?:the |all |your |any )?(?:above|previous|prior|instructions?|rules?)\b"
+    r"|\byou are now\b|\byou're now\b|\bfrom now on,? you (?:are|will|must|should)\b"
+    r"|\bnew instructions?:"                                      # ends at the colon: no trailing \b (a colon is not a word)
+    r"|\boverride (?:your |the |all )?(?:instructions?|rules?)\b"
+    r"|\bdo not (?:tell|inform|warn|mention(?: to)?|report to) (?:the |your )?(?:operator|owner|user|human)\b", re.I)
+# a chat role prefix at the start of a line: the shape of a planted conversation turn ("system:", "assistant:", ...)
+_PROSE_ROLE_PREFIX = re.compile(r"(?mi)^\s{0,8}(?:system|assistant|user|developer|tool|tool_call|tool_response)\s*:")
+# a covenant act line (A427, ACT_WORDS) written out as a command: the act word in CAPITALS as a whole word with its
+# grammar. A compound act (HANDS RUN, WEB SEARCH, MOLTBOOK <sub>) is command-shaped on its own, so it is flagged
+# anywhere; a bare act word (FETCH/HEAL/LEG/SELF-HEAL) is flagged only command-shaped -- at a line start or with a
+# colon -- so ordinary caps prose ("my LEG hurts, I need to HEAL") is left alone. CASE-SENSITIVE throughout, which
+# keeps lowercase prose ("search the web", "heal the disk", "hands on") out (A427's CAPITALS rule).
+_PROSE_ACT_LINE = re.compile(
+    r"\bHANDS\s+(?:LIST|READ|WRITE|RUN|PROPOSE)\b"
+    r"|\bWEB\s+SEARCH\b"
+    r"|\bMOLTBOOK\s+[A-Z]"
+    r"|^\s{0,8}(?:FETCH|SELF-HEAL|HEAL|LEG)\b"
+    r"|\b(?:FETCH|SELF-HEAL|HEAL|LEG)\s*:", re.M)
+
+
+def _prose_check(text):
+    """A435: (flagged, reason) for a non-code WRITE. It reads the text in this process, sends it nowhere and writes
+    it nowhere, and returns ONLY which signal fired -- never the text itself. It flags planted-instruction markup
+    (outside_text.clean: chat/role/fence marks, invisible characters) and a short set of spelled-out injections; on
+    everything else it abstains (the caller records not_judged). It reads for no meaning beyond these patterns."""
+    import outside_text                                   # pure text in, text out: no listener, no network, no file
+    _cleaned, removed = outside_text.clean(text)
+    # A reader does not see these; a person writing an ordinary note does not put them there. (An HTML comment --
+    # outside_text's "hidden comment" -- is left out on purpose: a markdown note may legitimately carry one.)
+    marks = [k for k in ("chat mark", "fence or role mark", "invisible character") if removed.get(k)]
+    if marks:
+        return True, "it carries %s a reader would not act on as ordinary text" % " and ".join(marks)
+    if _PROSE_ROLE_PREFIX.search(text):
+        return True, "it carries a chat role prefix (the shape of a planted conversation turn)"
+    if _PROSE_INJECTION.search(text):
+        return True, "it spells out an instruction addressed to a reader (a planted-instruction phrase)"
+    if _PROSE_ACT_LINE.search(text):
+        return True, "it writes a covenant act line out as a command"
+    return False, ""
+
+
 def _content_seat(d, workshop=None):
     """A429, 2026-11-15 (the owner: "Show the judge the content."). The hands' CONTENT SEAT: {"state", "message", "why"}.
 
     It reads the whole content (_content: never cut, so a line past GATE_TEXT_MAX is read like the first) in this
-    process. It sends it nowhere and writes it nowhere: no socket, no subprocess, no ledger, no other judge. It can find
-    one thing -- what this module's own screen() refuses -- and says "violates" with the screen's reason, the same
-    refusal run() would make. On anything else it ABSTAINS ("not_judged", as A428 defines it): code the screen passes
-    (it cannot judge code beyond the screen), a script that does not parse (a draft is not a fault), a file that is not
-    a script, a source it cannot read. It never says "clean"."""
+    process. It sends it nowhere and writes it nowhere: no socket, no subprocess, no ledger, no other judge. On a CODE
+    write and a RUN it can find one thing -- what this module's own screen() refuses -- and says "violates" with the
+    screen's reason, the same refusal run() would make. [A435, 2026-11-16: on a WRITE whose target is NOT code (so
+    screen() does not apply) it runs the PROSE seat (_prose_check): it flags planted-instruction markup or a spelled-out
+    injection and otherwise abstains.] On anything else it ABSTAINS ("not_judged", as A428 defines it): code the screen
+    passes (it cannot judge code beyond the screen), a script that does not parse (a draft is not a fault), a source it
+    cannot read, prose with none of the narrow signals. It never says "clean"."""
     text, why_not = _content(d, workshop)
     if text is None:
+        # A435: a WRITE whose name is not .py reached here because _content found no script in it. screen() cannot
+        # apply, so the PROSE seat does. Anything else that has no content (a RUN whose source cannot be read)
+        # abstains as before.
+        if d["kind"] == "write":
+            flagged, why = _prose_check(str(d["body"]))
+            if flagged:
+                return {"state": "violates", "why": why, "message": "content seat (prose): refused -- %s" % why}
+            return {"state": "not_judged", "why": "",
+                    "message": "content seat (prose): abstains -- no planted-instruction markup or injection phrasing, "
+                               "and this seat reads no further meaning"}
         return {"state": "not_judged", "why": "", "message": "content seat: abstains -- %s" % why_not}
     try:
         ast.parse(text)
@@ -826,13 +902,19 @@ def _content_seat(d, workshop=None):
     return {"state": "violates", "why": why, "message": "content seat: the screen refused it: %s" % why}
 
 
-def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=None, may_run=True, run_sha256=UNBOUND):
+def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=None, may_run=True, run_sha256=UNBOUND,
+        run_auth=None):
     """For the door: (handled, data_for_the_model, record). Not a directive -> (False, '', None). may_run gates a RUN
     (A423): the /m/agent door passes may_run only for an OPERATOR caller (loopback, or a request signed by a registered
     key), so an unauthenticated tailnet caller cannot run a script even if a screen spelling slips past -- the screen is
     a screen, not a sandbox. In-process callers (his practice loop, the tests) keep the default True.
     run_sha256 (A430): the door passes the value from the signed body (None when it has none), and a RUN then runs
-    only the file whose bytes hash to it. Not passed (UNBOUND): an in-process caller, not bound."""
+    only the file whose bytes hash to it. Not passed (UNBOUND): an in-process caller, not bound.
+    run_auth (A434): a finite authority to RUN for one started practice loop (covenant_tetsu_practice.PracticeRunAuth),
+    threaded by his practice loop so that starting a loop is never open-ended permission to run code. When one is given,
+    a RUN consumes it once (after may_run, before run()); once the authority is spent or past its wall-clock expiry a RUN
+    is refused with the reason and nothing is started, marked run_auth_refused in its row. The door passes none
+    (None): the door path is bound by may_run and run_sha256, not by this. WRITE, READ, LIST and PROPOSE never read it."""
     d = parse(answer)
     if not d:
         return False, "", None
@@ -865,8 +947,10 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
                 verdict, message = "violates", seat["message"][:300]
                 rec["gate"] = {"state": verdict, "message": message, "seat": "content", "quorum": rec["gate"]["state"]}
                 # the row reads as the screen's refusal always read (run() returned these), so a reader of "why" -- his
-                # practice loop, the door's data -- is told the same thing, earlier: nothing was written or started
-                rec["why"] = "the screen refused it: " + seat["why"]
+                # practice loop, the door's data -- is told the same thing, earlier: nothing was written or started.
+                # A435: a non-code (prose) WRITE never meets the screen, so its row carries the prose seat's own reason.
+                rec["why"] = seat["why"] if (kind == "write" and not str(d["target"]).endswith(".py")) \
+                    else "the screen refused it: " + seat["why"]
                 if kind == "run":
                     rec.update({"ok": False, "code": None})
         # A428: what his hands may do under each state is as it was -- "not_judged" was "held" until this date and is
@@ -893,6 +977,34 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
                 _append(rec, ledger)
                 return True, ("DATA: running a script needs the operator (a request from loopback or signed by a registered "
                               "key); this caller may not. Nothing was run. Say so plainly."), rec
+            # A434: his practice loop's finite run authority. A RUN spends one of it, after may_run and before run(); once
+            # the authority is exhausted or past its wall-clock expiry it is refused here, so nothing is started. The row
+            # is marked run_auth_refused, which the loop (attempt) reads as a stop -- it ends the pass, it does not crash.
+            # No authority given (None): an unbound caller, as before (the door, which is bound by may_run and run_sha256).
+            if run_auth is not None:
+                ok_auth, why_auth = run_auth.consume()
+                if not ok_auth:
+                    rec["refused"] = True
+                    rec["run_auth_refused"] = True
+                    rec["why"] = str(why_auth)[:300]
+                    rec.update({"ok": False, "code": None})
+                    _append(rec, ledger)
+                    return True, ("DATA: the run was refused -- %s. Nothing was run. Say so plainly." % str(why_auth)[:400]), rec
+            # A436 (2026-11-16, follows A430; closes the quorum's C3): a SIGNED-DOOR RUN approves the EXACT script (its
+            # run_sha256), not an invocation. run_sha256 binds the file's bytes but not the arguments, which come from
+            # the model's answer line -- so the operator's signature names the script, and a planted instruction could
+            # append arguments the operator never saw. On the door path (run_sha256 bound) a RUN that carries arguments
+            # is refused; it runs with no arguments. The practice path (in-process: run_auth set, run_sha256 UNBOUND)
+            # and any unsigned/plain caller are untouched -- only the signed door binds run_sha256.
+            if run_sha256 is not UNBOUND and d["args"]:
+                rec["refused"] = True
+                rec["run_args_refused"] = True
+                rec["why"] = "a signed run names the exact script, not arguments"
+                rec.update({"ok": False, "code": None})
+                _append(rec, ledger)
+                return True, ("DATA: a signed run of a workshop script runs it with NO arguments -- the operator's "
+                              "signature names the script (its sha256), not an invocation with arguments. Nothing was "
+                              "run. Say so plainly."), rec
             # A430: the binding rides a context variable, not a new positional argument, so a launcher's wrapper of
             # run() with the older signature still sees this call and passes it on; run() reads it there.
             token = _RUN_BINDING.set(run_sha256)

@@ -846,6 +846,10 @@ SUITES = [
     # TH1 (2026-09-26, A226): Tetsu's hands -- his workshop, bounded runs behind a screen and a
     # guard, proposals beside the tree and never in it; the door dispatches HANDS beside MOLTBOOK.
     ("test_th1_tetsu_hands.py", 180, "JUDGE"),
+    # A436 (2026-11-16, follows A430): a signed-door HANDS RUN approves the exact script (run_sha256), not an
+    # invocation; a RUN carrying arguments is refused. The practice path (in-process run_auth) and unsigned callers
+    # are untouched. Drives both ways. Closes the quorum's C3.
+    ("test_a436_run_args_bind.py", 60, "JUDGE"),
     # PP1 (2026-09-26, his words: "train tetsu to code at a high recursive level"; he chose the practice loop, nightly and
     # bounded): the curriculum solvable under his screen, a wrong file caught, the failure fed back, what he solves and
     # learns kept in his workshop, and the gate, the model and the clock each stopping it. Real runs; model and gate stubbed.
@@ -943,6 +947,12 @@ SUITES = [
     # process, never through the shared quorum (whose seats reach a runner and the tracked verdicts file); the seat
     # refuses what the screen refuses and otherwise abstains. Stub quorums and a stub runner; red on main 0/6.
     ("test_a429_hands_content_seat.py", 240, "JUDGE"),
+    # A435 (2026-11-16): the content seat now reads PROSE too, narrowly. A non-code WRITE's text is shown two narrow
+    # signals (planted-instruction markup via outside_text.clean; a spelled-out injection -- a role prefix, a short
+    # phrase list, a covenant act line in CAPITALS) and otherwise ABSTAINS, so an ordinary note still proceeds. The
+    # measurement is the gate: 22 ordinary writes 0 refused, 16 planted 14 flagged. Red on main 2/7. It reads no
+    # meaning beyond the patterns. Stub quorums and the runner road stubbed; the shipped corpora are measured here.
+    ("test_a435_prose_write_seat.py", 240, "JUDGE"),
     # A430 (2026-11-15, his words "Tie the signature."): a HANDS RUN through the door runs only the script whose bytes
     # hash to the run_sha256 inside the operator's signed body -- the door's real HANDS branch, real signatures, real
     # runs; read once, hashed, screened and executed from the same bytes; the practice loop unbound. Then the signing
