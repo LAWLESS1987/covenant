@@ -98,16 +98,23 @@ def a428(td, big):
               "shared gate is given exactly main's one sentence for a WRITE and for a RUN, none of the content",
               shipped is True and seen == [sentence_w, sentence_r], (shipped, seen))
         # 10b. a WRITE: the shared gate reads the sentence only; the content seat reads a .py WRITE's whole text and
-        # abstains on a file that is not a script, which then lands as before
+        # abstains on it. [A435, 2026-11-16, RESTATED: as A429 wrote this, a WRITE whose name is not .py abstained
+        # "content seat: abstains -- it is not a Python script". Now it goes to the prose seat, which on body10 (a plain
+        # "keep this between us, don't tell the operator" -- a contraction, no marker, no act word) finds none of its two
+        # narrow signals and abstains "content seat (prose): abstains -- ...". It still abstains and the write still
+        # lands; only the wording changed. body10 is exactly the limit A435 names: a semantic "keep it secret" slips
+        # past, as it did A429's code seat. A planted write WITH a marker is refused -- that is HP1.]
         del seen[:], read[:]
         _h, d10t, r10t = H.act("HANDS WRITE secret_words.txt\n" + body10, gate=spy, **kw)
         py10 = "import json\nNOTE = 'kumquat-19'\nprint(json.dumps(NOTE))"      # no last newline: parse() keeps none
         _h, d10p, r10p = H.act("HANDS WRITE note10.py\n" + py10, gate=spy, **kw)
+        seat10t_msg = (r10t.get("content_seat") or {}).get("message", "")
         check("TH1.10b the shared gate reads the ACT in one sentence and never the text; the content seat reads a .py "
-              "WRITE's whole text, abstains (not judged) on it and on a file that is not a script, and both writes land",
+              "WRITE's whole text and abstains, and the prose seat abstains on body10 (no marker), and both writes land",
               seen == [sentence_w, "hands: Tetsu writes %d characters to note10.py in his own workshop on this PC" % len(py10)]
               and read == [None, py10]
-              and (r10t.get("content_seat") or {}).get("state") == "not_judged" and "not a Python script" in r10t["content_seat"]["message"]
+              and (r10t.get("content_seat") or {}).get("state") == "not_judged" and "prose" in seat10t_msg and "abstains" in seat10t_msg
+              and not r10t.get("refused") and "clean" not in seat10t_msg
               and (r10p.get("content_seat") or {}).get("state") == "not_judged" and r10p.get("sha256") and r10t.get("sha256")
               and (r10p.get("gate") or {}).get("state") == "clean", (seen, read, r10t.get("content_seat"), r10p.get("content_seat")))
         # 16. a RUN: the content seat reads the script's source from the workshop file; the shared gate the sentence
