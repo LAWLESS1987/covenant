@@ -48,6 +48,7 @@ import contextlib
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import subprocess
@@ -306,6 +307,13 @@ def verify_signed(pubkey_pem, method, path, body, nonce, timestamp, signature_b6
     try:
         ts = float(timestamp)
     except (TypeError, ValueError):
+        return False, "bad timestamp"
+    if not math.isfinite(ts):
+        # A439: a NON-FINITE timestamp slips the freshness window -- abs(now - nan)
+        # > WINDOW_S is False, so a nan is never rejected as stale, and because the
+        # nonce store (_seen_nonces) is in-memory and resets on restart, a captured
+        # nan-stamped request replays after a restart. Reject non-finite at the
+        # ingress, the way every amount is (test_security_audit's U invariant).
         return False, "bad timestamp"
     if abs((now if now is not None else time.time()) - ts) > WINDOW_S:
         return False, "signature outside the %d s window" % WINDOW_S

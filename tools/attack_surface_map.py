@@ -35,6 +35,14 @@ HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # cross-process hands door) is named under BLIND SPOTS, not silently covered.
 ROUTE_SOURCES = ["covenant_unified_v8.py"]
 
+# The mapper's OWN test necessarily names route paths as classification DATA
+# (e.g. "/stake", "/succession/register") and fixtures -- not as a route it
+# exercises. Counting it as coverage credited routes nobody attacked and HID
+# real uncovered ones (the queue under-reported -- the dangerous direction). It
+# is excluded from the test index. A later test that genuinely drives a route
+# names it as a real exercise and is counted; this is the one file that cannot.
+SELF_TESTS = {"test_asm1_attack_surface.py"}
+
 # --- exposure classification (transparent on purpose: printed in the report) --
 # The METHOD is the primary signal: a GET reads, a POST mutates, and the hunt
 # queue is about the highest-risk surface -- state change. So EVERY GET-only
@@ -201,6 +209,8 @@ def build_report():
 
     test_files = []
     for p in sorted(glob.glob(os.path.join(HERE, "test_*.py"))):
+        if os.path.basename(p) in SELF_TESTS:
+            continue
         try:
             test_files.append((os.path.basename(p), open(p, encoding="utf-8").read()))
         except OSError:

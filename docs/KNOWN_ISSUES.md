@@ -17920,3 +17920,19 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 **Status:** in source on its branch, with its test both ways; a read-only tool, nothing deployed.
 
 ---
+
+### A439. [security hunt -- first catch from the A438 queue] A non-finite request timestamp slipped the operator-request gate; and the map was hiding uncovered routes by counting its own test -- BOTH FIXED 2026-11-16
+
+Hunting the A438 queue at its top item, `/actuator_learn`, turned up two real things.
+
+**1. The measurement was lying (the more important one).** The attack-surface map counted `test_asm1_attack_surface.py` -- its OWN test -- as route coverage. That test names route paths as classification DATA (`"/stake"`, `"/unstake"`, `"/succession/register"`) and a fixture (`"/claim_rewards"`), so the map credited those four money/control routes as adversarially tested when nothing attacked them. The queue UNDER-reported -- it hid uncovered surface, the dangerous direction a self-check can fail in. So the "18 of 47" first reported (A438) was a buggy under-count. Fixed: the map excludes its own test from the index (`SELF_TESTS`); ASM1 gains a case that fails if the map ever credits its own test again. TRUE queue after this and the fix below: **17 of 47**, led by the money POSTs `/claim_rewards`, `/stake`, `/unstake`.
+
+**2. A non-finite timestamp slipped the freshness window.** `/actuator_learn` (and `/daily_plan/approve`, `/checkin`, `/ai_chats`) are gated by `covenant_daily_plan.verify_signed`, which checked freshness with `abs(now - ts) > WINDOW_S`. That is **False for ts = nan**, so a nan timestamp was never rejected as stale; and because the nonce store (`_seen_nonces`) is in-memory and resets on restart, a captured nan-stamped request could replay after a restart. The signature still had to come from a REGISTERED key, so the reach is a trusted signer or a leaked request -- minor, defense-in-depth -- but it broke the U invariant (reject non-finite at every ingress). Fixed: `verify_signed` rejects a non-finite ts before the window and signature checks.
+
+**Repro:** `python test_a439_nonfinite_timestamp.py` -- exploit-first, both ways (3/3): the SAME nan request that is now refused VERIFIES on the pre-A439 code (a valid signature over nan, nan slips the window), inf is refused, and a finite in-window request on the SAME route still verifies (the gate did not start refusing everything). `python test_asm1_attack_surface.py` (13/13) pins the self-test exclusion. `python tools/attack_surface_map.py` shows the corrected queue.
+
+**Not changed / still open.** The in-memory, unbounded nonce store (`_seen_nonces`) -- a registered signer can still grow it, and it does not persist across restarts; noted, not fixed here (a registered-signer DoS / cross-restart window, lower than this). The 17 remaining queue items.
+
+**Status:** in source on its branch, both fixes with both-ways tests; the nan fix touches the live gate but is NOT deployed (no change to A/B/C without the operator's word).
+
+---

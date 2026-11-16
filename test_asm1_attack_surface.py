@@ -133,6 +133,15 @@ class RealTreeSmoke(unittest.TestCase):
         text = asm.render(rows, queue, meta)
         self.assertIn("BLIND SPOTS", text)
 
+    def test_mapper_does_not_credit_its_own_test(self):
+        # the map's own test names routes as DATA (classification inputs); counting
+        # it as coverage credited routes nobody attacked and HID real uncovered ones.
+        # It must never appear as a test for any route. Fails if the exclusion drops.
+        rows, _q, _m = asm.build_report()
+        for r in rows:
+            self.assertNotIn("test_asm1_attack_surface.py", r["tests"], r["path"])
+            self.assertNotIn("test_asm1_attack_surface.py", r["adversarial"], r["path"])
+
 
 if __name__ == "__main__":
     _res = unittest.TextTestRunner(verbosity=2).run(
