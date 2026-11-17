@@ -17884,3 +17884,55 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 **Status:** in source on its branch, with its measurement and tests; meaning beyond the pattern list not judged (by design); not deployed.
 
 ---
+
+### A437. [watchdog / launcher] Two watchdogs started in the SAME tick both survived and persisted -- one tree, one watchdog now holds for a same-tick race too -- IN SOURCE 2026-11-16
+
+**What.** "Fix the launcher bug" (the operator, after a deploy left extra `covenant_watchdog.py` processes). The launcher (`covenant_prod.bat`) was NOT the defect: its "one only" guard matches the watchdog by ABSOLUTE PATH, identical to the highway's two restart remedies (`remedy_restart_watchdog`, `remedy_schedule_watchdog_restart`) and the watchdog's own A160 self-check (`_watchdog_like()` / `_evict_twins`). All four actors agree. The real gap was in A160 itself: `_twins_to_evict` spared EVERY same-tick tie (two evicting each other would leave nothing running -- a real outage, measured 2026-09-20), and `_evict_twins` ran only at daemon START. So two watchdogs started in the same second by racing launchers (a manual restart plus the three nodes' scheduled restarts landing together) were each spared by the other and then persisted, with nothing to come back and cull them. Two live watchdogs each mine the pool once a minute, rate-limit each other into HTTP 429, and append contradictory verdicts to `ops/SELF_EVAL.md` (the A160 history).
+
+**Fix.** A deterministic, one-sided pid tiebreak: of a same-tick pair the LOWER pid stops the higher and survives (never both -- the persistent duplicate; never neither -- the outage the old rule guarded, since two equal pids cannot exist). And the A160 cull now runs EVERY round, not only at start (`_daemon_round`), so a same-tick twin that neither start-time scan could see -- it appeared just after this watchdog's own scan and was spared by the higher-pid twin's tiebreak -- is stopped within one interval instead of persisting.
+
+**Repro:** `python test_a437_twin_tiebreak.py` drives it both ways -- same-tick lower pid evicts the higher, higher pid defers (no mutual kill), three-in-a-tick collapse to the lowest, a younger/self/parent twin is never evicted, and `_daemon_round` re-culls every round even when the health pass raises. Each marked case fails on the pre-A437 code (same-tick spared; no per-round cull). `test_p22_watchdog_restart_verifies.py` P22h updated to the new semantics.
+
+**Not changed.** The launcher (`covenant_prod.bat`) -- its guard was already correct. `_watchdog_like()` and the highway's restart remedies. The absolute-path match. The `--once` and status paths (they never reach the daemon loop).
+
+**Residual (bounded).** A same-tick twin spared by a start-time race is culled by the next periodic pass, so it can live up to one interval (~60 s) before it is stopped -- defense-in-depth for a rare race, not an instant kill. The underlying cause (several uncoordinated launchers with no shared lock) is unchanged; A160+A437 are the eventual-consistency net over it.
+
+**Status:** in source on its branch, with its test both ways; not deployed (no change to A/B/C without the operator's word).
+
+---
+
+### A438. [security / white-hat] The hunt had no denominator -- a standing map of the attack surface and what of it has ever been adversarially tested -- IN SOURCE 2026-11-16
+
+**What.** His words, 2026-11-16: "we need the ultimate White Hat technology", then he chose a systematic self-audit. The covenant already has a strong regression net (80 SECURITY + 114 JUDGE suites swept daily; `mutation_probe.py` proving guards real; a live exec-guard shadow; `opsec_scan.py`), but every one of those locks in a KNOWN finding. Nothing computed the DENOMINATOR -- the whole ingress surface and which of it has ever had an adversarial test -- so the hunt was driven by memory, not by a map. That is the first-pass blind spot CLAUDE.md names ("establish the denominators by discovery").
+
+**Increment 1.** `tools/attack_surface_map.py` (read-only, defensive, his systems). It walks the source, discovers every Flask route by DISCOVERY (47 today, never a hardcoded list), classifies each by exposure (method-first: GET=READ; a mutating route's category by path-segment keyword), reads each handler for the gating calls PRESENT in it, cross-references each path to the test suites (adversarial = named by a suite in a security-relevant family: SECURITY/IDENTITY/ADVERSARIAL/JUDGE/MONEY/TRADER/HTTP/LEDGER), and emits a RANKED HUNT QUEUE: the mutating routes with no (adversarial test AND gating call), highest exposure first. Today: **18 of 47 routes queued**, led by `/actuator_learn` (EXEC) and the money POSTs (`/claim_rewards`, `/stake`, `/unstake`, `/trading/report_profit`).
+
+**It is a map, never a verdict.** It never says a route is safe. "has a test" = a test file mentions the path literal; "gated" = a gating call appears in the handler body; neither is proof. Every limit is printed under BLIND SPOTS and the report refuses to hide them.
+
+**Recorded, not yet covered (the surface this increment does NOT map -- the next increments):**
+- Non-Flask ingress: raw P2P / socket handlers, file-fed daemons (`ops/*.jsonl` consumers), the cross-process hands door, CLI entry points, routes in other modules.
+- Info-disclosure on GET routes (e.g. `/trading/net_pnl`, `/stakes` leaking value state) -- scored READ here, a separate lens.
+- Whether a gating call is correct, reached on every branch, or unbypassable -- presence is not a clearance.
+- The standing cadence (run it in `covenant_daily`, track the queue over time) and closing each top-of-queue item with a both-ways guard -- the loop A438 seeds.
+
+**Repro:** `python tools/attack_surface_map.py` (the map); `python test_asm1_attack_surface.py` drives its pure functions both ways (ASM1 12/12 -- e.g. `/health` must classify READ, which breaks if matching regresses to raw substring and "heal" catches "health") plus a real-tree smoke.
+
+**Status:** in source on its branch, with its test both ways; a read-only tool, nothing deployed.
+
+---
+
+### A439. [security hunt -- first catch from the A438 queue] A non-finite request timestamp slipped the operator-request gate; and the map was hiding uncovered routes by counting its own test -- BOTH FIXED 2026-11-16
+
+Hunting the A438 queue at its top item, `/actuator_learn`, turned up two real things.
+
+**1. The measurement was lying (the more important one).** The attack-surface map counted `test_asm1_attack_surface.py` -- its OWN test -- as route coverage. That test names route paths as classification DATA (`"/stake"`, `"/unstake"`, `"/succession/register"`) and a fixture (`"/claim_rewards"`), so the map credited those four money/control routes as adversarially tested when nothing attacked them. The queue UNDER-reported -- it hid uncovered surface, the dangerous direction a self-check can fail in. So the "18 of 47" first reported (A438) was a buggy under-count. Fixed: the map excludes its own test from the index (`SELF_TESTS`); ASM1 gains a case that fails if the map ever credits its own test again. TRUE queue after this and the fix below: **17 of 47**, led by the money POSTs `/claim_rewards`, `/stake`, `/unstake`.
+
+**2. A non-finite timestamp slipped the freshness window.** `/actuator_learn` (and `/daily_plan/approve`, `/checkin`, `/ai_chats`) are gated by `covenant_daily_plan.verify_signed`, which checked freshness with `abs(now - ts) > WINDOW_S`. That is **False for ts = nan**, so a nan timestamp was never rejected as stale; and because the nonce store (`_seen_nonces`) is in-memory and resets on restart, a captured nan-stamped request could replay after a restart. The signature still had to come from a REGISTERED key, so the reach is a trusted signer or a leaked request -- minor, defense-in-depth -- but it broke the U invariant (reject non-finite at every ingress). Fixed: `verify_signed` rejects a non-finite ts before the window and signature checks.
+
+**Repro:** `python test_a439_nonfinite_timestamp.py` -- exploit-first, both ways (3/3): the SAME nan request that is now refused VERIFIES on the pre-A439 code (a valid signature over nan, nan slips the window), inf is refused, and a finite in-window request on the SAME route still verifies (the gate did not start refusing everything). `python test_asm1_attack_surface.py` (13/13) pins the self-test exclusion. `python tools/attack_surface_map.py` shows the corrected queue.
+
+**Not changed / still open.** The in-memory, unbounded nonce store (`_seen_nonces`) -- a registered signer can still grow it, and it does not persist across restarts; noted, not fixed here (a registered-signer DoS / cross-restart window, lower than this). The 17 remaining queue items.
+
+**Status:** in source on its branch, both fixes with both-ways tests; the nan fix touches the live gate but is NOT deployed (no change to A/B/C without the operator's word).
+
+---

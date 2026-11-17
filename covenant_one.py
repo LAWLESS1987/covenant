@@ -97,6 +97,20 @@ SUITES = [
     # against a PC that has 6: a check moved to a copy answers about the copy.
     # They run in phase_integrity, in the live folder, before anything else.
     ("test_security_audit.py",           300,  "SECURITY"),
+    # A438 (2026-11-16): tools/attack_surface_map.py is the defensive COUNT PASS
+    # -- it discovers the Flask route surface by walking the source and emits a
+    # ranked hunt queue of routes with no (adversarial test AND gating call). ASM1
+    # drives its pure functions both ways (e.g. /health must be READ, which breaks
+    # if classification regresses to raw substring matching) and smoke-tests the
+    # real tree so the mapper cannot silently stop finding routes.
+    ("test_asm1_attack_surface.py",       60,  "SECURITY"),
+    # A439 (2026-11-16): first catch of the A438 hunt, at /actuator_learn. The
+    # shared operator-request gate (covenant_daily_plan.verify_signed) let a
+    # NON-FINITE timestamp slip the freshness window (abs(now-nan) > WINDOW_S is
+    # False); the nonce store resets on restart, so a captured nan request could
+    # replay. Rejected now at the ingress (the U invariant). Exploit-first both
+    # ways: the nan request verifies on the pre-A439 code, is refused after.
+    ("test_a439_nonfinite_timestamp.py",  60,  "SECURITY"),
     ("test_k1_runner_key_preservation.py",120, "SECURITY"),
     ("test_k3_p9_owner_only_guard.py",   120,  "SECURITY"),
     # Arrived on main 2026-08-27 from fix/tally-counts-failures-as-passes,
@@ -306,6 +320,12 @@ SUITES = [
     # (A135). P21h and P22's parser check both drive the failing direction.
     ("test_p21_self_eval_persist.py",    120,  "IDENTITY"),
     ("test_p22_watchdog_restart_verifies.py", 180, "IDENTITY"),
+    # A437 (2026-11-16): one tree, one watchdog even when two start in the SAME
+    # tick. A160 spared every tie and _evict_twins ran only at start, so a
+    # same-tick pair from racing launchers both survived and persisted. A pid
+    # tiebreak (lower pid stops the higher, one-sided) plus a per-round re-cull.
+    # Drives both ways: each new case fails on the pre-A437 code.
+    ("test_a437_twin_tiebreak.py", 60, "IDENTITY"),
     # P23 (2026-09-16): the three second-operator security findings -- A31
     # (/propose_code RCE), A21 (implicit credential grab), A44 (key ACL).
     # Added because a back-door audit pointed out that all three fixes existed

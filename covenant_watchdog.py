@@ -2444,9 +2444,19 @@ def _twins_to_evict(rows, my_pid, my_ppid):
     stub that launched it. Evict every row that started STRICTLY BEFORE this
     process did, never this process or its parent, and nothing at all when this
     process is not in the rows (a measurement that cannot see the measurer is
-    not trusted to act). A tie is left alone: two watchdogs started in the same
-    tick would otherwise each stop the other and leave NOTHING running, which
-    is the outage the guard then takes three to five minutes to notice.
+    not trusted to act).
+
+    Same tick (A437, 2026-11-16): the LOWER pid stops the higher and survives.
+    Until A437 a tie was left alone ENTIRELY -- two twins each evicting the
+    other would leave NOTHING running, the outage the guard takes three to five
+    minutes to notice. But sparing every tie meant two watchdogs started in the
+    same second by racing launchers BOTH survived and persisted, because this
+    function's caller (_evict_twins) ran only at daemon start and so never came
+    back to cull them. A pid tiebreak is deterministic and one-sided: of a
+    same-tick pair exactly one sees the other as a victim (its own pid is the
+    lower, the twin's is higher), so one is stopped and one survives -- never
+    both (the persistent duplicate A437 closes) and never neither (the outage
+    the old rule guarded, since two equal pids cannot exist).
 
     Why the newer one wins: a watchdog is only ever started by a restarter that
     has just stopped the old one, by the OS guard after finding none alive, or
@@ -2461,12 +2471,17 @@ def _twins_to_evict(rows, my_pid, my_ppid):
         return []
     my_t = mine[0]
     return sorted(p for p, t in rows
-                  if p not in (my_pid, my_ppid) and t < my_t)
+                  if p not in (my_pid, my_ppid)
+                  and (t < my_t or (t == my_t and p > my_pid)))
 
 
 def _evict_twins():
-    """Daemon start only. Measures, decides with _twins_to_evict, stops. Never
-    raises: a failed check costs one possible duplicate, never the watchdog."""
+    """Daemon only: at startup AND once per round (A437). Measures, decides with
+    _twins_to_evict, stops. Never raises: a failed check costs one possible
+    duplicate, never the watchdog. Running it every round (not only at start) is
+    what lets the surviving watchdog cull a same-tick twin that neither start's
+    scan could see because the twin had not yet appeared -- the one case the
+    pid tiebreak alone cannot reach, since the sparing happened at start."""
     import subprocess
     me = os.path.join(HERE, "covenant_watchdog.py")
     if any(ch in me for ch in "*?[]'`"):
@@ -2495,12 +2510,26 @@ def _evict_twins():
                         "Stop-Process -Id %s -Force -ErrorAction SilentlyContinue"
                         % ",".join(str(v) for v in victims)],
                        cwd=HERE, capture_output=True, text=True, timeout=60, creationflags=_NOWIN)
-        log("WARN", "another watchdog of this tree was already running (pid %s) when "
-                    "this one started -- stopped it: one tree, one watchdog (A160)"
+        log("WARN", "another watchdog of this tree was running (pid %s) -- "
+                    "stopped it: one tree, one watchdog (A160/A437)"
                     % ", ".join(str(v) for v in victims))
     except Exception as e:                                       # noqa: BLE001
         log("INFO", "could not stop twin watchdog %s: %s: %s"
                     % (victims, type(e).__name__, str(e)[:120]))
+
+
+def _daemon_round():
+    """One daemon iteration: a health pass, then an A160 re-cull. The cull runs
+    EVERY round (A437), not only at startup, so a same-tick twin left alive by a
+    start-time race -- one that appeared just after this watchdog's own start
+    scan and was then spared by the higher-pid twin's tiebreak -- is stopped
+    within one interval instead of persisting. A failed health pass never skips
+    the cull: the cull is what keeps 'one tree, one watchdog' true."""
+    try:
+        one_pass()
+    except Exception as e:                                  # noqa: BLE001
+        log("ERROR", f"watchdog pass failed: {type(e).__name__}: {e}")
+    _evict_twins()
 
 
 def main():
@@ -2592,10 +2621,7 @@ def main():
                     f"at round {_next} -- the count now survives the restarts "
                     f"covenant_highway.py schedules and the guard performs")
     while True:
-        try:
-            one_pass()
-        except Exception as e:                              # noqa: BLE001
-            log("ERROR", f"watchdog pass failed: {type(e).__name__}: {e}")
+        _daemon_round()
         time.sleep(a.interval)
 
 
