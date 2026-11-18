@@ -104,6 +104,12 @@ SUITES = [
     # if classification regresses to raw substring matching) and smoke-tests the
     # real tree so the mapper cannot silently stop finding routes.
     ("test_asm1_attack_surface.py",       60,  "SECURITY"),
+    # CA1 (2026-11-17): covenant_adopt -- the covenant-native auto-adoption gate
+    # (scan origin/main, decide if safe to adopt; PROPOSE by default, AUTO-apply
+    # only when armed). Pins the gate both ways: GO only when NORMAL + merge-clean
+    # + scan-clean + no new failing gate; HIGH/scan-hit/conflict/new-failure each
+    # hold. Reuses node D's safe_integrate design + covenant_one's differential gate.
+    ("test_ca1_covenant_adopt.py",        60,  "SECURITY"),
     # A439 (2026-11-16): first catch of the A438 hunt, at /actuator_learn. The
     # shared operator-request gate (covenant_daily_plan.verify_signed) let a
     # NON-FINITE timestamp slip the freshness window (abs(now-nan) > WINDOW_S is
