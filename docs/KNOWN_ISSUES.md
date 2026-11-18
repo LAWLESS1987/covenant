@@ -17936,3 +17936,22 @@ Hunting the A438 queue at its top item, `/actuator_learn`, turned up two real th
 **Status:** in source on its branch, both fixes with both-ways tests; the nan fix touches the live gate but is NOT deployed (no change to A/B/C without the operator's word).
 
 ---
+
+### A440. [security] The workshop runner starts Python in isolated mode -- now pinned both ways
+
+Asked on the Hugging Face forum (topic 191990, post 2, 2026-11-17): a `json.py` planted beside the hashed
+script loads unhashed if the script imports `json` and the child starts without `-I`, `-P` or
+`PYTHONSAFEPATH` -- does the launch pass any of those? It does. `covenant_tetsu_hands.run()` starts the child
+as `python -I -c RUNNER`, and on 3.11+ `-I` also sets `safe_path`, so the script's folder is never prepended
+to `sys.path`. Measured on this PC (3.12.10): with `-I` the planted module did not load (the standard
+library did; `sys.path[0]` was the stdlib zip); without `-I`, the control, it loaded. Until now nothing
+pinned the flag: removing `-I` would have reopened the vector silently.
+
+**Fixed.** `test_a440_runner_isolation.py` (SECURITY, registered in `covenant_one.py`) pins it: a static
+check that `run()` still passes `-I` before `-c RUNNER`; a planted sibling module that must NOT import under
+`-I`; the control that it DOES import without `-I`, so the test can see the vector; and `safe_path` asserted
+under `-I` on 3.11+. Four checks, all green on 3.12.10.
+
+**Limits.** This pins the launch flags and the sibling-module vector only. It says nothing about what an
+authorized script can reach once it is running -- the deny-list sandbox, the open item from the 2026-11-16
+quorum verification.
