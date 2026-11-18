@@ -18118,3 +18118,68 @@ laptop takes when it adopts this -- the mesh's source split (A/B/C vs node D and
 
 **Status (2026-11-18):** running on the laptop's A/B/C since their 09:28 reload (as A443's text). On main by this
 change; node D and the phone get it from main.
+
+### A446. [correctness / honesty, A348h and A263-DOCSTRING shape] A refused HANDS RUN told the model that loopback was enough, and act()'s docstring said the same; the door had required a signature since A423 -- FIXED IN SOURCE 2026-11-18, with a guard that ties the words to the gate
+
+(Numbering: this entry was written on the live branch claude/improve-miner-circle-back, commit e123449, where the ally fix is A443. On main that fix is A447 (03dac84), and the references below say A447.)
+
+**Found by Jang-woo**, running signed-RUN packet v2.3 against 9d85f6c (HF 183807 #44, 2026-11-18, our reply #45).
+In case 4 (unsigned, from loopback) the RUN was refused as it should be. But the data handed to the model said RUN
+needs the operator, "a request from loopback or signed by a registered key". The docstring of `act()` described the
+operator caller the same way. At 9d85f6c the door sets `_may_run = _request_signed_by_registered(request)`, which
+passes the address gate as False, so loopback alone has not been enough since A423. Since A447 (03dac84) an ally key
+is not enough either. The outcome followed the rule, and the reason given did not state it. All four of his add-on
+refusals carried the same text.
+
+**Recurrence check (rule 10).** `lookback_index.py find` turned up the same shape twice: A348h (a prompt told Tetsu
+bounds it did not send) and A263-DOCSTRING (a docstring claimed behaviour the code did not have). Each was a pattern
+tombstone on one wording. Nothing tied a stated reason to the gate that decides, so the next drift had nothing to
+stop it. This entry adds that tie.
+
+**Fixed here.**
+- The refusal is one constant, `covenant_tetsu_hands.RUN_REFUSED_DATA` (line 909). It says a request signed by one
+  of his own registered keys is needed, and that loopback alone, an ally key or a tailnet address is not enough.
+- `act()` returns that constant (line 988).
+- The docstring states the same rule.
+- The old words are kept as written on branch `a446-refusal-reason-as-written-2026-11-18` and tombstoned as
+  A446-RUN-REFUSAL-LOOPBACK.
+- The prefix "running a script needs the operator" is kept, because `test_th1_tetsu_hands.py` and
+  `test_a429_hands_content_seat.py` read it.
+
+**The guard,** `test_a446_run_refusal_reason.py` (5 tests). Every caller the text names as not enough (loopback
+alone, an ally key, a tailnet address, plus an unsigned stranger) is driven through the door's own HANDS branch,
+extracted from the AST as in test_a430 and test_a447. Each must be refused with exactly `RUN_REFUSED_DATA`. The
+caller the text names as enough (signed by his key, from an outside address) must run. Text checks pin the rule's
+words, and source checks pin the door's one `_may_run` line.
+
+**Driven both ways (rule 8).** Each mutation was applied, run, then reverted (from a byte-compared backup for (a),
+in memory for (b) and (c)):
+- (a) The old words restored: 2 tests red (the words, and the module scan).
+- (b) A gate that lets loopback run again: the not-enough test red.
+- (c) The pre-A447 gate (`bool(ok)`, so an ally passes): the not-enough test red.
+- Restored: 5/5.
+
+Neighbours green: TH1 31/31, HS1 6/6, A443 8/8, A430 18/18 (on the live branch).
+
+**Re-driven on main (ba051de), 2026-11-18,** before the PR: (a) old words red, (b) loopback admitted red, (c) the
+pre-A447 gate red, restored 5/5, both files byte-identical to their backups afterwards. TH1 31/31, HS1 6/6, A447
+8/8, A430 18/18 green. On main the test also points the A444 nonce store (`NONCE_STORE`) at its temp dir; see A448.
+
+**Not changed, not measured.** Packet v2.3 pins 9d85f6c, so outside runs of it still see the old words; packet v2.4
+pins the commit that carries this fix. Not deployed to the live nodes by this change. Per our #45, the 183807 thread
+is told once this is in the public tree.
+
+### A448. [test hygiene / record integrity, follows A444] Three suites write fixture nonces into the live store ops/operator_nonces.pairs -- OPEN, found 2026-11-18
+
+A444 (c233a04) made the signed-request nonce store durable: `covenant_daily_plan.NONCE_STORE`, default
+`ops/operator_nonces`, one file per (signer, nonce) pair under `ops/operator_nonces.pairs/`, relocatable by
+`COVENANT_NONCE_STORE`. Suites written before it isolate the nonce state by patching `DP._seen_nonces` with a fresh set,
+which no longer covers the store. **Measured on main ba051de, one run each, from an empty store:** test_a430_run_sha256
+left 22 files, test_a432_workshop_read 33, test_a447_ally_not_operator 11; test_a439, test_gg1, TH1 and HS1 left none.
+The files are fixture-key pairs, so they cannot spend a real operator nonce; the harm is that a test run in the live
+checkout writes into the operator's real store, and that state carries from one run to the next. The runner stages to a
+temp dir, so a covenant_one run does not touch the live checkout; a suite run by hand there does.
+
+Not fixed here. The fix is one patched attribute per suite (`(DP, "NONCE_STORE", <temp dir>)`, as
+test_a446_run_refusal_reason.py does on main), plus a guard driven both ways. The files from this measurement were moved
+aside, not deleted.
