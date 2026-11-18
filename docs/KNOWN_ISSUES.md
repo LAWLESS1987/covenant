@@ -17936,3 +17936,33 @@ Hunting the A438 queue at its top item, `/actuator_learn`, turned up two real th
 **Status:** in source on its branch, both fixes with both-ways tests; the nan fix touches the live gate but is NOT deployed (no change to A/B/C without the operator's word).
 
 ---
+
+### A441. [security] A signed request replayed once per PROCESS: the nonce store was per-process memory -- now durable and shared
+
+**Found 2026-11-18**, from the Hugging Face receipt-profile thread (topic 180706 #44): nootxlm's attack suite
+showed two processes sharing one store both accepting the same receipt -- check-and-record is one step inside a
+process, not across two. Covenant had the same shape, plainer: `covenant_daily_plan._seen_nonces` and
+`covenant_mycelium._seen` were module-level sets, nothing on disk, no lock, and `sign_json_request` binds no
+node. So a captured signed operator request was replay-protected only inside the one process that first saw it.
+On the laptop, A, B and C run from one checkout as three processes: the same signed RUN could execute once per
+node inside `WINDOW_S` (300 s), and a restart wiped the set (the "wipe and replay inside the window" case).
+
+**Fixed.** `pairstore_excl.ExclPairStore` (the cross-process (signer, nonce) pair-store built for that thread on
+2026-11-18 and race-tested both ways on Windows and WSL: one file per pair created by `os.link`, so a second
+link to the same name fails) now backs both verify paths through `covenant_daily_plan.nonce_check_and_record`.
+The order changed too: the signature is verified FIRST, then one atomic check-and-record, so an unverified
+request never consumes a nonce. The store lives at `ops/operator_nonces.pairs/` (`COVENANT_NONCE_STORE`
+relocates it; tests use a temp dir); expired pairs are pruned at most once a minute. A caller that passes its own
+`seen` set keeps the old in-process semantics.
+
+`test_a441_nonce_store.py` (SECURITY) drives it both ways: of six concurrent processes presenting one pair,
+exactly one accepts; a fresh process refuses a pair already recorded; the CONTROL (the old per-process set)
+accepts it in every process, so the test can see the vector; prune drops expired pairs and keeps live ones; and
+through the real `verify_signed` with a registered signer, a replay is refused in the same process and in a fresh
+one, while a bad-signature request leaves the nonce unconsumed. 7 of 7 on 3.12.10; A430S still 13 of 13.
+
+**NOT closed, recorded as the follow-up.** Cross-HOST replay: node D and the laptop do not share a checkout, so
+the same request still lands once on each host inside the window. Closing that needs the target node bound into
+the signed request (`sign_json_request` + the phone signer), or seen-nonces gossiped over the mesh. The store is
+for one machine's local filesystem; network filesystems were not tested. Wipe the pair directory and replay inside
+the window and the request is accepted -- the profile's own limit, unchanged.

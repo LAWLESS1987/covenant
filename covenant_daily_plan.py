@@ -65,6 +65,56 @@ DEFAULT_KEY = os.path.join(HERE, "nodeA_prod.db.key")
 APPROVE_PATH = "/daily_plan/approve"
 PLAN_PATH = "/daily_plan"
 WINDOW_S = 300           # a signed request older or newer than this is refused
+
+# A441 (2026-11-18): the nonce store is DURABLE and shared across the processes of one checkout. Before this the
+# seen-nonces were a module-level set, so a signed request was replay-protected only inside the ONE process that
+# first saw it: on a host running A, B and C from one checkout a captured request replayed once per node inside
+# WINDOW_S, and a restart wiped the set (nootxlm, Hugging Face 180706 #44: two processes on one store both
+# accepted a receipt). The store is pairstore_excl.ExclPairStore -- one file per (signer, nonce) pair created by
+# os.link, so check-and-record is one atomic step across processes; race-tested both ways on Windows and WSL.
+# Cross-HOST replay (node D against the laptop) is NOT closed here; that needs the node bound into the signed
+# request (A441's recorded follow-up). COVENANT_NONCE_STORE relocates the store (tests use a temp dir).
+NONCE_STORE = os.environ.get("COVENANT_NONCE_STORE") or os.path.join(HERE, "ops", "operator_nonces")
+_nonce_store_obj = None
+_last_prune = 0.0
+
+
+def _nonce_store():
+    global _nonce_store_obj
+    want = os.path.abspath(NONCE_STORE) + ".pairs"
+    if _nonce_store_obj is None or getattr(_nonce_store_obj, "dir", "") != want:
+        import pairstore_excl
+        _nonce_store_obj = pairstore_excl.ExclPairStore(NONCE_STORE)
+    return _nonce_store_obj
+
+
+def _pubkey_fp(pem):
+    return hashlib.sha256(_norm(pem).encode()).hexdigest()[:32]
+
+
+def nonce_check_and_record(pubkey_pem, nonce, ts, seen=None, now=None):
+    """One check-and-record of (signer, nonce). With `seen` (a set, for tests and callers that keep their own
+    scope) it keeps the old in-process semantics. With seen=None it uses the durable cross-process store, so the
+    same nonce presented to another process of this checkout, or after a restart, is refused. True if fresh and
+    now recorded; False if missing or reused. Expired pairs are pruned at most once a minute."""
+    global _last_prune
+    if not nonce:
+        return False
+    if seen is not None:
+        if nonce in seen:
+            return False
+        seen.add(nonce)
+        return True
+    store = _nonce_store()
+    t = now if now is not None else time.time()
+    if t - _last_prune > 60:
+        _last_prune = t
+        try:
+            store.prune(t, WINDOW_S)
+        except Exception:                                        # noqa: BLE001 -- pruning never blocks a verify
+            pass
+    return store.check_and_record(_pubkey_fp(pubkey_pem), nonce, int(float(ts)) + WINDOW_S)
+
 _seen_nonces = set()
 
 
@@ -317,12 +367,14 @@ def verify_signed(pubkey_pem, method, path, body, nonce, timestamp, signature_b6
         return False, "bad timestamp"
     if abs((now if now is not None else time.time()) - ts) > WINDOW_S:
         return False, "signature outside the %d s window" % WINDOW_S
-    seen = _seen_nonces if seen is None else seen
-    if not nonce or nonce in seen:
+    if not nonce:
         return False, "nonce reused or missing"
     if not cov.verify_operator_signature(pubkey_pem, method, path, body or b"", nonce, ts, signature_b64 or ""):
         return False, "signature does not verify"
-    seen.add(nonce)
+    # A441: verify FIRST (an unverified request never consumes a nonce), then ONE atomic check-and-record in a
+    # store that is durable and shared across this checkout's processes; a reused nonce is refused here.
+    if not nonce_check_and_record(pubkey_pem, nonce, ts, seen=seen, now=now):
+        return False, "nonce reused or missing"
     return True, who
 
 

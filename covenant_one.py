@@ -111,6 +111,7 @@ SUITES = [
     # replay. Rejected now at the ingress (the U invariant). Exploit-first both
     # ways: the nan request verifies on the pre-A439 code, is refused after.
     ("test_a439_nonfinite_timestamp.py",  60,  "SECURITY"),
+    ("test_a441_nonce_store.py",          120, "SECURITY"),
     ("test_k1_runner_key_preservation.py",120, "SECURITY"),
     ("test_k3_p9_owner_only_guard.py",   120,  "SECURITY"),
     # Arrived on main 2026-08-27 from fix/tally-counts-failures-as-passes,

@@ -149,12 +149,13 @@ def admit(req, body, tailnet_ok, signers_path=None, peers_path=None, ledger_path
             return False, addr, name, "ally: %s is not an ally door" % path
         try:
             import covenant_unified_v8 as cov
+            import covenant_daily_plan as DP
             tsf = float(ts)
             fresh = abs((now if now is not None else time.time()) - tsf) <= WINDOW_S
-            s = _seen if seen is None else seen
-            good = fresh and nonce and nonce not in s and cov.verify_operator_signature(pem, method, path, body or b"", nonce, tsf, sig)
-            if good:
-                s.add(nonce)
+            # A441: verify first, then one atomic, durable check-and-record shared across this checkout's processes.
+            good = (fresh and bool(nonce)
+                    and cov.verify_operator_signature(pem, method, path, body or b"", nonce, tsf, sig)
+                    and DP.nonce_check_and_record(pem, nonce, tsf, seen=seen, now=now))
         except Exception:                                         # noqa: BLE001
             good = False
         if good:
