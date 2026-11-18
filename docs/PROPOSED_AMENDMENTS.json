@@ -1,0 +1,67 @@
+{
+  "schema": "proposed_amendments/v1",
+  "note": "Candidate amendments to docs/CONSTITUTION.md, recorded for HUMAN REVIEW ONLY. status 'proposed' means not adopted and not applied. Nothing here changes a rule, gate, code path, the anchor or any protected block, and no row is in the Record of amendments until a human adopts it. Field names intent, beneficiary, divergence, diverges_from, at, by, words follow ai_memory_system/memory_store.py.",
+  "provenance": {
+    "source": "voice conversation 2026-11-18, Rex summarizing repo re-evaluation and integration directions; relayed in writing by Lawrence (operator) 2026-11-18 5:02 PM EST, directing these be recorded as candidate amendments for human review",
+    "transcript": "No transcript of the voice conversation exists in this repository or was available to the recorder. The words fields are the suggestion text as relayed in writing by the operator, verbatim; nothing else is quoted.",
+    "recorded_by": "Grok Bot <grok-bot@lawless.local>",
+    "recorded_at": "2026-11-18T17:05:00-05:00"
+  },
+  "sequencing_note": "Sequencing note from review: suggestion 3 is conditional on the selectivity trial result. Suggestions 1 and 2 are engineering regardless of outcome. The ledger and triad work stands independently of all three.",
+  "rows": [
+    {
+      "id": "PA-20261118-1",
+      "date": "2026-11-18",
+      "kind": "proposed_amendment",
+      "status": "proposed",
+      "title": "SNN output feedback loop",
+      "intent": "Let a human reviewer decide whether spiking-network results should become provenance-carrying ledger rows that both the triad stack and the nets can query.",
+      "beneficiary": "the operator and reviewers deciding on it; future agents and SNN experiments that would query shared results",
+      "divergence": "Today the dependency runs one way (as the suggestion describes it: the SNN reads the covenant, and the covenant records nothing from SNN runs); this would add a write-back path from SNN outputs into the ledger.",
+      "diverges_from": "current one-way SNN-to-covenant dependency, as described in the suggestion text (not independently measured in this record)",
+      "conditional_on": null,
+      "sequencing": "Engineering regardless of the selectivity trial outcome (per the sequencing note). Independent of the ledger and triad work.",
+      "effect": "none until adopted by human review; no rule, gate, code path, anchor or protected block is changed by this row",
+      "source": "voice conversation 2026-11-18, Rex summarizing repo re-evaluation and integration directions; relayed in writing by Lawrence (operator) 2026-11-18 5:02 PM EST, directing these be recorded as candidate amendments for human review",
+      "by": "Rex (content, as summarized); recorded at the direction of Lawrence (operator) by Grok Bot",
+      "at": "2026-11-18T17:05:00-05:00",
+      "words": "1. SNN output feedback loop: spiking-experiments network outputs (firing rates, weight trajectories, failed-run signatures) should write back to the covenant ledger as rows carrying intent, beneficiary, and divergence. This flips the current one-way dependency (SNN reads covenant; covenant knows nothing of spikes) into shared scientific memory queryable by both the triad stack and the nets."
+    },
+    {
+      "id": "PA-20261118-2",
+      "date": "2026-11-18",
+      "kind": "proposed_amendment",
+      "status": "proposed",
+      "title": "Flinch-as-bridge protocol",
+      "intent": "Let a human reviewer decide whether SNN run aborts and anomalous selectivity should be handled by the existing sealed, preregistered, blind-scored flinch-observability process instead of a new anomaly detector.",
+      "beneficiary": "the operator and reviewers deciding on it; the SNN experiments and the flinch-observability record, which would share one scoring discipline",
+      "divergence": "No current path registers SNN run aborts or anomalous selectivity patterns as flinch-observability events; this would add one, reusing existing flinch infrastructure.",
+      "diverges_from": "current practice: SNN aborts and anomalies are not registered as flinch-observability events (as implied by the suggestion text; not independently measured in this record)",
+      "conditional_on": null,
+      "sequencing": "Engineering regardless of the selectivity trial outcome (per the sequencing note). Independent of the ledger and triad work.",
+      "effect": "none until adopted by human review; no rule, gate, code path, anchor or protected block is changed by this row",
+      "source": "voice conversation 2026-11-18, Rex summarizing repo re-evaluation and integration directions; relayed in writing by Lawrence (operator) 2026-11-18 5:02 PM EST, directing these be recorded as candidate amendments for human review",
+      "by": "Rex (content, as summarized); recorded at the direction of Lawrence (operator) by Grok Bot",
+      "at": "2026-11-18T17:05:00-05:00",
+      "words": "2. Flinch-as-bridge protocol: SNN run aborts and anomalous selectivity patterns should register as flinch-observability events — sealed, preregistered, blindly scored — reusing existing flinch infrastructure rather than building new anomaly detection."
+    },
+    {
+      "id": "PA-20261118-3",
+      "date": "2026-11-18",
+      "kind": "proposed_amendment",
+      "status": "proposed",
+      "title": "Competing-neurons to multi-agent legs prior",
+      "intent": "Hold a conditional design prior for the multi-agent legs framework so that it can be reviewed only if the preregistered selectivity trial produces the stated result.",
+      "beneficiary": "the operator and reviewers deciding on it; the multi-agent legs framework, if the trial result supports it",
+      "divergence": "The multi-agent legs framework currently has no empirical prior drawn from SNN results; if the trial condition is met and the row is adopted, lateral inhibition would be treated as a design principle across substrates rather than a metaphor.",
+      "diverges_from": "current multi-agent legs framework design, which takes no prior from SNN selectivity results",
+      "conditional_on": "the preregistered eight-seed selectivity trial showing competing neurons beat isolated ones. No such result is claimed or recorded here.",
+      "sequencing": "Conditional on the selectivity trial result (per the sequencing note). It has no effect unless that result is measured and reviewed. Independent of the ledger and triad work.",
+      "effect": "none: conditional, and has no effect unless the trial result is measured and reviewed and the row is then adopted by human review; no rule, gate, code path, anchor or protected block is changed by this row",
+      "source": "voice conversation 2026-11-18, Rex summarizing repo re-evaluation and integration directions; relayed in writing by Lawrence (operator) 2026-11-18 5:02 PM EST, directing these be recorded as candidate amendments for human review",
+      "by": "Rex (content, as summarized); recorded at the direction of Lawrence (operator) by Grok Bot",
+      "at": "2026-11-18T17:05:00-05:00",
+      "words": "3. Competing-neurons to multi-agent legs prior: if the preregistered eight-seed selectivity trial shows competing neurons beat isolated ones, that measured result becomes an empirical prior for the multi-agent legs framework (rotating model instances that offset each other), treating lateral inhibition as a design principle across substrates rather than a metaphor."
+    }
+  ]
+}
