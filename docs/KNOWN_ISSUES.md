@@ -17966,6 +17966,46 @@ the same request still lands once on each host inside the window. Closing that n
 the signed request (`sign_json_request` + the phone signer), or seen-nonces gossiped over the mesh. The store is
 for one machine's local filesystem; network filesystems were not tested. Wipe the pair directory and replay inside
 the window and the request is accepted -- the profile's own limit, unchanged.
+### A445. [security] A metadata extension could forge a store-owned field, and a Unicode line separator could break out of the frontmatter -- hardened
+
+**Found 2026-11-18** sitting UNCOMMITTED in node D's working copy of `ai_memory_system/memory_store.py`: a prior
+hardening patch that had never reached main (node D's updater was excluding the file from its drift check as if
+it were runtime state; Astra's scratch run showed it is code -- 13 of 13 source files unchanged across 106 state
+operations -- and that memory data already lives in separate ignored files). Two vectors it closes:
+(1) a metadata extension could set a store-owned field -- `type`, `agent`, `intent`, `beneficiary`, `divergence`,
+`diverges_from`, and the node-local `created` / `review` / `review_by` -- so an extension could pass itself off as
+evidence of review, identity or checked provenance; (2) `render_memory` refused only `\r`, `\n` and NUL in a
+frontmatter field, but `parse_memory` splits with `splitlines()`, which also honours `\v`, `\f`, `\x1c`-`\x1e`,
+`\x85`, `\u2028` and `\u2029` -- so a field carrying one of those could break out of the frontmatter and forge
+other fields.
+
+**Fixed.** `_STORE_FIELDS` names the store-owned fields and `MemoryStore.put` refuses an extension that sets
+one; a non-dict extension is refused; `_FRONTMATTER_BREAKS` lists every separator `splitlines()` honours and
+`render_memory` refuses all of them in every frontmatter field; an extension key must be non-empty, trimmed and
+colon-free. Checks A445.1-A445.6 in `ai_memory_system/test_memory_system.py` drive it both ways: the forbidden
+inputs raise, an ordinary extension still renders and lands. The existing M1 suite stays green.
+
+**Limits.** This hardens the writer and the renderer. It does not re-validate records already on disk: a record
+written through an older writer with a forged field still reads as it was written (the chain shows when it was
+written, not that the field was honest).
+### A443. [security] The workshop runner starts Python in isolated mode -- now pinned both ways
+
+Asked on the Hugging Face forum (topic 191990, post 2, 2026-11-17): a `json.py` planted beside the hashed
+script loads unhashed if the script imports `json` and the child starts without `-I`, `-P` or
+`PYTHONSAFEPATH` -- does the launch pass any of those? It does. `covenant_tetsu_hands.run()` starts the child
+as `python -I -c RUNNER`, and on 3.11+ `-I` also sets `safe_path`, so the script's folder is never prepended
+to `sys.path`. Measured on this PC (3.12.10): with `-I` the planted module did not load (the standard
+library did; `sys.path[0]` was the stdlib zip); without `-I`, the control, it loaded. Until now nothing
+pinned the flag: removing `-I` would have reopened the vector silently.
+
+**Fixed.** `test_a443_runner_isolation.py` (SECURITY, registered in `covenant_one.py`) pins it: a static
+check that `run()` still passes `-I` before `-c RUNNER`; a planted sibling module that must NOT import under
+`-I`; the control that it DOES import without `-I`, so the test can see the vector; and `safe_path` asserted
+under `-I` on 3.11+. Four checks, all green on 3.12.10.
+
+**Limits.** This pins the launch flags and the sibling-module vector only. It says nothing about what an
+authorized script can reach once it is running -- the deny-list sandbox, the open item from the 2026-11-16
+quorum verification.
 ### A440. [security hunt -- second catch from the A438 queue] /claim_rewards' auth was sound but its domain-separation and ownership had no runner -- GUARDED 2026-11-16
 
 Hunting the A438 queue at `/claim_rewards` (a money POST). No new exploitable gap -- the v8.4 fix (`verify_stake_action_signature`, PATCH LOG item L) is sound: a signature required, the ACTION bound into the signed frame so a "claim" authorization is not an "unstake" one, the KEY bound so only the owner acts, and route-level replay via a persistent DB nonce. Unlike A439 there is NO freshness window here, so the non-finite-timestamp class does not apply. **The honest finding is a coverage gap, not a bug:** `test_a1a_a2` already proved a BAD signature is refused (400), but the two properties the v8.4 fix is actually FOR -- action domain separation and key ownership -- had no test. A fix whose key property has no runner is the A65 gap.
