@@ -97,5 +97,23 @@ def held_by_isolation(row):
     behaviour, and free was isolated because the judge refused what she wrote, so what she was reading may be part
     of why. Such a row carries `isolation` (set by covenant_ambassador.learn); it is held from Tetsu's
     improvement-mining and from free's ally ranking until covenant_moltbook_release -- the judge-gated door --
-    stamps `released_at` on it. Every reader of the comments log asks here, as it asks own_authors above."""
-    return bool(isinstance(row, dict) and row.get("isolation") and not row.get("released_at"))
+    stamps `released_at` on it. The readers that turn the comments log into learning or into free's context (the
+    improvement miner, the ally ranking) ask here. Not every reader does: covenant_security_probe.evolve takes
+    held directive rows as attack probes, by design (Codex, 2026-11-18: keep them available to a contained
+    adversarial-test path as untrusted specimens). This sentence used to say "Every reader of the comments log
+    asks here", which overstated it.
+
+    THE KEY IS THE STAMP (2026-11-18, the peer's hardening of Codex's point 3): a row carrying an `isolation` key
+    is stamped, whatever its value. A falsy value (`{}`, "", None) used to skip the hold; nothing writes one, but
+    the hold no longer depends on that.
+
+    RELEASED MEANS JUDGED CLEAN (2026-11-18, Codex's read of #67, note 3: "any truthy released_at releases the
+    hold"). The release stamps `released_at` on EVERY row it judges -- the ones it finds violating too, with
+    `label` True (covenant_moltbook_release.release). Reading `released_at` alone therefore released to the miner
+    and the ally ranking exactly the rows the judge refused. A held row is released only when the release judged it
+    clean: `released_at` set AND `label` is False (a real boolean, as the release writes it). A row judged violating,
+    or one with a `released_at` and no verdict beside it (nothing in this repo writes that; a hand edit could), stays
+    held. HI1e pins all three."""
+    if not (isinstance(row, dict) and "isolation" in row):
+        return False
+    return not (row.get("released_at") and row.get("label") is False)

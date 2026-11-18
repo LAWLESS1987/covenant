@@ -123,9 +123,18 @@ def main():
     print("HI1e -- held_by_isolation")
     check("HI1e an ordinary row is not held", OA.held_by_isolation({"text": "x"}) is False)
     check("HI1e a stamped, unreleased row is held", OA.held_by_isolation({"isolation": {"t": "T"}}) is True)
-    check("HI1e a stamped row the release passed is not held",
-          OA.held_by_isolation({"isolation": {"t": "T"}, "released_at": "2026-11-16T00:00:00Z"}) is False)
+    # A release row as covenant_moltbook_release writes it: released_at AND label (True = the judge found it
+    # violating). Before 2026-11-18 these fixtures carried released_at alone, which the release never writes.
+    check("HI1e a stamped row the release judged clean is not held",
+          OA.held_by_isolation({"isolation": {"t": "T"}, "released_at": "2026-11-16T00:00:00Z", "label": False}) is False)
+    check("HI1e a stamped row the release judged VIOLATING stays held (Codex's note 3)",
+          OA.held_by_isolation({"isolation": {"t": "T"}, "released_at": "2026-11-16T00:00:00Z", "label": True}) is True)
+    check("HI1e a released_at with no verdict beside it stays held",
+          OA.held_by_isolation({"isolation": {"t": "T"}, "released_at": "2026-11-16T00:00:00Z"}) is True
+          and OA.held_by_isolation({"isolation": {"t": "T"}, "released_at": "x", "label": "false"}) is True)
     check("HI1e junk is not held", OA.held_by_isolation(None) is False and OA.held_by_isolation("x") is False)
+    check("HI1e an isolation key with a falsy value is still a stamp (held)",
+          all(OA.held_by_isolation({"isolation": v}) is True for v in ({}, "", None, 0, False)))
 
     print("HI1f -- the improve-miner holds, says so, and mines once released")
     d = tempfile.mkdtemp(prefix="hi1_im_")
@@ -147,6 +156,14 @@ def main():
     check("HI1f the run counts what it held", st.get("isolation_rows_held") == 1, st)
     check("HI1f and says so out loud", "isolation hold (A433): 1 row" in IM.own_line(st), IM.own_line(st))
     rows[1]["released_at"] = "2026-11-16T12:00:00Z"
+    rows[1]["label"] = True                                    # judged VIOLATING: released_at alone frees nothing
+    write(rows)
+    st_v = {}
+    got_v = IM.harvest(candidates=cand, seen_path=seen, sends_path=os.path.join(d, "no_sends.jsonl"), stats=st_v)
+    check("HI1f a row the release judged violating is still held, and still not marked seen",
+          got_v == [] and st_v.get("isolation_rows_held") == 1
+          and "B" not in set(json.load(open(seen, encoding="utf-8"))), (got_v, st_v))
+    rows[1]["label"] = False                                   # judged clean: as the release writes it
     write(rows)
     st2 = {}
     got2 = IM.harvest(candidates=cand, seen_path=seen, sends_path=os.path.join(d, "no_sends.jsonl"), stats=st2)
@@ -161,14 +178,49 @@ def main():
                                     "directive": False}
         ledger = tempfile.mktemp(suffix="_hi1_allies.jsonl")
         held = [{"author": "held_one", "text": "x", "url": "u1", "isolation": {"t": "T"}},
-                {"author": "released_one", "text": "y", "url": "u2", "isolation": {"t": "T"}, "released_at": "R"},
+                {"author": "released_one", "text": "y", "url": "u2", "isolation": {"t": "T"}, "released_at": "R",
+                 "label": False},
+                {"author": "refused_one", "text": "w", "url": "u4", "isolation": {"t": "T"}, "released_at": "R",
+                 "label": True},
                 {"author": "ordinary_one", "text": "z", "url": "u3"}]
         ranked = AMB.find_allies(path=ledger, say=lambda *_a: None, rows=held)
     finally:
         AMB.score_ally = real_s
     names = sorted(r.get("author") for r in ranked or [])
-    check("HI1g the held author is not ranked; released and ordinary are",
+    check("HI1g the held and the judged-violating authors are not ranked; released-clean and ordinary are",
           names == ["ordinary_one", "released_one"], names)
+
+    print("HI1h -- a held row never decides who is US (Codex's read of #67, 2026-11-18)")
+    # The own-author prepass ran over EVERY row, held ones included: a held row whose text begins with one of our
+    # sent replies made its author "us", and that author's ordinary rows were then skipped -- a row read during
+    # isolation steering the miner before release. HI1f could not see it: its sends ledger was missing, so the
+    # prepass never ran. Here the ledger is real.
+    d = tempfile.mkdtemp(prefix="hi1_own_")
+    cand, seen, sends = (os.path.join(d, n) for n in ("c.jsonl", "seen.json", "sends.jsonl"))
+    our_reply = "our own reply about rollback drills, written under our account and sent to someone else " * 2
+    with io.open(sends, "w", encoding="utf-8") as fh:
+        fh.write(json.dumps({"sent": True, "author": "someone_else", "text": our_reply}) + "\n")
+    ordinary_m = "mallory's ordinary outside idea about consent records, read in a normal round " * 4
+    rows_h = [{"author": "mallory", "url": "u/m1", "text": our_reply, "sha256": "M1", "eligible": True, "flags": {},
+               "isolation": {"t": "T", "under": "isolated X"}},
+              {"author": "mallory", "url": "u/m2", "text": ordinary_m, "sha256": "M2", "eligible": True, "flags": {}}]
+    with io.open(cand, "w", encoding="utf-8") as fh:
+        fh.write("".join(json.dumps(r) + "\n" for r in rows_h))
+    st = {}
+    got = IM.harvest(candidates=cand, seen_path=seen, sends_path=sends, stats=st)
+    check("HI1h the sends ledger was read (the prepass ran)", st.get("sends_ledger") == "read", st)
+    check("HI1h a held row does not make its author us", st.get("own_authors") == [], st)
+    check("HI1h so that author's ordinary row is still mined", [r["id"] for r in got] == ["M2"], got)
+    check("HI1h and the held row is counted as held, not as ours",
+          st.get("isolation_rows_held") == 1 and st.get("own_rows_skipped") == 0, st)
+    rows_h[0]["released_at"] = "2026-11-18T12:00:00Z"
+    rows_h[0]["label"] = False                                 # judged clean, as the release writes it
+    with io.open(cand, "w", encoding="utf-8") as fh:
+        fh.write("".join(json.dumps(r) + "\n" for r in rows_h))
+    st2 = {}
+    IM.harvest(candidates=cand, seen_path=os.path.join(d, "seen2.json"), sends_path=sends, stats=st2)
+    check("HI1h once released, the same row IS evidence: its author is us and both rows are skipped as ours",
+          st2.get("own_authors") == ["mallory"] and st2.get("own_rows_skipped") == 2, st2)
 
     print("\nHI1: %d passed, %d failed" % (len(PASS), len(FAIL)))
     return 0 if not FAIL else 1
