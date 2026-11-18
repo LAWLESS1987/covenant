@@ -66,14 +66,14 @@ APPROVE_PATH = "/daily_plan/approve"
 PLAN_PATH = "/daily_plan"
 WINDOW_S = 300           # a signed request older or newer than this is refused
 
-# A441 (2026-11-18): the nonce store is DURABLE and shared across the processes of one checkout. Before this the
+# A444 (2026-11-18): the nonce store is DURABLE and shared across the processes of one checkout. Before this the
 # seen-nonces were a module-level set, so a signed request was replay-protected only inside the ONE process that
 # first saw it: on a host running A, B and C from one checkout a captured request replayed once per node inside
 # WINDOW_S, and a restart wiped the set (nootxlm, Hugging Face 180706 #44: two processes on one store both
 # accepted a receipt). The store is pairstore_excl.ExclPairStore -- one file per (signer, nonce) pair created by
 # os.link, so check-and-record is one atomic step across processes; race-tested both ways on Windows and WSL.
 # Cross-HOST replay (node D against the laptop) is NOT closed here; that needs the node bound into the signed
-# request (A441's recorded follow-up). COVENANT_NONCE_STORE relocates the store (tests use a temp dir).
+# request (A444's recorded follow-up). COVENANT_NONCE_STORE relocates the store (tests use a temp dir).
 NONCE_STORE = os.environ.get("COVENANT_NONCE_STORE") or os.path.join(HERE, "ops", "operator_nonces")
 _nonce_store_obj = None
 _last_prune = 0.0
@@ -378,7 +378,7 @@ def verify_signed(pubkey_pem, method, path, body, nonce, timestamp, signature_b6
         return False, "nonce reused or missing"
     if not cov.verify_operator_signature(pubkey_pem, method, path, body or b"", nonce, ts, signature_b64 or ""):
         return False, "signature does not verify"
-    # A441: verify FIRST (an unverified request never consumes a nonce), then ONE atomic check-and-record in a
+    # A444: verify FIRST (an unverified request never consumes a nonce), then ONE atomic check-and-record in a
     # store that is durable and shared across this checkout's processes; a reused nonce is refused here.
     if not nonce_check_and_record(pubkey_pem, nonce, ts, seen=seen, now=now):
         return False, "nonce reused or missing"

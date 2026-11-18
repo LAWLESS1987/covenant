@@ -1,4 +1,4 @@
-"""A441: a signed request's nonce is replay-protected across PROCESSES of one checkout and across a restart,
+"""A444: a signed request's nonce is replay-protected across PROCESSES of one checkout and across a restart,
 not only inside the one process that first saw it. Driven both ways: the durable store lets exactly one of N
 concurrent processes accept a (signer, nonce) pair and refuses it in a fresh process; the CONTROL (the old
 per-process set) accepts it in every process, so the test can see the vector. Then the same through the real
@@ -45,7 +45,7 @@ def child(*args):
     return json.loads(cp.stdout.strip().splitlines()[-1])
 
 
-class A441NonceStore(unittest.TestCase):
+class A444NonceStore(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="a441-")
         self.store = os.path.join(self.tmp, "nonces")
@@ -66,7 +66,7 @@ class A441NonceStore(unittest.TestCase):
         self.assertFalse(child("store", self.store, "k", "n2", self.exp))      # a "restart": new process, same pair
 
     def test_control_old_per_process_set_accepts_in_every_process(self):
-        """The vector A441 closes: a per-process set lets each process accept the same nonce."""
+        """The vector A444 closes: a per-process set lets each process accept the same nonce."""
         self.assertTrue(child("set", self.store, "k", "n3", self.exp))
         self.assertTrue(child("set", self.store, "k", "n3", self.exp))
 
@@ -119,7 +119,7 @@ class A441NonceStore(unittest.TestCase):
         self.assertEqual(self._verify(r)[0], True)                                # the genuine one still lands
 
 
-class A441QuorumPins(unittest.TestCase):
+class A444QuorumPins(unittest.TestCase):
     """What the review panel asked to see pinned (2026-11-18)."""
 
     def setUp(self):
@@ -176,4 +176,8 @@ class A441QuorumPins(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _res = unittest.TextTestRunner(verbosity=2).run(
+        unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__]))
+    _bad = len(_res.failures) + len(_res.errors)
+    print("A444: %d/%d passed" % (_res.testsRun - _bad, _res.testsRun))
+    sys.exit(1 if _bad else 0)

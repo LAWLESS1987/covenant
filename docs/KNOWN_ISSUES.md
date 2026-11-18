@@ -17937,7 +17937,7 @@ Hunting the A438 queue at its top item, `/actuator_learn`, turned up two real th
 
 ---
 
-### A441. [security] A signed request replayed once per PROCESS: the nonce store was per-process memory -- now durable and shared
+### A444. [security] A signed request replayed once per PROCESS: the nonce store was per-process memory -- now durable and shared
 
 **Found 2026-11-18**, from the Hugging Face receipt-profile thread (topic 180706 #44): nootxlm's attack suite
 showed two processes sharing one store both accepting the same receipt -- check-and-record is one step inside a
@@ -17955,7 +17955,7 @@ request never consumes a nonce. The store lives at `ops/operator_nonces.pairs/` 
 relocates it; tests use a temp dir); expired pairs are pruned at most once a minute. A caller that passes its own
 `seen` set keeps the old in-process semantics.
 
-`test_a441_nonce_store.py` (SECURITY) drives it both ways: of six concurrent processes presenting one pair,
+`test_a444_nonce_store.py` (SECURITY) drives it both ways: of six concurrent processes presenting one pair,
 exactly one accepts; a fresh process refuses a pair already recorded; the CONTROL (the old per-process set)
 accepts it in every process, so the test can see the vector; prune drops expired pairs and keeps live ones; and
 through the real `verify_signed` with a registered signer, a replay is refused in the same process and in a fresh
