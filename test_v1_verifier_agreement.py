@@ -420,6 +420,89 @@ def main():
         check("C3 mutation test ran", False, "NOT CHECKED: no sh on this host")
         check("C4 mutation test ran", False, "NOT CHECKED: no sh on this host")
 
+    # C5-C8 -- check.sh must not pass a verifier that did not verify (2026-11-14, KNOWN_ISSUES A425).
+    #
+    # C3/C4 drive check.sh with the REAL verifiers on a clean and on a mutated text. Nothing drove it with a
+    # verifier that does no work, and two of its checks passed one:
+    #   * checks 1 and 2 asked whether the first hash printed equals the last. With ONE hash printed those are
+    #     the same line, so a verifier that printed the anchor, computed nothing and exited 0 was reported as
+    #     an implementation that agrees;
+    #   * check 4 took ANY non-zero exit of scale.py as "the dissent survived", so a scale.py that crashed
+    #     passed. Python exits 1 on an uncaught error, the code scale.py itself uses, so the code alone cannot
+    #     tell them apart.
+    # Each case is a COPY in a temp folder with one file replaced by a stub; the tree here is never written.
+    # What is read is check.sh's exit code and its tally line, not its prose.
+    if sh_bin:
+        import constitution as _C2
+        base = ["check.sh", "verify.sh", "constitution.py", "docs/CONSTITUTION_ANCHOR.json"] \
+            + sorted({b["file"] for b in _C2.PROTECTED})
+
+        def run_with(stubs, extra=()):
+            """check.sh in a temp copy of the files it reads, plus `extra`, with `stubs` {name: text} written
+            over them. Returns (exit code, tally, output)."""
+            t = tempfile.mkdtemp(prefix="v1_stub_")
+            try:
+                os.makedirs(os.path.join(t, "docs"), exist_ok=True)
+                for rel in base + list(extra):
+                    src = os.path.join(HERE, rel.replace("/", os.sep))
+                    if os.path.exists(src):
+                        shutil.copy2(src, os.path.join(t, rel.replace("/", os.sep)))
+                for name, text in stubs.items():
+                    with open(os.path.join(t, name), "w", encoding="utf-8", newline="\n") as fh:
+                        fh.write(text)
+                rc, out = run_checker([sh_bin, "check.sh"], t)
+                return rc, tally(out), out
+            finally:
+                shutil.rmtree(t, ignore_errors=True)
+
+        AGREE_LINE = "TWO IMPLEMENTATIONS SHARING NO CODE AGREE"
+        rc0, t0, out0 = run_with({})
+        check("C5 control: with the real verifiers the copy passes, both constitution checks count and the "
+              "agreement line is printed. Without this the cases below could pass because check.sh fails on "
+              "everything",
+              rc0 == 0 and t0 is not None and t0[0] == 2 and t0[1] == 0 and AGREE_LINE in out0,
+              "rc=%s tally=%s %s" % (rc0, t0, out0[-200:]))
+
+        one = "anchored  %s" % published
+        for label, name, text in (
+                ("verify.sh prints the anchor ONCE and exits 0", "verify.sh",
+                 "#!/bin/sh\necho '%s'\nexit 0\n" % one),
+                ("verify.sh prints it THREE times and exits 0", "verify.sh",
+                 "#!/bin/sh\necho '%s'\necho '%s'\necho '%s'\nexit 0\n" % (one, one, one)),
+                ("constitution.py prints the anchor ONCE and exits 0", "constitution.py",
+                 "print(%r)\n" % one)):
+            rc, t, out = run_with({name: text})
+            check("C6 a verifier that computes nothing is NOT counted as agreeing: %s. check.sh exits 1, counts "
+                  "a disagreement, and does not print the agreement line" % label,
+                  rc == 1 and t is not None and t[1] >= 1 and AGREE_LINE not in out,
+                  "rc=%s tally=%s %s" % (rc, t, out[-260:]))
+
+        SCALE = ["scale.py", "triangulate.py"]
+        PASS4 = "which is the PASS"
+        rc4, t4, out4 = run_with({}, extra=SCALE)
+        check("C7 control: with the real scale.py check 4 PASSES -- one more pass than without it, exit 0. The "
+              "healthy case is exit 1 WITH the verdict that the dissenting witness is named",
+              rc4 == 0 and t4 is not None and t0 is not None and t4[0] == t0[0] + 1 and t4[1] == 0
+              and PASS4 in out4, "rc=%s tally=%s %s" % (rc4, t4, out4[-260:]))
+
+        SENTENCE = "dissenting witness(es) below it are named"
+        for label, text in (
+                ("it crashes (uncaught error, exit 1)", "raise RuntimeError('stub: scale.py crashed')\n"),
+                ("it exits 1 and prints nothing", "import sys\nsys.exit(1)\n"),
+                ("it exits 3", "import sys\nprint('NOT CLEAN')\nsys.exit(3)\n"),
+                ("it crashes on a line that QUOTES the verdict (the traceback is stderr, not a verdict)",
+                 "raise RuntimeError('NOT CLEAN. 1 %s')\n" % SENTENCE),
+                ("it prints the verdict and exits 2", "import sys\nprint('NOT CLEAN. 1 %s')\nsys.exit(2)\n" % SENTENCE),
+                ("it prints the verdict and exits 0 (the dissent absorbed)",
+                 "print('NOT CLEAN. 1 %s')\n" % SENTENCE)):
+            rc, t, out = run_with({"scale.py": text}, extra=SCALE)
+            check("C8 a scale.py that did not run to its verdict is NOT the dissent surviving: %s. check.sh "
+                  "exits 1, counts a disagreement, and check 4 is not a pass" % label,
+                  rc == 1 and t is not None and t0 is not None and t[0] == t0[0] and t[1] == 1
+                  and PASS4 not in out, "rc=%s tally=%s %s" % (rc, t, out[-260:]))
+    else:
+        check("C5-C8 stub-verifier cases ran", False, "NOT CHECKED: no sh on this host")
+
     n, ok = len(results), sum(results)
     print(f"\nV1: {ok}/{n} passed")
     return 0 if ok == n else 1

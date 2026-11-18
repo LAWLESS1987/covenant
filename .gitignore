@@ -289,6 +289,9 @@ ops/grid_snn_weights.npz
 ops/GRID_SAFE_STATE.json
 ops/GRID_SAFE_STATE.json.tmp
 ops/pause/
+# What this machine is to the highway (covenant_highway.machine_profile). Per machine; the tracked
+# template is ops/machine.example.json.
+ops/machine.json
 # Node A's off-box peers (the phone's tailnet address), read by covenant_watchdog.py
 # and covenant_prod.bat alike, so neither public file carries the address.
 ops/local_peers.txt
@@ -594,3 +597,5 @@ ops/HIGHWAY_AUTONOMY_LOOSEN_2026-11-02.md
 # not shipped on main (keeps the canonical branch lean / joinable). A dedicated archive
 # store is the proper long-term home (PR #42 review, 2026-11-08).
 ops/students/fallback_model*.json
+ops/covenant_adopt.jsonl
+ops/covenant_adopt.disabled

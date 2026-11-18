@@ -63,7 +63,10 @@ ROADS = ("tailnet", "lan", "spore")
 KIND_REQ, KIND_REPLY = "spore", "spore_reply"
 # the doors the second road already carries (entry.py's _pc_route callers, counted 2026-10-19): six calls on five
 # paths plus /m/code/<id>. The check-in, the daily plan and the money doors are NOT here.
-SPORE_DOORS = ("/m/agent", "/m/heal", "/pc/3d/state", "/m/image", "/m/code")
+# A432 (2026-11-15): /m/workshop/read, the workshop read door, so the phone shows the exact bytes it approves on every
+# road. The door itself answers only a request signed by a registered operator key; the relay changes nothing of that.
+# Its largest answer (a MAX_FILE file, base64'd in JSON) is under MAX_BODY.
+SPORE_DOORS = ("/m/agent", "/m/heal", "/pc/3d/state", "/m/image", "/m/code", "/m/workshop/read")
 # A reply body above this is answered 413, never cut silently. The body is base64'd three times on its way into a
 # block (the body field, the ciphertext field, the armor): about 2.37x. 400 KB keeps a block under the 1 MB every
 # reader refuses above (SP1b sends one this size through). The first value, 600 KB, would have made blocks of ~1.4 MB.
@@ -178,7 +181,13 @@ def door_ok(path):
 
 
 def wrap_request(sealer, method, path, body, headers, my_key, my_pem, pc_pem):
-    """(id, block): the signed request, sealed for the PC. HEADERS are the X-Operator-* headers the phone signed."""
+    """(id, block): the signed request, sealed for the PC. HEADERS are the X-Operator-* headers the phone signed.
+
+    For hands RUN, pass the body and headers returned together by
+    covenant_daily_plan.sign_json_request(..., run_sha256=...), or the phone's
+    equivalent. The hash belongs inside that signed body before wrapping;
+    spore carries the bytes unchanged and does not add authority in transit.
+    """
     rid = secrets.token_hex(8)
     obj = {"kind": KIND_REQ, "id": rid, "method": str(method), "path": str(path), "body": _b64(body),
            "headers": {k: str(v) for k, v in (headers or {}).items() if str(k).startswith("X-Operator-")}}

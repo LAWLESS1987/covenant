@@ -3,7 +3,12 @@
 test_cc1_consent_chain.py -- CC1. The consent hash-chain, driven BOTH ways: a
 synced ledger verifies PASS, and every tamper (edited past row, truncation,
 unsynced/forged append, broken chain link) turns the verifier's OWN check red
-(CLAUDE.md rule 8). Offline, in a temp dir; never touches the real ledger.
+(CLAUDE.md rule 8). Offline, in a temp dir; the real ledger is read once at the
+end (verify only) and never written.
+
+2026-11-13: the line ending is not part of a row. The same record must verify on
+an LF checkout, on a CRLF working tree and on the mixed tree that sealed it, and
+an edit to a row's CONTENT must still fail in every one of them.
 """
 import json
 import os
@@ -91,6 +96,83 @@ def main():
         ok7, _ = cc.verify(led, chn)
         check("CC1 append_consent adds row+chain atomically, still PASS, tip advances",
               ok7 and cc.tip(chn) != t_before)
+
+    # ---- line endings (2026-11-13) ----
+    with tempfile.TemporaryDirectory() as tmp:
+        led = os.path.join(tmp, "consent.jsonl")
+        chn = os.path.join(tmp, "consent.chain.jsonl")
+        lines = [json.dumps(r, ensure_ascii=False, sort_keys=True).encode("utf-8") for r in (
+            {"t": "2026-10-01T00:00:00Z", "by": "tetsu", "kind": "k0", "answer": "yes"},
+            {"t": "2026-10-02T00:00:00Z", "by": "tetsu", "kind": "k1", "answer": "No, I don't want this"},
+            {"t": "2026-10-03T00:00:00Z", "by": "tetsu", "kind": "k2", "answer": "yes"})]
+        sealed_with = [b"\r\n", b"\n", b"\r\n"]      # what the Windows tree that sealed it held, row by row
+
+        def put(rows, endings):
+            with open(led, "wb") as fh:
+                fh.write(b"".join(row + end for row, end in zip(rows, endings)))
+
+        # The chain exactly as the old code wrote it there: each entry over the row's bytes up to the newline,
+        # carriage return included.
+        prev = cc.ZERO
+        with open(chn, "wb") as fh:
+            for i, (row, end) in enumerate(zip(lines, sealed_with)):
+                e = {"seq": i, "row_sha256": cc._sha(row + end[:-1]), "prev": prev, "t": "2026-10-29T00:00:00Z"}
+                fh.write(cc._canon(e) + b"\n")
+                prev = cc._sha(cc._canon(e))
+
+        forms = {"the tree that sealed it (mixed)": sealed_with, "an LF checkout": [b"\n"] * 3,
+                 "a CRLF working tree": [b"\r\n"] * 3}
+        for name, endings in forms.items():
+            put(lines, endings)
+            ok, f = cc.verify(led, chn)
+            check(f"CC1 a record sealed over CRLF bytes verifies on {name}", ok, "; ".join(f))
+
+        edited = list(lines)
+        edited[1] = edited[1].replace(b"No, I don't want this", b"yes, go ahead")     # flip the recorded NO
+        for name, endings in forms.items():
+            put(edited, endings)
+            ok, f = cc.verify(led, chn)
+            check(f"CC1 an edited row still FAILS on {name}",
+                  (not ok) and any("chain[1]" in m and "edited in place" in m for m in f) and len(f) == 1, "; ".join(f))
+
+        inside = list(lines)
+        inside[0] = inside[0].replace(b'"answer"', b'"answer"\r')      # a carriage return INSIDE a row is content
+        put(inside, [b"\n"] * 3)
+        ok, f = cc.verify(led, chn)
+        check("CC1 a carriage return inside a row is content, not a line ending -> FAIL", not ok, "; ".join(f))
+
+        one_byte = list(lines)
+        one_byte[2] = one_byte[2][:-1] + b" }"                             # one byte of content, both endings
+        for endings in ([b"\n"] * 3, [b"\r\n"] * 3):
+            put(one_byte, endings)
+            check("CC1 one changed byte matches neither form of the hash", not cc.verify(led, chn)[0])
+
+        put(edited, [b"\n"] * 3)
+        added, _, err = cc.sync(led, chn)
+        check("CC1 sync still REFUSES to extend over an edited row of such a record", added == 0 and err is not None)
+
+        put(lines, [b"\n"] * 3)
+        cc.append_consent({"by": "tetsu", "kind": "k3", "answer": "yes"}, led, chn)
+        with open(led, "rb") as fh:
+            data = fh.read()
+        with open(chn, "rb") as fh:
+            chain_bytes = fh.read()
+        ok, f = cc.verify(led, chn)
+        check("CC1 a row appended now ends in a bare newline on every platform, and so does its chain entry",
+              ok and data.endswith(b"\n") and not data.endswith(b"\r\n") and data.count(b"\r") == 0
+              and not chain_bytes.endswith(b"\r\n"), "; ".join(f))
+        new_entry = cc.read_chain(chn)[-1]
+        new_row = cc.read_ledger_lines(led)[-1]
+        check("CC1 a new entry commits the row WITHOUT a carriage return",
+              new_entry["row_sha256"] == cc._sha(new_row) and not new_row.endswith(b"\r"))
+        with open(led, "wb") as fh:                                        # the same record, checked out CRLF
+            fh.write(data.replace(b"\n", b"\r\n"))
+        check("CC1 ...and that record verifies when checked out CRLF", cc.verify(led, chn)[0])
+
+    # The repository's own record, read only. On an LF checkout this was FAIL for six of nine rows until 2026-11-13.
+    if os.path.exists(cc.LEDGER) and os.path.exists(cc.CHAIN):
+        ok, f = cc.verify()
+        check("CC1 the repository's own consent record verifies on this checkout", ok, "; ".join(f[:3]))
 
     passed, total = sum(_results), len(_results)
     print(f"\nCC1: {passed}/{total} checks passed")

@@ -69,6 +69,14 @@ def heal(dry_run=False, who="button", ledger_path=None, run=None, sense=None):
            "paused": False, "dry_run": bool(dry_run), "who": str(who)[:40]}
     try:
         import covenant_highway as HW
+        # The machine this press runs on (HW.machine_profile): what does not describe it is reported as not
+        # applicable, and where the highway does not repair, a press repairs nothing and says so.
+        here = HW.machine_profile()
+        out["acts_here"] = bool(here["acts_here"])
+        if sense is None:
+            sense = lambda: HW.sense(machine=here)                # noqa: E731
+        if run is None:
+            run = lambda **kw: HW.run_once(machine=here, **kw)    # noqa: E731
         conditions = (sense or HW.sense)()
         out["looked_at"] = len(conditions)
         present = {k: v for k, v in conditions.items() if v.get("state") == HW.PRESENT}

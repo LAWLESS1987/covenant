@@ -2708,6 +2708,187 @@ def main():
     finally:
         H.REMEDIES.pop("_spy_async", None)
 
+    # ---- H1mp: the machine profile (2026-11-13). Remedies written for one PC must not run on another, and a
+    # detector that does not describe this machine must say so instead of reporting it broken. Both ways.
+    import covenant_heal as _heal_mod
+    _mp_dir = tempfile.mkdtemp(prefix="h1mp_")
+
+    def _profile(text, name="machine.json"):
+        p = os.path.join(_mp_dir, name)
+        with open(p, "w", encoding="utf-8") as fh:
+            fh.write(text if isinstance(text, str) else json.dumps(text))
+        return H.machine_profile(path=p)
+
+    home = H.machine_profile(path=os.path.join(_mp_dir, "no-such-file.json"))
+    check("H1mp no profile file is the machine this was written for: everything applies, the highway repairs",
+          home == {"acts_here": True, "not_applicable": {}, "why": "", "source": "none", "refused": [], "sha": ""},
+          str(home))
+    check("H1mp a profile carries the hash of its file, and a changed file a changed hash",
+          len(_profile({"acts_here": False})["sha"]) == 12
+          and _profile({"acts_here": False})["sha"] != _profile({"acts_here": False, "why": "x"})["sha"])
+    _asked = []
+    _real_health = H._health
+    try:
+        H._health = lambda: _asked.append(1) or {}
+        _saved_d, H.DETECTORS = H.DETECTORS, {"node_down": lambda health=None: {"state": H.ABSENT, "measured": {"health": health}}}
+        try:
+            H.sense(machine=_profile({"acts_here": False, "not_applicable": {"node_down": "elsewhere"}}))
+            check("H1mp a machine that does not host the home nodes is not asked for their health", not _asked, str(_asked))
+            H.sense(machine=_profile({"acts_here": False, "not_applicable": {"log_bloat": "elsewhere"}}))
+            H.sense()
+            check("H1mp mutation: a profile that does not name node_down, and no profile, both ask as before",
+                  len(_asked) == 2, str(_asked))
+        finally:
+            H.DETECTORS = _saved_d
+    finally:
+        H._health = _real_health
+    away = _profile({"acts_here": False, "why": "hosts node D only",
+                     "not_applicable": {"fixture_elsewhere": "asks for A, B and C, which run elsewhere"}})
+    check("H1mp a profile is read: does not repair here, and names what does not apply",
+          away["acts_here"] is False and away["source"] == "file" and list(away["not_applicable"]) == ["fixture_elsewhere"]
+          and away["why"] == "hosts node D only", str(away))
+    check("H1mp a list of names is accepted as well as a mapping",
+          sorted(_profile({"acts_here": False, "not_applicable": ["node_down", "log_bloat"]})["not_applicable"])
+          == ["log_bloat", "node_down"])
+    check("H1mp a readable profile that does not say acts_here: true does not repair",
+          _profile({"why": "x"})["acts_here"] is False and _profile({"acts_here": "yes"})["acts_here"] is False
+          and _profile({"acts_here": 1})["acts_here"] is False)
+    check("H1mp mutation: the same profile saying acts_here: true repairs", _profile({"acts_here": True})["acts_here"] is True)
+    _broken = [_profile(t) for t in ("{not json", "[1, 2]", '"text"', json.dumps({"acts_here": True, "not_applicable": 5}),
+                                     json.dumps({"acts_here": True, "not_applicable": {"node_down": 5}}),
+                                     json.dumps({"acts_here": True, "not_applicable": [1]}))]
+    check("H1mp a profile that cannot be read, or is the wrong shape, never repairs -- even one that says acts_here: true",
+          all(b["acts_here"] is False and b["source"] == "unreadable" and b["not_applicable"] == {} for b in _broken),
+          str([(b["acts_here"], b["source"]) for b in _broken]))
+
+    _entered = []
+    _saved_dets = H.DETECTORS
+    _real_rl = dict(H.REMEDIES["rotate_log"])
+    _calls = []
+    try:
+        def _det(name, state):
+            def fn(health=None):
+                _entered.append(name)
+                return {"state": state, "measured": {"fixture": name}}
+            return fn
+        # "fixture_elsewhere" is a name NO remedy answers, and every remedy that answers log_bloat is a spy: a pass
+        # that really acts must never reach a real remedy (the first draft of this block used node_down, and its
+        # "home profile" pass walked into the real restart_nodes).
+        H.DETECTORS = {"fixture_elsewhere": _det("fixture_elsewhere", H.PRESENT), "log_bloat": _det("log_bloat", H.PRESENT)}
+        H.REMEDIES["rotate_log"] = dict(_real_rl, fn=spy_remedy(_calls))
+        _real_fns = [n for n, r in H.REMEDIES.items()
+                     if ({"log_bloat", "fixture_elsewhere"} & set(r["for"])) and r["fn"].__name__ != "fn"]
+        check("H1mp every remedy that answers this block's fixture detectors is a stub", not _real_fns, str(_real_fns))
+        if _real_fns:
+            raise RuntimeError("H1mp would run a real remedy: %s" % _real_fns)
+
+        s_none = H.sense(health={})
+        check("H1mp sense() without a profile enters every detector, as it always has",
+              sorted(_entered) == ["fixture_elsewhere", "log_bloat"] and s_none["fixture_elsewhere"]["state"] == H.PRESENT, str(_entered))
+        del _entered[:]
+        s_away = H.sense(health={}, machine=away)
+        check("H1mp a detector the profile names is reported ABSENT with the reason, and its function is not entered",
+              _entered == ["log_bloat"] and s_away["fixture_elsewhere"] == {"state": H.ABSENT, "measured": {
+                  "applies_here": False, "why": "asks for A, B and C, which run elsewhere"}}, str(s_away["fixture_elsewhere"]))
+        check("H1mp ...and a detector it does not name is still measured", s_away["log_bloat"]["state"] == H.PRESENT)
+        check("H1mp the home profile changes nothing in sense()", H.sense(health={}, machine=home) == s_none)
+
+        # A profile cannot switch off a takeover guard, and a profile in force is said on every pass.
+        sly = _profile({"acts_here": False, "why": "hosts node D only",
+                        "not_applicable": {"consent_chain_broken": "not ours", "head_commitment_broken": "not ours",
+                                           "fixture_elsewhere": "elsewhere"}})
+        check("H1mp a profile that names the takeover guards has those names dropped and reported",
+              sorted(sly["not_applicable"]) == ["fixture_elsewhere"]
+              and sly["refused"] == ["consent_chain_broken", "head_commitment_broken"], str(sly))
+        check("H1mp ...in the list form too",
+              _profile({"not_applicable": ["consent_chain_broken", "log_bloat"]})["refused"] == ["consent_chain_broken"])
+        _guard_dets = dict(H.DETECTORS, consent_chain_broken=_det("consent_chain_broken", H.ABSENT),
+                           head_commitment_broken=_det("head_commitment_broken", H.ABSENT))
+        _fixture_dets, H.DETECTORS = H.DETECTORS, _guard_dets
+        try:
+            del _entered[:]
+            s_sly = H.sense(health={}, machine=sly)
+            check("H1mp ...and both guards are measured anyway: their functions are entered",
+                  {"consent_chain_broken", "head_commitment_broken"} <= set(_entered)
+                  and "applies_here" not in s_sly["consent_chain_broken"]["measured"], str(_entered))
+            a_sly, i_sly = H.run_once(dry_run=False, ledger=tmp_ledger(), cooldown_s=0, health={}, machine=sly)
+            check("H1mp ...and the pass raises it as an ALERT naming both, and says which detectors the profile switched off",
+                  any("takeover guard" in x and "consent_chain_broken" in x and "head_commitment_broken" in x for x in a_sly)
+                  and any("marks 1 detector(s) as not applying here: fixture_elsewhere" in x for x in i_sly),
+                  str((a_sly, i_sly)))
+        finally:
+            H.DETECTORS = _fixture_dets
+        del _entered[:]
+        a_home, i_home = H.run_once(dry_run=True, ledger=tmp_ledger(), cooldown_s=0, health={}, machine=home)
+        check("H1mp the home profile says nothing about a profile, and raises no alert about one",
+              not any("profile" in x or "machine.json" in x for x in a_home + i_home), str((a_home, i_home)))
+        del _entered[:]
+        del _calls[:]                                   # the spy records a dry run too
+
+        led = tmp_ledger()
+        a_away, i_away = H.run_once(dry_run=False, ledger=led, cooldown_s=0, health={}, machine=away)
+        check("H1mp where the highway does not repair, a real pass enters no remedy", not _calls, "calls=%d" % len(_calls))
+        check("H1mp ...and says so, with the reason, and still reports what it sees",
+              any("NOT REPAIRING ON THIS MACHINE (hosts node D only)" in x and "log_bloat" in x and "fixture_elsewhere" not in x
+                  for x in i_away), str(i_away))
+        check("H1mp ...and writes nothing to the ledger", not H.read_ledger(led), str(H.read_ledger(led)))
+        H.run_once(dry_run=False, ledger=led, cooldown_s=0, health={}, machine=_broken[0])
+        check("H1mp a profile that could not be read repairs nothing either", not _calls, "calls=%d" % len(_calls))
+        H.run_once(dry_run=False, ledger=led, cooldown_s=0, health={}, machine=home)
+        check("H1mp mutation: the home profile, same pass -> the remedy runs", len(_calls) == 1, "calls=%d" % len(_calls))
+        del _calls[:]
+        H.run_once(dry_run=False, ledger=tmp_ledger(), cooldown_s=0, health={})
+        check("H1mp mutation: no profile passed at all -> the remedy runs, as it always has", len(_calls) == 1,
+              "calls=%d" % len(_calls))
+
+        # The heal button reads the machine's own profile. Pointed at a file through the environment, never the tree's.
+        # heal() hands run_once no ledger, so the pass it starts would write to THIS TREE'S ops/highway.jsonl. The
+        # first version of this block did exactly that: on a second run the spy had two "did not fix" rows against
+        # it there, was quarantined, and the check below went red. The ledger is pointed at a temp file for the
+        # block, and the block checks that the tree's own ledger was not touched.
+        del _calls[:]
+        _old_env = os.environ.get("COVENANT_MACHINE_PROFILE")
+        _real_ledger = H.LEDGER
+        _ledger_before = os.path.getsize(_real_ledger) if os.path.exists(_real_ledger) else None
+        try:
+            H.LEDGER = tmp_ledger()
+            os.environ["COVENANT_MACHINE_PROFILE"] = os.path.join(_mp_dir, "machine.json")
+            _profile({"acts_here": False, "why": "hosts node D only", "not_applicable": {"fixture_elsewhere": "elsewhere"}})
+            out = _heal_mod.heal(dry_run=False, who="h1mp", ledger_path=tmp_ledger())
+            left = [x["condition"] for x in out["still_needs_a_person"]]
+            check("H1mp a press where the highway does not repair runs no remedy and says acts_here: False",
+                  out["ok"] and out["acts_here"] is False and not _calls, "%s calls=%d" % (out.get("acts_here"), len(_calls)))
+            check("H1mp ...and a condition that does not apply here is not handed to a person",
+                  "fixture_elsewhere" not in left and "log_bloat" in left, str(left))
+            os.environ["COVENANT_MACHINE_PROFILE"] = os.path.join(_mp_dir, "no-such-file.json")
+            out = _heal_mod.heal(dry_run=False, who="h1mp", ledger_path=tmp_ledger())
+            check("H1mp mutation: the same press with no profile repairs, and says acts_here: True",
+                  out["ok"] and out["acts_here"] is True and len(_calls) == 1
+                  and "fixture_elsewhere" in [x["condition"] for x in out["still_needs_a_person"]],
+                  "%s calls=%d" % (out.get("acts_here"), len(_calls)))
+        finally:
+            H.LEDGER = _real_ledger
+            if _old_env is None:
+                os.environ.pop("COVENANT_MACHINE_PROFILE", None)
+            else:
+                os.environ["COVENANT_MACHINE_PROFILE"] = _old_env
+        check("H1mp the presses above wrote nothing to this tree's own highway ledger",
+              (os.path.getsize(_real_ledger) if os.path.exists(_real_ledger) else None) == _ledger_before)
+    finally:
+        H.DETECTORS = _saved_dets
+        H.REMEDIES["rotate_log"] = _real_rl
+
+    with open(os.path.join(HERE, "ops", "machine.example.json"), encoding="utf-8") as _fh:
+        _example = json.load(_fh)
+    _unknown = sorted(set(_example["not_applicable"]) - set(H.DETECTORS))
+    check("H1mp every detector the example profile names exists", not _unknown, str(_unknown))
+    check("H1mp the example profile is a valid one that does not repair",
+          H.machine_profile(path=os.path.join(HERE, "ops", "machine.example.json"))["source"] == "file"
+          and _example["acts_here"] is False)
+    _tracked = os.path.exists(os.path.join(HERE, ".git")) and __import__("subprocess").run(
+        ["git", "ls-files", "--error-unmatch", "ops/machine.json"], cwd=HERE, capture_output=True).returncode == 0
+    check("H1mp ops/machine.json itself is not tracked: it is a fact about one machine", not _tracked)
+
     failed = [n for n, ok in results if not ok]
     print(f"\nH1: {len(results) - len(failed)}/{len(results)} passed")
     if failed:

@@ -97,6 +97,58 @@ OPEN_MIN_ASSERTS = 3
 # A349 B5: how many more times one round's ask is made after a passing error (a dropped connection, a timeout).
 ASK_RETRIES = 1
 
+# A434 (closes A430's open practice-loop item). An explicit, FINITE authority to RUN scripts for one started practice
+# loop. A430 bound the DOOR path (a signature naming the exact script, run_sha256); this binds the owner-started
+# PRACTICE path, which passes no signature and relied on act()'s may_run default. The loop's ROUNDS / TASKS_PER_NIGHT /
+# BUDGET_S already bound the WORK; this bounds the RUN AUTHORITY, so starting a night can never become open-ended
+# permission to execute code. It is created when a night (or a by-hand slot) begins, carries a maximum run count and a
+# wall-clock expiry, is consumed once per RUN, and refuses once spent or past its expiry -- then the loop ends the pass
+# like a gate stop, it does not crash. The defaults (new_run_auth) are generous: a normal night runs every task and
+# nothing is refused for the bound -- the point is finiteness, not a tighter night. WRITE is never bound by it.
+AUTH_RUN_MARGIN = ROUNDS          # runs beyond what a full night needs, so a normal night never reaches the count
+AUTH_EXPIRY_MARGIN_S = 5 * 60     # seconds past the night's two clocks, so a normal night never reaches the expiry
+
+
+class PracticeRunAuth:
+    """A finite run authority for one started practice loop (A434). It allows at most max_runs runs, until `expiry` (a
+    wall-clock deadline, read through `now`). consume() spends one run and returns (ok, reason); it refuses, spending
+    nothing, once past the expiry or once the count is used up, naming which bound stopped it. It never widens with
+    time; `used` only grows."""
+
+    def __init__(self, max_runs, expiry, now=time.time):
+        self.max_runs = max(0, int(max_runs))
+        self.expiry = float(expiry)
+        self.used = 0
+        self._now = now
+
+    @property
+    def left(self):
+        return max(0, self.max_runs - self.used)
+
+    def consume(self):
+        """(ok, reason). Spend one run when the authority has runs left and has not expired; otherwise refuse,
+        spending nothing, and say which bound stopped it. The expiry is checked first, so an expired authority is
+        never spent down by late runs."""
+        if self._now() >= self.expiry:
+            return False, ("the practice run authorization has expired (its wall-clock limit passed); it ran %d of at "
+                           "most %d scripts this loop, and no further script is run" % (self.used, self.max_runs))
+        if self.used >= self.max_runs:
+            return False, ("the practice run authorization is spent (%d of %d runs used this loop); no further script "
+                           "is run" % (self.used, self.max_runs))
+        self.used += 1
+        return True, "run %d of at most %d this loop" % (self.used, self.max_runs)
+
+
+def new_run_auth(start, tasks=TASKS_PER_NIGHT, budget_s=BUDGET_S, choice_budget_s=CHOICE_BUDGET_S, his_choice=True,
+                 now=time.time):
+    """The run authority a started night (or a by-hand slot) gets, defaulted generously from the loop's own limits:
+    enough runs for every task's every round and, when it runs, his own-choice slot's rounds, plus a margin; and a
+    wall-clock expiry past the night's two clocks, plus a margin. `start` is the night's own start time, passed in so
+    this reads `now` no more than the night already does; `now` is the clock each consume() reads."""
+    runs = max(0, int(tasks)) * ROUNDS + (CHOICE_ROUNDS if his_choice else 0) + AUTH_RUN_MARGIN
+    expiry = start + budget_s + (choice_budget_s if his_choice else 0) + AUTH_EXPIRY_MARGIN_S
+    return PracticeRunAuth(runs, expiry, now=now)
+
 # ---------------------------------------------------------------- the curriculum
 #
 # Each check is an expression and the value it must equal, or {"raises": "Name"} for an exception
@@ -588,8 +640,25 @@ def _own_import(why, task, workshop=None):
     return None
 
 
-def attempt(task, code, gate=None, workshop=None, hands_ledger=None):
-    """Write his file and run it with the checks, through his hands. -> (result dict, stop reason or None)."""
+def _screen_said(why, task, workshop=None):
+    """What he is told when the screen refuses his file (moved here unchanged from attempt() by A429, so the refusal
+    reads the same whether the screen makes it at the run or his hands' content seat makes it at the write)."""
+    # The allowed list is in the system message already; repeated here it buried the one fact that
+    # matters (measured 2026-09-26: the 3B sent the same `import sys` three rounds running).
+    said = re.sub(r"\s*\(allowed:[^)]*\)", "", why)[:240]
+    # A349 B6: an import of one of his own earlier files (parse importing his tokenize: 12 of 48 parse rounds) was
+    # told "Remove it, and whatever needs it", against a task built on that file. He is told to copy its function in
+    # instead; the screen is unchanged, and every other refusal reads as before.
+    own = _own_import(why, task, workshop)
+    said += ((". That is your own %s, and it cannot be imported here: copy its function into this file and call "
+              "it there." % own) if own else ". Remove it, and whatever needs it.")
+    return said
+
+
+def attempt(task, code, gate=None, workshop=None, hands_ledger=None, run_auth=None):
+    """Write his file and run it with the checks, through his hands. -> (result dict, stop reason or None). A434: a
+    run_auth, when given, is passed to the RUN (never the WRITE); a RUN it refuses (spent or expired) comes back as a
+    stop with passed None, so the loop ends the pass like a gate stop. No run_auth: the RUN is unbound, as before."""
     name = "%s/%s.py" % (DIR, task["id"])
     if code is None:
         return {"passed": 0, "total": len(task["checks"]), "said": "no Python file could be read from the answer"}, None
@@ -604,11 +673,20 @@ def attempt(task, code, gate=None, workshop=None, hands_ledger=None):
                         "file, outside any function, so they run" % (top_level_asserts(code), need)}, None
     def _gate_stop(rec):
         g = ((rec or {}).get("gate") or {}).get("state")
-        return (rec or {}).get("refused") and g in ("violates", "unreachable")
+        return (rec or {}).get("refused") and g in ("violates", "unreachable") and not _screened(rec)
+
+    def _screened(rec):
+        # A429: his hands' content seat refuses what the screen refuses, now at the WRITE and before a RUN. That is the
+        # screen's own refusal, made earlier: it is told to him as the screen's refusal always was (PP1.3a, PP1.3g) and
+        # the round goes on, as it did when the screen refused at the run. Only the quorum's refusal stops his practice.
+        g = (rec or {}).get("gate") or {}
+        return bool((rec or {}).get("refused") and g.get("seat") == "content")
 
     handled, data, rec = HANDS.act("HANDS WRITE %s\n%s" % (name, code), gate=gate, workshop=workshop, ledger=hands_ledger)
     if _gate_stop(rec):
         return {"passed": None, "total": len(task["checks"]), "said": data}, "the gate refused the write: %s" % data[:160]
+    if _screened(rec):
+        return {"passed": 0, "total": len(task["checks"]), "said": _screen_said(rec.get("why") or "", task, workshop)}, None
     if (rec or {}).get("refused") or (rec or {}).get("error"):             # e.g. a file over the size cap
         return {"passed": 0, "total": len(task["checks"]), "said": data[:300]}, None
     try:
@@ -616,7 +694,7 @@ def attempt(task, code, gate=None, workshop=None, hands_ledger=None):
     except ValueError as e:
         return {"passed": 0, "total": len(task["checks"]), "said": "the check file could not be written: %s" % e}, None
     handled, data, rec = HANDS.act("HANDS RUN %s/%s_check.py" % (DIR, task["id"]), gate=gate, workshop=workshop,
-                                   ledger=hands_ledger)
+                                   ledger=hands_ledger, run_auth=run_auth)
     # The check file is the harness's scaffolding (his code, already kept as practice/<id>.py, plus the checks), so
     # it is removed after the run: A233's write() keeps every overwritten file's earlier version for him, and that
     # history should hold his work, not a copy of it per round with the checks attached.
@@ -624,6 +702,11 @@ def attempt(task, code, gate=None, workshop=None, hands_ledger=None):
         os.remove(HANDS._path("%s/%s_check.py" % (DIR, task["id"]), workshop))
     except (OSError, ValueError):
         pass
+    # A434: the night's finite run authority refused this RUN (spent or expired). Nothing ran; end the pass the way a
+    # gate stop ends it (passed None, a stop reason) so the loop stops cleanly rather than treating it as a failed check.
+    if (rec or {}).get("run_auth_refused"):
+        return ({"passed": None, "total": len(task["checks"]), "said": data},
+                "the practice run authorization refused the run: %s" % str((rec or {}).get("why") or data)[:160])
     if _gate_stop(rec):
         return {"passed": None, "total": len(task["checks"]), "said": data}, "the gate refused the run: %s" % data[:160]
     out = data.split("STDOUT:\n", 1)[-1].split("\nSTDERR:\n", 1)
@@ -632,15 +715,7 @@ def attempt(task, code, gate=None, workshop=None, hands_ledger=None):
         err = (out[1] if len(out) > 1 else "").strip().splitlines()
         why = (rec or {}).get("why") or ""
         if why.startswith("the screen refused"):
-            # The allowed list is in the system message already; repeated here it buried the one fact that
-            # matters (measured 2026-09-26: the 3B sent the same `import sys` three rounds running).
-            said = re.sub(r"\s*\(allowed:[^)]*\)", "", why)[:240]
-            # A349 B6: an import of one of his own earlier files (parse importing his tokenize: 12 of 48 parse rounds) was
-            # told "Remove it, and whatever needs it", against a task built on that file. He is told to copy its function in
-            # instead; the screen is unchanged, and every other refusal reads as before.
-            own = _own_import(why, task, workshop)
-            said += ((". That is your own %s, and it cannot be imported here: copy its function into this file and call "
-                      "it there." % own) if own else ". Remove it, and whatever needs it.")
+            said = _screen_said(why, task, workshop)
         elif (rec or {}).get("timed_out"):
             said = "it did not finish in %.0f s" % HANDS.RUN_TIMEOUT_S
         elif (rec or {}).get("truncated"):
@@ -654,8 +729,10 @@ def attempt(task, code, gate=None, workshop=None, hands_ledger=None):
 
 
 def practise(task, ask, gate=None, workshop=None, ledger=None, hands_ledger=None, deadline=None, retention=False,
-             say=print, now=time.time, rounds=ROUNDS):
-    """Up to `rounds` (ROUNDS) rounds on one task. -> {"task", "solved_round", "rounds", "first", "stop"}."""
+             say=print, now=time.time, rounds=ROUNDS, run_auth=None):
+    """Up to `rounds` (ROUNDS) rounds on one task. -> {"task", "solved_round", "rounds", "first", "stop"}. A434: a
+    run_auth (the night's, or a by-hand slot's) is threaded to each attempt's RUN; when it refuses, the task stops
+    with that reason, exactly as the gate or the clock stops it. None (a direct caller): the RUNs are unbound."""
     last, first_said, out = None, None, {"task": task["id"], "solved_round": None, "rounds": 0, "retention": retention}
     for rnd in range(1, rounds + 1):
         if deadline and now() >= deadline:
@@ -690,7 +767,7 @@ def practise(task, ask, gate=None, workshop=None, ledger=None, hands_ledger=None
                 out["stop"] = "the model could not answer: %s: %s" % (type(err).__name__, str(err)[:120])
             break
         code = extract_code(answer)
-        res, stop = attempt(task, code, gate=gate, workshop=workshop, hands_ledger=hands_ledger)
+        res, stop = attempt(task, code, gate=gate, workshop=workshop, hands_ledger=hands_ledger, run_auth=run_auth)
         if code is None and int((meta or {}).get("tokens") or 0) >= MAX_TOKENS:
             res["said"] = ("the answer reached the length limit (%d tokens) before the file ended: send the file alone, "
                            "shorter, with no explanation" % MAX_TOKENS)
@@ -1003,9 +1080,11 @@ def _suite_on_live_state(workshop=None, choices=None):
 
 
 def choice_slot(ask, gate=None, workshop=None, ledger=None, hands_ledger=None, choices=None, budget_s=CHOICE_BUDGET_S,
-                rounds=CHOICE_ROUNDS, say=print, now=time.time):
+                rounds=CHOICE_ROUNDS, say=print, now=time.time, run_auth=None):
     """His own slot, once: record his learning.txt if he changed it, take tonight's choice, and practise it on the slot's
-    own clock and rounds. -> its ledger row, or None when he has named nothing (or a test suite aimed it at live state)."""
+    own clock and rounds. -> its ledger row, or None when he has named nothing (or a test suite aimed it at live state).
+    A434: night() passes its run authority here so the slot's RUNs count against the same finite bound as the
+    curriculum's. None (a by-hand caller of this function): the slot's RUNs are unbound, as before."""
     live = _suite_on_live_state(workshop, choices)
     if live:
         why = ("refused (A275): a test suite tried to run his slot on %s; hand it a temp workshop and choices path"
@@ -1027,7 +1106,7 @@ def choice_slot(ask, gate=None, workshop=None, ledger=None, hands_ledger=None, c
         return _append(dict(row, task=None, solved_round=None, rounds=0,
                             stop="the task could not be built: %s: %s" % (type(e).__name__, str(e)[:160])), ledger)
     r = practise(task, ask, gate=gate, workshop=workshop, ledger=ledger, hands_ledger=hands_ledger,
-                 deadline=now() + budget_s, retention=retention, say=say, now=now, rounds=rounds)
+                 deadline=now() + budget_s, retention=retention, say=say, now=now, rounds=rounds, run_auth=run_auth)
     return _append(dict(row, task=task["id"], retention=retention, solved_round=r["solved_round"], rounds=r["rounds"],
                         stop=r.get("stop"), source=task.get("source")), ledger)
 
@@ -1039,7 +1118,13 @@ def night(ask=None, gate=None, workshop=None, ledger=None, hands_ledger=None, ta
     if ask is None:
         import covenant_model
         ask = covenant_model.ask
-    deadline = now() + budget_s
+    # A434: one start time reads `now` exactly once here (as the old `deadline = now() + budget_s` did), and bounds both
+    # the night's clock and its finite RUN authority. The authority is created when the night starts and threaded to
+    # every RUN (the curriculum's and his own-choice slot's), so starting a night is never open-ended leave to run code.
+    start = now()
+    deadline = start + budget_s
+    run_auth = new_run_auth(start, tasks=tasks, budget_s=budget_s, choice_budget_s=CHOICE_BUDGET_S, his_choice=his_choice,
+                            now=now)
     results, stop, passing = [], None, False
     for task, retention in plan(tasks, ledger):
         if now() >= deadline:
@@ -1047,7 +1132,7 @@ def night(ask=None, gate=None, workshop=None, ledger=None, hands_ledger=None, ta
             break
         # A retention try never shows the task's own old answer: prompt() hands him only what it builds on.
         r = practise(task, ask, gate=gate, workshop=workshop, ledger=ledger, hands_ledger=hands_ledger,
-                     deadline=deadline, retention=retention, say=say, now=now)
+                     deadline=deadline, retention=retention, say=say, now=now, run_auth=run_auth)
         results.append(r)
         if r.get("stop"):                           # the gate, the model or the clock: the pass ends here
             stop = r["stop"]
@@ -1062,7 +1147,7 @@ def night(ask=None, gate=None, workshop=None, ledger=None, hands_ledger=None, ta
     choice = None
     if his_choice and (not stop or "clock" in stop or passing):
         choice = choice_slot(ask, gate=gate, workshop=workshop, ledger=ledger, hands_ledger=hands_ledger, choices=choices,
-                             say=say, now=now)
+                             say=say, now=now, run_auth=run_auth)
     done = [t["id"] for t in CURRICULUM if t["id"] in solved(ledger)]       # the curriculum's count; tracks are his
     first = sum(1 for r in results if r["solved_round"] == 1)
     within = sum(1 for r in results if r["solved_round"])
@@ -1136,14 +1221,19 @@ def main(argv=None):
         return 1 if s.get("stop") and "clock" not in s["stop"] else 0
     if a.choice:
         import covenant_model
-        print(json.dumps(choice_slot(covenant_model.ask), indent=1))
+        # A434: a by-hand slot is a started loop too, so it gets a finite run authority -- one choice slot's rounds
+        # with a margin, expiring past its own clock.
+        auth = PracticeRunAuth(CHOICE_ROUNDS + AUTH_RUN_MARGIN, time.time() + CHOICE_BUDGET_S + AUTH_EXPIRY_MARGIN_S)
+        print(json.dumps(choice_slot(covenant_model.ask, run_auth=auth), indent=1))
         return 0
     if a.task:
         if a.task not in BY_ID:
             print("no task %r; the curriculum is: %s" % (a.task, ", ".join(BY_ID)))
             return 2
         import covenant_model
-        r = practise(BY_ID[a.task], covenant_model.ask)
+        # A434: one by-hand task, bounded the same way -- its rounds with a margin, expiring past the night's clock.
+        auth = PracticeRunAuth(ROUNDS + AUTH_RUN_MARGIN, time.time() + BUDGET_S + AUTH_EXPIRY_MARGIN_S)
+        r = practise(BY_ID[a.task], covenant_model.ask, run_auth=auth)
         print(json.dumps(r, indent=1))
         return 0
     print(status())

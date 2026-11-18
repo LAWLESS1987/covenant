@@ -202,6 +202,9 @@ def main():
 
         print()
         bad = results.count(False)
+        # A425 (2026-11-14): the count in the form covenant_one.py's sweep reads ("N/M passed"). The two lines
+        # below are as they were; with only those the sweep read a green run of this suite as NO RESULT.
+        print(f"IP1: {len(results) - bad}/{len(results)} passed")
         if bad:
             print(f"test_intent_provenance: {bad} FAILED of {len(results)}")
             return 1

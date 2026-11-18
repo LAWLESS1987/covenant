@@ -58,13 +58,20 @@ def _canon(entry):
 
 
 def read_ledger_lines(path=LEDGER):
-    """The ledger's rows as their EXACT stored bytes (trailing newline stripped),
-    skipping blank lines. Hashing the raw bytes -- not a re-serialization -- means
-    any edit to what is actually on disk is caught."""
+    """The ledger's rows as their stored bytes, one per line, skipping blank lines.
+    Hashing the row's bytes -- not a re-serialization -- means any edit to what is
+    actually on disk is caught.
+
+    THE LINE ENDING IS NOT PART OF A ROW (2026-11-13). A trailing carriage return
+    is dropped, so one record reads the same on a checkout that stores the ledger
+    with LF and on a Windows working tree that holds CRLF. Before this, the chain
+    committed whichever bytes the machine that sealed it happened to hold, and
+    every other checkout of the same record read as TAMPERED (see row_matches)."""
     out = []
     try:
         with open(path, "rb") as fh:
             for raw in fh.read().split(b"\n"):
+                raw = raw.rstrip(b"\r")
                 if raw.strip():
                     out.append(raw)
     except OSError:
@@ -83,6 +90,21 @@ def read_chain(path=CHAIN):
     except OSError:
         pass
     return out
+
+
+def row_matches(entry, row_bytes):
+    """True when a chain entry commits this row.
+
+    Entries sealed before 2026-11-13 on a Windows working tree committed the row
+    WITH its carriage return: text-mode appends end a line CRLF there, while git
+    stores this ledger with LF (.gitattributes). Measured that day on the real
+    ledger: six of its nine entries match only with the carriage return put back,
+    so `verify` passed on the machine that sealed them and reported a tamper on
+    every other checkout. Such an entry is matched with the carriage return put
+    back. ONLY THE LINE ENDING IS FORGIVEN: a row whose content differs by one
+    byte matches neither form (test_cc1 drives both)."""
+    committed = entry.get("row_sha256")
+    return committed == _sha(row_bytes) or committed == _sha(row_bytes + b"\r")
 
 
 def _entry(seq, row_bytes, prev):
@@ -108,7 +130,7 @@ def verify(ledger_path=LEDGER, chain_path=CHAIN):
         e = chain[i]
         if e.get("seq") != i:
             findings.append(f"chain[{i}]: seq is {e.get('seq')!r}, expected {i}")
-        if e.get("row_sha256") != _sha(rows[i]):
+        if not row_matches(e, rows[i]):
             findings.append(f"chain[{i}]: committed hash does not match consent row {i} "
                             f"(that row was edited in place)")
         expect_prev = ZERO if i == 0 else _sha(_canon(chain[i - 1]))
@@ -130,7 +152,7 @@ def sync(ledger_path=LEDGER, chain_path=CHAIN):
     chain = read_chain(chain_path)
     # guard: never extend over a broken/edited existing chain
     for i in range(min(len(rows), len(chain))):
-        if chain[i].get("row_sha256") != _sha(rows[i]) or chain[i].get("seq") != i:
+        if not row_matches(chain[i], rows[i]) or chain[i].get("seq") != i:
             return 0, tip(chain_path), (f"refusing to sync: existing chain[{i}] does not match "
                                         f"consent row {i} -- run `verify` and resolve the tamper first")
     if len(chain) > len(rows):
@@ -139,7 +161,7 @@ def sync(ledger_path=LEDGER, chain_path=CHAIN):
     prev = tip(chain_path)
     added = 0
     os.makedirs(os.path.dirname(chain_path) or ".", exist_ok=True)
-    with open(chain_path, "a", encoding="utf-8") as fh:
+    with open(chain_path, "a", encoding="utf-8", newline="\n") as fh:
         for i in range(len(chain), len(rows)):
             e = _entry(i, rows[i], prev)
             fh.write(json.dumps(e, sort_keys=True, separators=(",", ":")) + "\n")
@@ -159,7 +181,9 @@ def append_consent(row, ledger_path=LEDGER, chain_path=CHAIN):
     row.setdefault("t", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
     line = json.dumps(row, ensure_ascii=False, sort_keys=True)
     os.makedirs(os.path.dirname(ledger_path) or ".", exist_ok=True)
-    with open(ledger_path, "a", encoding="utf-8") as fh:
+    # newline="\n": the same bytes on every platform. Text mode on Windows would
+    # end the line CRLF, which is how the mixed endings got into the ledger.
+    with open(ledger_path, "a", encoding="utf-8", newline="\n") as fh:
         fh.write(line + "\n")
     sync(ledger_path, chain_path)
     return row

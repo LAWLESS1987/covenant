@@ -250,8 +250,12 @@ const fd=d.forum_day||{},fs=fd.sent||0,ft=fd.tried||0;
 items.push({name:'Moltbook',color:fs?OK:UNK,sub:ft?fs+' sent of '+ft+' tried, '+(fd.window_h||24)+' h':'nothing tried in '+(fd.window_h||24)+' h',detail:d.forum,kind:'forum'});
 items.push({name:'Money',color:(d.money?(d.money.comfortable?OK:UNK):UNK),sub:d.money?(d.money.comfortable?'comfortable':'comfort not declared'):'not on record',detail:d.money,kind:'money'});
 const hp=Object.keys(hw).filter(k=>hw[k]==='present'),hu=Object.keys(hw).filter(k=>hw[k]==='unknown');
-CW.setMycelium(myc,hp.length?BAD:(hu.length?UNK:OK));
-items.push({name:'Highway',color:hp.length?BAD:(hu.length?UNK:OK),sub:hp.length?hp.length+' need attention':(hu.length?hu.length+' not known':'all clear'),detail:hw,kind:'highway'});
+// NO READING IS NOT "ALL CLEAR" (2026-11-13). When the highway read blows this page's deadline the state carries
+// highway:null; that was drawn green, on the orb and on the mycelium. Unknown is amber here like everywhere else.
+const hwNone=!Object.keys(hw).length;
+const hcol=hp.length?BAD:((hu.length||hwNone)?UNK:OK);
+CW.setMycelium(myc,hcol);
+items.push({name:'Highway',color:hcol,sub:hp.length?hp.length+' need attention':(hwNone?'no reading':(hu.length?hu.length+' not known':'all clear')),detail:hw,kind:'highway'});
 // HIS OTHER REPOSITORIES (2026-10-13, "implement the other repos into the apps also"): each a world on the outer ring,
 // read from its clone on this PC. Green: committed and in step with GitHub; amber: work not committed, commits not
 // pushed, or no upstream to compare with. Nothing here is a judgement of the work in it.
@@ -411,11 +415,19 @@ def highway_detail(H):
     seen = H.last_sense()
     if seen is not None and all(k in seen for k in names):
         return {k: str(seen[k] or "unknown").lower() for k in names}, None
-    sensed = H.sense(only=list(HIGHWAY_CORE))
+    # 2026-11-13: read with this machine's profile (covenant_highway.machine_profile). On a PC that is not the one
+    # the road was written for, the core read asked 127.0.0.1 for nodes it does not host, took 6 s against this
+    # page's 3 s deadline, and the orb was left with NO reading -- which the page then drew green.
+    profile = getattr(H, "machine_profile", None)
+    here = profile() if profile else None
+    sensed = H.sense(only=list(HIGHWAY_CORE), machine=here) if here is not None else H.sense(only=list(HIGHWAY_CORE))
     out = {k: str((v or {}).get("state") or "unknown").lower() for k, v in sensed.items()}
+    not_here = (here or {}).get("not_applicable") or {}
     rest = [k for k in names if k not in out]
     for k in rest:
-        out[k] = "unknown"
+        # A detector that does not describe this machine is not "unknown" here: there is nothing to know.
+        out[k] = "absent" if k in not_here else "unknown"
+    rest = [k for k in rest if k not in not_here]
     return out, ("the watchdog's full pass is not fresh here (stale, or older than %d detector(s)); the %d core "
                  "detectors were read now and the rest are unknown" % (len(rest), len(sensed)))
 

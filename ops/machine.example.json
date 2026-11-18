@@ -1,0 +1,13 @@
+{
+  "_about": "Copy to ops/machine.json on a machine that is NOT the PC the highway was written for. No file means: that PC; everything applies and the highway repairs. See covenant_highway.machine_profile.",
+  "acts_here": false,
+  "why": "this PC hosts node D only; its services are kept running by its own watchdog",
+  "not_applicable": {
+    "node_down": "asks this machine for nodes A, B and C, which run on the other PC",
+    "sync_task_missing": "expects the other PC's scheduled tasks",
+    "model_unmanaged": "this PC's model servers are started by its own start script, not by the keeper",
+    "redundancy_degraded": "looks for the other PC's beacons",
+    "build_stale_on_pc": "the app build is fetched on the other PC",
+    "manifest_stale": "the bundle is sealed on the other PC"
+  }
+}

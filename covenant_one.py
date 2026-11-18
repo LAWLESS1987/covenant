@@ -50,6 +50,7 @@ EXIT CODES
     2   nothing failed, something could not be measured -- NOT a pass
 """
 import argparse
+import fnmatch
 import glob
 import hashlib
 import os
@@ -96,6 +97,47 @@ SUITES = [
     # against a PC that has 6: a check moved to a copy answers about the copy.
     # They run in phase_integrity, in the live folder, before anything else.
     ("test_security_audit.py",           300,  "SECURITY"),
+    # A438 (2026-11-16): tools/attack_surface_map.py is the defensive COUNT PASS
+    # -- it discovers the Flask route surface by walking the source and emits a
+    # ranked hunt queue of routes with no (adversarial test AND gating call). ASM1
+    # drives its pure functions both ways (e.g. /health must be READ, which breaks
+    # if classification regresses to raw substring matching) and smoke-tests the
+    # real tree so the mapper cannot silently stop finding routes.
+    ("test_asm1_attack_surface.py",       60,  "SECURITY"),
+    # CA1 (2026-11-17): covenant_adopt -- the covenant-native auto-adoption gate
+    # (scan origin/main, decide if safe to adopt; PROPOSE by default, AUTO-apply
+    # only when armed). Pins the gate both ways: GO only when NORMAL + merge-clean
+    # + scan-clean + no new failing gate; HIGH/scan-hit/conflict/new-failure each
+    # hold. Reuses node D's safe_integrate design + covenant_one's differential gate.
+    ("test_ca1_covenant_adopt.py",        60,  "SECURITY"),
+    # A439 (2026-11-16): first catch of the A438 hunt, at /actuator_learn. The
+    # shared operator-request gate (covenant_daily_plan.verify_signed) let a
+    # NON-FINITE timestamp slip the freshness window (abs(now-nan) > WINDOW_S is
+    # False); the nonce store resets on restart, so a captured nan request could
+    # replay. Rejected now at the ingress (the U invariant). Exploit-first both
+    # ways: the nan request verifies on the pre-A439 code, is refused after.
+    ("test_a439_nonfinite_timestamp.py",  60,  "SECURITY"),
+    ("test_a444_nonce_store.py",          120, "SECURITY"),
+    ("test_a443_runner_isolation.py",     60,  "SECURITY"),
+    # A440 (2026-11-16): second A438-hunt catch, at /claim_rewards. The v8.4 fix
+    # (verify_stake_action_signature) binds the ACTION and the KEY into the signed
+    # frame, but only "bad signature -> 400" was tested (A1a); the domain
+    # separation (a claim-sig is not an unstake-sig) and ownership had no runner.
+    # This pins them both ways. Guards /claim_rewards and /unstake.
+    ("test_a440_stake_action_auth.py",    60,  "SECURITY"),
+    # A441 (2026-11-16): third A438-hunt catch, at /stake -- a REAL defect. A nan
+    # amount slipped `amount <= 0` and `balance < amount` (both False for nan),
+    # reached self.stakes (poisoning total_staked, derived from it) and diverged
+    # from the db when save_stake hit the NOT NULL constraint -- one authenticated
+    # /stake could corrupt the pool and lock the staker out. The U invariant missed
+    # /stake. stake() now rejects non-finite before any state change; both ways.
+    ("test_a441_nonfinite_stake.py",      60,  "SECURITY"),
+    # A442 (2026-11-16): fourth A438-hunt catch, at /succession/register. register
+    # validated threshold/guardians/keys but NOT the dead-man's-switch timing, so a
+    # NEGATIVE heartbeat_interval/grace made the deadline land in the past and fired
+    # a PENDING succession episode immediately on a LIVE primary (measured); a
+    # non-finite value 500'd at the db. Now rejected at write time; both ways.
+    ("test_a442_succession_timing.py",    60,  "SECURITY"),
     ("test_k1_runner_key_preservation.py",120, "SECURITY"),
     ("test_k3_p9_owner_only_guard.py",   120,  "SECURITY"),
     # Arrived on main 2026-08-27 from fix/tally-counts-failures-as-passes,
@@ -305,6 +347,12 @@ SUITES = [
     # (A135). P21h and P22's parser check both drive the failing direction.
     ("test_p21_self_eval_persist.py",    120,  "IDENTITY"),
     ("test_p22_watchdog_restart_verifies.py", 180, "IDENTITY"),
+    # A437 (2026-11-16): one tree, one watchdog even when two start in the SAME
+    # tick. A160 spared every tie and _evict_twins ran only at start, so a
+    # same-tick pair from racing launchers both survived and persisted. A pid
+    # tiebreak (lower pid stops the higher, one-sided) plus a per-round re-cull.
+    # Drives both ways: each new case fails on the pre-A437 code.
+    ("test_a437_twin_tiebreak.py", 60, "IDENTITY"),
     # P23 (2026-09-16): the three second-operator security findings -- A31
     # (/propose_code RCE), A21 (implicit credential grab), A44 (key ACL).
     # Added because a back-door audit pointed out that all three fixes existed
@@ -496,6 +544,9 @@ SUITES = [
     ("test_a82_exposure_unknown.py",      120, "SECURITY"),
     ("test_a85_manifest_privacy.py",      120, "SECURITY"),
     ("test_g3_behavioural_guards.py",     120, "SECURITY"),
+    # A421, registered in the change that created it. Drives the real _accept_loop
+    # with scripted callers, then real sockets on ephemeral ports. 20 checks.
+    ("test_pg1_peer_caller_gate.py",      120, "SECURITY"),
     # A90, registered in the change that created it (the lesson the A88
     # comment below records). Runs covenant_chat end to end with the
     # dispatcher replaced by a recorder, so it reads what WOULD have gone on
@@ -842,6 +893,10 @@ SUITES = [
     # TH1 (2026-09-26, A226): Tetsu's hands -- his workshop, bounded runs behind a screen and a
     # guard, proposals beside the tree and never in it; the door dispatches HANDS beside MOLTBOOK.
     ("test_th1_tetsu_hands.py", 180, "JUDGE"),
+    # A436 (2026-11-16, follows A430): a signed-door HANDS RUN approves the exact script (run_sha256), not an
+    # invocation; a RUN carrying arguments is refused. The practice path (in-process run_auth) and unsigned callers
+    # are untouched. Drives both ways. Closes the quorum's C3.
+    ("test_a436_run_args_bind.py", 60, "JUDGE"),
     # PP1 (2026-09-26, his words: "train tetsu to code at a high recursive level"; he chose the practice loop, nightly and
     # bounded): the curriculum solvable under his screen, a wrong file caught, the failure fed back, what he solves and
     # learns kept in his workshop, and the gate, the model and the clock each stopping it. Real runs; model and gate stubbed.
@@ -927,6 +982,36 @@ SUITES = [
     # parsed from a results page, a same-host crawl bounded per page, per answer and per day, every page through the
     # one web door and a refusal reported rather than raised; the door is a stub, no network.
     ("test_tc1_tetsu_crawl.py", 120, "JUDGE"),
+    # outside_text (A424, 2026-11-14): the door strips chat/role/fence marks and invisible characters from outside
+    # content (fetched pages, forum posts) before the 3B reads them (clean()-only hygiene; the full fence frame did
+    # not bind the 3B, KNOWN_ISSUES A424). Pure text in/out: what is taken out and what is left exactly alone.
+    ("test_outside_text.py", 60, "JUDGE"),
+    # A427 (2026-11-14): the act-word door guard -- hold an act (HANDS/FETCH/WEB/MOLTBOOK/HEAL/SELF-HEAL/LEG) whose
+    # word the caller's own message spells out (in CAPITALS / as the whole act line / in quotes); TETSU's check, 0
+    # false positives measured. covenant_model gains a stub-answer queue so suites drive acts without naming them.
+    ("test_a427_actword.py", 60, "JUDGE"),
+    # A429 (2026-11-15, the owner: "Show the judge the content."): his hands' content goes to a content seat in this
+    # process, never through the shared quorum (whose seats reach a runner and the tracked verdicts file); the seat
+    # refuses what the screen refuses and otherwise abstains. Stub quorums and a stub runner; red on main 0/6.
+    ("test_a429_hands_content_seat.py", 240, "JUDGE"),
+    # A435 (2026-11-16): the content seat now reads PROSE too, narrowly. A non-code WRITE's text is shown two narrow
+    # signals (planted-instruction markup via outside_text.clean; a spelled-out injection -- a role prefix, a short
+    # phrase list, a covenant act line in CAPITALS) and otherwise ABSTAINS, so an ordinary note still proceeds. The
+    # measurement is the gate: 22 ordinary writes 0 refused, 16 planted 14 flagged. Red on main 2/7. It reads no
+    # meaning beyond the patterns. Stub quorums and the runner road stubbed; the shipped corpora are measured here.
+    ("test_a435_prose_write_seat.py", 240, "JUDGE"),
+    # A430 (2026-11-15, his words "Tie the signature."): a HANDS RUN through the door runs only the script whose bytes
+    # hash to the run_sha256 inside the operator's signed body -- the door's real HANDS branch, real signatures, real
+    # runs; read once, hashed, screened and executed from the same bytes; the practice loop unbound. Then the signing
+    # client: the hash goes in before signing and survives mycelium and spore unchanged.
+    ("test_a430_run_sha256.py", 120, "JUDGE"),
+    ("test_a430_run_signing.py", 60, "JUDGE"),
+    # A432 (2026-11-15, the owner: "Sounds like a good plan. Get it done."): POST /m/workshop/read hands back one
+    # workshop file's exact bytes and their sha256 to a request signed by a registered operator key, and to nobody
+    # else (unsigned, loopback-only and tailnet-only callers 403); a bad name, a name or link leaving the workshop, a
+    # missing and an oversized file refused with the contract's status; one ledger row per answer, never the content;
+    # the spore relay carries the door. The real node app, real signatures, fixture workshop. Red on main 0/18.
+    ("test_a432_workshop_read.py", 120, "JUDGE"),
     # JE1 (2026-09-26, A231): the judge evaluation's statistics (Fisher, chi-square, phi on the correlated-error
     # table) pinned against scipy's values, and the report's prose taking its figures from the run -- two had been
     # written in from the first dataset and printed beside tables that said otherwise.
@@ -956,6 +1041,14 @@ SUITES = [
     # HT (2026-11-09, 116094e): in a topic we opened, a reply to post #1 is addressed to us. It shipped
     # unregistered, so the sweep of 298bd10 read "orphaned on disk 1". Pure, no network; 4/4 by hand.
     ("test_hf_threads_own_topic.py", 30, "JUDGE"),
+    # A425 (2026-11-14), A419 a second time: the intent-provenance gate's own suite (d57ea70, 32 checks, every
+    # guard driven both ways) sat beside M1 in the same folder and was in no runner, so CI never ran it. A419
+    # listed the two suites it found and left the coverage phase reading the root only, so the next one was not
+    # called an orphan either. Listed here; the coverage phase now reads the staged folders too (CO1 below).
+    ("ai_memory_system/test_intent_provenance.py", 60, "SECURITY"),
+    # CO1 (2026-11-14, A425): the coverage phase itself, on a scratch tree -- an unlisted suite in a staged
+    # folder and one with ".PRE-" in its name are both called orphans; a listed or switched-off one is not.
+    ("test_co1_coverage_orphans.py", 60, "SECURITY"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every
@@ -1005,6 +1098,28 @@ DELIBERATELY_OFF = {
         "ledger, not a suite. Driven both ways inside HC1 (rows) and HC2 "
         "(stale vs tamper).",
     "trace_runner.py":      "helper, not a suite",
+    # A425 (2026-11-14). The five files below are in folders the sweep stages and match the suite patterns. The
+    # coverage phase read the root only, so none was run and none was named. Counted two ways that could
+    # disagree (a walk of the staged folders, and git ls-files): 8 such files, 2 listed since A419, 1 listed
+    # by A425, and these 5. Each was run by hand on 2026-11-14 from a fresh clone before it was written down.
+    "pending-v8.38/test_competence.py":
+        "an EARLIER COPY of the root suite of the same name (36,580 bytes against the root's 37,085), kept "
+        "beside the held semantic-judge files. The sweep runs the root one. By hand from this folder: 47/47 "
+        "passed, 1 UNKNOWN (the node-level checks cannot import the core from here).",
+    "pending-v8.38/test_sem5_register_coverage.py":
+        "an EARLIER COPY of the root suite of the same name (7,220 bytes against 9,628). The sweep runs the "
+        "root one. By hand from this folder: SEM5 6/6.",
+    "pending-v8.38/test_semantic_judge.py":
+        "an EARLIER COPY of the root suite of the same name (17,467 bytes against 18,903). The sweep runs the "
+        "root one. It CANNOT run from this folder: the held core beside it imports covenant_path_pattern, "
+        "which is at the root (ModuleNotFoundError, measured).",
+    "quant/test_backtest_guardrails.py":
+        "BYTE-IDENTICAL to the root test_backtest_guardrails.py, which the sweep runs (16 passed by hand in "
+        "either place); the module it tests, quant/covenant_backtest.py, is byte-identical to the root's too. "
+        "Running both would count the same 16 checks twice.",
+    "sentinel_witness/verify_record.py":
+        "a STANDALONE verifier that reads a record back from a RUNNING node's /chain (--node URL), not a "
+        "suite. test_e3_witness_loop.py imports it, and that suite is itself on this record.",
     # NOT a wiring oversight. run_all_tests.sh names this suite; it exists
     # NOWHERE on the production PC, and the fix it tests exists nowhere either:
     # grep for _fair_share / _compact_locked / last_eviction_age_seconds in the
@@ -1273,12 +1388,17 @@ def stage(say):
             # A201 (2026-09-21): the untracked runtimes under tools/ (llama, sd -- binaries and an
             # 18 MB zip) are never staged: a staged copy of one tripped Defender, and no suite
             # runs them (the model and image doors are stubbed in every suite).
-            shutil.copytree(s, os.path.join(work, d), dirs_exist_ok=True,
-                            ignore=shutil.ignore_patterns("llama", "sd") if d == "tools"
-                            else _eval_ignore if d == "eval"
-                            else shutil.ignore_patterns("__pycache__"))
+            shutil.copytree(s, os.path.join(work, d), dirs_exist_ok=True, ignore=_stage_ignore(d))
     say("   staged into %s" % work)
     return work
+
+
+def _stage_ignore(d):
+    """What the copy leaves out of staged folder d. One definition (A425, 2026-11-14): stage() copies with it and
+    the coverage phase walks with it, so the orphan search reads the folders the sweep carries and no others."""
+    return (shutil.ignore_patterns("llama", "sd") if d == "tools"
+            else _eval_ignore if d == "eval"
+            else shutil.ignore_patterns("__pycache__"))
 
 
 # WHICH FOLDERS THE COPY CARRIES, AND WHY THE OTHERS ARE LEFT OUT (A298, 2026-10-07).
@@ -1389,11 +1509,24 @@ def phase_coverage(say):
     listed = [s for s, _, _ in SUITES] + [n for n, _, _ in IN_PLACE]
     absent = [s for s in listed if not os.path.isfile(os.path.join(HERE, s))]
     on_disk = set()
-    for pat in ("test_*.py", "sim_*.py", "probe_*.py", "verify_*.py"):
+    pats = ("test_*.py", "sim_*.py", "probe_*.py", "verify_*.py")
+    # A425 (2026-11-14). Two holes, closed here. (1) This loop skipped any name holding ".PRE-" and said nothing:
+    # a file the search leaves out by its name is neither run nor reported. Counted before the skip was removed:
+    # 0 such files in a clone (they are gitignored) and 0 on the PC this was written on. On a disk that holds
+    # one it is now an ORPHAN, by name, until it is listed or put on the off-record with its reason.
+    for pat in pats:
         for p in glob.glob(os.path.join(HERE, pat)):
-            n = os.path.basename(p)
-            if ".PRE-" not in n:
-                on_disk.add(n)
+            on_disk.add(os.path.basename(p))
+    # (2) The search read the root only (A382, A419), so a suite in a folder the sweep stages could be in no
+    # list and never be called an orphan: ai_memory_system/test_intent_provenance.py was. The staged folders
+    # are walked now, at any depth, with the same leave-outs as the copy, and a file there is named by its path.
+    for d in STAGE_DIRS:
+        ignore = _stage_ignore(d)
+        for dp, dns, fns in os.walk(os.path.join(HERE, d)):
+            dns[:] = sorted(set(dns) - set(ignore(dp, dns)))
+            for n in fns:
+                if any(fnmatch.fnmatch(n, pat) for pat in pats):
+                    on_disk.add(os.path.relpath(os.path.join(dp, n), HERE).replace(os.sep, "/"))
     orphans = sorted(on_disk - set(listed) - set(DELIBERATELY_OFF))
 
     say("  listed in this runner   %d suites (%d in the sweep, %d in place)"
