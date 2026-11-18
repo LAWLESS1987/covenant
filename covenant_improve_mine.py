@@ -147,7 +147,11 @@ def harvest(candidates=None, seen_path=None, min_chars=MIN_CHARS, update=True, r
     seen = _load_seen(seen_path)
     send_rows = OA.load_sends(sends_path)                      # None when the ledger is missing
     ours = OA.our_texts(send_rows)
-    own = OA.own_authors(_rows(candidates), ours) if ours else set()
+    # A held row is not evidence of anything yet, including of who is us (Codex's read of #67, 2026-11-18): the
+    # prepass ran over every row, so a held row matching one of our texts made its author "us" and that author's
+    # ordinary rows were skipped -- a row read during isolation steering the miner before release. HI1h pins it.
+    own = (OA.own_authors((r for r in _rows(candidates) if not OA.held_by_isolation(r)), ours)
+           if ours else set())
     n_own = 0
     n_held = 0
     pend = set(pending_requeue()) if requeue_first else set()

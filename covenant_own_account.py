@@ -97,5 +97,15 @@ def held_by_isolation(row):
     behaviour, and free was isolated because the judge refused what she wrote, so what she was reading may be part
     of why. Such a row carries `isolation` (set by covenant_ambassador.learn); it is held from Tetsu's
     improvement-mining and from free's ally ranking until covenant_moltbook_release -- the judge-gated door --
-    stamps `released_at` on it. Every reader of the comments log asks here, as it asks own_authors above."""
-    return bool(isinstance(row, dict) and row.get("isolation") and not row.get("released_at"))
+    stamps `released_at` on it. Every reader of the comments log asks here, as it asks own_authors above.
+
+    RELEASED MEANS JUDGED CLEAN (2026-11-18, Codex's read of #67, note 3: "any truthy released_at releases the
+    hold"). The release stamps `released_at` on EVERY row it judges -- the ones it finds violating too, with
+    `label` True (covenant_moltbook_release.release). Reading `released_at` alone therefore released to the miner
+    and the ally ranking exactly the rows the judge refused. A held row is released only when the release judged it
+    clean: `released_at` set AND `label` is False (a real boolean, as the release writes it). A row judged violating,
+    or one with a `released_at` and no verdict beside it (nothing in this repo writes that; a hand edit could), stays
+    held. HI1e pins all three."""
+    if not (isinstance(row, dict) and row.get("isolation")):
+        return False
+    return not (row.get("released_at") and row.get("label") is False)
