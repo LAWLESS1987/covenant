@@ -1,4 +1,4 @@
-"""A440: the workshop runner starts Python in ISOLATED mode (-I), so a module planted beside the hashed script
+"""A443: the workshop runner starts Python in ISOLATED mode (-I), so a module planted beside the hashed script
 cannot shadow the standard library. Asked on the Hugging Face forum (topic 191990 #2): "a planted json.py beside
 the hashed script loads unhashed if the script imports json and the child starts without -I, -P or
 PYTHONSAFEPATH -- does the packet's launch pass any of those?" It does: -I, which on 3.11+ also sets safe_path.
@@ -21,7 +21,7 @@ def _run(flags, cwd):
     return (cp.stdout + cp.stderr).strip()
 
 
-class A440RunnerIsolation(unittest.TestCase):
+class A443RunnerIsolation(unittest.TestCase):
     def setUp(self):
         self.ws = tempfile.mkdtemp(prefix="a440-")
         with open(os.path.join(self.ws, "json.py"), "w", encoding="utf-8") as fh:
@@ -52,4 +52,8 @@ class A440RunnerIsolation(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _res = unittest.TextTestRunner(verbosity=2).run(
+        unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__]))
+    _bad = len(_res.failures) + len(_res.errors)
+    print("A443: %d/%d passed" % (_res.testsRun - _bad, _res.testsRun))
+    sys.exit(1 if _bad else 0)

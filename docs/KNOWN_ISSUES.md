@@ -17937,7 +17937,7 @@ Hunting the A438 queue at its top item, `/actuator_learn`, turned up two real th
 
 ---
 
-### A440. [security] The workshop runner starts Python in isolated mode -- now pinned both ways
+### A443. [security] The workshop runner starts Python in isolated mode -- now pinned both ways
 
 Asked on the Hugging Face forum (topic 191990, post 2, 2026-11-17): a `json.py` planted beside the hashed
 script loads unhashed if the script imports `json` and the child starts without `-I`, `-P` or
@@ -17947,7 +17947,7 @@ to `sys.path`. Measured on this PC (3.12.10): with `-I` the planted module did n
 library did; `sys.path[0]` was the stdlib zip); without `-I`, the control, it loaded. Until now nothing
 pinned the flag: removing `-I` would have reopened the vector silently.
 
-**Fixed.** `test_a440_runner_isolation.py` (SECURITY, registered in `covenant_one.py`) pins it: a static
+**Fixed.** `test_a443_runner_isolation.py` (SECURITY, registered in `covenant_one.py`) pins it: a static
 check that `run()` still passes `-I` before `-c RUNNER`; a planted sibling module that must NOT import under
 `-I`; the control that it DOES import without `-I`, so the test can see the vector; and `safe_path` asserted
 under `-I` on 3.11+. Four checks, all green on 3.12.10.
