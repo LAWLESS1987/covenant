@@ -133,6 +133,8 @@ def main():
           OA.held_by_isolation({"isolation": {"t": "T"}, "released_at": "2026-11-16T00:00:00Z"}) is True
           and OA.held_by_isolation({"isolation": {"t": "T"}, "released_at": "x", "label": "false"}) is True)
     check("HI1e junk is not held", OA.held_by_isolation(None) is False and OA.held_by_isolation("x") is False)
+    check("HI1e an isolation key with a falsy value is still a stamp (held)",
+          all(OA.held_by_isolation({"isolation": v}) is True for v in ({}, "", None, 0, False)))
 
     print("HI1f -- the improve-miner holds, says so, and mines once released")
     d = tempfile.mkdtemp(prefix="hi1_im_")
