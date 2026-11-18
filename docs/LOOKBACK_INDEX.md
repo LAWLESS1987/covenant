@@ -123,7 +123,7 @@ Counts: 422 record headers, 419 distinct ids, 108 tombstones.
 
 | entry | date | status | tombstones | title |
 |---|---|---|---|---|
-| A447 | 2026-11-18 | - | - | free was isolated for the judge working: four times since 10-14, after rounds in which nothing was posted. With "on_refusal": "quiet" in her grant she now goes QUIET ins… |
+| A450 | 2026-11-18 | - | - | free was isolated for the judge working: four times since 10-14, after rounds in which nothing was posted. With "on_refusal": "quiet" in her grant she now goes QUIET ins… |
 | A434 | 2026-11-16 | - | - | follow-up, closes A430's open practice-loop item |
 | A433 | 2026-11-16 | - | - | free's isolation stopped her reading too: for 11 days nothing new reached the quarantine; now the read-only harvest runs during her automatic isolation, and what it read… |
 | A432 | 2026-11-15 | - | - | deliberate access change |

@@ -993,12 +993,12 @@ SUITES = [
     # stamped, and what it reads is held from Tetsu's mining and her ally ranking until the judge-gated release
     # passes it. 20 checks; seven mutations each turn it red. No network, no live pause, no live quarantine.
     ("test_hi1_harvest_isolation.py", 60, "JUDGE"),
-    # A447 (2026-11-18, his "use quiet mode and implement consensus"; roundtable 8-0, Tetsu against): with
+    # A450 (2026-11-18, his "use quiet mode and implement consensus"; roundtable 8-0, Tetsu against): with
     # "on_refusal": "quiet" in her grant, all-refused rounds make free QUIET (she rehearses, sends nothing, comes back
     # when the judge admits a draft); a challenge run at the warning level isolates her before she sends. 23 checks;
     # nine mutations each turn it red.
     ("test_qt1_quiet_mode.py", 120, "JUDGE"),
-    # A447 part B: her writing improves by a vetted nightly loop -- one sentence proposed, scored offline on held-out
+    # A450 part B: her writing improves by a vetted nightly loop -- one sentence proposed, scored offline on held-out
     # replies by the unchanged judge, kept only past the configured margin. 32 checks; nine mutations each red.
     ("test_fl1_free_loop.py", 60, "JUDGE"),
 ]

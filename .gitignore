@@ -466,7 +466,7 @@ ops/ambassador_sends.jsonl
 # A270 (2026-10-06): free's round lock and Tetsu's per-round decisions, runtime records beside the sends ledger
 ops/ambassador_round.lock
 ops/tetsu_moltbook_updates.jsonl
-# A447 (2026-11-18): free's quiet state, her vetted writing instruction and the loop's passes -- runtime, beside
+# A450 (2026-11-18): free's quiet state, her vetted writing instruction and the loop's passes -- runtime, beside
 # the sends ledger. ops/free_loop.json (the loop's margin, set by hand) stays tracked.
 ops/ambassador_quiet.json
 ops/free_writer.json

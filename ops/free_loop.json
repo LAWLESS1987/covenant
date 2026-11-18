@@ -1,5 +1,5 @@
 {
- "_what": "A447 part B: the margins free's nightly writing loop (covenant_free_loop.py) must clear before a change to her writing instruction is kept. Set here, by hand -- Cipher's amendment (2026-11-18): the margin is defined in a config file, not left to anyone's discretion. Only numbers below are read; any other value is ignored.",
+ "_what": "A450 part B: the margins free's nightly writing loop (covenant_free_loop.py) must clear before a change to her writing instruction is kept. Set here, by hand -- Cipher's amendment (2026-11-18): the margin is defined in a config file, not left to anyone's discretion. Only numbers below are read; any other value is ignored.",
  "window": 50,
  "show_n": 5,
  "heldout_n": 20,

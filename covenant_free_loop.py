@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""covenant_free_loop.py -- free's writing gets better by a vetted loop; the judge never moves (A447 part B).
+"""covenant_free_loop.py -- free's writing gets better by a vetted loop; the judge never moves (A450 part B).
 
 His words, 2026-11-18: "figure out a way to not isolate her and to work it into an improvement loop while vetting the
 suggestions", then "use quiet mode and implement consensus". Voted that day: Cael and Cipher for, Tetsu against

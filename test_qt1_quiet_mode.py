@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""QT1 -- free goes QUIET, not isolated, when the judge refuses her; the challenge run isolates her (A447).
+"""QT1 -- free goes QUIET, not isolated, when the judge refuses her; the challenge run isolates her (A450).
 
 His words, 2026-11-18: "figure out a way to not isolate her and to work it into an improvement loop while vetting the
 suggestions", then "use quiet mode and implement consensus". Pinned here, every check by running the round:

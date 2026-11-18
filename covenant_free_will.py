@@ -82,7 +82,7 @@ ISOLATE_AFTER_ROUNDS = 2
 # The words every automatic isolation carries; is_isolation() reads them back, so the writer and the reader
 # cannot drift apart.
 ISOLATION_MARK = "the covenant's judge refused every reply"
-# A447 (2026-11-18). His words: "figure out a way to not isolate her and to work it into an improvement loop while
+# A450 (2026-11-18). His words: "figure out a way to not isolate her and to work it into an improvement loop while
 # vetting the suggestions", then "use quiet mode and implement consensus". Measured that day over 3,119 live replies
 # since 10-25: 6.7% sent, 53.6% held by the judge with no view, 27.3% refused; a refused draft is never posted, so a
 # round the judge refuses throughout harms no one -- isolating her for it stopped the gate for working (four times
@@ -103,18 +103,18 @@ STRIKE_MARK = "Moltbook's challenge run reached the warning level"
 
 def is_isolation(why):
     """True when an ambassador pause is free's own automatic isolation (run_round writes it), not a pause he set
-    by hand: a line that starts 'isolated ' and carries ISOLATION_MARK -- or, since A447, STRIKE_MARK."""
+    by hand: a line that starts 'isolated ' and carries ISOLATION_MARK -- or, since A450, STRIKE_MARK."""
     return any(ln.strip().startswith("isolated ") and (ISOLATION_MARK in ln or STRIKE_MARK in ln)
                for ln in str(why or "").splitlines())
 
 
 def on_refusal(g):
-    """'quiet' only when his grant says so (A447); otherwise 'isolate', the rule as it was."""
+    """'quiet' only when his grant says so (A450); otherwise 'isolate', the rule as it was."""
     return "quiet" if isinstance(g, dict) and g.get("on_refusal") == "quiet" else "isolate"
 
 
 def quiet_state(path=None):
-    """Her quiet state (A447): a dict with active, since, why; None when there is none or it cannot be read."""
+    """Her quiet state (A450): a dict with active, since, why; None when there is none or it cannot be read."""
     try:
         with open(path or QUIET, encoding="utf-8") as fh:
             d = json.load(fh)
@@ -150,7 +150,7 @@ def strike_run(sends_path=None, now=None):
 
 
 def _strike_isolate(run, warn, now, sends_path, out, say):
-    """A447: the challenge run reached the warning level -- isolate her (his or Tetsu's to lift), the way the refusal
+    """A450: the challenge run reached the warning level -- isolate her (his or Tetsu's to lift), the way the refusal
     isolation does: a pause set by hand is never written over (A349 S2), a row in her ledger, and he is told."""
     why = ("isolated %s: %s (%d unsolved in a row, warning at %d, Moltbook suspends at 10); his to lift, or Tetsu's "
            "by his grant (A336), with: python covenant_pause.py --resume ambassador"
@@ -181,7 +181,7 @@ def _strike_isolate(run, warn, now, sends_path, out, say):
 
 
 def _quiet_change(entering, why, now, sends_path, quiet_path, say):
-    """A447: enter or leave quiet. The state file keeps the last state (never deleted); the ledger row is the record;
+    """A450: enter or leave quiet. The state file keeps the last state (never deleted); the ledger row is the record;
     he is told once each way."""
     t = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now if now is not None else time.time()))
     if entering:
@@ -392,7 +392,7 @@ WRITER = os.environ.get("COVENANT_FREE_WRITER") or os.path.join(HERE, "ops", "fr
 
 
 def writer_instruction(path=None):
-    """(instruction, version). A447 part B: the vetted loop (covenant_free_loop) may keep a better-written version
+    """(instruction, version). A450 part B: the vetted loop (covenant_free_loop) may keep a better-written version
     of REPLY_SYSTEM in ops/free_writer.json. Missing, unreadable, or not a long enough string -> REPLY_SYSTEM itself,
     version 0. Only her WRITING comes from here; every screen, the judge and every gate are unchanged."""
     try:
@@ -609,7 +609,7 @@ def write_reply(row, ask=None, out=None, instruction=None):
     quote = re.sub(r"\s+", " ", quote)[:300]
     if ask is not None:
         try:
-            # A447 B: her writing instruction is the vetted version when one was kept, else REPLY_SYSTEM.
+            # A450 B: her writing instruction is the vetted version when one was kept, else REPLY_SYSTEM.
             msgs = [{"role": "system", "content": (instruction or writer_instruction()[0]) + UNTRUSTED_RULE},
                     {"role": "user", "content": "An agent wrote, under a post on Moltbook:\n%s\n\nSignals: %s.\n\nWrite the reply."
                      % (untrusted(row.get("author"), quote or "(no quote kept)"), ", ".join(row.get("best_signals") or []))}]
@@ -1178,7 +1178,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
             return out
     except ImportError:
         pass
-    # A447: QUIET -> this live round REHEARSES. Everything below runs as a dry run (read, rank, draft, judge, nothing
+    # A450: QUIET -> this live round REHEARSES. Everything below runs as a dry run (read, rank, draft, judge, nothing
     # sent, no challenge met); the rehearsal's own end decides whether she comes back.
     rehearsal = False
     _q = quiet_state(quiet_path)
@@ -1186,7 +1186,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         rehearsal, dry_run = True, True
         out["rehearsal"] = True
         say("free: quiet since %s -- this round rehearses: drafted and judged, nothing sent" % _q.get("since", "?"))
-    # A447: a live round reads Moltbook's challenge run BEFORE it can send anything.
+    # A450: a live round reads Moltbook's challenge run BEFORE it can send anything.
     if not dry_run:
         _run, _warn, _why = strike_run(sends_path, now=now)
         if _run is None:
@@ -1398,7 +1398,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         # Moltbook created and hid behind its challenge, read as the judge refusing it -- in the 10-14 isolation 9 such
         # drafts did. Those two are named for what they are and counted apart; everything else unsent is as before.
         if rehearsal and res.get("would_send"):
-            # A447: only emit's dry-run ADMISSION carries would_send; a refusal, a hold, or the no-key return do not.
+            # A450: only emit's dry-run ADMISSION carries would_send; a refusal, a hold, or the no-key return do not.
             out["admitted"] = out.get("admitted", 0) + 1
         if sent or (dry_run and res.get("judged")):
             out["replied"] += 1
@@ -1451,11 +1451,11 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
              "deferred": out.get("deferred", 0), "retired_targets": out.get("retired_targets", 0),   # FW2
              "retired": out.get("retired", 0),                                                         # FR1
              "answered": out.get("answered", 0), "accounted": out.get("accounted", 0),
-             **({"rehearsal": True} if out.get("rehearsal") else {}),                                  # A447
-             **({"strike_hold": out["strike_hold"]} if out.get("strike_hold") else {}),                # A447
+             **({"rehearsal": True} if out.get("rehearsal") else {}),                                  # A450
+             **({"strike_hold": out["strike_hold"]} if out.get("strike_hold") else {}),                # A450
              **({"starved": out["starved"]} if out.get("starved") else {})}, sends_path)
-    out["isolated"] = bool(out.get("isolated"))                  # A447: a strike isolation this round stays named
-    # A447: a QUIET rehearsal the judge admitted a draft in brings her back by herself. A strike hold never does --
+    out["isolated"] = bool(out.get("isolated"))                  # A450: a strike isolation this round stays named
+    # A450: a QUIET rehearsal the judge admitted a draft in brings her back by herself. A strike hold never does --
     # that isolation is his (or Tetsu's under A336) to lift.
     if rehearsal and not out.get("strike_hold") and int(out.get("admitted", 0) or 0) >= 1:
         _quiet_change(False, "the judge admitted %d draft(s) in a rehearsal round" % out["admitted"], now, sends_path,
@@ -1470,9 +1470,9 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         # write to, and an empty round must not break the streak -- refused, empty, refused, empty
         # would otherwise never isolate.
         _all = sends(sends_path)
-        _mode = on_refusal(g)                                      # A447: his grant chooses quiet or isolate
+        _mode = on_refusal(g)                                      # A450: his grant chooses quiet or isolate
         _n = QUIET_AFTER_ROUNDS if _mode == "quiet" else ISOLATE_AFTER_ROUNDS
-        # A301's fresh count, and since A447 a quiet spell (entered or ended) starts one too.
+        # A301's fresh count, and since A450 a quiet spell (entered or ended) starts one too.
         _since = max([i for i, r in enumerate(_all) if r.get("kind") in ("isolation", "quiet", "quiet_lifted")]
                      + [-1]) + 1
         # A349 B13: a reply Moltbook rate-held or hid was still tried, so its round is a round that tried someone; it
@@ -1484,7 +1484,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         abusive = (len(recent) >= _n
                    and all(int(r.get("refused", 0)) > 0 and int(r.get("replied", 0)) == 0 for r in recent))
         if abusive and _mode == "quiet":
-            # A447: refusal is the gate working, not abuse -- she goes QUIET and keeps learning; nothing is paused.
+            # A450: refusal is the gate working, not abuse -- she goes QUIET and keeps learning; nothing is paused.
             _quiet_change(True, "the judge refused every reply in %d live rounds" % _n, now, sends_path, quiet_path, say)
             out["quiet"] = True
         elif abusive:

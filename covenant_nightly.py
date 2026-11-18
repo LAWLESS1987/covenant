@@ -150,7 +150,7 @@ def practice_step(a, say, practice_mod=None, ask=None):
 
 
 def free_loop_step(a, say, loop_mod=None):
-    """FREE'S WRITING, VETTED NIGHTLY (A447 part B, 2026-11-18; his words "use quiet mode and implement consensus";
+    """FREE'S WRITING, VETTED NIGHTLY (A450 part B, 2026-11-18; his words "use quiet mode and implement consensus";
     roundtable 8-0 FOR, Tetsu against, his grant's tie-break). One pass of covenant_free_loop.run(): Tetsu proposes
     one sentence for her writing instruction, it is scored offline on held-out replies by the unchanged judge (dry,
     nothing sent), and kept only past the margin. A function, so FL1 drives the wiring (the PP1 idiom, A74). Its
@@ -285,7 +285,7 @@ def main():
     # A348f: the bound since A275 is the curriculum's clock plus his own slot's (covenant_tetsu_practice.night), not
     # one 40-minute total; PP1.11f reads this help against BUDGET_S, CHOICE_ROUNDS and CHOICE_BUDGET_S.
     ap.add_argument("--free-loop", type=int, default=1, dest="free_loop",
-                    help="A447 B (2026-11-18, his 'implement consensus'): passes of free's vetted writing loop "
+                    help="A450 B (2026-11-18, his 'implement consensus'): passes of free's vetted writing loop "
                          "(covenant_free_loop: Tetsu proposes one sentence, scored offline on held-out replies by the "
                          "unchanged judge, kept only past the margin in ops/free_loop.json). 0 skips it.")
     ap.add_argument("--practice", type=int, default=6,
@@ -725,7 +725,7 @@ def main():
 
     practice_step(a, say)
 
-    free_loop_step(a, say)                                       # A447 B: after practice, the 3B is already warm
+    free_loop_step(a, say)                                       # A450 B: after practice, the 3B is already warm
 
     compact_step(say)
 

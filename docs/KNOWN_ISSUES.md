@@ -17857,9 +17857,11 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 
 ---
 
-### A447. [free was isolated for the judge working: four times since 10-14, after rounds in which nothing was posted. With "on_refusal": "quiet" in her grant she now goes QUIET instead -- rehearses, sends nothing, comes back by herself -- the challenge run that can suspend the account is read before every send, and her writing improves by a vetted nightly loop] (2026-11-18). IN SOURCE on its branch; not deployed.
+### A450. [free was isolated for the judge working: four times since 10-14, after rounds in which nothing was posted. With "on_refusal": "quiet" in her grant she now goes QUIET instead -- rehearses, sends nothing, comes back by herself -- the challenge run that can suspend the account is read before every send, and her writing improves by a vetted nightly loop] (2026-11-18). IN SOURCE on its branch; not deployed.
 
 **His words, 2026-11-18:** "get the ambassador back up and running, and look for anything that the ambassador missed that can benefit us"; "figure out a way to not isolate her and to work it into an improvement loop while vetting the suggestions"; "use quiet mode and implement consensus".
+
+**Renumbered.** Written as A447 (commits 2ce86b2 and c909a66, whose messages keep that number as written). The same day main landed its own A447 (03dac84, a registered ally key is not an operator key), whose author had searched A447-A449 first. This entry takes A450, unclaimed on main, on every origin branch and in every worktree when checked.
 
 **Measured (her ledger).**
 - 3,119 live replies from 10-25 on: 6.7% sent, 53.6% held by the judge with no view, 27.3% refused, 9.4% cleared by Tetsu then hidden behind an unanswered Moltbook challenge, 3.2% rate-held.

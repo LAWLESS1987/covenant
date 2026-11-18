@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FL1 -- free's vetted writing loop (A447 part B). Every check runs the code with stand-ins; nothing is sent,
+"""FL1 -- free's vetted writing loop (A450 part B). Every check runs the code with stand-ins; nothing is sent,
 no model or judge is called, no live file is touched.
 
   FL1a config: defaults; numbers from the file; a wrong type is ignored, never trusted
