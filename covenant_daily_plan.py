@@ -89,7 +89,7 @@ def _nonce_store():
 
 
 def _pubkey_fp(pem):
-    return hashlib.sha256(_norm(pem).encode()).hexdigest()[:32]
+    return hashlib.sha256(_norm(pem).encode()).hexdigest()          # full digest (quorum: never truncate a key id)
 
 
 def nonce_check_and_record(pubkey_pem, nonce, ts, seen=None, now=None):
@@ -113,7 +113,14 @@ def nonce_check_and_record(pubkey_pem, nonce, ts, seen=None, now=None):
             store.prune(t, WINDOW_S)
         except Exception:                                        # noqa: BLE001 -- pruning never blocks a verify
             pass
-    return store.check_and_record(_pubkey_fp(pubkey_pem), nonce, int(float(ts)) + WINDOW_S)
+    if not store.check_and_record(_pubkey_fp(pubkey_pem), nonce, int(float(ts)) + WINDOW_S):
+        return False
+    # Quorum (2026-11-18): a request SUSPENDED between its window check and this record could land after prune
+    # removed the original pair. So re-check freshness against a FRESH clock after recording; a request whose
+    # timestamp is by now outside the window is refused even though its pair was just recorded (fail closed).
+    if abs(time.time() - float(ts)) > WINDOW_S:
+        return False
+    return True
 
 _seen_nonces = set()
 

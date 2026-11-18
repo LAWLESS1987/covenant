@@ -119,5 +119,61 @@ class A441NonceStore(unittest.TestCase):
         self.assertEqual(self._verify(r)[0], True)                                # the genuine one still lands
 
 
+class A441QuorumPins(unittest.TestCase):
+    """What the review panel asked to see pinned (2026-11-18)."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="a441q-")
+        os.environ["COVENANT_NONCE_STORE"] = os.path.join(self.tmp, "nonces")
+        DP.NONCE_STORE = os.environ["COVENANT_NONCE_STORE"]
+        DP._nonce_store_obj = None
+
+    def test_registration_and_fingerprint_share_one_canonical_form(self):
+        """Conscious Ledger's attack: a key presented in another encoding must either fail registration or map
+        to the SAME pair name -- never 'registered but a new fingerprint'. Whitespace variants collapse under
+        _norm on both sides; a character-level variant is not the registered key at all."""
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        key = rsa.generate_private_key(65537, 2048)
+        _body, h = DP.sign_json_request(key, "POST", "/m/agent", {"message": "x"})
+        pem = base64.b64decode(h["X-Operator-Pubkey"]).decode()
+        signers = os.path.join(self.tmp, "signers.json")
+        DP.register_signer("canon", pem, signers)
+        variants = [pem.replace("\n", "\r\n"), "  " + pem.replace("\n", "\n   ") + "\n\n", pem.replace("\n", "")]
+        for v in variants:
+            self.assertEqual(DP.signer_name(v, signers), "canon")
+            self.assertEqual(DP._pubkey_fp(v), DP._pubkey_fp(pem))
+        lines = pem.strip().splitlines()
+        mid = lines[1]
+        altered = "\n".join([lines[0], ("B" if mid[0] != "B" else "C") + mid[1:]] + lines[2:]) + "\n"
+        self.assertIsNone(DP.signer_name(altered, signers))           # not the registered key -> refused before the nonce
+
+    def test_no_production_caller_passes_its_own_seen_set(self):
+        """DeepSeek's audit: the in-process `seen` escape hatch is for tests only. Any production call that passed a
+        set would silently bring per-process acceptance back, so pin it."""
+        import re
+        bad = []
+        for name in os.listdir(HERE):
+            if not name.endswith(".py") or name.startswith("test_"):
+                continue
+            src = open(os.path.join(HERE, name), encoding="utf-8", errors="replace").read()
+            for m in re.finditer(r"(verify_signed|nonce_check_and_record|\badmit)\([^)]*\bseen\s*=\s*(?!None\b|seen\b)", src):
+                bad.append("%s: %s" % (name, m.group(0)[:80]))
+        self.assertEqual(bad, [])
+
+    def test_suspended_duplicate_is_refused_after_the_window(self):
+        """ChatGPT's TOCTOU: a request that passes its window check, is suspended past the window (long enough for
+        prune to have removed the original pair), then reaches the atomic record, must still be refused."""
+        import time as _t
+        pem = "-----BEGIN PUBLIC KEY-----\nabc\n-----END PUBLIC KEY-----"
+        ts = _t.time()
+        self.assertTrue(DP.nonce_check_and_record(pem, "fresh", ts, now=ts))          # a fresh request lands
+        real = _t.time
+        try:
+            DP.time.time = lambda: ts + DP.WINDOW_S + 5                                 # the clock at record time
+            self.assertFalse(DP.nonce_check_and_record(pem, "suspended", ts, now=ts))   # ...is past the window
+        finally:
+            DP.time.time = real
+
+
 if __name__ == "__main__":
     unittest.main()
