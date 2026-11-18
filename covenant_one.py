@@ -117,6 +117,7 @@ SUITES = [
     # replay. Rejected now at the ingress (the U invariant). Exploit-first both
     # ways: the nan request verifies on the pre-A439 code, is refused after.
     ("test_a439_nonfinite_timestamp.py",  60,  "SECURITY"),
+    ("test_a444_nonce_store.py",          120, "SECURITY"),
     ("test_a443_runner_isolation.py",     60,  "SECURITY"),
     # A440 (2026-11-16): second A438-hunt catch, at /claim_rewards. The v8.4 fix
     # (verify_stake_action_signature) binds the ACTION and the KEY into the signed
