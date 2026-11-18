@@ -1715,6 +1715,45 @@ def sr_supersede_rank():
           "supersede_withheld" in w["shout"]["because"], w["shout"]["because"])
 
 
+def h_hardening():
+    """A445: a metadata extension cannot forge a store-owned field; every Unicode line separator that
+    splitlines() honours is refused in a frontmatter field, not only \\r, \\n and NUL; bad extension keys and a
+    non-dict extension are refused; and an ordinary extension still renders and lands. Each driven both ways."""
+    import memory_store as _ms
+    print("A445 -- store-owned fields and frontmatter separators")
+
+    def raises(fn):
+        try:
+            fn()
+            return False
+        except ValueError:
+            return True
+
+    root = tempfile.mkdtemp(prefix="h-")
+    st = MemoryStore(root)
+    owned = ("type", "agent", "intent", "beneficiary", "divergence", "diverges_from", "created", "review", "review_by")
+    forged = [k for k in owned
+              if not raises(lambda k=k: st.put("h1-" + k, "d", "project", "b", "tester", extra={k: "forged"}))]
+    check("A445.1 a metadata extension cannot override a store-owned field (%d fields)" % len(owned), not forged, forged)
+    check("A445.2 a non-dict metadata extension is refused",
+          raises(lambda: st.put("h2", "d", "project", "b", "tester", extra=["not", "a", "dict"])))
+    seps = (" ", " ", "\x85", "\x1c", "\x1d", "\x1e", "\v", "\f")
+    leak_name = [repr(s) for s in seps
+                 if not raises(lambda s=s: _ms.render_memory("n" + s + "agent: forged", "d", "project", "b", "tester"))]
+    leak_extra = [repr(s) for s in seps
+                  if not raises(lambda s=s: _ms.render_memory("n", "d", "project", "b", "tester",
+                                                               extra={"note": "x" + s + "agent: forged"}))]
+    check("A445.3 every Unicode line separator is refused in a frontmatter field (%d separators, name and extension)"
+          % len(seps), not leak_name and not leak_extra, leak_name + leak_extra)
+    bad = [repr(k) for k in ("", " padded", "has:colon")
+           if not raises(lambda k=k: _ms.render_memory("n", "d", "project", "b", "tester", extra={k: "v"}))]
+    check("A445.4 an empty, padded or colon-bearing extension key is refused", not bad, bad)
+    out = _ms.render_memory("n", "d", "project", "b", "tester", extra={"source": "hf-thread"})
+    check("A445.5 an ordinary extension still renders", "source: hf-thread" in out, out[:120])
+    rec = st.put("a445-ok", "d", "project", "b", "tester", extra={"source": "hf-thread"})
+    check("A445.6 an ordinary extension still lands in the store", bool(rec), rec)
+
+
 def main():
     print("M1 -- the AI memory system: store, chain, tombstones, HTTP, auth\n")
     root = tempfile.mkdtemp(prefix="aimem_")
@@ -1738,6 +1777,8 @@ def main():
         m_mood()
         print()
         sr_supersede_rank()
+        print()
+        h_hardening()
         print()
         u_unchecked(root)
         print()
