@@ -18095,3 +18095,61 @@ Hunting the A438 queue at `/succession/register` (CONTROL -- the takeover-resist
 **Status:** in source on its branch, with its test both ways. Runtime code (`covenant_unified_v8.py`) -> `source_sha256` changes; NOT deployed (no change to A/B/C without the operator's word).
 
 ---
+
+---
+
+### A447. [security, follows A423] A registered ALLY key passed every "registered operator" check -- signed HANDS RUN, the isolation lift, the operator workshop read -- CLOSED IN SOURCE 2026-11-17 (B2)
+
+**Found by an outside packet.** Collective #21's signed-RUN packet (v2.3, case C1) registered a throwaway key as an
+ally at its default scope and made a signed HANDS RUN with it at the pinned commit 9d85f6c. The approved script ran.
+nootxlm reproduced it on native Linux (HF 180706 #39, 2026-11-17): all eleven cases as pre-registered, C1 included.
+
+**Cause.** `covenant_unified_v8._request_signed_by_registered` returned `covenant_mycelium.admit()`'s `ok`.
+`admit()` is ok for "signed:operator" and also for "signed:ally", meaning an ally key on a door in its scope, and
+`/m/agent` is in `ALLY_DOORS`. A423 meant "a request signed by a registered operator key" and reused `admit()`.
+The same helper also decides `heal_lift_authorized` (A370): un-isolating free when Tetsu presses HEAL on `/m/agent`.
+So an ally talking to Tetsu could also authorize the lift, which the A168 grant reserves to him.
+
+**His decision.** He chose B2 on 2026-11-17, after an 11-of-11 quorum for B (`ops/ALLY_RUN_DECISION_2026-11-17.md`),
+"as long as it doesn't interfere with the most recent hugging face reply". It doesn't: the packet reads its eight
+files from git at 9d85f6c and checks their hashes, so nootxlm's run and every rerun of this packet still characterize
+that commit, where C1's "the ally runs" stays true.
+
+**Fix.** The helper requires `_how == "signed:operator"`, exactly, in the one place. All three callers inherit it:
+RUN (`may_run`), the lift, and `/m/workshop/read`. Ally admission in `admit()` is unchanged: an ally still talks on
+its doors.
+
+**Repro, both ways:** `python -m pytest test_a447_ally_not_operator.py`, 9 tests. Before the fix: 5 failed (ally RUN
+ran, ally lifted, the helper said True for an ally on /m/agent and for an ally with a custom read scope, and the source
+guard). The 4 operator and loopback controls passed. After the fix: 9/9. Also green afterwards: A430 and ASM1 (39 with
+A447), TH1 31/31, HL1 34/34, A370 11/11, A430S 13/13, A432 18/18, FW1 130, MY1 16, SP1 32, TF1 30, A22 26/26.
+*A slip in the first draft of the test:* the custom-scope check signed one request and called `admit()` twice on it.
+The second call refused a REPLAY, so the check passed before the fix for the wrong reason. Each call is now signed
+separately, and that check was red before the fix.
+
+**Not checked / still open.** Allies registered on the other nodes (only this PC was checked: no
+`ops/mycelium_peers.json`). Whether an ally's WRITE reaches the workshop the practice loop runs from (the loop writes
+its own check file and runs it on the next line, so a substitution would be a race in principle). Option C (a per-ally
+"hands:run" grant) and option D (RUN on its own door) are not built. Containment and egress of the workshop sandbox
+(A436) are unchanged.
+
+**Status (as first written on the live branch, 2026-11-17, kept):** in source on that branch with a both-ways test. NOT
+deployed and NOT pushed. The public line for the HF threads should say "closed in source at <commit>", not "closed",
+until it is deployed.
+
+**Counts, in their units (2026-11-18).** The 9 above is pytest's count on 11-17. Main's runner (unittest, which
+`covenant_one` reads) counts the same file as 8 tests: against main's core before this change `A447: 3/8` (the five
+ally refusals red), and with it `A447: 8/8`. Measured both ways in the change's own worktree.
+
+**Numbering (2026-11-18).** Written as A443 on the laptop's live branch (af88402). Main's A443 is a different entry, the
+runner -I pin (#75), renumbered there the same day to avoid an earlier collision; neither side had looked at the other's
+in-flight numbers. Main is canonical, so this change lands as A447. A447-A449 were searched first in every worktree's
+KNOWN_ISSUES and every ref's commit messages, and were free.
+
+**Also carried: #72's A441 comment, doubled.** `StakingPool.stake` on main held A441's seven-line comment twice. It
+came in with 7334c4a itself, not from a merge (the guard line appears once, so behaviour was never affected). This
+change keeps one copy. With both, main's core is byte-identical to the laptop's apart from this entry's number, which the
+laptop takes when it adopts this -- the mesh's source split (A/B/C vs node D and the phone) closes on that hash.
+
+**Status (2026-11-18):** running on the laptop's A/B/C since their 09:28 reload (as A443's text). On main by this
+change; node D and the phone get it from main.

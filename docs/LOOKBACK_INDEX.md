@@ -123,6 +123,7 @@ Counts: 432 record headers, 429 distinct ids, 108 tombstones.
 
 | entry | date | status | tombstones | title |
 |---|---|---|---|---|
+| A447 | 2026-11-17 | CLOSED | - | security, follows A423 |
 | A445 | - | - | - | security |
 | A444 | - | - | - | security |
 | A443 | - | - | - | security |
