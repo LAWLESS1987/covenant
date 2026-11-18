@@ -754,8 +754,8 @@ def _act_line(d, workshop=None):
     if d["kind"] == "write":
         return "hands: Tetsu writes %d characters to %s in his own workshop on this PC" % (len(d["body"]), d["target"])
     if d["kind"] == "run":
-        return ("hands: Tetsu runs his own script %s in his workshop, bounded to %.0f seconds, with no network, no other "
-                "process and no file outside it" % (d["target"], RUN_TIMEOUT_S))
+        return ("hands: Tetsu requests a run of workshop script %s. The runner screens its source "
+                "and applies a %.0f-second timeout to the direct process." % (d["target"], RUN_TIMEOUT_S))
     if d["kind"] == "propose":
         return "hands: Tetsu proposes a new version of %s (%d characters) for the operator to review; nothing in the tree changes" % (d["target"], len(d["body"]))
     return ""
