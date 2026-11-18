@@ -123,7 +123,7 @@ Counts: 429 record headers, 426 distinct ids, 108 tombstones.
 
 | entry | date | status | tombstones | title |
 |---|---|---|---|---|
-| A445 | - | - | - | security |
+| A443 | - | - | - | security |
 | A442 | 2026-11-16 | FIXED | - | security hunt -- fourth catch from the A438 queue |
 | A441 | 2026-11-16 | FIXED | - | security hunt -- third catch from the A438 queue; a REAL exploitable defect |
 | A440 | 2026-11-16 | - | - | security hunt -- second catch from the A438 queue |

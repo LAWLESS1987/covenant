@@ -104,6 +104,12 @@ SUITES = [
     # if classification regresses to raw substring matching) and smoke-tests the
     # real tree so the mapper cannot silently stop finding routes.
     ("test_asm1_attack_surface.py",       60,  "SECURITY"),
+    # CA1 (2026-11-17): covenant_adopt -- the covenant-native auto-adoption gate
+    # (scan origin/main, decide if safe to adopt; PROPOSE by default, AUTO-apply
+    # only when armed). Pins the gate both ways: GO only when NORMAL + merge-clean
+    # + scan-clean + no new failing gate; HIGH/scan-hit/conflict/new-failure each
+    # hold. Reuses node D's safe_integrate design + covenant_one's differential gate.
+    ("test_ca1_covenant_adopt.py",        60,  "SECURITY"),
     # A439 (2026-11-16): first catch of the A438 hunt, at /actuator_learn. The
     # shared operator-request gate (covenant_daily_plan.verify_signed) let a
     # NON-FINITE timestamp slip the freshness window (abs(now-nan) > WINDOW_S is
@@ -111,6 +117,7 @@ SUITES = [
     # replay. Rejected now at the ingress (the U invariant). Exploit-first both
     # ways: the nan request verifies on the pre-A439 code, is refused after.
     ("test_a439_nonfinite_timestamp.py",  60,  "SECURITY"),
+    ("test_a443_runner_isolation.py",     60,  "SECURITY"),
     # A440 (2026-11-16): second A438-hunt catch, at /claim_rewards. The v8.4 fix
     # (verify_stake_action_signature) binds the ACTION and the KEY into the signed
     # frame, but only "bad signature -> 400" was tested (A1a); the domain

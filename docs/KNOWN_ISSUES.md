@@ -17959,6 +17959,24 @@ inputs raise, an ordinary extension still renders and lands. The existing M1 sui
 **Limits.** This hardens the writer and the renderer. It does not re-validate records already on disk: a record
 written through an older writer with a forged field still reads as it was written (the chain shows when it was
 written, not that the field was honest).
+### A443. [security] The workshop runner starts Python in isolated mode -- now pinned both ways
+
+Asked on the Hugging Face forum (topic 191990, post 2, 2026-11-17): a `json.py` planted beside the hashed
+script loads unhashed if the script imports `json` and the child starts without `-I`, `-P` or
+`PYTHONSAFEPATH` -- does the launch pass any of those? It does. `covenant_tetsu_hands.run()` starts the child
+as `python -I -c RUNNER`, and on 3.11+ `-I` also sets `safe_path`, so the script's folder is never prepended
+to `sys.path`. Measured on this PC (3.12.10): with `-I` the planted module did not load (the standard
+library did; `sys.path[0]` was the stdlib zip); without `-I`, the control, it loaded. Until now nothing
+pinned the flag: removing `-I` would have reopened the vector silently.
+
+**Fixed.** `test_a443_runner_isolation.py` (SECURITY, registered in `covenant_one.py`) pins it: a static
+check that `run()` still passes `-I` before `-c RUNNER`; a planted sibling module that must NOT import under
+`-I`; the control that it DOES import without `-I`, so the test can see the vector; and `safe_path` asserted
+under `-I` on 3.11+. Four checks, all green on 3.12.10.
+
+**Limits.** This pins the launch flags and the sibling-module vector only. It says nothing about what an
+authorized script can reach once it is running -- the deny-list sandbox, the open item from the 2026-11-16
+quorum verification.
 ### A440. [security hunt -- second catch from the A438 queue] /claim_rewards' auth was sound but its domain-separation and ownership had no runner -- GUARDED 2026-11-16
 
 Hunting the A438 queue at `/claim_rewards` (a money POST). No new exploitable gap -- the v8.4 fix (`verify_stake_action_signature`, PATCH LOG item L) is sound: a signature required, the ACTION bound into the signed frame so a "claim" authorization is not an "unstake" one, the KEY bound so only the owner acts, and route-level replay via a persistent DB nonce. Unlike A439 there is NO freshness window here, so the non-finite-timestamp class does not apply. **The honest finding is a coverage gap, not a bug:** `test_a1a_a2` already proved a BAD signature is refused (400), but the two properties the v8.4 fix is actually FOR -- action domain separation and key ownership -- had no test. A fix whose key property has no runner is the A65 gap.
