@@ -138,6 +138,7 @@ SUITES = [
     # a PENDING succession episode immediately on a LIVE primary (measured); a
     # non-finite value 500'd at the db. Now rejected at write time; both ways.
     ("test_a442_succession_timing.py",    60,  "SECURITY"),
+("test_a447_ally_not_operator.py",    60,  "SECURITY"),
     ("test_k1_runner_key_preservation.py",120, "SECURITY"),
     ("test_k3_p9_owner_only_guard.py",   120,  "SECURITY"),
     # Arrived on main 2026-08-27 from fix/tally-counts-failures-as-passes,
