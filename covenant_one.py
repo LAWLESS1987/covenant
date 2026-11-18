@@ -1039,6 +1039,9 @@ SUITES = [
     # The go-live scheme ends "ALL PASS" with no number, so it joins "passed, counted 0" -- named, not hidden.
     ("ai_memory_system/test_memory_system.py", 180, "SECURITY"),
     ("tools/test_golive_scheme.py", 60, "SECURITY"),
+    # HT (2026-11-09, 116094e): in a topic we opened, a reply to post #1 is addressed to us. It shipped
+    # unregistered, so the sweep of 298bd10 read "orphaned on disk 1". Pure, no network; 4/4 by hand.
+    ("test_hf_threads_own_topic.py", 30, "JUDGE"),
     # A425 (2026-11-14), A419 a second time: the intent-provenance gate's own suite (d57ea70, 32 checks, every
     # guard driven both ways) sat beside M1 in the same folder and was in no runner, so CI never ran it. A419
     # listed the two suites it found and left the coverage phase reading the root only, so the next one was not
