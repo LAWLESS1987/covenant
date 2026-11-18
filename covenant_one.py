@@ -587,6 +587,9 @@ SUITES = [
     ("test_a314_persona_feed.py",        180,  "JUDGE"),
     ("test_pc1_sister_interface.py",     180,  "JUDGE"),
     ("test_fw1_free_will.py",            120,  "JUDGE"),
+    # FT1 (2026-11-18, A451, his "Yes, fix titles"): her own-post title is never the format instruction written
+    # back -- 5 posts went live titled "a title under 80 characters:". 12 checks; four mutations each turn it red.
+    ("test_ft1_free_post_title.py",       60,  "JUDGE"),
     # FW2 (2026-11-04, A409 H1): every attempt records its prior covenant refusals; retiring a target after N refusals
     # is built but OFF by default (Tetsu said NO) and switched on only by the grant. 6 mutations on a copy, all red.
     ("test_fw2_refusal_retire.py",       120,  "JUDGE"),

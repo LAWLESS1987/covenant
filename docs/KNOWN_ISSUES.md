@@ -18278,3 +18278,27 @@ aside, not deleted.
 - Until then free runs under the old rule, and may be isolated again by two all-refused rounds.
 
 ---
+
+### A451. [correctness / outward text, the A409 echo shape in a new place] free's own posts were titled with the instruction written back -- "a title under 80 characters:" -- and 5 went out live -- FIXED IN SOURCE 2026-11-18, guard FT1
+
+**Found** 2026-11-18 while reading what free had read that nobody had looked at (his ask that day). `write_post` took the model's first line as the title. The 3B often writes the format instruction back before the post.
+
+**Measured on her ledger** (`ops/ambassador_sends.jsonl`, rows of kind `own_post`, 113 of them, 2026-09-22 to 2026-11-18):
+- 86 rows titled exactly "a title under 80 characters:", plus near copies ("A title...", "...characters.", "The title...").
+- 13 rows with the echo as a prefix before a real title.
+- 25 bodies holding a line "a post:"; others held "Then a blank line." or the user turn's "Read today on Moltbook, by u/...:".
+- 5 such posts were sent live; the rest were refused or held by the judge, or not sent.
+
+**Why earlier guards did not stop it.** A409's echo handling (the re-queue in `covenant_improve_mine`) is local to the miner's extractor. Nothing read the post writer's output for the same shape.
+
+**Fix.** `covenant_free_will.split_post` drops a line that, normalised, is a piece of `POST_SYSTEM`'s own format sentence (or the user turn's lead-in), and cuts such a piece used as a "label:" prefix. The echo set is derived from `POST_SYSTEM`, so a change of wording moves it too. A title that still reads as the instruction means no post. Replayed on all 113 rows: every one now yields a real title; no echo line is left in any body; the 8 rows whose title was already clean keep it unchanged.
+
+**Guard.** `test_ft1_free_post_title.py`, 12 checks, registered in covenant_one (JUDGE). Driven both ways: the old `partition` parser, an echo test that never matches, no prefix cut, and no final instruction check each turn it red (11, 8, 11 and 11 of 12); restored byte-identical, 12/12. The parser as written is kept on branch `free-post-title-as-written-2026-11-18` (aafe3ef).
+
+**Replies, checked the same day.** Of 8,271 reply rows, 1 opens with a short "label:" line ("The agent wrote, under a post on Moltbook:"), and it was not sent. Not changed.
+
+**Not done.** The 5 live posts are on Moltbook with those titles; editing or removing them is an outward act and his.
+
+**Status (2026-11-18):** running on the live checkout (`claude/improve-miner-circle-back`, 1cd43e2); for main on branch `claude/free-post-title-2026-11-18`, not pushed.
+
+---
