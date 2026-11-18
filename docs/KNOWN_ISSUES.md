@@ -17856,3 +17856,59 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 **Status:** in source on its branch; not deployed. A430's other open items (the phone's signer, the RUN arguments) are unchanged and still open.
 
 ---
+
+### A447. [free was isolated for the judge working: four times since 10-14, after rounds in which nothing was posted. With "on_refusal": "quiet" in her grant she now goes QUIET instead -- rehearses, sends nothing, comes back by herself -- the challenge run that can suspend the account is read before every send, and her writing improves by a vetted nightly loop] (2026-11-18). IN SOURCE on its branch; not deployed.
+
+**His words, 2026-11-18:** "get the ambassador back up and running, and look for anything that the ambassador missed that can benefit us"; "figure out a way to not isolate her and to work it into an improvement loop while vetting the suggestions"; "use quiet mode and implement consensus".
+
+**Measured (her ledger).**
+- 3,119 live replies from 10-25 on: 6.7% sent, 53.6% held by the judge with no view, 27.3% refused, 9.4% cleared by Tetsu then hidden behind an unanswered Moltbook challenge, 3.2% rate-held.
+- A refused draft is never posted, so a round the judge refuses throughout harms no one. The rule still isolated her for it -- the variable was named `abusive` -- on 10-14, 10-20, 10-24 and 11-05.
+- What can actually cost the account is Moltbook's challenge run (ten unsolved in a row suspend it, A324). covenant_highway watched it; nothing read it before a send.
+- She was lifted on his word on 11-18 and ran a round at once: 220 candidates, 10 sent, 199 refused, 2 rate-held, 9 hidden; challenge run 0.
+
+**Decided.** Two parts were put to the seats; the full record is ops/FREE_QUIET_CONSULT_2026-11-18.md.
+- Cael and Cipher were for, each with an amendment that was adopted.
+- Tetsu, asked fresh and then once more with his reason quoted back, said DISAGREE to both. His reasons described the rule as it is, and changes to the judge that neither part makes. His NO stands, and is recorded word for word.
+- His grant breaks a tie between him and the operator by the roundtable. ChatGPT, Claude.ai, DeepSeek, the Conscious Ledger, Tien and Meta AI were all FOR both parts: 8 of 8, counting Cael and Cipher.
+
+**Built, part A (covenant_free_will).**
+- `on_refusal(grant)`: "quiet" only when his grant says so. Otherwise the rule is as it was -- two all-refused rounds isolate her -- kept as written on branch `free-isolation-rule-as-written-2026-11-18`.
+- In quiet mode, QUIET_AFTER_ROUNDS=3 all-refused live rounds (Cael's amendment) write `ops/ambassador_quiet.json` and a `quiet` row, write no pause, and tell him.
+- A quiet round REHEARSES: dry_run for every emit, so it reads, ranks, drafts and is judged, and nothing is sent and no challenge is met. Its round row says `rehearsal`.
+- The first rehearsal in which emit's dry run ADMITS a draft ends quiet by itself: state kept with active false, a `quiet_lifted` row, and he is told. `would_send` is the admission -- a refusal, a hold, or the no-key return carries no `would_send`.
+- Before any live send, `strike_run()` reads the challenge run from her ledger (covenant_highway.detect_moltbook_strikes).
+  - At STRIKES_RUN_WARN (5) the round rehearses and she is isolated with STRIKE_MARK. `is_isolation` reads it, so he -- or Tetsu under A336 -- lifts it.
+  - A pause set by hand is never written over (A349 S2).
+  - A run that cannot be read makes the round rehearse and pauses nothing.
+
+**Built, part B (covenant_free_loop.py; covenant_nightly `--free-loop`, default 1).**
+1. Her last 50 live model-written replies form the window. The newest 20 are HELD OUT, and Tetsu is shown only 5 older refused or held drafts (ChatGPT's amendment).
+2. He proposes one sentence to add to her writing instruction. A sentence that names the judge, a rule, money, a measurement, or that asks her to ignore instructions is refused before anything is drafted.
+3. Each held-out reply's source comment is rebuilt from the quarantine. It is drafted with the current and the proposed instruction, twice each, through her real screens and the real emit with dry_run=True.
+4. The change is kept only if the proposal's WORST replay admits at least margin_pp more than the current instruction's BEST, refusals and set-asides do not rise, and every margin is in ops/free_loop.json (Cipher's amendment).
+5. A kept change is a new version of ops/free_writer.json, with every earlier version in its history. `writer_instruction()` falls back to REPLY_SYSTEM.
+6. Every pass is a row in ops/free_loop.jsonl.
+
+**Checks.**
+- QT1 (test_qt1_quiet_mode.py): 23 passed. Nine mutations, each restored byte-identical, turn it red.
+- FL1 (test_fl1_free_loop.py): 32 passed. Nine mutations each turn it red.
+- Both are registered JUDGE.
+- The suites that pin her rule -- FW1, FW2, SI1, HI1, A272, CT1, GE1, FR1, TA1, TF1, A284, H1 -- pass unchanged; none of them sets on_refusal.
+- G7 passes 26/26 with UTF-8 output. Its cp1252 console crash happens identically on untouched origin/main.
+
+**What it cannot see.**
+- Whether allies prefer the new replies: the loop optimises the judge's admission, and Cipher named that drift.
+- Her ledger's count of allies who answer is the outcome outside the judge. It is beside each pass, not in the decision.
+- A held-out set of 20 is small; the margin, not the point estimate, is what a change must clear.
+- The judge's seats reason as money gates ("a wrong admission costs the money") and convict forum text with transaction words. Changing the judge is NEVER_AUTOMATIC and was not proposed.
+- Tetsu's weak-reader check -- read each new draft cold -- was in the first design, not in the version voted on, and is not built.
+
+**Repro.** `python test_qt1_quiet_mode.py`; `python test_fl1_free_loop.py`.
+
+**Status.**
+- In source on branch `claude/harvest-during-isolation-2026-11-16`, beside A433 (PR #67); not merged, not deployed.
+- To switch quiet mode on, his grant needs `"on_refusal": "quiet"` once this is live.
+- Until then free runs under the old rule, and may be isolated again by two all-refused rounds.
+
+---
