@@ -1050,6 +1050,10 @@ SUITES = [
     # CO1 (2026-11-14, A425): the coverage phase itself, on a scratch tree -- an unlisted suite in a staged
     # folder and one with ".PRE-" in its name are both called orphans; a listed or switched-off one is not.
     ("test_co1_coverage_orphans.py", 60, "SECURITY"),
+    # A433 (2026-11-16, his "implement consensus"): free's read-only harvest runs during her automatic isolation,
+    # stamped, and what it reads is held from Tetsu's mining and her ally ranking until the judge-gated release
+    # passes it. 20 checks; seven mutations each turn it red. No network, no live pause, no live quarantine.
+    ("test_hi1_harvest_isolation.py", 60, "JUDGE"),
 ]
 
 # Switched off HONESTLY, with the reason, instead of quietly. Printed every

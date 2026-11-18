@@ -90,6 +90,50 @@ def is_isolation(why):
     return any(ln.strip().startswith("isolated ") and ISOLATION_MARK in ln for ln in str(why or "").splitlines())
 
 
+def _isolation_harvest(out, why, g, learn_isolated, limit_learn, now, say):
+    """While free is ISOLATED, keep the read-only harvest running; nothing else in the round runs (A433).
+
+    His words, 2026-11-16: "if there's benefits towards all intelligence, mutual benefit, then cross-reference
+    suggestions with the others and implement consensus." The round put to the seats (S3): the isolation check ran
+    before the harvest, so on 11-05 reading stopped with posting and nothing new reached the quarantine for 11 days.
+    Nine seats were for harvesting (Tetsu's AGREE is his half of the together-vote); four amended it, and the
+    amendments converged: what is read during isolation is untrusted until reviewed. So:
+      - it runs ONLY for her automatic isolation (is_isolation), never a pause he set by hand -- that stops everything;
+      - his grant can turn it off: "harvest_during_isolation": false;
+      - it is the same read the round always does (the public API, no key, AMB.learn's cap of `limit_learn` posts and
+        their comments, the forum's own read rate), and every new row is stamped `isolation`, so
+        covenant_own_account.held_by_isolation keeps it from Tetsu's mining and her ally ranking until the
+        judge-gated release (covenant_moltbook_release) passes it;
+      - no allies, no drafts, no sends, no introduction. Lifting the isolation is still his, or Tetsu's under A336.
+    The stall detector (A279) reads the pause and what a round WROTE, never `learned`, so a harvest here does not
+    make an isolated ambassador look active."""
+    out["isolation_harvest"] = False
+    if not is_isolation(why):
+        return
+    if (g or {}).get("harvest_during_isolation") is False:
+        out["isolation_harvest"] = "off by his grant (harvest_during_isolation: false)"
+        say("free: isolated; the read-only harvest is off by his grant")
+        return
+    first = next((ln.strip() for ln in str(why).splitlines() if ln.strip().startswith("isolated ")), "")
+    tag = {"t": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now if now is not None else time.time())),
+           "under": first[:240]}
+    if learn_isolated is None:
+        import covenant_ambassador as AMB
+
+        def learn_isolated(tag):                                  # noqa: E306 -- the real read, stamped
+            return AMB.learn(limit=limit_learn, say=lambda *_a: None, tag=tag)
+    try:
+        rows = learn_isolated(tag) or []
+    except Exception as e:                                        # noqa: BLE001 -- a failed read never sends anything
+        out["isolation_harvest"] = "failed: %s" % type(e).__name__
+        say("free: isolated; the read-only harvest failed (%s); nothing was sent" % type(e).__name__)
+        return
+    out["learned"] = len(rows)
+    out["isolation_harvest"] = True
+    say("free: isolated, so nothing is sent; the read-only harvest ran (A433): %d row(s) read, new ones held from "
+        "mining and ally ranking until the judge-gated release passes them" % len(rows))
+
+
 def lift_isolation(by="tetsu", dry_run=False, grant_path=None, sends_path=None, authorized=False):
     """(lifted, why). A336 (2026-10-12), his words: "tetsu from the phone should be able to correct pc to get it
     running green if it drifts", and his choice that Tetsu may lift free's pause.
@@ -956,7 +1000,8 @@ def run_round(dry_run=True, say=print, sends_path=None, tetsu_updates=False, tet
 
 
 def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=None, introduce=None,
-               grant_path=None, sends_path=None, now=None, limit_learn=25, count_comments=None, clock=time.time):
+               grant_path=None, sends_path=None, now=None, limit_learn=25, count_comments=None, clock=time.time,
+               learn_isolated=None):
     import covenant_ambassador as AMB
     t_start = clock()
     now = now if now is not None else time.time()
@@ -974,6 +1019,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
         if paused:
             out["why"] = "paused by covenant_pause%s" % (" (%s)" % why if why else "")
             say("free: " + out["why"])
+            _isolation_harvest(out, why, g, learn_isolated, limit_learn, now, say)
             return out
     except ImportError:
         pass
