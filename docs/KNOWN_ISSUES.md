@@ -17908,7 +17908,7 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 
 **Status.**
 - In source on branch `claude/harvest-during-isolation-2026-11-16`, beside A433 (PR #67); not merged, not deployed.
-- To switch quiet mode on, his grant needs `"on_refusal": "quiet"` once this is live.
+- His grant on this branch carries `"on_refusal": "quiet"` with his words (`on_refusal_AUTHOR`), so quiet mode is on once this is live; removing the key returns her to two-round isolation.
 - Until then free runs under the old rule, and may be isolated again by two all-refused rounds.
 
 ---
