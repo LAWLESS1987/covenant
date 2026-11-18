@@ -204,6 +204,13 @@ def content_digest(rec: Dict[str, Any]) -> str:
 # the memory SAYS.
 _NODE_LOCAL = _VOLATILE + ("created", "review", "review_by")
 
+# Only the store and its admission checks may assign these fields. An
+# extension is not evidence of review, identity, or checked provenance.
+_STORE_FIELDS = frozenset(_NODE_LOCAL + (
+    "type", "agent", "intent", "beneficiary", "divergence", "diverges_from"))
+# parse_memory uses splitlines(), which also recognizes Unicode separators.
+_FRONTMATTER_BREAKS = "\r\n\x00\v\f\x1c\x1d\x1e\x85\u2028\u2029"
+
 
 def claim_digest(rec: Dict[str, Any]) -> str:
     """Hash of the claim ALONE, for comparing one node against another.
@@ -305,15 +312,18 @@ def render_memory(name: str, description: str, mtype: str, body: str,
     # memory. It cannot escape, because parse_memory stops at the fence.
     for label, val in (("name", name), ("description", description),
                        ("type", mtype), ("agent", agent)):
-        if any(c in str(val) for c in "\r\n\x00"):
+        if any(c in str(val) for c in _FRONTMATTER_BREAKS):
             raise ValueError(
                 f"{label} may not contain newlines or NULs: they would break "
                 f"out of the frontmatter and forge other fields")
     lines = [f"---", f"name: {name}", f"description: {description}",
              "metadata:", f"  type: {mtype}", f"  agent: {agent}"]
+    for k in extra or {}:
+        if not isinstance(k, str) or not k or k != k.strip() or ":" in k:
+            raise ValueError("metadata keys must be nonempty, trimmed and contain no colon")
     for k in sorted(extra or {}):
         v = (extra or {})[k]
-        if any(c in str(k) + str(v) for c in "\r\n\x00"):
+        if any(c in str(k) + str(v) for c in _FRONTMATTER_BREAKS):
             raise ValueError(f"metadata {k!r} may not contain newlines or NULs")
         if v not in (None, ""):
             lines.append(f"  {k}: {v}")
@@ -701,6 +711,10 @@ class MemoryStore:
             extra: Optional[Dict[str, Any]] = None,
             intent: str = "", beneficiary: str = "", divergence: str = "",
             diverges_from: str = "") -> Dict[str, Any]:
+        if extra is not None and not isinstance(extra, dict):
+            raise ValueError("metadata extensions must be an object")
+        if any(isinstance(k, str) and k.strip() in _STORE_FIELDS for k in (extra or {})):
+            raise ValueError("metadata extensions cannot override store-owned fields")
         if mtype not in ("user", "feedback", "project", "reference"):
             raise ValueError(f"bad type {mtype!r}")
         if tier not in ("core", "archival"):

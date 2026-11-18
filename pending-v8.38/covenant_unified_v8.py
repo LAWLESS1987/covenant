@@ -5551,6 +5551,22 @@ class StakingPool:
         return math.fsum(s.amount for s in self.stakes.values())
 
     def stake(self, pubkey: str, amount: float, duration: int) -> Tuple[bool, str]:
+        # A441: reject a NON-FINITE amount before any state change. nan slips both
+        # `amount <= 0` (nan <= 0 is False) and `balance < amount` (balance < nan is
+        # False), so without this a nan amount reached self.stakes[pubkey] -- poisoning
+        # total_staked, which is DERIVED from it -- and then diverged from the db when
+        # save_stake hit SQLite's NOT NULL constraint (nan -> NULL) and raised, leaving
+        # the staker locked out with a row the db never got. The U invariant (reject
+        # non-finite at every ingress) covered transactions and the ledger, not /stake.
+        # A441: reject a NON-FINITE amount before any state change. nan slips both
+        # `amount <= 0` (nan <= 0 is False) and `balance < amount` (balance < nan is
+        # False), so without this a nan amount reached self.stakes[pubkey] -- poisoning
+        # total_staked, which is DERIVED from it -- and then diverged from the db when
+        # save_stake hit SQLite's NOT NULL constraint (nan -> NULL) and raised, leaving
+        # the staker locked out with a row the db never got. The U invariant (reject
+        # non-finite at every ingress) covered transactions and the ledger, not /stake.
+        if not math.isfinite(amount):
+            return False, "Stake amount must be finite"
         if amount <= 0:
             return False, "Stake amount must be positive"
         if duration < STAKE_MIN_DURATION:
@@ -5804,6 +5820,18 @@ class SuccessionGuardianSystem:
                 return False, (f"{label} pubkey is not a usable public key -- "
                                f"rejected at write time rather than stored and "
                                f"discovered unusable at succession")
+        # A442: validate the dead-man's-switch TIMING before storing it. A negative
+        # heartbeat_interval_days or grace_period_days makes check_dead_mans_switch's
+        # deadline (last_heartbeat + interval*86400 + grace*86400) land in the PAST,
+        # so it fires a PENDING succession episode immediately -- on a LIVE primary
+        # whose heartbeat cannot prevent it (measured: a fresh register with
+        # interval=-100000 triggered episode 1 at once). A non-finite value raises
+        # at the db's NOT NULL column (nan -> NULL) and 500s. Reject both at write
+        # time, the way /stake rejects a non-finite amount (A441, the U invariant).
+        if not math.isfinite(heartbeat_interval_days) or heartbeat_interval_days <= 0:
+            return False, "heartbeat_interval_days must be a positive finite number"
+        if not math.isfinite(grace_period_days) or grace_period_days < 0:
+            return False, "grace_period_days must be a non-negative finite number"
         with self.lock:
             cfg = SuccessionConfig(primary_pubkey=primary_pubkey, successor_pubkey=successor_pubkey,
                                     threshold=threshold, heartbeat_interval_days=heartbeat_interval_days,

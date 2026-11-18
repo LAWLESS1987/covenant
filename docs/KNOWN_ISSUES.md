@@ -17936,3 +17936,127 @@ Hunting the A438 queue at its top item, `/actuator_learn`, turned up two real th
 **Status:** in source on its branch, both fixes with both-ways tests; the nan fix touches the live gate but is NOT deployed (no change to A/B/C without the operator's word).
 
 ---
+
+### A444. [security] A signed request replayed once per PROCESS: the nonce store was per-process memory -- now durable and shared
+
+**Found 2026-11-18**, from the Hugging Face receipt-profile thread (topic 180706 #44): nootxlm's attack suite
+showed two processes sharing one store both accepting the same receipt -- check-and-record is one step inside a
+process, not across two. Covenant had the same shape, plainer: `covenant_daily_plan._seen_nonces` and
+`covenant_mycelium._seen` were module-level sets, nothing on disk, no lock, and `sign_json_request` binds no
+node. So a captured signed operator request was replay-protected only inside the one process that first saw it.
+On the laptop, A, B and C run from one checkout as three processes: the same signed RUN could execute once per
+node inside `WINDOW_S` (300 s), and a restart wiped the set (the "wipe and replay inside the window" case).
+
+**Fixed.** `pairstore_excl.ExclPairStore` (the cross-process (signer, nonce) pair-store built for that thread on
+2026-11-18 and race-tested both ways on Windows and WSL: one file per pair created by `os.link`, so a second
+link to the same name fails) now backs both verify paths through `covenant_daily_plan.nonce_check_and_record`.
+The order changed too: the signature is verified FIRST, then one atomic check-and-record, so an unverified
+request never consumes a nonce. The store lives at `ops/operator_nonces.pairs/` (`COVENANT_NONCE_STORE`
+relocates it; tests use a temp dir); expired pairs are pruned at most once a minute. A caller that passes its own
+`seen` set keeps the old in-process semantics.
+
+`test_a444_nonce_store.py` (SECURITY) drives it both ways: of six concurrent processes presenting one pair,
+exactly one accepts; a fresh process refuses a pair already recorded; the CONTROL (the old per-process set)
+accepts it in every process, so the test can see the vector; prune drops expired pairs and keeps live ones; and
+through the real `verify_signed` with a registered signer, a replay is refused in the same process and in a fresh
+one, while a bad-signature request leaves the nonce unconsumed. 7 of 7 on 3.12.10; A430S still 13 of 13.
+
+**NOT closed, recorded as the follow-up.** Cross-HOST replay: node D and the laptop do not share a checkout, so
+the same request still lands once on each host inside the window. Closing that needs the target node bound into
+the signed request (`sign_json_request` + the phone signer), or seen-nonces gossiped over the mesh. The store is
+for one machine's local filesystem; network filesystems were not tested. Wipe the pair directory and replay inside
+the window and the request is accepted -- the profile's own limit, unchanged.
+### A445. [security] A metadata extension could forge a store-owned field, and a Unicode line separator could break out of the frontmatter -- hardened
+
+**Found 2026-11-18** sitting UNCOMMITTED in node D's working copy of `ai_memory_system/memory_store.py`: a prior
+hardening patch that had never reached main (node D's updater was excluding the file from its drift check as if
+it were runtime state; Astra's scratch run showed it is code -- 13 of 13 source files unchanged across 106 state
+operations -- and that memory data already lives in separate ignored files). Two vectors it closes:
+(1) a metadata extension could set a store-owned field -- `type`, `agent`, `intent`, `beneficiary`, `divergence`,
+`diverges_from`, and the node-local `created` / `review` / `review_by` -- so an extension could pass itself off as
+evidence of review, identity or checked provenance; (2) `render_memory` refused only `\r`, `\n` and NUL in a
+frontmatter field, but `parse_memory` splits with `splitlines()`, which also honours `\v`, `\f`, `\x1c`-`\x1e`,
+`\x85`, `\u2028` and `\u2029` -- so a field carrying one of those could break out of the frontmatter and forge
+other fields.
+
+**Fixed.** `_STORE_FIELDS` names the store-owned fields and `MemoryStore.put` refuses an extension that sets
+one; a non-dict extension is refused; `_FRONTMATTER_BREAKS` lists every separator `splitlines()` honours and
+`render_memory` refuses all of them in every frontmatter field; an extension key must be non-empty, trimmed and
+colon-free. Checks A445.1-A445.6 in `ai_memory_system/test_memory_system.py` drive it both ways: the forbidden
+inputs raise, an ordinary extension still renders and lands. The existing M1 suite stays green.
+
+**Limits.** This hardens the writer and the renderer. It does not re-validate records already on disk: a record
+written through an older writer with a forged field still reads as it was written (the chain shows when it was
+written, not that the field was honest).
+### A443. [security] The workshop runner starts Python in isolated mode -- now pinned both ways
+
+Asked on the Hugging Face forum (topic 191990, post 2, 2026-11-17): a `json.py` planted beside the hashed
+script loads unhashed if the script imports `json` and the child starts without `-I`, `-P` or
+`PYTHONSAFEPATH` -- does the launch pass any of those? It does. `covenant_tetsu_hands.run()` starts the child
+as `python -I -c RUNNER`, and on 3.11+ `-I` also sets `safe_path`, so the script's folder is never prepended
+to `sys.path`. Measured on this PC (3.12.10): with `-I` the planted module did not load (the standard
+library did; `sys.path[0]` was the stdlib zip); without `-I`, the control, it loaded. Until now nothing
+pinned the flag: removing `-I` would have reopened the vector silently.
+
+**Fixed.** `test_a443_runner_isolation.py` (SECURITY, registered in `covenant_one.py`) pins it: a static
+check that `run()` still passes `-I` before `-c RUNNER`; a planted sibling module that must NOT import under
+`-I`; the control that it DOES import without `-I`, so the test can see the vector; and `safe_path` asserted
+under `-I` on 3.11+. Four checks, all green on 3.12.10.
+
+**Limits.** This pins the launch flags and the sibling-module vector only. It says nothing about what an
+authorized script can reach once it is running -- the deny-list sandbox, the open item from the 2026-11-16
+quorum verification.
+### A440. [security hunt -- second catch from the A438 queue] /claim_rewards' auth was sound but its domain-separation and ownership had no runner -- GUARDED 2026-11-16
+
+Hunting the A438 queue at `/claim_rewards` (a money POST). No new exploitable gap -- the v8.4 fix (`verify_stake_action_signature`, PATCH LOG item L) is sound: a signature required, the ACTION bound into the signed frame so a "claim" authorization is not an "unstake" one, the KEY bound so only the owner acts, and route-level replay via a persistent DB nonce. Unlike A439 there is NO freshness window here, so the non-finite-timestamp class does not apply. **The honest finding is a coverage gap, not a bug:** `test_a1a_a2` already proved a BAD signature is refused (400), but the two properties the v8.4 fix is actually FOR -- action domain separation and key ownership -- had no test. A fix whose key property has no runner is the A65 gap.
+
+**Closed.** `test_a440_stake_action_auth.py` (6/6) pins, both ways: a claim-sig authorizes claim (control) but is refused for unstake and vice versa (domain separation holds only because `action` is inside the frame -- drop it and this fails); another key's signature over the same frame is refused (ownership); a tampered timestamp and a garbage signature are refused. Names `/claim_rewards` and `/unstake`, SECURITY-tagged, so the map credits both: queue **17 -> 15**.
+
+**Not covered / still open.**
+- The route-level REPLAY nonce (`/claim_rewards`, `/unstake` reject a resubmitted signature) is proven by code read, not by a test -- it needs a booted node + staking pool; a node-boot test is the next step.
+- `/stake` stays in the queue: it gates on a DIFFERENT function (`verify_stake_signature`), a separate item.
+- **A map-accuracy limitation, noted not fixed:** the map OVER-reported `/claim_rewards` because its tag parser reads only single-word tags, so it could not see `test_a1a_a2`'s compound tag "ROUTES + BOUNDS" (nor opsec's "DAILY + GUARDS"). Over-reporting is the safe direction (a covered route flagged, not an uncovered one hidden -- the opposite of A439's self-coverage bug), so it is recorded for a later map increment rather than rushed. Even fixed, those two tag families are not in the adversarial set, so the judgement of whether a ROUTES/GUARDS suite counts as route-defense is the operator's, not the map's.
+
+**Status:** in source on its branch, with its test both ways; a test-only change (no runtime code touched), nothing deployed.
+
+---
+
+### A441. [security hunt -- third catch from the A438 queue; a REAL exploitable defect] A non-finite stake amount corrupted the staking pool -- FIXED 2026-11-16
+
+Hunting the A438 queue at `/stake` (a money POST) found the most serious catch so far -- not a coverage gap but a live, exploitable defect, confirmed by running it.
+
+**The exploit.** `/stake` reads `amount = float(data.get("amount"))` and calls `StakingPool.stake(pubkey, amount, duration)`. That method guarded with `if amount <= 0` and `if balance < amount` -- **both are False for `nan`** (every nan comparison is False), so a `nan` amount slipped both. It was then written into `self.stakes[pubkey]` (line order: the in-memory dict is set, THEN `save_stake`, THEN `record_ledger_entry`). `total_staked` is DERIVED from `self.stakes`, so it became **nan -- poisoning every yield and reward sum in the pool**. Then `save_stake` hit SQLite's NOT NULL constraint (`nan` -> NULL) and RAISED, so the db never got the row: the in-memory pool and the db diverged, the request 500'd, and the staker was left `already staked` with a stake the db does not have (locked out). A `nan` amount still needs a valid `verify_stake_signature` over `str(nan)`, so the reach is any registered staker -- but one request corrupts the whole pool.
+
+Confirmed by running it: `StakingPool.stake(pk, float('nan'), ...)` raised `IntegrityError: NOT NULL constraint failed: stakes.amount` with `pk in pool.stakes == True`.
+
+**Why U did not catch it.** `test_security_audit`'s U invariant -- reject non-finite amounts at every ingress -- covers the transaction endpoint, the trading bridge and `record_ledger_entry`, but NOT `/stake`/`StakingPool.stake`. This is the ingress U missed.
+
+**Fix.** `StakingPool.stake` rejects a non-finite amount before any state change (`if not math.isfinite(amount): return False, "Stake amount must be finite"`), at the chokepoint every caller passes (the route, direct library calls, any raw path) -- the same level U names.
+
+**Repro:** `python test_a441_nonfinite_stake.py` (4/4), exploit-first both ways: pre-A441, `stake(pk, nan, ...)` RAISES and leaves `pk` in `self.stakes` (the corruption); after, it returns `(False, "...finite...")` and touches nothing. inf is likewise refused; a finite positive amount still reaches the balance check (the guard did not start refusing everything); zero/negative still rejected as "positive". Names `/stake`: queue drops it.
+
+**Noted, not changed.** The write-before-persist ordering in `stake()` (`self.stakes[pubkey]` set before `save_stake`) is a latent in-memory/db divergence for any `save_stake` failure, not only nan; the finite guard removes the nan vector, but the ordering is a separate hardening. `int(duration)` on a malformed value still 500s (robustness, lower).
+
+**Status:** in source on its branch, with its test both ways. This touches runtime code (`covenant_unified_v8.py`), so `source_sha256` changes; it is NOT deployed -- no change to A/B/C without the operator's word.
+
+---
+
+### A442. [security hunt -- fourth catch from the A438 queue] Succession registration did not validate the dead-man's-switch timing -- a negative interval fired a false succession on a live primary -- FIXED 2026-11-16
+
+Hunting the A438 queue at `/succession/register` (CONTROL -- the takeover-resistance surface). `SuccessionGuardianSystem.register` was already well-hardened where it counts: the threshold is bounded (`1 <= threshold <= N`, so the M-of-N cannot be set to 0), guardians are capped and must be 2+ distinct, every key is PEM-validated. But it validated NONE of `heartbeat_interval_days` / `grace_period_days`.
+
+**The defect, measured.** `check_dead_mans_switch` computes `deadline = last_heartbeat + interval*86400 + grace*86400` and fires a PENDING succession episode when `now > deadline`. A NEGATIVE interval or grace makes the deadline land in the PAST, so the switch fires IMMEDIATELY -- and the primary's heartbeat cannot stop it, because a fresh heartbeat only resets `last_heartbeat`, which is still behind the negative offset. Confirmed: `register(interval=-100000, grace=0)` was accepted, and `check_dead_mans_switch` on a just-registered LIVE primary returned `PENDING triggered, episode 1`. A non-finite value instead raises at the db's `NOT NULL` REAL column (`nan -> NULL`) and 500s.
+
+**Severity -- bounded, checked before claiming.** Succession here is a guardian key-RECOVERY scheme: recovery material is sealed to the ORIGINAL guardians (`seal_recovery_material`), so a false trigger -- even followed by attacker-chosen guardians confirming -- does not hand over the primary's sealed material or assets. So this is a false-trigger / griefing of a security-critical mechanism (a bogus "primary incapacitated" episode), not a direct takeover. Still worth closing: a dead-man's-switch that fires on a live, heartbeating primary is broken.
+
+**Fix.** `register` rejects a non-finite or non-positive `heartbeat_interval_days` and a non-finite or negative `grace_period_days` at write time -- the same U-invariant discipline as /stake (A441).
+
+**Repro:** `python test_a442_succession_timing.py` (6/6), exploit-first both ways: pre-A442 `register(-100000)` succeeds and the switch fires PENDING on a live primary; after, register refuses it (and there is no config to fire). inf/nan/zero are refused; a valid 30/15 config registers and does NOT false-trigger.
+
+**Noted, not changed (the operator's design calls, not mine).**
+- `/succession/register` is self-attested (no signature) and `save_succession_config` overwrites by `primary_pubkey`, so an attacker can overwrite a victim's succession CONFIG (a griefing vector). The route docstring defends the self-attested model and the recovery material stays sealed to the original guardians; changing this is a design decision, flagged for review, not patched blind.
+- `/succession/heartbeat` and `/succession/confirm` also read `float(timestamp)`; their freshness/replay handling is a separate check, a later hunt item.
+
+**Status:** in source on its branch, with its test both ways. Runtime code (`covenant_unified_v8.py`) -> `source_sha256` changes; NOT deployed (no change to A/B/C without the operator's word).
+
+---
