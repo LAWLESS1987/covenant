@@ -17936,3 +17936,58 @@ Hunting the A438 queue at its top item, `/actuator_learn`, turned up two real th
 **Status:** in source on its branch, both fixes with both-ways tests; the nan fix touches the live gate but is NOT deployed (no change to A/B/C without the operator's word).
 
 ---
+
+### A440. [security hunt -- second catch from the A438 queue] /claim_rewards' auth was sound but its domain-separation and ownership had no runner -- GUARDED 2026-11-16
+
+Hunting the A438 queue at `/claim_rewards` (a money POST). No new exploitable gap -- the v8.4 fix (`verify_stake_action_signature`, PATCH LOG item L) is sound: a signature required, the ACTION bound into the signed frame so a "claim" authorization is not an "unstake" one, the KEY bound so only the owner acts, and route-level replay via a persistent DB nonce. Unlike A439 there is NO freshness window here, so the non-finite-timestamp class does not apply. **The honest finding is a coverage gap, not a bug:** `test_a1a_a2` already proved a BAD signature is refused (400), but the two properties the v8.4 fix is actually FOR -- action domain separation and key ownership -- had no test. A fix whose key property has no runner is the A65 gap.
+
+**Closed.** `test_a440_stake_action_auth.py` (6/6) pins, both ways: a claim-sig authorizes claim (control) but is refused for unstake and vice versa (domain separation holds only because `action` is inside the frame -- drop it and this fails); another key's signature over the same frame is refused (ownership); a tampered timestamp and a garbage signature are refused. Names `/claim_rewards` and `/unstake`, SECURITY-tagged, so the map credits both: queue **17 -> 15**.
+
+**Not covered / still open.**
+- The route-level REPLAY nonce (`/claim_rewards`, `/unstake` reject a resubmitted signature) is proven by code read, not by a test -- it needs a booted node + staking pool; a node-boot test is the next step.
+- `/stake` stays in the queue: it gates on a DIFFERENT function (`verify_stake_signature`), a separate item.
+- **A map-accuracy limitation, noted not fixed:** the map OVER-reported `/claim_rewards` because its tag parser reads only single-word tags, so it could not see `test_a1a_a2`'s compound tag "ROUTES + BOUNDS" (nor opsec's "DAILY + GUARDS"). Over-reporting is the safe direction (a covered route flagged, not an uncovered one hidden -- the opposite of A439's self-coverage bug), so it is recorded for a later map increment rather than rushed. Even fixed, those two tag families are not in the adversarial set, so the judgement of whether a ROUTES/GUARDS suite counts as route-defense is the operator's, not the map's.
+
+**Status:** in source on its branch, with its test both ways; a test-only change (no runtime code touched), nothing deployed.
+
+---
+
+### A441. [security hunt -- third catch from the A438 queue; a REAL exploitable defect] A non-finite stake amount corrupted the staking pool -- FIXED 2026-11-16
+
+Hunting the A438 queue at `/stake` (a money POST) found the most serious catch so far -- not a coverage gap but a live, exploitable defect, confirmed by running it.
+
+**The exploit.** `/stake` reads `amount = float(data.get("amount"))` and calls `StakingPool.stake(pubkey, amount, duration)`. That method guarded with `if amount <= 0` and `if balance < amount` -- **both are False for `nan`** (every nan comparison is False), so a `nan` amount slipped both. It was then written into `self.stakes[pubkey]` (line order: the in-memory dict is set, THEN `save_stake`, THEN `record_ledger_entry`). `total_staked` is DERIVED from `self.stakes`, so it became **nan -- poisoning every yield and reward sum in the pool**. Then `save_stake` hit SQLite's NOT NULL constraint (`nan` -> NULL) and RAISED, so the db never got the row: the in-memory pool and the db diverged, the request 500'd, and the staker was left `already staked` with a stake the db does not have (locked out). A `nan` amount still needs a valid `verify_stake_signature` over `str(nan)`, so the reach is any registered staker -- but one request corrupts the whole pool.
+
+Confirmed by running it: `StakingPool.stake(pk, float('nan'), ...)` raised `IntegrityError: NOT NULL constraint failed: stakes.amount` with `pk in pool.stakes == True`.
+
+**Why U did not catch it.** `test_security_audit`'s U invariant -- reject non-finite amounts at every ingress -- covers the transaction endpoint, the trading bridge and `record_ledger_entry`, but NOT `/stake`/`StakingPool.stake`. This is the ingress U missed.
+
+**Fix.** `StakingPool.stake` rejects a non-finite amount before any state change (`if not math.isfinite(amount): return False, "Stake amount must be finite"`), at the chokepoint every caller passes (the route, direct library calls, any raw path) -- the same level U names.
+
+**Repro:** `python test_a441_nonfinite_stake.py` (4/4), exploit-first both ways: pre-A441, `stake(pk, nan, ...)` RAISES and leaves `pk` in `self.stakes` (the corruption); after, it returns `(False, "...finite...")` and touches nothing. inf is likewise refused; a finite positive amount still reaches the balance check (the guard did not start refusing everything); zero/negative still rejected as "positive". Names `/stake`: queue drops it.
+
+**Noted, not changed.** The write-before-persist ordering in `stake()` (`self.stakes[pubkey]` set before `save_stake`) is a latent in-memory/db divergence for any `save_stake` failure, not only nan; the finite guard removes the nan vector, but the ordering is a separate hardening. `int(duration)` on a malformed value still 500s (robustness, lower).
+
+**Status:** in source on its branch, with its test both ways. This touches runtime code (`covenant_unified_v8.py`), so `source_sha256` changes; it is NOT deployed -- no change to A/B/C without the operator's word.
+
+---
+
+### A442. [security hunt -- fourth catch from the A438 queue] Succession registration did not validate the dead-man's-switch timing -- a negative interval fired a false succession on a live primary -- FIXED 2026-11-16
+
+Hunting the A438 queue at `/succession/register` (CONTROL -- the takeover-resistance surface). `SuccessionGuardianSystem.register` was already well-hardened where it counts: the threshold is bounded (`1 <= threshold <= N`, so the M-of-N cannot be set to 0), guardians are capped and must be 2+ distinct, every key is PEM-validated. But it validated NONE of `heartbeat_interval_days` / `grace_period_days`.
+
+**The defect, measured.** `check_dead_mans_switch` computes `deadline = last_heartbeat + interval*86400 + grace*86400` and fires a PENDING succession episode when `now > deadline`. A NEGATIVE interval or grace makes the deadline land in the PAST, so the switch fires IMMEDIATELY -- and the primary's heartbeat cannot stop it, because a fresh heartbeat only resets `last_heartbeat`, which is still behind the negative offset. Confirmed: `register(interval=-100000, grace=0)` was accepted, and `check_dead_mans_switch` on a just-registered LIVE primary returned `PENDING triggered, episode 1`. A non-finite value instead raises at the db's `NOT NULL` REAL column (`nan -> NULL`) and 500s.
+
+**Severity -- bounded, checked before claiming.** Succession here is a guardian key-RECOVERY scheme: recovery material is sealed to the ORIGINAL guardians (`seal_recovery_material`), so a false trigger -- even followed by attacker-chosen guardians confirming -- does not hand over the primary's sealed material or assets. So this is a false-trigger / griefing of a security-critical mechanism (a bogus "primary incapacitated" episode), not a direct takeover. Still worth closing: a dead-man's-switch that fires on a live, heartbeating primary is broken.
+
+**Fix.** `register` rejects a non-finite or non-positive `heartbeat_interval_days` and a non-finite or negative `grace_period_days` at write time -- the same U-invariant discipline as /stake (A441).
+
+**Repro:** `python test_a442_succession_timing.py` (6/6), exploit-first both ways: pre-A442 `register(-100000)` succeeds and the switch fires PENDING on a live primary; after, register refuses it (and there is no config to fire). inf/nan/zero are refused; a valid 30/15 config registers and does NOT false-trigger.
+
+**Noted, not changed (the operator's design calls, not mine).**
+- `/succession/register` is self-attested (no signature) and `save_succession_config` overwrites by `primary_pubkey`, so an attacker can overwrite a victim's succession CONFIG (a griefing vector). The route docstring defends the self-attested model and the recovery material stays sealed to the original guardians; changing this is a design decision, flagged for review, not patched blind.
+- `/succession/heartbeat` and `/succession/confirm` also read `float(timestamp)`; their freshness/replay handling is a separate check, a later hunt item.
+
+**Status:** in source on its branch, with its test both ways. Runtime code (`covenant_unified_v8.py`) -> `source_sha256` changes; NOT deployed (no change to A/B/C without the operator's word).
+
+---
