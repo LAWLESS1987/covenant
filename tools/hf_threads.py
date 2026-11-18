@@ -15,7 +15,8 @@ gitignored, so it is never republished through the public repo.
 What this cannot see (rule 9): private messages and notifications (they need the
 signed-in session), posts deleted before the run, and whether a reply that does not
 quote or reply-to us is still meant for us -- "addressed to us" is reply_to one of our
-posts, or our name in the text, or the next post after ours from someone we answered.
+posts, a reply to the topic itself in a topic we opened (Discourse leaves reply_to empty
+for those), our name in the text, or the next post after ours from someone we answered.
 """
 from __future__ import annotations
 
@@ -91,11 +92,15 @@ def addressed_to_us_unanswered(t: dict) -> list[dict]:
     rt = by_n[last]["reply_to"]
     # the person our LAST post answered; their next post may answer us without reply_to
     answered = by_n[rt]["user"] if rt in by_n else None
+    # Discourse leaves reply_to empty for a reply to the topic itself (post #1). In a topic
+    # we opened, that is a reply to us (2026-11-09: 191599 #2 was missed this way).
+    opened = 1 in ours
     out, seen_answered = [], False
     for p in t["posts"]:
         if p["n"] <= last or p["user"].lower() in (USER, "system"):
             continue
         why = ("reply_to our #%d" % p["reply_to"] if p["reply_to"] in ours
+               else "reply to our topic" if opened and p["reply_to"] is None
                else "names us" if USER in p["text"].lower()
                else "next post from %s, whom our #%d answered" % (answered, last)
                if p["user"] == answered and not seen_answered else None)

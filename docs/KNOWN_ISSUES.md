@@ -17857,6 +17857,295 @@ This is the lesson A422's own note anticipated: a screen is a screen, not a sand
 
 ---
 
+### A436. [security, follows A430] A signed-door HANDS RUN bound the script file but not its arguments -- ARG-BOUND 2026-11-16
+
+**What.** A430 ties a signed RUN to run_sha256, the sha256 of the script's bytes, so the operator's signature names the exact FILE. But a RUN's ARGUMENTS come from the model's answer line ("HANDS RUN name arg1 arg2"), not the signed body -- so run_sha256 bound the file and not the invocation: the operator signed "run file-hash-H" and the model, which a planted instruction can steer, supplied the arguments. The full quorum (the bots, Grok on X, DeepSeek, Meta AI, ChatGPT, Gemini, Claude.ai, Mistral, Codex, the local 27Bs) was unanimous on this (their C3); the laptop seat flagged it in the A430 review.
+
+**The fix.** On the signed door (run_sha256 bound, in `act()`), a RUN that carries any arguments is refused with a clear message, before it runs; it runs with no arguments. The practice path (in-process: run_auth set, run_sha256 UNBOUND) and any unsigned / plain caller are untouched -- only the signed door binds run_sha256, so only it is tightened. A423 still refuses an unsigned RUN before this is reached.
+
+**Severity (the gap was bounded).** Weaker-than-stated, not broken: a script runs in the workshop sandbox (python -I, the screen deny-list -- no network, no subprocess, no file outside the workshop -- and time / memory / process limits), so arguments could not make the approved script escape; they could only change what it did within the workshop. This closes the gap so the operator's signature names the exact run, not just the file.
+
+**Repro:** `test_a436_run_args_bind.py` drives it both ways -- a signed RUN with arguments is refused (run_args_refused), a signed RUN with none is left to A430's hash check, the practice path and a plain in-process caller with arguments are untouched, and an unsigned RUN is refused by A423 first.
+
+**Cost (every gain with its cost).** A signed run can no longer pass arguments on the answer line; if an operator-approved workshop script ever needs arguments, they must be baked into the script or bound in the signed body (hash the invocation) as a later change -- an operator-approved run from the phone carries none today.
+
+**Still open (recorded by the quorum, not built):** a runtime sandbox / network-egress / descendant-process containment for a script that runs, and operator-key theft with no revocation. Both are the operator's call, not fixed blind.
+
+**Status:** fixed (a signed-door RUN forbids arguments; the practice and unsigned paths are untouched)
+
+---
+
+### A435. [his hands' content seat now reads PROSE, narrowly: a non-code WRITE's text is shown two narrow signals and otherwise abstains, so an ordinary note still proceeds] (2026-11-16). In source on its branch; not deployed.
+
+- **The open follow-up this closes.** A429 gave the content a seat of its own, but only for code: it reads a `.py` WRITE and a RUN's source through this module's own `screen()`, and ABSTAINS on everything else -- so a PROSE write (`.txt`, `.md`, any non-code file) was judged by nobody (A429's limit "Prose is read by no judge", its open item 1). The risk A428 named is a file of planted instructions written now and read as instructions later. But judging prose for meaning is unreliable and MUST NOT block an ordinary write -- that is exactly why the code seat abstains rather than convicting. So the prose seat reads two NARROW signals, not meaning.
+
+- **Looked for the same shape first (rule 10).** `tools/lookback_index.py find` on hands, prose, content, outside; `docs/RETRACTED.json` holds no tombstone on the hands gate or the prose path. The direct predecessor is A429 (open item 1). A427 is the act-word door guard whose CAPITALS rule the act-line signal reuses; `outside_text.py` (asked 2026-11-14) is the markup/invisible-character detector reused here. Not a recurrence of a fixed defect: this closes A429's open item. A433 and A434 are taken by other work and are not used here.
+
+- **What changed**, in `covenant_tetsu_hands.py` and nowhere else in the code:
+  - **`_prose_check(text)` -> (flagged, reason).** It reads the text in this process, sends it nowhere and writes it nowhere, and returns ONLY which signal fired, never the text. It FLAGS when: (1) `outside_text.clean` takes out a **chat mark**, a **fence or role mark** or an **invisible character** (the markup a reader would not act on as ordinary text; `outside_text`'s "hidden comment" is deliberately NOT used, so an ordinary markdown `<!-- -->` is left alone); (2) a **chat role prefix** begins a line (`system:`, `assistant:`, `user:`, `developer:`, `tool:`, case-insensitive); (3) a **spelled-out injection phrase** matches, case-insensitive on word boundaries -- the documented set is: `ignore (the/all/any) above|preceding|previous|prior|earlier|foregoing`; `disregard (…) above|preceding|previous|prior|instruction(s)|rule(s)`; `forget (…) above|previous|prior|instruction(s)|rule(s)`; `you are now`; `you're now`; `from now on you are|will|must|should`; `new instruction(s):`; `override (your/the/all) instruction(s)|rule(s)`; `do not tell|inform|warn|mention|report to (the/your) operator|owner|user|human`; (4) a **covenant act line** written out as a command (A427 / `ACT_WORDS`), CASE-SENSITIVE in CAPITALS: a compound act anywhere (`HANDS LIST|READ|WRITE|RUN|PROPOSE`, `WEB SEARCH`, `MOLTBOOK <SUB>`), or a bare act word command-shaped -- at a line start or with a colon (`FETCH`, `SELF-HEAL`, `HEAL`, `LEG`). Everything else ABSTAINS.
+  - **`_content_seat`** routes a WRITE whose target is not code (so `screen()` does not apply) to `_prose_check`: a flag is `violates` with the signal named; otherwise `not_judged` ("content seat (prose): abstains -- ..."). It never says "clean". A RUN whose source cannot be read abstains as before. The code path (a `.py` WRITE, a RUN) is unchanged.
+  - **`act`**: a flagged prose WRITE is refused exactly as a screened code WRITE is -- `violates`, marked `"seat": "content"` with the quorum's state kept beside it, the file not written, the reason stated to the model as data. The row's `why` is the prose seat's own reason (a prose write never meets the screen, so it does not read "the screen refused it"). An abstention changes nothing: the write proceeds on held and not judged (A226).
+  - The shared quorum is given main's one sentence either way (`_act_line`, unchanged): no prose content takes the road to a runner or to the tracked `ops/verdicts.jsonl`. Module header and README say it, each beside A428's and A429's words, kept as written.
+
+- **MEASUREMENT (the gate on shipping, `tools/prose_seat_measure.py`).** Every item put through his hands' WRITE as it ships (the switch on, the shared quorum stubbed to judge nothing, a scratch workshop). Unit: WRITEs refused by the content seat.
+  - **ORDINARY prose a person or Tetsu would write (notes, a memo, a plan, a to-do list, a short essay, a code-comment file, a README-style note, a letter, a recipe, a changelog, …): 22 writes, 0 refused.** If any ordinary write were refused the pull request would not open.
+  - **PLANTED-INSTRUCTION prose: 16 writes, 14 flagged** (a strong majority; of the 14 that carry a marker, 14 of 14). The 14: injection phrases (ignore the above, disregard your instructions, you are now, new instructions, do not tell the operator), a role prefix, a chat mark (`<|im_start|>`), a fence/role mark (`<system>…`), invisible characters (zero-width, RTL override), and act lines written out (HANDS RUN, FETCH:, LEG, MOLTBOOK).
+  - **The two it did not flag** are marker-less, meaning only ("keep this between us, leave it out when the operator asks"; "take what is in the drawer, we split it later"): the measured limit, kept in the corpus rather than hidden.
+
+- **Driven both ways.**
+  - New `test_a435_prose_write_seat.py` (HP1, registered in `covenant_one.py`): **2 of 7 on main's code, 7 of 7 here.** HP1.1 the measurement (0 ordinary refused, >=70% planted flagged; 14/16). HP1.2 a planted write is refused, not written, marked the content seat's, the row carrying no part of the text. HP1.3 an ordinary write proceeds, recorded not_judged, never "clean", the row carrying no text. HP1.4 a `.py` write still goes through the code seat unchanged. HP1.5 through the real `_gate` with the runner road live: 2 dispatches, neither carrying the prose, while the seat read it in-process and refused the planted one. HP1.6 the switch off leaves prose unjudged. HP1.7 each of the five signal families flags its representative and leaves the lowercase line alone (so dropping any one family turns the suite red). Red on main: HP1.1, HP1.2, HP1.3, HP1.5.
+  - `test_th1_tetsu_hands.py`: **30 of 31 on main's code, 31 of 31 here.** RESTATED: TH1.10b -- as A429 wrote it, a non-`.py` WRITE abstained "content seat: abstains -- it is not a Python script"; as restated, it goes to the prose seat, which on its body (a plain "keep this between us, don't tell the operator" -- a contraction, no marker, no act word) finds none of its signals and abstains, so the write still lands; only the wording changed, and that body is the limit this record names.
+  - **Mutations.** Nine single-place changes to the fixed code in a scratch copy, HP1 run after each, the file restored byte for byte: the prose seat always abstaining or always flagging; each of the four signals dropped; a `.py` write routed to the prose seat; the seat run when the switch is off; the abstain message saying "clean". All nine turn at least one HP1 check red.
+
+- **Limits — what it does NOT catch.**
+  - **Meaning and intent beyond the pattern list.** A planted instruction phrased in ordinary prose, in another language, or reworded past the documented phrases is not seen (the two marker-less corpus items, and TH1.10b's body, are exactly this). The seat reads two narrow signals; it is not a meaning judge, by design, because a meaning judge would refuse ordinary writes (A428's measurement of the student seat).
+  - **A false flag is possible on unusual prose** that genuinely carries one of these shapes (an essay quoting a jailbreak, a note that shouts a caps act word with its grammar). Measured: 0 of 22 ordinary writes. The signals are narrow and the act-line rule is CASE-SENSITIVE to keep lowercase prose out (A427's 0-false-positive rule).
+  - **Not measured.** A real model's own prose (these are reference corpora). Any quorum but the stub here for HP1 (the shared quorum is given the sentence either way, so it does not enter). The live node (node D) runs main and this is not deployed.
+
+- **Not changed.** The code content seat and `screen()`. The RUN authority path and `run_sha256` (A430). The door. `covenant_unified_v8.py`, either copy. What a PROPOSE puts to the gate. The shared quorum and its runner road.
+
+**Repro:** `python test_a435_prose_write_seat.py`; `python tools/prose_seat_measure.py`; `python test_th1_tetsu_hands.py`.
+
+**Status:** in source on its branch, with its measurement and tests; meaning beyond the pattern list not judged (by design); not deployed.
+
+---
+
+### A437. [watchdog / launcher] Two watchdogs started in the SAME tick both survived and persisted -- one tree, one watchdog now holds for a same-tick race too -- IN SOURCE 2026-11-16
+
+**What.** "Fix the launcher bug" (the operator, after a deploy left extra `covenant_watchdog.py` processes). The launcher (`covenant_prod.bat`) was NOT the defect: its "one only" guard matches the watchdog by ABSOLUTE PATH, identical to the highway's two restart remedies (`remedy_restart_watchdog`, `remedy_schedule_watchdog_restart`) and the watchdog's own A160 self-check (`_watchdog_like()` / `_evict_twins`). All four actors agree. The real gap was in A160 itself: `_twins_to_evict` spared EVERY same-tick tie (two evicting each other would leave nothing running -- a real outage, measured 2026-09-20), and `_evict_twins` ran only at daemon START. So two watchdogs started in the same second by racing launchers (a manual restart plus the three nodes' scheduled restarts landing together) were each spared by the other and then persisted, with nothing to come back and cull them. Two live watchdogs each mine the pool once a minute, rate-limit each other into HTTP 429, and append contradictory verdicts to `ops/SELF_EVAL.md` (the A160 history).
+
+**Fix.** A deterministic, one-sided pid tiebreak: of a same-tick pair the LOWER pid stops the higher and survives (never both -- the persistent duplicate; never neither -- the outage the old rule guarded, since two equal pids cannot exist). And the A160 cull now runs EVERY round, not only at start (`_daemon_round`), so a same-tick twin that neither start-time scan could see -- it appeared just after this watchdog's own scan and was spared by the higher-pid twin's tiebreak -- is stopped within one interval instead of persisting.
+
+**Repro:** `python test_a437_twin_tiebreak.py` drives it both ways -- same-tick lower pid evicts the higher, higher pid defers (no mutual kill), three-in-a-tick collapse to the lowest, a younger/self/parent twin is never evicted, and `_daemon_round` re-culls every round even when the health pass raises. Each marked case fails on the pre-A437 code (same-tick spared; no per-round cull). `test_p22_watchdog_restart_verifies.py` P22h updated to the new semantics.
+
+**Not changed.** The launcher (`covenant_prod.bat`) -- its guard was already correct. `_watchdog_like()` and the highway's restart remedies. The absolute-path match. The `--once` and status paths (they never reach the daemon loop).
+
+**Residual (bounded).** A same-tick twin spared by a start-time race is culled by the next periodic pass, so it can live up to one interval (~60 s) before it is stopped -- defense-in-depth for a rare race, not an instant kill. The underlying cause (several uncoordinated launchers with no shared lock) is unchanged; A160+A437 are the eventual-consistency net over it.
+
+**Status:** in source on its branch, with its test both ways; not deployed (no change to A/B/C without the operator's word).
+
+---
+
+### A438. [security / white-hat] The hunt had no denominator -- a standing map of the attack surface and what of it has ever been adversarially tested -- IN SOURCE 2026-11-16
+
+**What.** His words, 2026-11-16: "we need the ultimate White Hat technology", then he chose a systematic self-audit. The covenant already has a strong regression net (80 SECURITY + 114 JUDGE suites swept daily; `mutation_probe.py` proving guards real; a live exec-guard shadow; `opsec_scan.py`), but every one of those locks in a KNOWN finding. Nothing computed the DENOMINATOR -- the whole ingress surface and which of it has ever had an adversarial test -- so the hunt was driven by memory, not by a map. That is the first-pass blind spot CLAUDE.md names ("establish the denominators by discovery").
+
+**Increment 1.** `tools/attack_surface_map.py` (read-only, defensive, his systems). It walks the source, discovers every Flask route by DISCOVERY (47 today, never a hardcoded list), classifies each by exposure (method-first: GET=READ; a mutating route's category by path-segment keyword), reads each handler for the gating calls PRESENT in it, cross-references each path to the test suites (adversarial = named by a suite in a security-relevant family: SECURITY/IDENTITY/ADVERSARIAL/JUDGE/MONEY/TRADER/HTTP/LEDGER), and emits a RANKED HUNT QUEUE: the mutating routes with no (adversarial test AND gating call), highest exposure first. Today: **18 of 47 routes queued**, led by `/actuator_learn` (EXEC) and the money POSTs (`/claim_rewards`, `/stake`, `/unstake`, `/trading/report_profit`).
+
+**It is a map, never a verdict.** It never says a route is safe. "has a test" = a test file mentions the path literal; "gated" = a gating call appears in the handler body; neither is proof. Every limit is printed under BLIND SPOTS and the report refuses to hide them.
+
+**Recorded, not yet covered (the surface this increment does NOT map -- the next increments):**
+- Non-Flask ingress: raw P2P / socket handlers, file-fed daemons (`ops/*.jsonl` consumers), the cross-process hands door, CLI entry points, routes in other modules.
+- Info-disclosure on GET routes (e.g. `/trading/net_pnl`, `/stakes` leaking value state) -- scored READ here, a separate lens.
+- Whether a gating call is correct, reached on every branch, or unbypassable -- presence is not a clearance.
+- The standing cadence (run it in `covenant_daily`, track the queue over time) and closing each top-of-queue item with a both-ways guard -- the loop A438 seeds.
+
+**Repro:** `python tools/attack_surface_map.py` (the map); `python test_asm1_attack_surface.py` drives its pure functions both ways (ASM1 12/12 -- e.g. `/health` must classify READ, which breaks if matching regresses to raw substring and "heal" catches "health") plus a real-tree smoke.
+
+**Status:** in source on its branch, with its test both ways; a read-only tool, nothing deployed.
+
+---
+
+### A439. [security hunt -- first catch from the A438 queue] A non-finite request timestamp slipped the operator-request gate; and the map was hiding uncovered routes by counting its own test -- BOTH FIXED 2026-11-16
+
+Hunting the A438 queue at its top item, `/actuator_learn`, turned up two real things.
+
+**1. The measurement was lying (the more important one).** The attack-surface map counted `test_asm1_attack_surface.py` -- its OWN test -- as route coverage. That test names route paths as classification DATA (`"/stake"`, `"/unstake"`, `"/succession/register"`) and a fixture (`"/claim_rewards"`), so the map credited those four money/control routes as adversarially tested when nothing attacked them. The queue UNDER-reported -- it hid uncovered surface, the dangerous direction a self-check can fail in. So the "18 of 47" first reported (A438) was a buggy under-count. Fixed: the map excludes its own test from the index (`SELF_TESTS`); ASM1 gains a case that fails if the map ever credits its own test again. TRUE queue after this and the fix below: **17 of 47**, led by the money POSTs `/claim_rewards`, `/stake`, `/unstake`.
+
+**2. A non-finite timestamp slipped the freshness window.** `/actuator_learn` (and `/daily_plan/approve`, `/checkin`, `/ai_chats`) are gated by `covenant_daily_plan.verify_signed`, which checked freshness with `abs(now - ts) > WINDOW_S`. That is **False for ts = nan**, so a nan timestamp was never rejected as stale; and because the nonce store (`_seen_nonces`) is in-memory and resets on restart, a captured nan-stamped request could replay after a restart. The signature still had to come from a REGISTERED key, so the reach is a trusted signer or a leaked request -- minor, defense-in-depth -- but it broke the U invariant (reject non-finite at every ingress). Fixed: `verify_signed` rejects a non-finite ts before the window and signature checks.
+
+**Repro:** `python test_a439_nonfinite_timestamp.py` -- exploit-first, both ways (3/3): the SAME nan request that is now refused VERIFIES on the pre-A439 code (a valid signature over nan, nan slips the window), inf is refused, and a finite in-window request on the SAME route still verifies (the gate did not start refusing everything). `python test_asm1_attack_surface.py` (13/13) pins the self-test exclusion. `python tools/attack_surface_map.py` shows the corrected queue.
+
+**Not changed / still open.** The in-memory, unbounded nonce store (`_seen_nonces`) -- a registered signer can still grow it, and it does not persist across restarts; noted, not fixed here (a registered-signer DoS / cross-restart window, lower than this). The 17 remaining queue items.
+
+**Status:** in source on its branch, both fixes with both-ways tests; the nan fix touches the live gate but is NOT deployed (no change to A/B/C without the operator's word).
+
+---
+
+### A444. [security] A signed request replayed once per PROCESS: the nonce store was per-process memory -- now durable and shared
+
+**Found 2026-11-18**, from the Hugging Face receipt-profile thread (topic 180706 #44): nootxlm's attack suite
+showed two processes sharing one store both accepting the same receipt -- check-and-record is one step inside a
+process, not across two. Covenant had the same shape, plainer: `covenant_daily_plan._seen_nonces` and
+`covenant_mycelium._seen` were module-level sets, nothing on disk, no lock, and `sign_json_request` binds no
+node. So a captured signed operator request was replay-protected only inside the one process that first saw it.
+On the laptop, A, B and C run from one checkout as three processes: the same signed RUN could execute once per
+node inside `WINDOW_S` (300 s), and a restart wiped the set (the "wipe and replay inside the window" case).
+
+**Fixed.** `pairstore_excl.ExclPairStore` (the cross-process (signer, nonce) pair-store built for that thread on
+2026-11-18 and race-tested both ways on Windows and WSL: one file per pair created by `os.link`, so a second
+link to the same name fails) now backs both verify paths through `covenant_daily_plan.nonce_check_and_record`.
+The order changed too: the signature is verified FIRST, then one atomic check-and-record, so an unverified
+request never consumes a nonce. The store lives at `ops/operator_nonces.pairs/` (`COVENANT_NONCE_STORE`
+relocates it; tests use a temp dir); expired pairs are pruned at most once a minute. A caller that passes its own
+`seen` set keeps the old in-process semantics.
+
+`test_a444_nonce_store.py` (SECURITY) drives it both ways: of six concurrent processes presenting one pair,
+exactly one accepts; a fresh process refuses a pair already recorded; the CONTROL (the old per-process set)
+accepts it in every process, so the test can see the vector; prune drops expired pairs and keeps live ones; and
+through the real `verify_signed` with a registered signer, a replay is refused in the same process and in a fresh
+one, while a bad-signature request leaves the nonce unconsumed. 7 of 7 on 3.12.10; A430S still 13 of 13.
+
+**NOT closed, recorded as the follow-up.** Cross-HOST replay: node D and the laptop do not share a checkout, so
+the same request still lands once on each host inside the window. Closing that needs the target node bound into
+the signed request (`sign_json_request` + the phone signer), or seen-nonces gossiped over the mesh. The store is
+for one machine's local filesystem; network filesystems were not tested. Wipe the pair directory and replay inside
+the window and the request is accepted -- the profile's own limit, unchanged.
+### A445. [security] A metadata extension could forge a store-owned field, and a Unicode line separator could break out of the frontmatter -- hardened
+
+**Found 2026-11-18** sitting UNCOMMITTED in node D's working copy of `ai_memory_system/memory_store.py`: a prior
+hardening patch that had never reached main (node D's updater was excluding the file from its drift check as if
+it were runtime state; Astra's scratch run showed it is code -- 13 of 13 source files unchanged across 106 state
+operations -- and that memory data already lives in separate ignored files). Two vectors it closes:
+(1) a metadata extension could set a store-owned field -- `type`, `agent`, `intent`, `beneficiary`, `divergence`,
+`diverges_from`, and the node-local `created` / `review` / `review_by` -- so an extension could pass itself off as
+evidence of review, identity or checked provenance; (2) `render_memory` refused only `\r`, `\n` and NUL in a
+frontmatter field, but `parse_memory` splits with `splitlines()`, which also honours `\v`, `\f`, `\x1c`-`\x1e`,
+`\x85`, `\u2028` and `\u2029` -- so a field carrying one of those could break out of the frontmatter and forge
+other fields.
+
+**Fixed.** `_STORE_FIELDS` names the store-owned fields and `MemoryStore.put` refuses an extension that sets
+one; a non-dict extension is refused; `_FRONTMATTER_BREAKS` lists every separator `splitlines()` honours and
+`render_memory` refuses all of them in every frontmatter field; an extension key must be non-empty, trimmed and
+colon-free. Checks A445.1-A445.6 in `ai_memory_system/test_memory_system.py` drive it both ways: the forbidden
+inputs raise, an ordinary extension still renders and lands. The existing M1 suite stays green.
+
+**Limits.** This hardens the writer and the renderer. It does not re-validate records already on disk: a record
+written through an older writer with a forged field still reads as it was written (the chain shows when it was
+written, not that the field was honest).
+### A443. [security] The workshop runner starts Python in isolated mode -- now pinned both ways
+
+Asked on the Hugging Face forum (topic 191990, post 2, 2026-11-17): a `json.py` planted beside the hashed
+script loads unhashed if the script imports `json` and the child starts without `-I`, `-P` or
+`PYTHONSAFEPATH` -- does the launch pass any of those? It does. `covenant_tetsu_hands.run()` starts the child
+as `python -I -c RUNNER`, and on 3.11+ `-I` also sets `safe_path`, so the script's folder is never prepended
+to `sys.path`. Measured on this PC (3.12.10): with `-I` the planted module did not load (the standard
+library did; `sys.path[0]` was the stdlib zip); without `-I`, the control, it loaded. Until now nothing
+pinned the flag: removing `-I` would have reopened the vector silently.
+
+**Fixed.** `test_a443_runner_isolation.py` (SECURITY, registered in `covenant_one.py`) pins it: a static
+check that `run()` still passes `-I` before `-c RUNNER`; a planted sibling module that must NOT import under
+`-I`; the control that it DOES import without `-I`, so the test can see the vector; and `safe_path` asserted
+under `-I` on 3.11+. Four checks, all green on 3.12.10.
+
+**Limits.** This pins the launch flags and the sibling-module vector only. It says nothing about what an
+authorized script can reach once it is running -- the deny-list sandbox, the open item from the 2026-11-16
+quorum verification.
+### A440. [security hunt -- second catch from the A438 queue] /claim_rewards' auth was sound but its domain-separation and ownership had no runner -- GUARDED 2026-11-16
+
+Hunting the A438 queue at `/claim_rewards` (a money POST). No new exploitable gap -- the v8.4 fix (`verify_stake_action_signature`, PATCH LOG item L) is sound: a signature required, the ACTION bound into the signed frame so a "claim" authorization is not an "unstake" one, the KEY bound so only the owner acts, and route-level replay via a persistent DB nonce. Unlike A439 there is NO freshness window here, so the non-finite-timestamp class does not apply. **The honest finding is a coverage gap, not a bug:** `test_a1a_a2` already proved a BAD signature is refused (400), but the two properties the v8.4 fix is actually FOR -- action domain separation and key ownership -- had no test. A fix whose key property has no runner is the A65 gap.
+
+**Closed.** `test_a440_stake_action_auth.py` (6/6) pins, both ways: a claim-sig authorizes claim (control) but is refused for unstake and vice versa (domain separation holds only because `action` is inside the frame -- drop it and this fails); another key's signature over the same frame is refused (ownership); a tampered timestamp and a garbage signature are refused. Names `/claim_rewards` and `/unstake`, SECURITY-tagged, so the map credits both: queue **17 -> 15**.
+
+**Not covered / still open.**
+- The route-level REPLAY nonce (`/claim_rewards`, `/unstake` reject a resubmitted signature) is proven by code read, not by a test -- it needs a booted node + staking pool; a node-boot test is the next step.
+- `/stake` stays in the queue: it gates on a DIFFERENT function (`verify_stake_signature`), a separate item.
+- **A map-accuracy limitation, noted not fixed:** the map OVER-reported `/claim_rewards` because its tag parser reads only single-word tags, so it could not see `test_a1a_a2`'s compound tag "ROUTES + BOUNDS" (nor opsec's "DAILY + GUARDS"). Over-reporting is the safe direction (a covered route flagged, not an uncovered one hidden -- the opposite of A439's self-coverage bug), so it is recorded for a later map increment rather than rushed. Even fixed, those two tag families are not in the adversarial set, so the judgement of whether a ROUTES/GUARDS suite counts as route-defense is the operator's, not the map's.
+
+**Status:** in source on its branch, with its test both ways; a test-only change (no runtime code touched), nothing deployed.
+
+---
+
+### A441. [security hunt -- third catch from the A438 queue; a REAL exploitable defect] A non-finite stake amount corrupted the staking pool -- FIXED 2026-11-16
+
+Hunting the A438 queue at `/stake` (a money POST) found the most serious catch so far -- not a coverage gap but a live, exploitable defect, confirmed by running it.
+
+**The exploit.** `/stake` reads `amount = float(data.get("amount"))` and calls `StakingPool.stake(pubkey, amount, duration)`. That method guarded with `if amount <= 0` and `if balance < amount` -- **both are False for `nan`** (every nan comparison is False), so a `nan` amount slipped both. It was then written into `self.stakes[pubkey]` (line order: the in-memory dict is set, THEN `save_stake`, THEN `record_ledger_entry`). `total_staked` is DERIVED from `self.stakes`, so it became **nan -- poisoning every yield and reward sum in the pool**. Then `save_stake` hit SQLite's NOT NULL constraint (`nan` -> NULL) and RAISED, so the db never got the row: the in-memory pool and the db diverged, the request 500'd, and the staker was left `already staked` with a stake the db does not have (locked out). A `nan` amount still needs a valid `verify_stake_signature` over `str(nan)`, so the reach is any registered staker -- but one request corrupts the whole pool.
+
+Confirmed by running it: `StakingPool.stake(pk, float('nan'), ...)` raised `IntegrityError: NOT NULL constraint failed: stakes.amount` with `pk in pool.stakes == True`.
+
+**Why U did not catch it.** `test_security_audit`'s U invariant -- reject non-finite amounts at every ingress -- covers the transaction endpoint, the trading bridge and `record_ledger_entry`, but NOT `/stake`/`StakingPool.stake`. This is the ingress U missed.
+
+**Fix.** `StakingPool.stake` rejects a non-finite amount before any state change (`if not math.isfinite(amount): return False, "Stake amount must be finite"`), at the chokepoint every caller passes (the route, direct library calls, any raw path) -- the same level U names.
+
+**Repro:** `python test_a441_nonfinite_stake.py` (4/4), exploit-first both ways: pre-A441, `stake(pk, nan, ...)` RAISES and leaves `pk` in `self.stakes` (the corruption); after, it returns `(False, "...finite...")` and touches nothing. inf is likewise refused; a finite positive amount still reaches the balance check (the guard did not start refusing everything); zero/negative still rejected as "positive". Names `/stake`: queue drops it.
+
+**Noted, not changed.** The write-before-persist ordering in `stake()` (`self.stakes[pubkey]` set before `save_stake`) is a latent in-memory/db divergence for any `save_stake` failure, not only nan; the finite guard removes the nan vector, but the ordering is a separate hardening. `int(duration)` on a malformed value still 500s (robustness, lower).
+
+**Status:** in source on its branch, with its test both ways. This touches runtime code (`covenant_unified_v8.py`), so `source_sha256` changes; it is NOT deployed -- no change to A/B/C without the operator's word.
+
+---
+
+### A442. [security hunt -- fourth catch from the A438 queue] Succession registration did not validate the dead-man's-switch timing -- a negative interval fired a false succession on a live primary -- FIXED 2026-11-16
+
+Hunting the A438 queue at `/succession/register` (CONTROL -- the takeover-resistance surface). `SuccessionGuardianSystem.register` was already well-hardened where it counts: the threshold is bounded (`1 <= threshold <= N`, so the M-of-N cannot be set to 0), guardians are capped and must be 2+ distinct, every key is PEM-validated. But it validated NONE of `heartbeat_interval_days` / `grace_period_days`.
+
+**The defect, measured.** `check_dead_mans_switch` computes `deadline = last_heartbeat + interval*86400 + grace*86400` and fires a PENDING succession episode when `now > deadline`. A NEGATIVE interval or grace makes the deadline land in the PAST, so the switch fires IMMEDIATELY -- and the primary's heartbeat cannot stop it, because a fresh heartbeat only resets `last_heartbeat`, which is still behind the negative offset. Confirmed: `register(interval=-100000, grace=0)` was accepted, and `check_dead_mans_switch` on a just-registered LIVE primary returned `PENDING triggered, episode 1`. A non-finite value instead raises at the db's `NOT NULL` REAL column (`nan -> NULL`) and 500s.
+
+**Severity -- bounded, checked before claiming.** Succession here is a guardian key-RECOVERY scheme: recovery material is sealed to the ORIGINAL guardians (`seal_recovery_material`), so a false trigger -- even followed by attacker-chosen guardians confirming -- does not hand over the primary's sealed material or assets. So this is a false-trigger / griefing of a security-critical mechanism (a bogus "primary incapacitated" episode), not a direct takeover. Still worth closing: a dead-man's-switch that fires on a live, heartbeating primary is broken.
+
+**Fix.** `register` rejects a non-finite or non-positive `heartbeat_interval_days` and a non-finite or negative `grace_period_days` at write time -- the same U-invariant discipline as /stake (A441).
+
+**Repro:** `python test_a442_succession_timing.py` (6/6), exploit-first both ways: pre-A442 `register(-100000)` succeeds and the switch fires PENDING on a live primary; after, register refuses it (and there is no config to fire). inf/nan/zero are refused; a valid 30/15 config registers and does NOT false-trigger.
+
+**Noted, not changed (the operator's design calls, not mine).**
+- `/succession/register` is self-attested (no signature) and `save_succession_config` overwrites by `primary_pubkey`, so an attacker can overwrite a victim's succession CONFIG (a griefing vector). The route docstring defends the self-attested model and the recovery material stays sealed to the original guardians; changing this is a design decision, flagged for review, not patched blind.
+- `/succession/heartbeat` and `/succession/confirm` also read `float(timestamp)`; their freshness/replay handling is a separate check, a later hunt item.
+
+**Status:** in source on its branch, with its test both ways. Runtime code (`covenant_unified_v8.py`) -> `source_sha256` changes; NOT deployed (no change to A/B/C without the operator's word).
+
+---
+
+---
+
+### A447. [security, follows A423] A registered ALLY key passed every "registered operator" check -- signed HANDS RUN, the isolation lift, the operator workshop read -- CLOSED IN SOURCE 2026-11-17 (B2)
+
+**Found by an outside packet.** Collective #21's signed-RUN packet (v2.3, case C1) registered a throwaway key as an
+ally at its default scope and made a signed HANDS RUN with it at the pinned commit 9d85f6c. The approved script ran.
+nootxlm reproduced it on native Linux (HF 180706 #39, 2026-11-17): all eleven cases as pre-registered, C1 included.
+
+**Cause.** `covenant_unified_v8._request_signed_by_registered` returned `covenant_mycelium.admit()`'s `ok`.
+`admit()` is ok for "signed:operator" and also for "signed:ally", meaning an ally key on a door in its scope, and
+`/m/agent` is in `ALLY_DOORS`. A423 meant "a request signed by a registered operator key" and reused `admit()`.
+The same helper also decides `heal_lift_authorized` (A370): un-isolating free when Tetsu presses HEAL on `/m/agent`.
+So an ally talking to Tetsu could also authorize the lift, which the A168 grant reserves to him.
+
+**His decision.** He chose B2 on 2026-11-17, after an 11-of-11 quorum for B (`ops/ALLY_RUN_DECISION_2026-11-17.md`),
+"as long as it doesn't interfere with the most recent hugging face reply". It doesn't: the packet reads its eight
+files from git at 9d85f6c and checks their hashes, so nootxlm's run and every rerun of this packet still characterize
+that commit, where C1's "the ally runs" stays true.
+
+**Fix.** The helper requires `_how == "signed:operator"`, exactly, in the one place. All three callers inherit it:
+RUN (`may_run`), the lift, and `/m/workshop/read`. Ally admission in `admit()` is unchanged: an ally still talks on
+its doors.
+
+**Repro, both ways:** `python -m pytest test_a447_ally_not_operator.py`, 9 tests. Before the fix: 5 failed (ally RUN
+ran, ally lifted, the helper said True for an ally on /m/agent and for an ally with a custom read scope, and the source
+guard). The 4 operator and loopback controls passed. After the fix: 9/9. Also green afterwards: A430 and ASM1 (39 with
+A447), TH1 31/31, HL1 34/34, A370 11/11, A430S 13/13, A432 18/18, FW1 130, MY1 16, SP1 32, TF1 30, A22 26/26.
+*A slip in the first draft of the test:* the custom-scope check signed one request and called `admit()` twice on it.
+The second call refused a REPLAY, so the check passed before the fix for the wrong reason. Each call is now signed
+separately, and that check was red before the fix.
+
+**Not checked / still open.** Allies registered on the other nodes (only this PC was checked: no
+`ops/mycelium_peers.json`). Whether an ally's WRITE reaches the workshop the practice loop runs from (the loop writes
+its own check file and runs it on the next line, so a substitution would be a race in principle). Option C (a per-ally
+"hands:run" grant) and option D (RUN on its own door) are not built. Containment and egress of the workshop sandbox
+(A436) are unchanged.
+
+**Status (as first written on the live branch, 2026-11-17, kept):** in source on that branch with a both-ways test. NOT
+deployed and NOT pushed. The public line for the HF threads should say "closed in source at <commit>", not "closed",
+until it is deployed.
+
+**Counts, in their units (2026-11-18).** The 9 above is pytest's count on 11-17. Main's runner (unittest, which
+`covenant_one` reads) counts the same file as 8 tests: against main's core before this change `A447: 3/8` (the five
+ally refusals red), and with it `A447: 8/8`. Measured both ways in the change's own worktree.
+
+**Numbering (2026-11-18).** Written as A443 on the laptop's live branch (af88402). Main's A443 is a different entry, the
+runner -I pin (#75), renumbered there the same day to avoid an earlier collision; neither side had looked at the other's
+in-flight numbers. Main is canonical, so this change lands as A447. A447-A449 were searched first in every worktree's
+KNOWN_ISSUES and every ref's commit messages, and were free.
+
+**Also carried: #72's A441 comment, doubled.** `StakingPool.stake` on main held A441's seven-line comment twice. It
+came in with 7334c4a itself, not from a merge (the guard line appears once, so behaviour was never affected). This
+change keeps one copy. With both, main's core is byte-identical to the laptop's apart from this entry's number, which the
+laptop takes when it adopts this -- the mesh's source split (A/B/C vs node D and the phone) closes on that hash.
+
+**Status (2026-11-18):** running on the laptop's A/B/C since their 09:28 reload (as A443's text). On main by this
+change; node D and the phone get it from main.
+
+---
+
 ### A450. [free was isolated for the judge working: four times since 10-14, after rounds in which nothing was posted. With "on_refusal": "quiet" in her grant she now goes QUIET instead -- rehearses, sends nothing, comes back by herself -- the challenge run that can suspend the account is read before every send, and her writing improves by a vetted nightly loop] (2026-11-18). IN SOURCE on its branch; not deployed.
 
 **His words, 2026-11-18:** "get the ambassador back up and running, and look for anything that the ambassador missed that can benefit us"; "figure out a way to not isolate her and to work it into an improvement loop while vetting the suggestions"; "use quiet mode and implement consensus".

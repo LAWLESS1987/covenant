@@ -281,6 +281,14 @@ Three things, in one process:
   otherwise abstains. Measured with the same tool: 10 of 10 reference solutions pass,
   and a script that reaches `os` through `uuid` is refused at its write and its run.
   The content of prose (a `.txt`, a `.md`) is read by no judge.]
+  [A435, 2026-11-16. The content seat now reads prose too, but narrowly: a non-code
+  write's text is shown two signals and otherwise abstains, so an ordinary note still
+  proceeds. It flags planted-instruction markup (chat/role/fence marks or invisible
+  characters) or a spelled-out injection (a role prefix, a short list of phrases like
+  "ignore the above", or a covenant act line written out in CAPITALS), and a flagged
+  write is refused like a screened code write. It reads no meaning beyond those
+  patterns: a planted instruction in ordinary prose or reworded past the list is not
+  seen (KNOWN_ISSUES A435).]
 - **A propagation layer built as an address-event network.** A block announce is
   148 bytes because it carries an address, not a payload; the receiver fetches
   what it does not have. Link conductance is Hebbian, redundant announces are
