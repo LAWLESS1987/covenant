@@ -597,3 +597,5 @@ ops/HIGHWAY_AUTONOMY_LOOSEN_2026-11-02.md
 # not shipped on main (keeps the canonical branch lean / joinable). A dedicated archive
 # store is the proper long-term home (PR #42 review, 2026-11-08).
 ops/students/fallback_model*.json
+ops/covenant_adopt.jsonl
+ops/covenant_adopt.disabled
