@@ -17937,7 +17937,7 @@ Hunting the A438 queue at its top item, `/actuator_learn`, turned up two real th
 
 ---
 
-### A442. [security] A metadata extension could forge a store-owned field, and a Unicode line separator could break out of the frontmatter -- hardened
+### A445. [security] A metadata extension could forge a store-owned field, and a Unicode line separator could break out of the frontmatter -- hardened
 
 **Found 2026-11-18** sitting UNCOMMITTED in node D's working copy of `ai_memory_system/memory_store.py`: a prior
 hardening patch that had never reached main (node D's updater was excluding the file from its drift check as if
@@ -17953,7 +17953,7 @@ other fields.
 **Fixed.** `_STORE_FIELDS` names the store-owned fields and `MemoryStore.put` refuses an extension that sets
 one; a non-dict extension is refused; `_FRONTMATTER_BREAKS` lists every separator `splitlines()` honours and
 `render_memory` refuses all of them in every frontmatter field; an extension key must be non-empty, trimmed and
-colon-free. Checks A442.1-A442.6 in `ai_memory_system/test_memory_system.py` drive it both ways: the forbidden
+colon-free. Checks A445.1-A445.6 in `ai_memory_system/test_memory_system.py` drive it both ways: the forbidden
 inputs raise, an ordinary extension still renders and lands. The existing M1 suite stays green.
 
 **Limits.** This hardens the writer and the renderer. It does not re-validate records already on disk: a record
