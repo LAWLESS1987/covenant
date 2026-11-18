@@ -902,12 +902,22 @@ def _content_seat(d, workshop=None):
     return {"state": "violates", "why": why, "message": "content seat: the screen refused it: %s" % why}
 
 
+# A446 (found by Jang-woo running packet v2.3, HF 183807 #44): the reason handed to the model when a RUN is refused
+# said loopback was enough. Since A423 it is not, and since A447 an ally key is not either: the door's may_run is
+# covenant_unified_v8._request_signed_by_registered, true only for a request signed by one of his own keys
+# ("signed:operator"). The words below state that rule; test_a446_run_refusal_reason.py holds them to the gate.
+RUN_REFUSED_DATA = ("DATA: running a script needs the operator: a request signed by one of his own registered keys. "
+                    "Loopback alone, an ally key or a tailnet address is not enough, and this caller has none of his "
+                    "keys' signatures. Nothing was run. Say so plainly.")
+
+
 def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=None, may_run=True, run_sha256=UNBOUND,
         run_auth=None):
     """For the door: (handled, data_for_the_model, record). Not a directive -> (False, '', None). may_run gates a RUN
-    (A423): the /m/agent door passes may_run only for an OPERATOR caller (loopback, or a request signed by a registered
-    key), so an unauthenticated tailnet caller cannot run a script even if a screen spelling slips past -- the screen is
-    a screen, not a sandbox. In-process callers (his practice loop, the tests) keep the default True.
+    (A423): the /m/agent door passes may_run only for an OPERATOR caller -- a request signed by one of his own
+    registered keys; not loopback alone (A423), not an ally key (A447) -- so no other caller can run a script even if a
+    screen spelling slips past -- the screen is a screen, not a sandbox. In-process callers (his practice loop, the
+    tests) keep the default True. A446: the refusal tells the model this rule (RUN_REFUSED_DATA), not an older one.
     run_sha256 (A430): the door passes the value from the signed body (None when it has none), and a RUN then runs
     only the file whose bytes hash to it. Not passed (UNBOUND): an in-process caller, not bound.
     run_auth (A434): a finite authority to RUN for one started practice loop (covenant_tetsu_practice.PracticeRunAuth),
@@ -973,10 +983,9 @@ def act(answer, gate=None, say=None, workshop=None, ledger=None, proposals_dir=N
             return True, "DATA: written -- %s, %d bytes, in your workshop%s." % (w["name"], w["bytes"], note), rec
         if kind == "run":
             if not may_run:                                  # A423: RUN is code execution; refused for a caller the door
-                rec["refused"] = True                         # did not authorize (not loopback, not a registered signature)
+                rec["refused"] = True                         # did not authorize (no signature from an operator key, A447)
                 _append(rec, ledger)
-                return True, ("DATA: running a script needs the operator (a request from loopback or signed by a registered "
-                              "key); this caller may not. Nothing was run. Say so plainly."), rec
+                return True, RUN_REFUSED_DATA, rec
             # A434: his practice loop's finite run authority. A RUN spends one of it, after may_run and before run(); once
             # the authority is exhausted or past its wall-clock expiry it is refused here, so nothing is started. The row
             # is marked run_auth_refused, which the loop (attempt) reads as a stop -- it ends the pass, it does not crash.

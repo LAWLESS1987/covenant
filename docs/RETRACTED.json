@@ -2752,6 +2752,36 @@
     "docs/LOOKBACK_INDEX.md"
    ],
    "note_on_branch": "The rule as written stays runnable on branch a280-own-account-rule-as-written-2026-11-09 (b54566f), and the pre-change files are kept in .trash/own_account_2026-11-09/."
+  },
+  {
+   "id": "A446-RUN-REFUSAL-LOOPBACK",
+   "claim": "The data covenant_tetsu_hands.act() handed the model on a refused HANDS RUN, and act()'s docstring: that the operator (who may RUN) means loopback or a request signed by a registered key.",
+   "verbatim": [
+    "DATA: running a script needs the operator (a request from loopback or signed by a registered key); this caller may not. Nothing was run. Say so plainly.",
+    "the /m/agent door passes may_run only for an OPERATOR caller (loopback, or a request signed by a registered key)"
+   ],
+   "truth": "Since A423 the door sets may_run from _request_signed_by_registered alone, so loopback is not enough; since A447 (03dac84 on main; A443, af88402, on the live branch) only signed:operator passes, so an ally key is not enough either. covenant_tetsu_hands.RUN_REFUSED_DATA now states that, and test_a446_run_refusal_reason.py holds the words to the gate.",
+   "refuted_by": "Jang-woo, running signed-RUN packet v2.3 against 9d85f6c (HF 183807 #44, 2026-11-18); checked against the source the same day.",
+   "patterns": [
+    "a request from loopback or signed by a registered",
+    "OPERATOR caller \\(loopback, or a request signed by a registered"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md",
+    "private/",
+    "test_r1_retracted.py",
+    "test_a446_run_refusal_reason.py",
+    "ops/HF_183807_P44_REPLY_DRAFT_2026-11-18.md",
+    "pending-v8.38/",
+    ".trash/predeploy_A429_A430_20261115T203306Z/",
+    ".trash/predeploy_A432_20261116T020308Z/",
+    ".trash/predeploy_A434_A435_A436_20261116T162031Z/"
+   ],
+   "note_on_branch": "Kept as written on branch a446-refusal-reason-as-written-2026-11-18 (at af31ea0). The pinned packet commit 9d85f6c also keeps it, by design.",
+   "note_on_allow": "The three .trash/predeploy_* directories are whole pre-deploy copies of the tree kept by earlier deploys (rule 10); they hold the old wording as it was. Named one by one, as A392's are, so a new copy elsewhere is still caught."
   }
  ]
 }
