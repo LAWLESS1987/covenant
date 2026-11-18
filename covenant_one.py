@@ -97,6 +97,47 @@ SUITES = [
     # against a PC that has 6: a check moved to a copy answers about the copy.
     # They run in phase_integrity, in the live folder, before anything else.
     ("test_security_audit.py",           300,  "SECURITY"),
+    # A438 (2026-11-16): tools/attack_surface_map.py is the defensive COUNT PASS
+    # -- it discovers the Flask route surface by walking the source and emits a
+    # ranked hunt queue of routes with no (adversarial test AND gating call). ASM1
+    # drives its pure functions both ways (e.g. /health must be READ, which breaks
+    # if classification regresses to raw substring matching) and smoke-tests the
+    # real tree so the mapper cannot silently stop finding routes.
+    ("test_asm1_attack_surface.py",       60,  "SECURITY"),
+    # CA1 (2026-11-17): covenant_adopt -- the covenant-native auto-adoption gate
+    # (scan origin/main, decide if safe to adopt; PROPOSE by default, AUTO-apply
+    # only when armed). Pins the gate both ways: GO only when NORMAL + merge-clean
+    # + scan-clean + no new failing gate; HIGH/scan-hit/conflict/new-failure each
+    # hold. Reuses node D's safe_integrate design + covenant_one's differential gate.
+    ("test_ca1_covenant_adopt.py",        60,  "SECURITY"),
+    # A439 (2026-11-16): first catch of the A438 hunt, at /actuator_learn. The
+    # shared operator-request gate (covenant_daily_plan.verify_signed) let a
+    # NON-FINITE timestamp slip the freshness window (abs(now-nan) > WINDOW_S is
+    # False); the nonce store resets on restart, so a captured nan request could
+    # replay. Rejected now at the ingress (the U invariant). Exploit-first both
+    # ways: the nan request verifies on the pre-A439 code, is refused after.
+    ("test_a439_nonfinite_timestamp.py",  60,  "SECURITY"),
+    ("test_a444_nonce_store.py",          120, "SECURITY"),
+    ("test_a443_runner_isolation.py",     60,  "SECURITY"),
+    # A440 (2026-11-16): second A438-hunt catch, at /claim_rewards. The v8.4 fix
+    # (verify_stake_action_signature) binds the ACTION and the KEY into the signed
+    # frame, but only "bad signature -> 400" was tested (A1a); the domain
+    # separation (a claim-sig is not an unstake-sig) and ownership had no runner.
+    # This pins them both ways. Guards /claim_rewards and /unstake.
+    ("test_a440_stake_action_auth.py",    60,  "SECURITY"),
+    # A441 (2026-11-16): third A438-hunt catch, at /stake -- a REAL defect. A nan
+    # amount slipped `amount <= 0` and `balance < amount` (both False for nan),
+    # reached self.stakes (poisoning total_staked, derived from it) and diverged
+    # from the db when save_stake hit the NOT NULL constraint -- one authenticated
+    # /stake could corrupt the pool and lock the staker out. The U invariant missed
+    # /stake. stake() now rejects non-finite before any state change; both ways.
+    ("test_a441_nonfinite_stake.py",      60,  "SECURITY"),
+    # A442 (2026-11-16): fourth A438-hunt catch, at /succession/register. register
+    # validated threshold/guardians/keys but NOT the dead-man's-switch timing, so a
+    # NEGATIVE heartbeat_interval/grace made the deadline land in the past and fired
+    # a PENDING succession episode immediately on a LIVE primary (measured); a
+    # non-finite value 500'd at the db. Now rejected at write time; both ways.
+    ("test_a442_succession_timing.py",    60,  "SECURITY"),
     ("test_k1_runner_key_preservation.py",120, "SECURITY"),
     ("test_k3_p9_owner_only_guard.py",   120,  "SECURITY"),
     # Arrived on main 2026-08-27 from fix/tally-counts-failures-as-passes,
@@ -306,6 +347,12 @@ SUITES = [
     # (A135). P21h and P22's parser check both drive the failing direction.
     ("test_p21_self_eval_persist.py",    120,  "IDENTITY"),
     ("test_p22_watchdog_restart_verifies.py", 180, "IDENTITY"),
+    # A437 (2026-11-16): one tree, one watchdog even when two start in the SAME
+    # tick. A160 spared every tie and _evict_twins ran only at start, so a
+    # same-tick pair from racing launchers both survived and persisted. A pid
+    # tiebreak (lower pid stops the higher, one-sided) plus a per-round re-cull.
+    # Drives both ways: each new case fails on the pre-A437 code.
+    ("test_a437_twin_tiebreak.py", 60, "IDENTITY"),
     # P23 (2026-09-16): the three second-operator security findings -- A31
     # (/propose_code RCE), A21 (implicit credential grab), A44 (key ACL).
     # Added because a back-door audit pointed out that all three fixes existed
@@ -846,6 +893,10 @@ SUITES = [
     # TH1 (2026-09-26, A226): Tetsu's hands -- his workshop, bounded runs behind a screen and a
     # guard, proposals beside the tree and never in it; the door dispatches HANDS beside MOLTBOOK.
     ("test_th1_tetsu_hands.py", 180, "JUDGE"),
+    # A436 (2026-11-16, follows A430): a signed-door HANDS RUN approves the exact script (run_sha256), not an
+    # invocation; a RUN carrying arguments is refused. The practice path (in-process run_auth) and unsigned callers
+    # are untouched. Drives both ways. Closes the quorum's C3.
+    ("test_a436_run_args_bind.py", 60, "JUDGE"),
     # PP1 (2026-09-26, his words: "train tetsu to code at a high recursive level"; he chose the practice loop, nightly and
     # bounded): the curriculum solvable under his screen, a wrong file caught, the failure fed back, what he solves and
     # learns kept in his workshop, and the gate, the model and the clock each stopping it. Real runs; model and gate stubbed.
@@ -943,6 +994,12 @@ SUITES = [
     # process, never through the shared quorum (whose seats reach a runner and the tracked verdicts file); the seat
     # refuses what the screen refuses and otherwise abstains. Stub quorums and a stub runner; red on main 0/6.
     ("test_a429_hands_content_seat.py", 240, "JUDGE"),
+    # A435 (2026-11-16): the content seat now reads PROSE too, narrowly. A non-code WRITE's text is shown two narrow
+    # signals (planted-instruction markup via outside_text.clean; a spelled-out injection -- a role prefix, a short
+    # phrase list, a covenant act line in CAPITALS) and otherwise ABSTAINS, so an ordinary note still proceeds. The
+    # measurement is the gate: 22 ordinary writes 0 refused, 16 planted 14 flagged. Red on main 2/7. It reads no
+    # meaning beyond the patterns. Stub quorums and the runner road stubbed; the shipped corpora are measured here.
+    ("test_a435_prose_write_seat.py", 240, "JUDGE"),
     # A430 (2026-11-15, his words "Tie the signature."): a HANDS RUN through the door runs only the script whose bytes
     # hash to the run_sha256 inside the operator's signed body -- the door's real HANDS branch, real signatures, real
     # runs; read once, hashed, screened and executed from the same bytes; the practice loop unbound. Then the signing
