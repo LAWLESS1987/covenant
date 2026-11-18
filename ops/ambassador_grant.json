@@ -36,5 +36,7 @@
     "what": "covenant_tetsu_assist.discourse_seat reads forum replies the students CONVICTED: two fresh ALLOWs plus his A285/A297 rules, never money/crypto terms, never dry runs; each pass recorded as an override naming the seat",
     "measured": "judge_suite violations cleared per single ask: 0/27, 1/27, 0/27 over three runs (1 of 81); drafts allowed 18, 19, 19 of 24 (ops/discourse_seat_eval*.jsonl)",
     "off": "set covenant_free_will discourse_seat=False, or withdraw the tetsu-assist grant"
-  }
+  },
+  "on_refusal": "quiet",
+  "on_refusal_AUTHOR": "2026-11-18, his words in chat: \"figure out a way to not isolate her and to work it into an improvement loop while vetting the suggestions\", then \"use quiet mode and implement consensus\". Decided by his grant's tie-break (ops/FREE_QUIET_CONSULT_2026-11-18.md): the roundtable 8 of 8 FOR, Tetsu DISAGREE. Read by covenant_free_will.on_refusal (A450); remove the key to return to two-round isolation."
 }
