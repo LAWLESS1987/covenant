@@ -18279,6 +18279,167 @@ aside, not deleted.
 
 ---
 
+### A445b. [security, the second half of A445] The text checked was not the text written, a key could answer strip() two ways, and `superseded_by` could be set through an extension -- CLOSED IN SOURCE 2026-11-18
+
+**Found 2026-11-10, landed 2026-11-18.** A challenge run against the memory-admission repair (collective record
+`reviews/claude-first-assignment-2026-11-10/memory/`, cases C14, C16, C23) reproduced three residual shapes and a
+follow-up patch was written the same day. It was never proposed to this repository. A445 (2026-11-18) landed the
+first half from a different copy. A gap check of the collective's open items found the second half still applied
+cleanly to main and was not in it.
+
+**The shapes, each reproduced on main `3a446b7` before the change.**
+1. *Two renderings.* `render_memory` checked `str(val)` for a line break and then wrote the value with an
+   f-string, which calls `__format__`. A `str` subclass that answers the two differently passed the check and wrote
+   a second frontmatter line. Measured: an `agent: forged` line in all four fields (name, description, type, agent)
+   and in an extension value.
+2. *A key that answers `strip()` two ways.* `put` asked `k.strip() in _STORE_FIELDS`. A `str` subclass equal to
+   `"agent"` as a dictionary key answered the ownership check with another word and the renderer's trimmed-key
+   check honestly. Measured: the stored record's `agent` read `forged`.
+3. *`superseded_by` through an extension.* The field was not store-owned, so `put(..., extra={"superseded_by": x})`
+   marked a record superseded with no `supersede` audit line. Recall demotes a superseded record (A245).
+4. *A successor that is not a name.* `supersede()` wrote any `new_name`: `"Not A Name"`, `"../x"`, the empty
+   string. A number raised `AttributeError` from the hashing line after no check at all.
+
+**Fixed.** `_exact()` converts each value once to a plain `str`, and that one text is both checked and written.
+Extension keys must be exactly `str` in `put` and in `render_memory`. `superseded_by` joins `_STORE_FIELDS`;
+`supersede()` still writes it, because it renders the record itself and does not pass through the extension
+check. `supersede()` refuses a successor that does not match the memory-name pattern, before reading anything.
+
+**Round 2, from a non-author read (2026-11-18).** Another session probed the pushed change (25 probes; the four
+changes held) and found one residual: `put(extra={"\u200bsuperseded_by": x})`, the same with the zero-width space
+after, and `"Superseded_by"` were all WRITTEN. The parser reads each as a different key, so no code was fooled, but
+the line in the file looks like `superseded_by: x` to a person or a model reading it as text. Closed by an
+allowlist in `put`: an extension key is a lowercase ASCII word (`[a-z][a-z0-9_]{0,39}`). The two keys callers pass
+today, `source` and `supersedes`, pass it. The same read saw a superseded record's file carry `type` and `agent`
+twice: the rewrite paths hand a record's whole metadata back to `render_memory` as `extra`. It predates this change
+(same value both times, so it parsed the same); `render_memory` now writes the two once.
+
+**Repro, both ways.** `cd ai_memory_system && python -I test_memory_system.py`, checks A445b.1 to A445b.11.
+With the change: M1 220 of 220. With `memory_store.py` reverted to main `e103155` and the tests kept: 212 of 220,
+eight red (A445b.1 to A445b.6, A445b.9, A445b.11) and the three honest-input controls green (A445b.7, A445b.8,
+A445b.10). With only round 2 reverted: 218 of 220 (A445b.9 and A445b.11 red). `test_intent_provenance.py` 57 of 57
+and `test_m1_memory_system.py` pass. Python 3.12.10, Windows.
+
+**Reads.** A local 27B: three leads, each tested, none held. The non-author session above: 25 probes, the residual
+now closed. Gemini (Flash-Lite, signed out), on round 1 only: could not refute the three claims put to it. Codex was
+out of quota. No outside reviewer has read round 2.
+
+**Reach, stated at its size.** In-process callers only. The HTTP server builds its own extension
+(`{"supersedes": ...}`) and never passes a client's, and JSON yields plain `str`, so none of the four shapes was
+reachable over the wire in this revision. A library caller, an import script or a future route that forwards
+client metadata could have reached them.
+
+**Limits.** The key allowlist is on `put`, the door callers use. `render_memory` keeps its wider key rule,
+because the rewrite paths re-render records already on disk and must not start refusing an old record's key.
+Records already on disk are not re-validated, as under A445. C18 from the same challenge run, what
+a rewrite of a superseded record should do to its `superseded_by`, is a semantics question and is NOT decided
+here. `screen_provenance` still accepts `str` subclasses by `isinstance`; pull request #84 is editing that
+function, so it is left alone in this change.
+
+**Status:** in source on its branch with its tests; not deployed.
+
+### A262b. [honesty of a published number, follows A262] `readme_totals.py` published the platform of the machine that ran the TOOL, and the date the transcript file was last written -- FIXED IN SOURCE 2026-11-18
+
+**Found 2026-11-18** while trying to refresh the README's totals from the transcript CI uploaded for main
+`4361e67` (300 suites, 8,019 checks, 0 failed, on Linux). Read on a Windows PC, the tool announced
+`300 suites, 8,019 checks, 0 failed, win32`.
+
+**Cause.** `read_totals` looked for the literal words `win32`, `linux` or `darwin` after `platform`. `covenant_one`
+writes `platform      Windows 11 (AMD64)` or `platform      Linux 7.0.0-...`, so the pattern has never matched
+any transcript and the fallback always ran: the platform of the machine running `readme_totals.py`. It was right
+only when the sweep and the tool ran on the same kind of machine. The date came from the transcript file's
+modification time, which is when it was last written or copied, not when the sweep ran; the transcript carries its
+own `when` line.
+
+**Fixed.** `platform_of()` reads the transcript's own platform line and maps its first word (Windows to win32,
+Linux to linux, Darwin or macOS to darwin). A platform line it cannot place returns None and `--write` stops with
+exit 2 and writes nothing. Only a transcript with no platform line at all falls back to this machine, as before.
+`date_of()` reads the `when` line and falls back to the file's date.
+
+**Repro, both ways.** `python test_g1_doc_consistency.py`, checks T5c to T5f: 25 of 25 with the change. With
+`readme_totals.py` reverted and the tests kept: 22 of 25 on Windows (T5c read a Linux transcript as win32, T5d
+took the file's date, T5e guessed). T5c is built so that one of its two halves is red on any machine under the
+old code. T5f, the transcript with neither line, passes both ways.
+
+**NOT done here, on purpose: the totals themselves.** The marked lines still say 262 suites, 7,234 checks, win32,
+2026-11-09. The README's own prose beside them says "It is **win32**" and that `covenant_one.py --all` reproduces
+the number, and that a green tick on one platform does not speak for the other. The CI transcript is a Linux
+`--ci` run, so writing its numbers there would contradict that paragraph. The refresh needs a clean `--all` sweep
+on Windows; the PC this was found on has environment-shaped failures in its local sweep.
+
+**Status:** in source on its branch with its tests; no published number changed.
+
+---
+
+### A452. [the adoption gate told him a run was held and nothing about whether the same thing had gone wrong before; now a run that contradicts a clean adoption searches the record and its tombstones and carries the closest entries] (2026-11-18). IN SOURCE on its branch; not deployed, the gate stays propose-only.
+
+**His words.** On whether a change to the core should hold for his word (typed 2026-11-18 in the TETSU session and relayed to this one verbatim): "keep it auto, but if something contradicts, use the tombstones to figure out where it went wrong." His go for building it into this gate, typed in this session the same day: "Build it locally", then "push it too".
+
+**Found.** The peer session asked whether `tools/covenant_adopt.py` holds a core-only change for him. Measured by calling `classify`: `covenant_unified_v8.py` alone, or with `verify_deploy.py`, the held copy and `MANIFEST.sha256`, is NORMAL; A447 was held only because its test's name contains "operator". He was asked, and chose to keep that. What the gate lacked was his second half: a held run named its reasons and stopped there. Rule 10's "search the tombstones and the record first" was a thing a person had to remember to do.
+
+**Built (advisory; it changes no decision).**
+- `contradictions(result)`: what in a run contradicts a clean adoption -- an unclean merge, a backdoor-scan hit or a scan that errored, a newly failing gate, an apply that did not land -- each with what tripped. The deliberate HIGH hold is not one, nor an already-current run, a dry apply or an apply that landed. A pure function of the result, so it reads ledger lines from before it existed.
+- `lookback(result)`: only when something contradicted. Words from the run are weighed -- what tripped 3 (its file, gate or suite, and an A-number inside its name), an A-number in an incoming commit's subject 2, a file that merely changed 1 -- and matched by whole word against `docs/KNOWN_ISSUES.md` headers and each tombstone's claim and truth in `docs/RETRACTED.json`, through `tools/lookback_index.py`'s own readers. The top five go into the result with where each is (a live line number for an entry), the words that matched and the score. No model.
+- `seen_before`: for each contradiction, how many earlier ledger runs carried the same kind tripped by the same thing, with the first and last time.
+- `annotate(result)` adds all three after the decision and any apply, before the run is recorded; the text output and `digest` show them. A failure inside it is written into the result and never raised.
+- `conflict_detail` / `conflict_paths`: a conflicted merge's reason now names the hand-written files that conflict, generated ones last. It was the first line of `git ls-files -u`, cut at 100 characters.
+
+**What the real ledger showed.** `ops/covenant_adopt.jsonl` on the laptop holds 4 runs: 3 already-current, 1 NO-GO (2026-11-18 08:37, a merge conflict). The one path that line recorded is `MANIFEST.sha256`, a generated file, so the first version of the look back aimed at the manifest (A255). That is why the conflict reason was changed, and why a generated path on an old line is not used as a key; the same run now points at A438 to A442, the entries its incoming commits name. 0 of the 4 runs is a HIGH hold, so "the HIGH hold is not a contradiction" is pinned by fixture, not seen on real data.
+
+**Checks.** CA1 (`test_ca1_covenant_adopt.py`, registered SECURITY): 12 tests before, 40 now. Sixteen mutations of the tool, each run and the file restored byte-identical, each turn it red: the HIGH hold counted; a conflict also reported as a failing gate; a dry apply counted as failed; substring matching; every weight equal; searching with no contradiction; an unreadable tombstone file hidden; no cap on hits; a failing look back raised; recurrence ignoring what tripped; A-numbers in a suite's name unread; classify widened to hold the core; generated files named as the conflict; an old line's generated path kept; a long conflict cut silently; the digest dropping its pointers. The first pass caught 11 of 13: two tests were too weak (recurrence, and the A-number weight) and were tightened before this was committed. LI1 11 of 11.
+
+**A draft corrected before commit (rule 10).** Two tests as first written expected a made-up record entry in the test's own fixture ahead of that entry's fixture tombstone. The ranking was right and the expectation wrong: the tombstone's text also carries the word "scan", so it scores 4 against 3. The tests now state the order and why. Not in `docs/RETRACTED.json`: it was an assertion in an uncommitted test, never a published claim.
+
+**What it cannot see.**
+- Headers and tombstone text only, never an entry's body: an error whose header does not name the file, gate or number that tripped is not found. A hit is a pointer; open the line.
+- It searches this checkout's record, not the incoming one, on purpose: text arriving in the merge under test could describe its own failure as known. So an entry that exists only upstream is not found until it is adopted.
+- The full pipeline was not run end to end with this change (`scan` runs `covenant_one --check` twice). The print path and `digest` were run through fixtures; `annotate` was run over the real ledger read-only.
+- A line already in the ledger keeps its old one-path conflict reason; only new runs name every file.
+- `_applied_today` (the daily cap) still stops on a torn ledger line. Left as it is: reading past a torn line there could undercount applies.
+
+**Not changed.** `classify`, `decide`, the scan patterns, the kill-switch, the daily cap, `apply`, the exit codes. The kill-switch `ops/covenant_adopt.disabled` is present on the laptop, so the gate applies nothing either way.
+
+**Numbering.** A449 has no header on any ref and is left alone; A451 is claimed on the live branch (free's own-post title). Searched every worktree's `docs/KNOWN_ISSUES.md` and every ref's commit subjects for A449 to A469 first.
+
+**Repro.** `python test_ca1_covenant_adopt.py`.
+
+**Status:** in source on branch `feat/adopt-tombstone-lookback`; not merged, not deployed.
+
+**Non-author read, 2026-11-18 (everything above is kept as first written; this is what it got wrong and what changed).** The TETSU session read pull request #87 at 08b2380 with 20 probes of its own. Same model family, so not an outside read. Every point below was reproduced here before it was fixed: the tool as committed at 08b2380 fails 14 of today's 52 CA1 tests.
+- **One claim above did not hold (tombstone A452-LOOKBACK-NEVER-INCOMING).** "It searches this checkout's record, not the incoming one, on purpose" was false after an apply that failed with HEAD already moved: `apply()` reports applied only when the updater returns 0, so a nonzero return after the merge leaves the working tree holding the incoming record, and the look back read the working tree. A header planted in the incoming record, describing that failure as known and safe, came back as its pointer. The lazy `import lookback_index` loaded the incoming copy of that file too. Now the record is read from the commit the run started at (`git show <head>:docs/...`), a missing or unknown commit is reported as unreadable and never replaced by the files on disk, and the readers are loaded when the gate starts. Whether the laptop's updater always rolls back before returning nonzero is UNDETERMINED; the fix does not depend on it. The claim as written stays on branch `a452-lookback-claim-as-written-2026-11-18`.
+- **The search words are the sender's.** They come from the merge under test: what failed, its commit subjects, its file names. On the real record one subject naming five A-numbers took 4 of the 5 pointers. The sender can steer which of this checkout's entries are shown, never what they say. Now each hit carries `matched_from` (tripped / subject / changed), the note says where the words come from, and hits supported by nothing that tripped are capped at 2. A failing suite named after an entry still makes that entry the top hit; that is inherent and is what the origin label is for.
+- **The conflict reason was parsed back out of its own prose.** A file named `a,b.py` came back as two keys and `we (+2 more)` as `we`. The list now travels in the result as `merge_conflicts` and is used as it is; the prose is only for a person. The old-line reader handles the pre-A452 form only and gives no keys for anything else.
+- **Only the bracketed title was searched.** The entry said "headers". 163 of 439 entries had a bracketed title of three words or fewer (the peer's count; A443, A444 and A445 are each "security"), so a scan hit in `memory_store.py` did not find A445 or A445b. The whole header line is searched now.
+- **An odd ledger row raised.** A row whose `scan` or `test` is not an object raised AttributeError, voided the recurrence count for the whole run, and would have raised out of `digest`. Such a row now reads as no contradiction.
+- **A run could go unrecorded.** The look back ran before the ledger line was written, so a Ctrl-C or a kill inside it left a run, possibly one whose apply had landed, with no line. `annotate_and_record` records in a `finally`.
+
+**Checks after the read.** CA1 52 of 52 (40 before it). 27 mutations of the fixed tool, each restored byte-identical, each turn CA1 red, among them: reading the working tree; falling back to disk with no commit, and with an unknown commit; importing the readers at call time; parsing the conflict list from prose; searching only the bracketed title; dropping the origin labels; lifting the cap; not recording when interrupted.
+
+**Still not measured.** The full pipeline end to end. A real failed apply on the laptop. The updater's own rollback.
+
+**Status (after the read):** on branch `feat/adopt-tombstone-lookback` as a second commit on 08b2380; not merged, not deployed.
+
+**Re-read at b2b4268, 2026-11-18 (the same session, 27 probes; everything above is kept as written).** All five findings closed under its probes. One thing was left, and it answered a question put to it: the cap on the sender's words was dodged by NAMING things. Five failing suites that arrive with the merge, `test_a12_x.py` to `test_a441_x.py`, gave five pointers, each labelled "tripped" at weight 3; one new file named after five entries did the same alone. Its rule, built as it gave it: a file's name counts as what tripped only if that path is tracked at the commit the run started at (`git cat-file -e <head>:<path>`). A suite that was there and now fails is evidence; a name that arrives with the merge is its sender's word, gets the origin `new_name` and a subject's weight, and falls under the same cap of 2. A gate id and a scan pattern label are this tool's own words and need no file. With no usable commit nothing is vouched for. CA1 57 of 57 (52 of 57 before the change); 31 mutations, each caught, four of them new: a new name counted as tripped; the gate's own words made to need a file; "was it there" asked of the working tree; no commit vouching for every name.
+
+**On the line numbers (its note, not changed).** A pointer's line number is `lookback_index.entries`' count over `splitlines()`, and the header weighed is taken from the same split, so the two cannot drift from each other. A raw form feed or U+2028 in `docs/KNOWN_ISSUES.md` would make that count differ from an editor's; the file holds neither today (its measurement). That would be `tools/lookback_index.py`'s to fix, for `find` as well.
+
+**Status (after the re-read):** a third commit on branch `feat/adopt-tombstone-lookback`, local only when written; not merged, not deployed.
+
+**Third read, at 41b85a7, 2026-11-19 (the same session, 18 probes; everything above is kept as written).** 41b85a7 was pushed to pull request #87 that morning on his "Push it". The read found one way past the rule it had asked for, and three older holes in the gate itself.
+- **One claim above did not hold for every file (tombstone A452-NEW-NAME-EVERY-FILE).** "A file's name counts as what tripped only if that path is tracked at the commit the run started at", and the note the look back returns, "A failing file that was not there before the run is labelled new_name, not tripped." Whether a key WAS a file was decided by its spelling: a dot, a slash or a backslash. A new file at the repository root with no extension, `a12_a34_a56_a78_a441`, carrying a scan hit, was taken for the gate's own word, never asked about, and gave five pointers each labelled "tripped" at weight 3. The same through a conflict, whose path the sender names. Reproduced here before it was fixed. Now each contradiction says which of its keys are file paths (`paths`: a scan hit's file, a conflicted path, a failing suite), decided where the key is produced and never by how it is spelled; every path is asked of the pre-run commit; a contradiction that does not say has every key asked. The claim as written stays on branch `a452-new-name-claim-as-written-2026-11-19`.
+- **Only a whole commit id is read.** `_at_commit` and `_exists_at` accepted 7 to 40 characters, and `detect()` hands them 12. Git resolves a short id as a ref name before an object id. Reproduced (git 2.55, Windows, a throwaway origin, sender and node): a tag named after the node's 12-character HEAD, pushed with the change, follows the gate's own `git fetch`; `<head12>:docs/KNOWN_ISSUES.md` is then the sender's record, and a file that arrived with the merge reads as having been there before. A tag named after the whole 40-character id did not shadow it. These two functions now refuse anything shorter than a whole id and say so. **Until `detect()` carries the whole id, a real run's look back therefore reads "unreadable" rather than reading through a name the sender can plant.** That half is not in this change (next point).
+- **Its cost.** One `git cat-file -e` per name was 302 processes and 11 s for 300 new files (its measurement). The commit's paths are now listed once (`git ls-tree -r -z`), and no `<rev>:<path>` is built from a name the sender chose.
+- **Older than #87, in the gate on main, NOT fixed here.** The TETSU session is building these as their own pull request against main, on his word typed in its session, under A453: (H1) the short id also reaches `scan()` and the differential test, so with that tag the scan reads clean and the reference worktree is the incoming tip; (H2) `scan()` reads the diff by what a line begins with, so an added line beginning "++" is never scanned and a line "++ b/name" renames every later hit; (H3) an incoming `.gitattributes` saying `*.py -diff` makes the diff say "Binary files differ" and the scan read clean. Each reproduced here against 41b85a7 before I knew it was being built there. Three more found while reading for this and sent to that session, the first by reading and the other two measured: the laptop's updater (`update_abc.ps1`, outside the repository) runs its own fetch and merges `origin/main` by name, so what lands is not held to the commit the gate tested; `detect()` lists changed files with rename detection on, so `covenant_act_gate.py` renamed to `helper.py` with a line changed inside it listed only `helper.py` and classified NORMAL; and a fetch that fails with a tracking ref that does not resolve is recorded as "already current", exit 3.
+- **Where it stands on this host (measured 2026-11-19).** The scheduled task runs the gate daily with `COVENANT_ADOPT_AUTO=1`; that day's 05:00 ledger line reads armed, kill-switch present, NO-GO. `ops/covenant_adopt.disabled` is the only thing between a GO and an apply. The live checkout has 12 tags, none hex-named, and no tag or branch under `origin/`.
+
+**Checks after the third read.** CA1 67 of 67. The tool as pushed at 41b85a7 against these tests: 60 of 67. 41 mutations of the fixed tool, each restored byte-identical, each turn CA1 red, among them: is-it-a-file decided by spelling again; an abbreviated id accepted; a scan hit's file, a conflicted path, a failing suite not listed as a path; a pattern label listed as one; a contradiction that does not say waved through; the paths listed again for every name.
+
+**Still not measured.** The full pipeline end to end. A real failed apply. The updater's own rollback. This change with the whole id arriving from `detect()`: that needs the other pull request on main and main merged into this branch.
+
+**Status (after the third read):** a commit on local branch `fix/adopt-lookback-paths-whole-id`, on top of 41b85a7; not pushed, not merged, not deployed.
+
+---
+
 ### A451. [correctness / outward text, the A409 echo shape in a new place] free's own posts were titled with the instruction written back -- "a title under 80 characters:" -- and 5 went out live -- FIXED IN SOURCE 2026-11-18, guard FT1
 
 **Found** 2026-11-18 while reading what free had read that nobody had looked at (his ask that day). `write_post` took the model's first line as the title. The 3B often writes the format instruction back before the post.

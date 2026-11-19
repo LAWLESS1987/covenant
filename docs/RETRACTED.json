@@ -2782,6 +2782,48 @@
    ],
    "note_on_branch": "Kept as written on branch a446-refusal-reason-as-written-2026-11-18 (at af31ea0). The pinned packet commit 9d85f6c also keeps it, by design.",
    "note_on_allow": "The three .trash/predeploy_* directories are whole pre-deploy copies of the tree kept by earlier deploys (rule 10); they hold the old wording as it was. Named one by one, as A392's are, so a new copy elsewhere is still caught."
+  },
+  {
+   "id": "A452-LOOKBACK-NEVER-INCOMING",
+   "claim": "That the adoption gate's look back searches this checkout's record and never the incoming one. Written at 08b2380 (2026-11-18) in the A452 comment of tools/covenant_adopt.py, in docs/KNOWN_ISSUES.md A452 and in the body of pull request #87.",
+   "verbatim": [
+    "It searches THIS checkout's record, never the incoming",
+    "It searches this checkout's record, not the incoming one, on purpose"
+   ],
+   "truth": "False after an apply that failed with HEAD already moved: apply() reports applied only when the updater returns 0, so a nonzero return after the merge was made leaves the working tree holding the INCOMING docs/KNOWN_ISSUES.md and docs/RETRACTED.json, and lookback() at 08b2380 read the working tree. A header planted in the incoming record, describing that failure as known, came back as its pointer. The lazy import of tools/lookback_index.py loaded the incoming copy of that file too. Restated: the record is read from the commit the run started at (git show <head>:docs/...), a missing commit is reported as unreadable and never replaced by the files on disk, and the readers are loaded when the gate starts. Whether the laptop's updater always rolls back before returning nonzero was not determined; the fix does not depend on it.",
+   "refuted_by": "The TETSU session's non-author read of covenant #87, 2026-11-18 (its probe87.py, 20 probes, on a temp root). Reproduced the same day in a throwaway git repository as CA1's TheRecordSearchedIsThePreRunOne, which is red on the tool as committed at 08b2380.",
+   "patterns": [
+    "searches THIS checkout's record, never the incoming",
+    "searches this checkout's record, not the incoming one"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a452-lookback-claim-as-written-2026-11-18 (at 08b2380)."
+  },
+  {
+   "id": "A452-NEW-NAME-EVERY-FILE",
+   "claim": "That in the adoption gate's look back a failing file's name counts as what tripped only if the file was tracked at the commit the run started at, so that a name arriving with the merge is always labelled new_name and capped. Written at 41b85a7 (2026-11-18) in tools/covenant_adopt.py (the docstring of _terms and the note lookback() returns), in docs/KNOWN_ISSUES.md A452, in that commit's message and, on 2026-11-19, in the body of pull request #87.",
+   "verbatim": [
+    "a file's name counts as what tripped only if that path is tracked at the commit the run started at",
+    "A failing file that was not there before the run is labelled new_name, not tripped."
+   ],
+   "truth": "False at 41b85a7 for a file whose name has no dot and no slash. Whether a key was a file was decided by its spelling (_is_file_name: a dot, a slash or a backslash), so a new file at the repository root with no extension, a12_a34_a56_a78_a441, carrying a scan hit, was taken for the gate's own word, was never asked about, and gave five pointers each labelled tripped at weight 3; the same through a conflict, whose path the sender names. Restated: each contradiction now says which of its keys are file paths (`paths`: a scan hit's file, a conflicted path, a failing suite), decided where the key is produced; every path is asked of the pre-run commit, and a contradiction that does not say has every key asked. Separately, the commit id these functions accepted could be an abbreviation (7 to 40 characters), which git resolves as a ref name first; only a whole id is read now.",
+   "refuted_by": "The TETSU session's third read of covenant #87 at 41b85a7, 2026-11-19 (its probe87c.py, 18 probes, scratch clone). Reproduced the same day in throwaway repositories (git 2.55, Windows) and pinned as CA1's test_a_new_file_with_no_dot_and_no_slash_is_still_a_file and test_a_conflicted_path_the_sender_named_is_a_file_too, both red on the tool as pushed at 41b85a7.",
+   "patterns": [
+    "counts as what tripped only if that path is tracked",
+    "before the run is labelled new_name, not tripped"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a452-new-name-claim-as-written-2026-11-19 (at 41b85a7)."
   }
  ]
 }
