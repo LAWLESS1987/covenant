@@ -270,12 +270,12 @@ def main():
     check("PC1z12 [driven] the history route returns this caller's four turns and nobody else's",
           [x["q"] for x in _turns] == ["q1", "q2", "q3", "q5"], [x.get("q") for x in _turns])
     check("PC1z12 [driven] a held turn comes back held, with the FIRST fit record's messages (6 dropped, 34 kept)",
-          _turns[0]["held"] is True and _turns[0]["immune"] is False and _turns[0]["fit"] == [{"dropped": 6, "kept": 34}], _turns[0])
+          _turns[0].get("held") is True and _turns[0].get("immune") is False and _turns[0].get("fit") == [{"dropped": 6, "kept": 34}], _turns[0])
     check("PC1z12 [driven] an immune turn comes back immune and at the cap (40 kept); a withheld one keeps its reason and is not 'held'",
-          _turns[1]["immune"] is True and _turns[1]["fit"] == [{"dropped": 0, "kept": 40}]
-          and _turns[2]["withheld"] is True and _turns[2]["held"] is False and _turns[2]["why"] == "Ethical violation: x", _turns[1:3])
+          _turns[1].get("immune") is True and _turns[1].get("fit") == [{"dropped": 0, "kept": 40}]
+          and _turns[2].get("withheld") is True and _turns[2].get("held") is False and _turns[2].get("why") == "Ethical violation: x", _turns[1:3])
     check("PC1z12 [driven] a row with no usable fit record gives zeros, never an error",
-          _turns[3]["fit"] == [{"dropped": 0, "kept": 0}] and _turns[3]["held"] is False, _turns[3])
+          _turns[3].get("fit") == [{"dropped": 0, "kept": 0}] and _turns[3].get("held") is False, _turns[3])
 
     LOOP, PHONE, LAN = "127.0.0.1", "100.72.0.10", "192.168.1.50"
 

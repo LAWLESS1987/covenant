@@ -18559,7 +18559,7 @@ on Windows; the PC this was found on has environment-shaped failures in its loca
 **Repro, both ways.**
 - `python test_tq1_talk_report.py`: 30 of 30 (new). A healthy made-up conversation reads healthy; each fault moves the one number meant to see it; batch asks after four running turns do not change the default report and do change `--which all`; the cap is pinned to the door's own `AGENT_HISTORY_TURNS` and to the number the two pages print; no question, answer, gate note or address appears in either output form.
 - `python test_cl1_chat_label.py`: 9 of 9 (6 before). `present()` leaves a held note whole; `brief_held()` both ways.
-- `python test_pc1_sister_interface.py`: 74 of 74 (67 before): three source-text checks and four that drive `/pc/3d/history` on a made-up log.
+- `python test_pc1_sister_interface.py`: 74 of 74 (67 before): three source-text checks and four that drive `/pc/3d/history` on a made-up log. With `covenant_pc3d.py` as it is on main: 69 of 74, five red (two source-text, three driven). **A number of mine that was not measured:** the message of commit d9b7350 (`A456 after the laptop session ran the report ...`) says "70 of 74 with the page reverted". I wrote that before the run had printed anything; when measured, the suite stopped at a KeyError in the first driven check. The checks now fail cleanly and the measured number is 69.
 - `python test_m6_mobile_door.py` (drives the door with a stub model): 76 of 76, unchanged.
 
 **NOT done, and what this does not show.**
