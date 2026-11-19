@@ -2762,9 +2762,23 @@ def _mirror_lag_cycles(feed, now=None, cache_path=None, save=True):
         heads = entry.get("heads") or {}
         if not target:
             continue
+        # A SNAPSHOT copy is never judged by its commit id (A455). The feed names such copies in
+        # `snapshot_copies`: only the FILES of main are uploaded there, never history, so that copy's head is a
+        # commit made on the other side and can never equal the target. Whether it is behind is the feed's own
+        # comparison by content, `needs_snapshot`. Read by id, threefold-memory's Hugging Face copy counted as
+        # lagging for 33 readings while every file matched (2026-11-18 to 11-19), and the remedy re-ran a task
+        # that had nothing to upload. A feed that names snapshot copies but carries no `needs_snapshot` list is
+        # an older or broken feed: then the old reading stands, which errs toward saying "behind".
+        snap = entry.get("snapshot_copies")
+        snap = set(snap) if isinstance(snap, list) else set()
+        due = entry.get("needs_snapshot")
+        due = set(due) if isinstance(due, list) else None
         for copy in UNISON_COPIES:
             head = str(heads.get(copy) or "")
-            if not head or head == target:
+            if copy in snap and due is not None:
+                if copy not in due:
+                    continue
+            elif not head or head == target:
                 continue
             key = "%s/%s" % (name, copy)
             prev = cache.get(key) or {}
