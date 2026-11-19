@@ -1847,6 +1847,22 @@ def h_followup():
     ok = st.supersede("hf-old", "hf-new", "tester")
     meta = (st.get("hf-old") or {}).get("metadata") or {}
     check("A445b.8 an ordinary supersede still marks the old record", ok is True and meta.get("superseded_by") == "hf-new", meta)
+    # Round 2, from a non-author read of the change: keys that only LOOK like a store-owned one.
+    zw, nb = chr(0x200b), chr(0xa0)
+    alike = [zw + "superseded_by", "superseded_by" + zw, "Superseded_by", "superseded-by", nb + "agent", "review.by",
+             "9lives", "a" * 41]
+    landed = [repr(k) for k in alike
+              if not refuses(lambda k=k: st.put("hf9", "d", "project", "b", "tester", extra={k: "x"}))]
+    check("A445b.9 a look-alike or non-word extension key is refused by the store (%d keys)" % len(alike),
+          not landed and st.get("hf9") is None, landed)
+    rec = st.put("hf10", "d", "project", "b", "tester", extra={"source": "hf-thread", "supersedes": "hf-old", "run_2": "ok"})
+    m = (rec or {}).get("metadata") or {}
+    check("A445b.10 the keys callers use today, and an ordinary word, still land",
+          m.get("source") == "hf-thread" and m.get("supersedes") == "hf-old" and m.get("run_2") == "ok", m)
+    with open(st._path("hf-old"), encoding="utf-8") as fh:
+        head = fh.read().split("\n---\n", 1)[0].splitlines()
+    twice = [k for k in ("type", "agent") if sum(1 for ln in head if ln.strip().startswith(k + ":")) != 1]
+    check("A445b.11 a superseded record's file names its type and agent once each", not twice, twice)
 
 
 def main():

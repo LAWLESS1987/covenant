@@ -18305,17 +18305,33 @@ Extension keys must be exactly `str` in `put` and in `render_memory`. `supersede
 `supersede()` still writes it, because it renders the record itself and does not pass through the extension
 check. `supersede()` refuses a successor that does not match the memory-name pattern, before reading anything.
 
-**Repro, both ways.** `cd ai_memory_system && python -I test_memory_system.py`, checks A445b.1 to A445b.8.
-With the change: M1 217 of 217. With `memory_store.py` reverted to main and the tests kept: 211 of 217, the six
-refusal checks red (A445b.1 to A445b.6) and the two honest-input controls green (A445b.7, A445b.8).
-`test_intent_provenance.py` 32 of 32 and `test_m1_memory_system.py` pass unchanged. Python 3.12.10, Windows.
+**Round 2, from a non-author read (2026-11-18).** Another session probed the pushed change (25 probes; the four
+changes held) and found one residual: `put(extra={"\u200bsuperseded_by": x})`, the same with the zero-width space
+after, and `"Superseded_by"` were all WRITTEN. The parser reads each as a different key, so no code was fooled, but
+the line in the file looks like `superseded_by: x` to a person or a model reading it as text. Closed by an
+allowlist in `put`: an extension key is a lowercase ASCII word (`[a-z][a-z0-9_]{0,39}`). The two keys callers pass
+today, `source` and `supersedes`, pass it. The same read saw a superseded record's file carry `type` and `agent`
+twice: the rewrite paths hand a record's whole metadata back to `render_memory` as `extra`. It predates this change
+(same value both times, so it parsed the same); `render_memory` now writes the two once.
+
+**Repro, both ways.** `cd ai_memory_system && python -I test_memory_system.py`, checks A445b.1 to A445b.11.
+With the change: M1 220 of 220. With `memory_store.py` reverted to main `e103155` and the tests kept: 212 of 220,
+eight red (A445b.1 to A445b.6, A445b.9, A445b.11) and the three honest-input controls green (A445b.7, A445b.8,
+A445b.10). With only round 2 reverted: 218 of 220 (A445b.9 and A445b.11 red). `test_intent_provenance.py` 57 of 57
+and `test_m1_memory_system.py` pass. Python 3.12.10, Windows.
+
+**Reads.** A local 27B: three leads, each tested, none held. The non-author session above: 25 probes, the residual
+now closed. Gemini (Flash-Lite, signed out), on round 1 only: could not refute the three claims put to it. Codex was
+out of quota. No outside reviewer has read round 2.
 
 **Reach, stated at its size.** In-process callers only. The HTTP server builds its own extension
 (`{"supersedes": ...}`) and never passes a client's, and JSON yields plain `str`, so none of the four shapes was
 reachable over the wire in this revision. A library caller, an import script or a future route that forwards
 client metadata could have reached them.
 
-**Limits.** Records already on disk are not re-validated, as under A445. C18 from the same challenge run, what
+**Limits.** The key allowlist is on `put`, the door callers use. `render_memory` keeps its wider key rule,
+because the rewrite paths re-render records already on disk and must not start refusing an old record's key.
+Records already on disk are not re-validated, as under A445. C18 from the same challenge run, what
 a rewrite of a superseded record should do to its `superseded_by`, is a semantics question and is NOT decided
 here. `screen_provenance` still accepts `str` subclasses by `isinstance`; pull request #84 is editing that
 function, so it is left alone in this change.

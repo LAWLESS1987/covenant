@@ -47,6 +47,10 @@ from typing import Any, Dict, List, Optional
 from index_db import MemoryIndex
 
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,79}$")
+# An extension key a caller may add through put(): a lowercase ASCII word. Anything wider admits keys that READ
+# as a store-owned one without being it -- a zero-width space, a no-break space or a capital beside
+# `superseded_by` parses as a different key, but the line in the file looks the same to a person or a model.
+_EXT_KEY = re.compile(r"[a-z][a-z0-9_]{0,39}")
 GENESIS = "0" * 64
 
 # ---------------------------------------------------------------- BOUNDS --
@@ -361,6 +365,10 @@ def render_memory(name: str, description: str, mtype: str, body: str,
         if type(k) is not str or not k or k != k.strip() or ":" in k:
             raise ValueError("metadata keys must be nonempty, trimmed and contain no colon")
     for k in sorted(extra or {}):
+        if k in ("type", "agent"):
+            # Written once, above, from the arguments. The rewrite paths (supersede, touch, review) pass a
+            # record's whole metadata back as `extra`, which used to write both lines a second time.
+            continue
         v = (extra or {})[k]
         v = "" if v is None else _exact(v)
         if any(c in k + v for c in _FRONTMATTER_BREAKS):
@@ -757,6 +765,9 @@ class MemoryStore:
             raise ValueError("metadata extension keys must be plain strings")
         if any(k.strip() in _STORE_FIELDS for k in (extra or {})):
             raise ValueError("metadata extensions cannot override store-owned fields")
+        if any(not _EXT_KEY.fullmatch(k) for k in (extra or {})):
+            raise ValueError("metadata extension keys must be lowercase ASCII words: a-z, 0-9 and _, "
+                             "starting with a letter, at most 40 characters")
         if mtype not in ("user", "feedback", "project", "reference"):
             raise ValueError(f"bad type {mtype!r}")
         if tier not in ("core", "archival"):
