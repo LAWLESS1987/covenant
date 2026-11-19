@@ -82,7 +82,17 @@ SKIP_DIRS = {".git", "__pycache__", ".venv", "venv", "node_modules", "logs",
              # sandbox. verify_bundle.py already skips `.claude` for the same
              # reason (its SKIP_DIR), so the two tools disagreed about the same
              # directory and only one of them said so out loud.
-             ".claude"}
+             ".claude",
+             # ADDED 2026-11-19 (A454). `.trash/` is where the tombstone rule
+             # puts anything retired -- "moved aside, never deleted". A copy of
+             # the core there is a RETIRED copy: nothing starts a node from it,
+             # and the sync tool rightly refuses to overwrite it (untracked, left
+             # for a person). Left in the scan, three pre-deploy backups that
+             # declared v8.40 with the old bytes -- old because the live core
+             # changed twice without a version bump -- held the highway's
+             # resync remedy every round from 2026-11-18T04:38Z, for a file that
+             # could never be delivered. Same shape as `.claude` above.
+             ".trash"}
 
 
 _DECLARED_CACHE = {}
@@ -303,6 +313,25 @@ def v6_mutation():
         live, col, mis, arch = audit(tmp)
         check("V6d ...and it is measured: same version, same bytes, no failure",
               not col, str([c["rel"] for c in col]))
+
+        # V6e (A454) -- a RETIRED copy under .trash/ is not a delivery. The
+        # same bytes one directory over, outside .trash, still are: the skip is
+        # the directory's name, not luck.
+        plant(tmp, {os.path.join(".trash", "predeploy_x", "covenant_unified_v8.py"):
+                    ("v8.39", "retired: the bytes before a deploy")})
+        live, col, mis, arch = audit(tmp)
+        check("V6e a copy under .trash/ claiming the live version with other "
+              "bytes is NOT a collision (retired, never deliverable)",
+              not col, str([c["rel"] for c in col]))
+        plant(tmp, {os.path.join("retired_x", "covenant_unified_v8.py"):
+                    ("v8.39", "retired: the bytes before a deploy")})
+        live, col, mis, arch = audit(tmp)
+        check("V6f ...and the same bytes outside .trash/ ARE one -- the skip "
+              "is the directory, not the content",
+              len(col) == 1 and col[0]["rel"].startswith("retired_x"),
+              str([c["rel"] for c in col]))
+        shutil.rmtree(os.path.join(tmp, "retired_x"))
+        shutil.rmtree(os.path.join(tmp, ".trash"))
 
         # V7 -- the mislabelled backup.
         plant(tmp, {"covenant_unified_v8.PRE-v8.40.py": ("v8.40", "oops")})

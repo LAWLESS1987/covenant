@@ -18279,6 +18279,31 @@ aside, not deleted.
 
 ---
 
+### A454. [operations / forgotten-step tombstone, P18 V3 + A117 shape] Three retired pre-deploy backups under .trash/ declared the live version v8.40 with the bytes before the deploy, so held_core_drift stood and the highway's resync remedy was held every round from 2026-11-18T04:38Z -- FIXED IN SOURCE 2026-11-19 (.trash is skipped like .claude), the three files renamed by hand on the laptop
+
+**His words, 2026-11-19 (the provenance side session):** "Use your discernment towards mutual benefit to get everything running."
+
+**Measured (laptop, the running tree C:\Users\Lawre\covenant, 2026-11-19 ~11:50Z).**
+- logs/watchdog.log: `held_core_drift is present and resync_held_core held` first at 2026-11-18T04:38:48Z, then `still present ... nothing done this pass` every round since; the remedy is AUTO_REVERSIBLE and was never run.
+- `python covenant_sync_held_core.py --check` exit 1: `left alone .trash\predeploy_A429_A430_20261115T203306Z\covenant_unified_v8.py declares v8.40 but this repository does not track it`, the same for `predeploy_A432_20261116T020308Z` and `predeploy_main_doorfix_20261115T000804Z`; `out of sync: 0 held copies; 3 left for a person`. All three are untracked (`.trash/` is in .gitignore at line 591); the tool refuses untracked files by design and says so.
+- Why they collide only since 11-18: the dirs date from 11-14..11-16 and were byte-identical to the live core until the live line changed the core twice without a version bump (16b7c3c deploy(mesh) A441/A442, 51c83a4 A447 adopted), after which three files claimed v8.40 with other bytes. P18 V3 reads that as a second claimant; the nodes report `src=0d4b6b1c31c8` beside the version, so the operator was never actually misled -- the hold was for a file nothing can run.
+- Lookback (`tools/lookback_index.py find held_core_drift` / `predeploy_A432`): nothing before this entry. Rule 10: a forgotten step (retire a backup under .trash, and the scan still reads it) whose tombstone must be a guard at the place, not a sentence.
+
+**Fixed.**
+- `test_p18_version_collision.SKIP_DIRS` gains `.trash`, beside `.claude` (2026-09-09) and for the same reason: a copy there is retired or a sandbox, never a delivery. `covenant_sync_held_core.py` imports that scan, so the fixer and the test agree in one place.
+- By hand on the laptop, so the remedy clears before this lands: the three files renamed `covenant_unified_v8.py.retired`, bytes unchanged, a `RETIRED_covenant_unified_v8.txt` beside each saying why and how to restore. Nothing deleted. After the rename, `--check` reads `held copies: in sync (live v8.40, 0d4b6b1c31c8)`, exit 0.
+
+**Checks.**
+- P18 (`test_p18_version_collision.py`) 20 -> 22: V6e a copy under .trash/ claiming the live version with other bytes is not a collision; V6f the same bytes one directory over, outside .trash/, still are (the skip is the directory's name, not the content).
+- A117 (`test_a117_held_core_autosync.py`) 21 -> 23 passed, 2 skipped as before: A117.10a `--check` on a planted tree with a .trash/ copy reads in sync, exit 0, no "left alone"; A117.10b the fixer leaves the copy byte-for-byte.
+- Mutation, each alone in a scratch copy, the real files byte-identical before and after (sha256 bfad8deeff97 / d2866e74bdb8 / 9900f6647193): `.trash` removed from SKIP_DIRS -> P18 exit 1 with V6e and V6f red, A117 exit 1 with A117.10a and A117.10b red. Record: the provenance side session's scratchpad, `probe/mutation_p18_trash.txt`.
+
+**What it cannot see.** A colliding copy placed under .trash/ on purpose is now invisible to V3 -- the same trade as `.claude`: V3 guards a STAGED copy that could be run or shipped, and nothing starts a node from .trash/. The live line's practice of changing the core without a version bump (the cause) is not changed here; the version string and the src hash are both reported, and the hash is the one that moves.
+
+**Status.** In source on `claude/p18-skip-trash-2026-11-19` from main 695b86f; not merged. On the laptop the running tree is 75 commits behind main (claude/improve-miner-circle-back), so the rename, not this skip, is what holds there until main is reconciled into the live line.
+
+---
+
 ### A445b. [security, the second half of A445] The text checked was not the text written, a key could answer strip() two ways, and `superseded_by` could be set through an extension -- CLOSED IN SOURCE 2026-11-18
 
 **Found 2026-11-10, landed 2026-11-18.** A challenge run against the memory-admission repair (collective record
