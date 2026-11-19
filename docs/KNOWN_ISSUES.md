@@ -18001,6 +18001,46 @@ the same request still lands once on each host inside the window. Closing that n
 the signed request (`sign_json_request` + the phone signer), or seen-nonces gossiped over the mesh. The store is
 for one machine's local filesystem; network filesystems were not tested. Wipe the pair directory and replay inside
 the window and the request is accepted -- the profile's own limit, unchanged.
+
+### A444b. [security, the second half of A444] The same replay measured independently at both gates before the fix landed; now a both-ways guard of A444 at the ALLY branch too, each node life a fresh process
+
+**What happened (2026-11-17).** A side session was asked to measure whether covenant's own nonce stores had the
+shape nootxlm found. Against 9d85f6c, with the in-memory sets, it measured at BOTH gates:
+`covenant_daily_plan.verify_signed` (registered operator signers) and `covenant_mycelium.admit`'s ally branch
+(registered ally keys on `ALLY_DOORS`). A captured signed request was ACCEPTED again by a restarted process
+inside the 300 s window, and by BOTH of two processes released together; one second past the window it was
+refused. That is A444's finding. It was committed as "A445" (95d963a, kept as written on branch
+`a445-nonce-replay-as-numbered-2026-11-17`). Meanwhile main landed A444 (the fix) and its own A445 (memory_store,
+a different entry), so this lands as A444b and duplicates neither number.
+
+**Recurrence (rule 10).** A444 was IN FLIGHT on another branch while this was measured. The number search found
+that branch but did not read its content, so a finding already being fixed was measured a second time. It was
+cheap, and it adds the ally-branch guard below; but checking for a number collision is not the same as checking
+for duplicate work. Before measuring a shape, read the in-flight entries' TITLES as well as their numbers.
+
+**One thing the measurement adds to A444's design note.** Two mutation probes were run against the old gates and
+never committed. The first was a durable per-nonce file store used in the gates' old ORDER: check, then RSA
+verify (milliseconds), then add. It closed restart, but two processes still BOTH accepted in 12 of 12 runs,
+because both pass the check before either writes. The second made a create-only-if-absent claim the decision
+(a failed claim refuses), and exactly one of two processes accepted. A444's fix has that second shape: verify
+first, then one atomic `ExclPairStore.check_and_record`. **"Make the store durable" alone would not have closed
+the two-process case.**
+
+**The guard.** `test_a444b_nonce_replay_gates.py` (12/12 on main; the store is pointed at a temp dir). It
+complements `test_a444_nonce_store.py`, which races the store and drives `verify_signed`: this file drives BOTH
+gates, the ally branch through `admit()` as the off-tailnet doors call it, every life a fresh interpreter on the
+default store. Same life: replay refused. Restart inside the window: refused. Two processes released together:
+exactly one accepts. Past the window: refused. Clearing the legacy sets (`_seen_nonces`, `_seen`) in-process
+does not re-open the replay. CONTROL: each life on its own store directory (the pre-A444 shape) and both accept,
+so the test can still see the vector. **Driven both ways:** with 9d85f6c's `covenant_daily_plan.py` and
+`covenant_mycelium.py` swapped in, the restart, two-process and legacy-set cases go red at both gates (6 of 12
+red); on main, 12 of 12 green.
+
+**Still open, unchanged from A444.** Cross-HOST replay (the node is not in the signed bytes) and network
+filesystems.
+
+---
+
 ### A445. [security] A metadata extension could forge a store-owned field, and a Unicode line separator could break out of the frontmatter -- hardened
 
 **Found 2026-11-18** sitting UNCOMMITTED in node D's working copy of `ai_memory_system/memory_store.py`: a prior
