@@ -18337,3 +18337,34 @@ here. `screen_provenance` still accepts `str` subclasses by `isinstance`; pull r
 function, so it is left alone in this change.
 
 **Status:** in source on its branch with its tests; not deployed.
+
+### A262b. [honesty of a published number, follows A262] `readme_totals.py` published the platform of the machine that ran the TOOL, and the date the transcript file was last written -- FIXED IN SOURCE 2026-11-18
+
+**Found 2026-11-18** while trying to refresh the README's totals from the transcript CI uploaded for main
+`4361e67` (300 suites, 8,019 checks, 0 failed, on Linux). Read on a Windows PC, the tool announced
+`300 suites, 8,019 checks, 0 failed, win32`.
+
+**Cause.** `read_totals` looked for the literal words `win32`, `linux` or `darwin` after `platform`. `covenant_one`
+writes `platform      Windows 11 (AMD64)` or `platform      Linux 7.0.0-...`, so the pattern has never matched
+any transcript and the fallback always ran: the platform of the machine running `readme_totals.py`. It was right
+only when the sweep and the tool ran on the same kind of machine. The date came from the transcript file's
+modification time, which is when it was last written or copied, not when the sweep ran; the transcript carries its
+own `when` line.
+
+**Fixed.** `platform_of()` reads the transcript's own platform line and maps its first word (Windows to win32,
+Linux to linux, Darwin or macOS to darwin). A platform line it cannot place returns None and `--write` stops with
+exit 2 and writes nothing. Only a transcript with no platform line at all falls back to this machine, as before.
+`date_of()` reads the `when` line and falls back to the file's date.
+
+**Repro, both ways.** `python test_g1_doc_consistency.py`, checks T5c to T5f: 25 of 25 with the change. With
+`readme_totals.py` reverted and the tests kept: 22 of 25 on Windows (T5c read a Linux transcript as win32, T5d
+took the file's date, T5e guessed). T5c is built so that one of its two halves is red on any machine under the
+old code. T5f, the transcript with neither line, passes both ways.
+
+**NOT done here, on purpose: the totals themselves.** The marked lines still say 262 suites, 7,234 checks, win32,
+2026-11-09. The README's own prose beside them says "It is **win32**" and that `covenant_one.py --all` reproduces
+the number, and that a green tick on one platform does not speak for the other. The CI transcript is a Linux
+`--ci` run, so writing its numbers there would contradict that paragraph. The refresh needs a clean `--all` sweep
+on Windows; the PC this was found on has environment-shaped failures in its local sweep.
+
+**Status:** in source on its branch with its tests; no published number changed.

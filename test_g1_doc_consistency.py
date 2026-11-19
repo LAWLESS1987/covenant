@@ -271,6 +271,30 @@ def main():
           "'label since 2026-08-29, 61 core changes ago' ... 'win32, 2026-10-05'",
           "(label since 2026-08-29, 61 core changes ago)" in _new and "win32, 2026-10-05" in _new
           and "2026-10-01" not in _new, _new)
+    # A262b (2026-11-18): the platform and the date come from the transcript, not from the machine or the file.
+    # One of T5c's two halves is red on ANY machine under the old code, which published the reader's platform.
+    import tempfile as _tf
+    _d = _tf.mkdtemp(prefix="g1_a262b_")
+
+    def _tr(name, platform_line, when="2026-01-02 03:04:05 +0000"):
+        p = os.path.join(_d, name)
+        with open(p, "w", encoding="utf-8") as fh:
+            fh.write("  when          %s\n%s  suites run          3\n  checks passed       4\n  checks failed       0\n"
+                     % (when, platform_line))
+        os.utime(p, (1900000000, 1900000000))                    # the file's own date is years away from `when`
+        return RT.read_totals(p)
+
+    _win = _tr("w.txt", "  platform      Windows 11 (AMD64)\n")
+    _lin = _tr("l.txt", "  platform      Linux 7.0.0-1019-azure (x86_64)\n")
+    check("T5c a transcript's platform is the one IT names: a Windows transcript reads win32 and a Linux one "
+          "reads linux, whichever machine reads them", _win[3] == "win32" and _lin[3] == "linux", (_win[3], _lin[3]))
+    check("T5d the date is the transcript's `when`, not the day the file was written or copied",
+          _win[4] == "2026-01-02" and _lin[4] == "2026-01-02", (_win[4], _lin[4]))
+    check("T5e a platform line this tool cannot place is None, never a guess",
+          _tr("x.txt", "  platform      Plan9 4th-edition\n")[3] is None)
+    _old = _tr("o.txt", "", when="")
+    check("T5f a transcript with no platform line and no `when` still reads (this machine, the file's date)",
+          _old[3] in ("win32", sys.platform) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", _old[4] or "") is not None, _old)
     _since, _changes = RT.version_age(RT.core_identity()[0])
     _top = next((l for l in open(os.path.join(HERE, "README.md"), encoding="utf-8")
                  if "<!--TOTALS-->" in l and "source `" in l), "")

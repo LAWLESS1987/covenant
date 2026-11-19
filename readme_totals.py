@@ -51,6 +51,32 @@ def newest_transcript(explicit=None):
     return best
 
 
+_PLATFORM_WORDS = (("windows", "win32"), ("win32", "win32"), ("linux", "linux"), ("darwin", "darwin"), ("macos", "darwin"))
+
+
+def platform_of(t):
+    """The platform a transcript SAYS it ran on, as the short word the docs carry; None when its platform line
+    names something this tool cannot place.
+
+    A262b (2026-11-18). covenant_one writes `platform      Windows 11 (AMD64)` or `platform      Linux 7.0.0-...`.
+    The pattern this function replaced looked for the literal words win32, linux or darwin after `platform`, which
+    no transcript has ever carried, so it never matched and the platform published was the machine RUNNING THIS
+    TOOL. Read on a Windows PC, a Linux CI transcript would have been published as "0 failed on win32". Only a
+    transcript with no platform line at all (older than the identity block) falls back to this machine."""
+    m = re.search(r"^[ \t]*platform[ \t]+(\S+)", t, re.M)
+    if not m:
+        return "win32" if sys.platform == "win32" else sys.platform
+    word = m.group(1).lower()
+    return next((name for key, name in _PLATFORM_WORDS if word.startswith(key)), None)
+
+
+def date_of(t, path):
+    """The day the transcript says the sweep ran (its `when` line), else the file's own date. A262b: the file's
+    date is when it was last written or COPIED, which is not when it was measured."""
+    m = re.search(r"^[ \t]*when[ \t]+(\d{4}-\d{2}-\d{2})\b", t, re.M)
+    return m.group(1) if m else time.strftime("%Y-%m-%d", time.localtime(os.path.getmtime(path)))
+
+
 def read_totals(path):
     """(suites, passed, failed, platform, date) from a covenant_one transcript."""
     t = io.open(path, encoding="utf-8", errors="replace").read()
@@ -58,10 +84,7 @@ def read_totals(path):
         m = re.search(r"^\s*%s\s+(\d+)\s*$" % re.escape(label), t, re.M)
         return int(m.group(1)) if m else None
     suites, passed, failed = num("suites run"), num("checks passed"), num("checks failed")
-    m = re.search(r"platform\s*[:=]?\s*(win32|linux|darwin)", t)
-    platform = m.group(1) if m else ("win32" if sys.platform == "win32" else sys.platform)
-    date = time.strftime("%Y-%m-%d", time.localtime(os.path.getmtime(path)))
-    return suites, passed, failed, platform, date
+    return suites, passed, failed, platform_of(t), date_of(t, path)
 
 
 def core_identity():
@@ -123,6 +146,8 @@ def main():
     suites, passed, failed, platform, date = read_totals(tr)
     if suites is None or passed is None:
         print("transcript %s has no 'suites run' / 'checks passed' lines" % os.path.basename(tr)); return 2
+    if platform is None:
+        print("transcript %s names a platform this tool cannot place; nothing written" % os.path.basename(tr)); return 2
     version, src, nlines = core_identity()
     since, changes = version_age(version)
     print("transcript %s (%s): %d suites, %s checks, %d failed, %s" % (os.path.basename(tr), date, suites, "{:,}".format(passed), failed or 0, platform))
