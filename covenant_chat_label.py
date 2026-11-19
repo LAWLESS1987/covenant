@@ -37,6 +37,14 @@ is still returned either way -- it is a true classification, not the softening.
 import os
 
 SOFT_ENV = "COVENANT_CHAT_SOFT_LABEL"
+# A456 (2026-11-19, his "Improve Tetsu's communication with me"). A turn the gate HELD -- no finding made --
+# carried the gate's whole working beside every answer: which seats held, which rule, why the question waits.
+# Measured: 12 of 12 held turns in one ask log, median note 609 characters; the day this was written a 29-word
+# answer of his arrived with 798 characters of gate text. On the conversation surface a held turn now shows the
+# gate's OWN opening words ("Held, not judged") and says where the rest is. Nothing is decided here, and the
+# ledger row keeps the full note. COVENANT_CHAT_SHORT_HELD=0 restores the full note on the display.
+SHORT_HELD_ENV = "COVENANT_CHAT_SHORT_HELD"
+HELD_TAIL = " (no finding was made; the gate's full note is in the ask log)"
 
 # The three labels a conversation turn's gate outcome can carry. "held" covers
 # BOTH already-soft gate phrasings (not_understood -> "Held, not judged";
@@ -57,6 +65,26 @@ LEX_PREFIX = (
 def soft_enabled():
     """True unless the operator's kill switch COVENANT_CHAT_SOFT_LABEL=0 is set."""
     return os.environ.get(SOFT_ENV, "1") != "0"
+
+
+def short_held_enabled():
+    """True unless the operator's switch COVENANT_CHAT_SHORT_HELD=0 is set."""
+    return os.environ.get(SHORT_HELD_ENV, "1") != "0"
+
+
+def brief_held(raw):
+    """The gate's own opening words for a turn it made no finding on, plus where the full note is kept.
+
+    "Held, not judged: local:0: HELD -- both seats ..." -> "Held, not judged (no finding was made; ...)".
+    The words before the first colon are the GATE'S, not this module's: the meaning is not changed, only the
+    working is left in the ledger. A note that does not have that shape (no colon, or an opening longer than a
+    short phrase) is returned whole: an unexpected note is shown, never summarised by guesswork."""
+    raw = str(raw)
+    head, sep, _rest = raw.partition(":")
+    head = head.strip()
+    if not sep or not head or len(head) > 40:
+        return raw
+    return head + HELD_TAIL
 
 
 def classify(admitted, alleges_nothing):
@@ -88,6 +116,8 @@ def present(message, admitted, alleges_nothing):
     label = classify(bool(admitted), bool(alleges_nothing))
     if label == LEXICAL and soft_enabled():
         return LEX_PREFIX + raw, label
+    if label == HELD and short_held_enabled():
+        return brief_held(raw), label
     return raw, label
 
 
@@ -112,12 +142,28 @@ def _selftest():
     ck("clean-label", l == CLEAN, l)
     ck("clean-untouched", d == "ok", d)
 
-    # 2. already-soft hold: label held, display untouched (never re-softened).
+    # 2. a hold: label held. A456: the display is the gate's own opening words and where the rest is kept;
+    #    with COVENANT_CHAT_SHORT_HELD=0 the display is the full note, untouched, as it was before.
+    os.environ.pop(SHORT_HELD_ENV, None)  # default ON
     d, l = present(raw_held, admitted=False, alleges_nothing=True)
     ck("held-label", l == HELD, l)
-    ck("held-untouched", d == raw_held, d)
+    ck("held-brief-is-the-gates-own-words", d == "Held, not judged" + HELD_TAIL, d)
+    ck("held-brief-drops-the-working", "content words" not in d and len(d) < len(raw_held) + len(HELD_TAIL), d)
     d, l = present(raw_unsure, admitted=False, alleges_nothing=True)
     ck("unsure-held-label", l == HELD, l)
+    ck("unsure-brief", d == "Blocked, not proven" + HELD_TAIL, d)
+    odd = "a note with no colon in it at all"
+    ck("held-odd-shape-shown-whole", present(odd, admitted=False, alleges_nothing=True)[0] == odd)
+    long_head = "x" * 60 + ": rest"
+    ck("held-long-opening-shown-whole", present(long_head, admitted=False, alleges_nothing=True)[0] == long_head)
+    os.environ[SHORT_HELD_ENV] = "0"
+    d, l = present(raw_held, admitted=False, alleges_nothing=True)
+    ck("held-switch-off-untouched", d == raw_held and l == HELD, d)
+    os.environ.pop(SHORT_HELD_ENV, None)
+    ck("held-switch-reversible", present(raw_held, admitted=False, alleges_nothing=True)[0] != raw_held)
+    # the brief form is for HELD only: a clean turn and a bare dissent never pass through it
+    ck("brief-never-touches-clean", present("ok: fine", admitted=True, alleges_nothing=False)[0] == "ok: fine")
+    ck("brief-never-touches-a-dissent", raw_viol in present(raw_viol, admitted=False, alleges_nothing=False)[0])
 
     # 3. bare dissent on chat: label lexical-detection, display reframed, RAW KEPT.
     os.environ.pop(SOFT_ENV, None)  # default ON

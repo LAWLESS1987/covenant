@@ -93,7 +93,7 @@ html,body{margin:0;height:100%;background:var(--ink);color:var(--txt);font:15px/
 #chathead button:hover{background:rgba(92,225,230,.15)}
 #answer{overflow:auto;padding:4px 14px 12px;white-space:pre-wrap;display:none;scrollbar-width:thin;border-top:1px solid var(--line)}
 #chatwin.min #answer{display:none!important}
-#answer .ln{margin:0 0 8px}#answer .you{color:var(--cyan)}#answer .heal{color:var(--green);font-family:var(--mono);font-size:13px}
+#answer .ln{margin:0 0 8px}#answer .note{opacity:.65;font-size:12px}#answer .you{color:var(--cyan)}#answer .heal{color:var(--green);font-family:var(--mono);font-size:13px}
 body.nochat #answer{display:none!important}
 body.nochat #chatwin{display:none}
 #panel.min #info{display:none}
@@ -126,6 +126,19 @@ async function getState(){try{const r=await fetch('/pc/3d/state');
  // a busy node (HTTP 429: every local process shares one loopback address) keeps the last good reading on screen
  if(!r.ok){document.getElementById('live').textContent=(state?'last reading kept':'waiting')+' · the node is busy (HTTP '+r.status+'), trying again';setTimeout(getState,20000);return;}
  state=await r.json();if(state.page&&state.page!==PAGESHA&&!document.getElementById('q').value&&!(typeof inflight!=='undefined'&&inflight)){location.reload();return;}if(state.voice)voice=state.voice;document.getElementById('live').textContent='height '+(state.self.chain_height??'?')+' · peers '+(state.peers?state.peers.length:0)+(state.immunity&&state.immunity.granted?' · immunity '+(state.immunity.paused?'paused':'on'):'');showHealing();if(window.onState)window.onState();}catch(e){document.getElementById('live').textContent='state unreadable';}}
+// A456: what he said, what is spoken, and what is only shown. The notes (held, immune, how much of the earlier
+// conversation was no longer in his view) are shown beside the answer and never read aloud; before this the gate
+// text was spoken with the answer, a held turn looked like any other, and an empty answer showed nothing at all.
+function tetsuParts(j){const notes=[];let txt='';
+ if(!j||j.status!=='success'){notes.push((j&&j.message)||'no answer');return{txt:txt,notes:notes,say:'I could not answer this time.'};}
+ if(j.withheld){notes.push('withheld by the gate: '+(j.message||''));return{txt:txt,notes:notes,say:'My answer was withheld by the gate.'};}
+ txt=String(j.answer||'').trim();
+ if(!txt)notes.push('he gave no words this time; nothing was lost, ask again');
+ if(j.immune)notes.push('immune: the word of the gate is attached');
+ if(j.alleges_nothing)notes.push('held, not judged');
+ const d=Math.max.apply(null,[0].concat((j.fit||[]).map(function(f){return (f&&f.dropped)||0;})));
+ if(d>0)notes.push(d+(d===1?' earlier exchange is':' earlier exchanges are')+' no longer in his view');
+ return{txt:txt,notes:notes,say:txt||'I have no words this time.'};}
 function speak(t){try{const u=new SpeechSynthesisUtterance(t);u.pitch=voice.pitch;u.rate=voice.rate;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
 // THE CONVERSATION STAYS ON SCREEN (2026-09-26, his words: "increase tetsus pc logs length so
 // its not gone before i respond"). Every exchange is appended, never replaced, and the page
@@ -172,8 +185,9 @@ async function send(){
  try{
   const r=await fetch('/m/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t}),signal:ctrl.signal});
   const j=await r.json();
-  const txt=j.status==='success'?(j.withheld?'(withheld: '+(j.message||'')+')':(j.answer||''))+(j.immune?'  [immune: the gate\\'s word is attached]':''):(j.message||'no answer');
-  pend.textContent='Tetsu: '+txt;addCopy(pend,txt);speak(txt);
+  const p=tetsuParts(j);const txt=p.txt;
+  pend.textContent='Tetsu: '+(txt||'(no words)');addCopy(pend,txt);speak(p.say);
+  if(p.notes.length){const n=document.createElement('div');n.className='ln note';n.textContent='['+p.notes.join('; ')+']';pend.after(n);}
  }catch(e){
   pend.textContent=(e&&e.name==='AbortError')?'Tetsu: (stopped)':('Tetsu: no answer: '+e);
  }

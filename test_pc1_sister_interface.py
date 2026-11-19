@@ -228,6 +228,16 @@ def main():
           and "addCopy(pend,txt)" in page7 and "addCopy(hl,t)" in page7)
     bad7 = broken_script_lines(page7)
     check("PC1z7 the new script still parses: no quoted string spans a line", not bad7, bad7)
+    # A456 (2026-11-19): what stands beside an answer is SHOWN and never SPOKEN, a held turn is said to be held,
+    # an empty answer is said to be empty, and he is told when earlier exchanges were no longer in Tetsu's view.
+    check("PC1z11 the 3D page speaks only his words (speak(p.say)); gate text is no longer read aloud",
+          "function tetsuParts(j)" in page7 and "speak(p.say)" in page7 and "speak(txt)" not in page7)
+    check("PC1z11 ...and shows the notes on their own line: held, immune, out of view, no words",
+          "n.className='ln note'" in page7 and "'held, not judged'" in page7 and "no longer in his view" in page7
+          and "he gave no words this time" in page7 and "immune: the word of the gate is attached" in page7)
+    check("PC1z11 the Talk panel carries the same notes under the answer",
+          "function talkNotes(j)" in C.PAGE and "+talkNotes(j)+" in C.PAGE and "no longer in his view" in C.PAGE
+          and "he gave no words this time" in C.PAGE and not broken_script_lines(C.PAGE), broken_script_lines(C.PAGE))
 
     LOOP, PHONE, LAN = "127.0.0.1", "100.72.0.10", "192.168.1.50"
 

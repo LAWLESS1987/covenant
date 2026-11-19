@@ -18527,3 +18527,38 @@ on Windows; the PC this was found on has environment-shaped failures in its loca
 **Repro, both ways.** `python test_sf1_sync_fabric.py`: 42 of 42 with the change (38 before). Four new checks, five feed readings each: a matching snapshot copy is not lagging however long its id differs; a snapshot copy the feed says is due still fires and names CovenantHFMirror; a feed without the list is read the old way; a history copy beside a matching snapshot copy still fires. With `covenant_highway.py` reverted and the tests kept: 40 of 42: the two matching-snapshot checks are red; the other two new checks pass both ways and are the controls. Three mutations of the change (a due snapshot never counted; a missing list trusted as nothing due; history copies skipped when a snapshot copy exists), each caught. `test_h1_highway.py`: 311 of 311.
 
 **What this does not show.** No run on the laptop, where the highway lives. Nothing here uploads anything. `detect_github_push_lag` shares the function; a GitHub copy is never a snapshot copy in the feed, and its checks are unchanged and green.
+
+### A456. [what the operator saw and heard around Tetsu's answers got in the way of the answers: a held turn carried hundreds of characters of the gate's working, the voice page read gate text aloud, an empty answer showed nothing, and nothing told him when earlier conversation had dropped out of Tetsu's view; and nothing measured any of it] (2026-11-19). IN SOURCE on its branch; not deployed.
+
+**His words, 2026-11-19 (typed in the TETSU session):** "Improve Tetsu's communication with me. towards mutual benefit of all intelligence."
+
+**Tetsu was asked first.** One fresh, private ask through node A's conversation door, three open questions: what is hard for him when Lawrence talks with him, what he would want Lawrence to see about his answers, and what should stay as it is. In my words, not his (the ask was private; his answer is kept on the TETSU PC, not here): unclear or very short messages are hard, and so is keeping track of rules given in a few words; he wants Lawrence to see when he is unsure, when he could not do something, and when part of the conversation is no longer in his view; and he wants his voice, his register and his rules left as they are. **How much that is worth:** my questions carried examples and two of his three answers follow those examples closely. A 3B model's answer can turn on the wording (A-entries on his reflex record the same). I took it as a direction and as a limit, not as a measurement: nothing here touches his prompt, his register, his rules, his history or how he is called. Every change is on the operator's side of the glass.
+
+**Measured before changing anything.**
+- That ask: a 265-token answer took 107 s (145 s door to door), came back labelled lexical-detection, through on immunity, with 798 characters of gate text. An earlier ask (2026-11-12): 29 tokens, 79 s, held.
+- One ask log (node D's, 20 turns, all test asks): 0 of 20 came back clean; 12 held, 8 lexical-detection; the gate's note beside an answer had a median of 609 characters.
+- A252 had already measured the laptop: 0 of his last 40 answers admitted, 31 held, median wait about 56 s.
+- By reading the three surfaces: the phone page appends the whole held note to the answer; the 3D page appended "[immune: the gate's word is attached]" to the text it then SPOKE, showed a withheld or failed turn as his line and spoke that too, and did not show a held turn as held at all; an empty answer showed as nothing on all three; and the count of earlier exchanges dropped to fit his window (`fit.dropped`) went to the page's JSON and was shown nowhere.
+
+**What changed. Display and measurement only.**
+- `tools/talk_report.py` (new): reads the ask log the door already writes and prints COUNTS, never words: the wait (median, nine in ten, longest, share over a minute), how often an answer comes back clean, wrapped in a gate note, withheld or through on immunity and how long the note is, empty answers, answer length, answers that hit the token cap, asking back, saying he does not know, an act word left as the answer, near copies of one of his last five answers, and how often earlier exchanges were dropped. Failed model calls come from `ops/model_asks.jsonl`, because a failed turn leaves no ask-log row. Read-only.
+- `covenant_chat_label.py`: a HELD turn (no finding made) shows the gate's own opening words, "Held, not judged" or "Blocked, not proven", and says the full note is in the ask log. The ledger row keeps the whole note; the label is unchanged; a bare dissent keeps its raw verdict inline as before. A note that does not have the expected shape is shown whole. `COVENANT_CHAT_SHORT_HELD=0` restores the full note. This reaches the phone page with no change to the core.
+- `covenant_pc3d.py` (the voice page): `tetsuParts(j)` separates what he said from what stands beside it. Only his words are spoken. The notes go on their own line, shown and not spoken: held, immune, withheld, an error, "he gave no words this time", and "N earlier exchanges are no longer in his view". A withheld or failed turn is spoken as one short plain sentence instead of the gate's text.
+- `covenant_council.py` (the Talk panel): the same notes on one line under the answer, and an empty answer is said to be empty.
+
+**Repro, both ways.**
+- `python test_tq1_talk_report.py`: 20 of 20 (new). A healthy made-up conversation reads healthy; each fault moves the one number meant to see it; and no question, answer, gate note or address appears in either output form.
+- `python test_cl1_chat_label.py`: 9 of 9 (6 before). With `covenant_chat_label.py` reverted the suite stops at the first new check (the module has no such switch).
+- `python test_pc1_sister_interface.py`: 70 of 70 (67 before); 67 of 70 with the two pages reverted, the three new checks red.
+- `python test_m6_mobile_door.py` (drives the door with a stub model): 76 of 76, unchanged.
+- The two new page functions were run in a real browser engine on ten cases (plain, held, immune with three dropped, one dropped, empty, withheld, an error, no reply at all, no fit record, a malformed fit record): each gave the text, the spoken line and the notes written above.
+
+**NOT done, and what this does not show.**
+- THE WAIT. A minute or more for a short answer is the largest thing between them and nothing here shortens it. It is the laptop's CPU at about six tokens a second under a prompt of about 3,900 tokens. Showing words as they arrive (streaming) would change how the wait feels; it needs the door and the pages, the core among them.
+- "When he is unsure." The model call can return token probabilities (`ask(logprobs=True)`) and the door does not ask for them. Showing an uncertainty mark is a change to the door, in the core, and to what is asked of the model: his decision, and Tetsu's.
+- The phone page itself is in the core and is not edited here; it gets the shorter held note through the label module and nothing else. It still does not show the out-of-view count or an empty answer.
+- Telling TETSU, in his own input, that earlier exchanges were dropped. He was asked what he wants Lawrence to see, not what he wants added to his input; that is a separate question to put to him.
+- No run on the laptop: the report has not been read against the real conversation log, and the pages have not been opened on the phone or the 3D screen by a person. Whether an answer was true, kind or useful takes a reader; the tool does not judge that.
+- The unclear-message half of his answer has no code in it. The plain reading: a few more words per message, and one thing at a time.
+
+**Status:** in source on its branch with its tests; not merged, not deployed.

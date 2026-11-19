@@ -209,7 +209,13 @@ PAGE = """<!doctype html>
 <script>
 async function post(path, body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});return r.json();}
 async function talk(){const t=document.getElementById('t_in').value.trim();if(!t)return;const o=document.getElementById('t_out');o.className='';o.textContent='thinking...';
- const j=await post('/m/agent',{text:t});o.textContent=j.status==='success'?(j.withheld?'(withheld by the gate: '+j.message+')':j.answer)+'\\n\\n'+(j.model||'')+' '+(j.ms||'')+' ms':('error: '+j.message);}
+ const j=await post('/m/agent',{text:t});o.textContent=j.status==='success'?(j.withheld?'(withheld by the gate: '+j.message+')':(String(j.answer||'').trim()||'(he gave no words this time; nothing was lost, ask again)'))+talkNotes(j)+'\\n\\n'+(j.model||'')+' '+(j.ms||'')+' ms':('error: '+j.message);}
+// A456: what stands beside an answer, said once and plainly: held, immune, and how much of the earlier
+// conversation was no longer in his view when he answered.
+function talkNotes(j){const n=[];if(j.withheld)return '';if(j.alleges_nothing)n.push('held, not judged');if(j.immune)n.push('immune: the word of the gate is attached');
+ const d=Math.max.apply(null,[0].concat((j.fit||[]).map(function(f){return (f&&f.dropped)||0;})));
+ if(d>0)n.push(d+(d===1?' earlier exchange is':' earlier exchanges are')+' no longer in his view');
+ return n.length?'\\n['+n.join('; ')+']':'';}
 // A349 B2: an answer his immunity returned is labelled so, with the verdict attached, never as admitted.
 async function council(){const t=document.getElementById('c_in').value.trim();if(!t)return;const o=document.getElementById('c_out');o.className='';o.textContent='convening...';
  const j=await post('/pc/council',{text:t});if(j.status!=='success'){o.textContent='error: '+j.message;return;}

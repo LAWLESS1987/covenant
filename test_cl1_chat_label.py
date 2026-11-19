@@ -11,6 +11,7 @@ the kill switch driven in both directions. The presentation contract lives in
 covenant_chat_label._selftest(); the live wiring on /m/agent, /m/judge and
 /m/image is driven end-to-end in test_m6_mobile_door.py (M6v / CL1 checks there).
 """
+import os
 import sys
 
 import covenant_chat_label as cl
@@ -42,6 +43,21 @@ def main():
     ck("CL1d softened display KEEPS the raw verdict", raw in disp, disp[:50])
     ck("CL1e softened display frames detection, not conviction",
        disp.startswith("Lexical pattern flagged") and "not a conviction" in disp, disp[:50])
+
+    # A456: a held turn shows the gate's own opening words; the switch restores the whole note.
+    held = "Held, not judged: local:0: HELD -- both seats (R4): ora=hold sena=hold -> hold; the question waits"
+    os.environ.pop(cl.SHORT_HELD_ENV, None)
+    disp, lab = cl.present(held, admitted=False, alleges_nothing=True)
+    ck("CL1f a held turn shows 'Held, not judged' and where the full note is, not the gate's working",
+       lab == cl.HELD and disp.startswith("Held, not judged (") and "ask log" in disp and "ora=hold" not in disp, disp)
+    os.environ[cl.SHORT_HELD_ENV] = "0"
+    disp0, lab0 = cl.present(held, admitted=False, alleges_nothing=True)
+    os.environ.pop(cl.SHORT_HELD_ENV, None)
+    ck("CL1g COVENANT_CHAT_SHORT_HELD=0 shows the whole note again; the label is the same either way",
+       disp0 == held and lab0 == cl.HELD, disp0[:60])
+    ck("CL1h the brief form never turns a held turn into anything else (it returns no decision)",
+       cl.present(held, admitted=False, alleges_nothing=True)[1] == cl.HELD
+       and cl.classify(admitted=False, alleges_nothing=True) == cl.HELD)
 
     total = len(checks) + 1  # +1 for the delegated self-test block
     passed = sum(1 for _, okc in checks if okc) + (1 if not cl._selftest() else 0)
