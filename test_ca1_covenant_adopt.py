@@ -339,6 +339,17 @@ class TheRecordSearchedIsThePreRunOne(unittest.TestCase):
         lb2 = A.lookback(dict(self.failed, head="0" * 12))           # a commit this repository does not have
         self.assertEqual((lb2["hits"], len(lb2["unreadable"])), ([], 2), lb2)
 
+    def test_whether_a_failing_file_was_already_there_is_asked_of_the_pre_run_commit(self):
+        # docs/KNOWN_ISSUES.md is tracked at the pre-run commit; test_a433_arrives.py is in no commit at all, and
+        # is put in the working tree to show the files on disk are not what is asked.
+        with io.open(os.path.join(self.repo, "test_a433_arrives.py"), "w", encoding="utf-8") as fh:
+            fh.write("x\n")
+        r = _run(decision="NO-GO", head=self.before[:12], changed_files=[], incoming_commits=[],
+                 test={"ok": False, "new_failures": ["test_a433_arrives.py", "docs/KNOWN_ISSUES.md"]})
+        terms = A._terms(r, A.contradictions(r), A._exists_at(self.before[:12]))
+        self.assertEqual((terms["a433"][1], terms["known_issues"][1]), ("new_name", "tripped"))
+        self.assertEqual(A._terms(r, A.contradictions(r), A._exists_at(""))["known_issues"][1], "new_name")   # no commit: not vouched for
+
     def test_the_records_readers_are_the_ones_loaded_when_the_gate_started(self):
         # a lazy `import lookback_index` inside lookback() would load whatever the apply left on disk
         real = sys.modules.get("lookback_index")
@@ -375,6 +386,37 @@ class WhoChoseTheWords(unittest.TestCase):
         hits = A.lookback(dict(SCAN_HIT, incoming_commits=self.FLOOD), root=_root())["hits"]
         self.assertEqual([h["id"] for h in hits[:2]], ["A555-SCANNER-SELF-HIT", "A555"])
         self.assertEqual(sum(1 for h in hits if "tripped" not in h["matched_from"]), A.SENDER_ONLY_MAX)
+
+    # The peer's re-read at b2b4268: the cap was dodged by NAMING things. Five failing suites that arrive with
+    # the merge, test_a12_x.py ... test_a441_x.py, gave five pointers, every one labelled "tripped" at weight 3.
+    # A suite that existed before the run and now fails is evidence; one that arrives with the merge is the
+    # sender's word, whatever it is called.
+    ARRIVING = ["test_a900_x.py", "test_a433_x.py", "test_a777_x.py", "test_a556_x.py", "test_a555_x.py"]
+
+    def _failing(self, names):
+        return _run(decision="NO-GO", test={"ok": False, "new_failures": names}, changed_files=[], incoming_commits=[])
+
+    def test_a_name_that_arrives_with_the_merge_is_the_senders_word_and_is_capped(self):
+        hits = A.lookback(self._failing(self.ARRIVING), root=_root(), exists=lambda p: False)["hits"]
+        self.assertEqual(len(hits), A.SENDER_ONLY_MAX, hits)
+        self.assertTrue(all(list(h["matched_from"]) == ["new_name"] for h in hits), hits)
+
+    def test_a_suite_that_was_already_there_still_counts_as_what_tripped(self):
+        there = {"test_a433_x.py"}
+        hits = A.lookback(self._failing(self.ARRIVING), root=_root(), exists=lambda p: p in there)["hits"]
+        self.assertEqual((hits[0]["id"], hits[0]["matched_from"]), ("A433", {"tripped": ["a433"]}))
+        self.assertEqual(sum(1 for h in hits if "tripped" not in h["matched_from"]), A.SENDER_ONLY_MAX)
+
+    def test_the_gates_own_words_need_no_file(self):
+        # a gate id and a scan pattern label are this tool's vocabulary, not a name the sender chose
+        g5 = A.lookback(self._failing(["G5"]), root=_root(), exists=lambda p: False)["hits"]
+        self.assertEqual([(h["id"], list(h["matched_from"])) for h in g5], [("A556", ["tripped"])])
+
+    def test_one_new_file_named_after_five_entries_gets_no_more_than_the_cap(self):
+        r = _run(decision="NO-GO", changed_files=[], incoming_commits=[],
+                 scan={"state": "hits", "hits": [{"file": "a900_a433_a777_a556_a555.py", "pattern": "cred_capture"}]})
+        hits = A.lookback(r, root=_root(), exists=lambda p: False)["hits"]
+        self.assertEqual(len(hits), A.SENDER_ONLY_MAX, hits)
 
 
 class TheWholeHeaderIsSearched(unittest.TestCase):

@@ -290,7 +290,7 @@ _SHA = re.compile(r"[0-9a-f]{7,40}")
 # Words every header carries: matching on them would rank by nothing.
 _STOP = frozenset(("covenant", "test", "tests", "tools", "docs", "ops", "main", "init", "the", "and", "for",
                    "not", "with", "from", "that", "this", "py", "md", "json"))
-_ORIGINS = ("tripped", "subject", "changed")
+_ORIGINS = ("tripped", "new_name", "subject", "changed")
 
 
 def contradictions(result):
@@ -341,11 +341,40 @@ def _stem(path):
     return os.path.basename(str(path).replace("\\", "/")).rsplit(".", 1)[0].lower()
 
 
-def _terms(result, contras):
+def _is_file_name(key):
+    """A path or a file name, as opposed to a gate id (G5) or a scan pattern label: this tool's own words."""
+    k = str(key)
+    return "/" in k or "\\" in k or "." in k
+
+
+def _exists_at(head):
+    """A function saying whether a path is tracked at commit `head` in REPO. With no usable commit it vouches
+    for nothing. The working tree is never asked: after an apply it holds what arrived."""
+    def exists(path):
+        if not _SHA.fullmatch(str(head or "")):
+            return False
+        try:
+            r = subprocess.run(["git", "-C", REPO, "cat-file", "-e", "%s:%s" % (head, str(path).replace("\\", "/"))],
+                               capture_output=True, timeout=60, creationflags=_NOWIN)
+        except (OSError, subprocess.SubprocessError):
+            return False
+        return r.returncode == 0
+    return exists
+
+
+def _terms(result, contras, exists=None):
     """{word: (weight, origin)}. What TRIPPED weighs 3 (its file or gate name, and any A-number inside it); an
     A-number in an incoming commit's subject weighs 2; a file that merely changed weighs 1, as do the separate
-    words of what tripped. The heaviest use of a word wins, so naming a thing twice does not rank it higher."""
+    words of what tripped. The heaviest use of a word wins, so naming a thing twice does not rank it higher.
+
+    A FILE'S NAME COUNTS AS WHAT TRIPPED ONLY IF THE FILE WAS THERE BEFORE THE RUN (`exists(path)`; None vouches
+    for every path, for a hand run over a directory). The TETSU session's re-read at b2b4268: five failing
+    suites that ARRIVED with the merge, test_a12_x.py ... test_a441_x.py, gave five pointers, each labelled
+    "tripped" at weight 3, and one new file named after five entries did the same alone. A suite that existed
+    and now fails is evidence; a name that arrives with the merge is its sender's word. Such a name gets the
+    origin "new_name" and a subject's weight, and falls under the same cap."""
     terms = {}
+    exists = exists or (lambda _path: True)
 
     def add(tok, w, origin):
         tok = tok.lower()
@@ -355,12 +384,13 @@ def _terms(result, contras):
     for c in contras:
         for k in c.get("keys") or []:
             stem = _stem(k)
-            add(stem, 3, "tripped")
+            w, origin = (2, "new_name") if _is_file_name(k) and not exists(k) else (3, "tripped")
+            add(stem, w, origin)
             for m in _ANUM.finditer(stem.replace("_", " ")):
-                add("a" + m.group(1), 3, "tripped")
+                add("a" + m.group(1), w, origin)
             for part in stem.split("_"):
                 if len(part) >= 4:
-                    add(part, 1, "tripped")
+                    add(part, 1, origin)
     for subj in result.get("incoming_commits") or []:
         for m in _ANUM.finditer(str(subj).lower()):
             add("a" + m.group(1), 2, "subject")
@@ -400,7 +430,7 @@ def _from_dir(root, rel):
         return None, type(e).__name__
 
 
-def lookback(result, contras=None, root=None, top=LOOKBACK_TOP):
+def lookback(result, contras=None, root=None, top=LOOKBACK_TOP, exists=None):
     """Search the record of past errors with words from a run that contradicted. Returns {"searched",
     "unreadable", "terms", "hits", "note"}; `hits` are the closest record entries and tombstones, each with
     where it is, which words matched, where those words came from, and its score. No contradiction: nothing is
@@ -414,19 +444,21 @@ def lookback(result, contras=None, root=None, top=LOOKBACK_TOP):
     out = {"searched": [], "unreadable": [], "terms": {}, "hits": [],
            "note": "pointers, not findings: open the line before relying on it. The search words come from the "
                    "merge under test (what failed, its commit subjects, its file names), so its sender can "
-                   "influence which entries are shown, never what they say."}
+                   "influence which entries are shown, never what they say. A failing file that was not there "
+                   "before the run is labelled new_name, not tripped."}
     if not contras:
         return out
     if LI is None:
         out["unreadable"].append("tools/lookback_index.py could not be loaded when the gate started")
         return out
-    terms = _terms(result, contras)
-    out["terms"] = dict(sorted(((t, w) for t, (w, _o) in terms.items()), key=lambda kv: (-kv[1], kv[0]))[:20])
     if root is None:
         head = str(result.get("head") or "")
         read, where = (lambda rel: _at_commit(head, rel)), "at commit %s" % head[:12]
+        exists = exists or _exists_at(head)
     else:
         read, where = (lambda rel: _from_dir(root, rel)), "in %s" % os.path.basename(str(root).rstrip("\\/"))
+    terms = _terms(result, contras, exists)
+    out["terms"] = dict(sorted(((t, w) for t, (w, _o) in terms.items()), key=lambda kv: (-kv[1], kv[0]))[:20])
     entries, heads, tombs = [], [], []
     text, why = read("docs/KNOWN_ISSUES.md")
     if text is None:
@@ -468,7 +500,7 @@ def lookback(result, contras=None, root=None, top=LOOKBACK_TOP):
     for _score, _num, h in scored:
         if len(out["hits"]) >= max(0, int(top)):
             break
-        if "tripped" not in h["matched_from"]:                  # nothing that tripped supports it: the sender's words
+        if "tripped" not in h["matched_from"]:                  # only new names, subjects, changed files: the sender's words
             if sender_only >= SENDER_ONLY_MAX:
                 continue
             sender_only += 1
