@@ -126,7 +126,7 @@ Counts: 440 record headers, 437 distinct ids, 111 tombstones.
 
 | entry | date | status | tombstones | title |
 |---|---|---|---|---|
-| A455 | 2026-11-19 | - | - | the highway counted a Hugging Face snapshot as lagging for 33 readings while every file matched: it compared commit ids, and a snapshot copy's id is made on the other si… |
+| A453 | 2026-11-19 | - | - | security |
 | A452 | 2026-11-18 | - | A452-LOOKBACK-NEVER-INCOMING, A452-NEW-NAME-EVERY-FILE | the adoption gate told him a run was held and nothing about whether the same thing had gone wrong before; now a run that contradicts a clean adoption searches the record… |
 | A450 | 2026-11-18 | - | - | free was isolated for the judge working: four times since 10-14, after rounds in which nothing was posted. With "on_refusal": "quiet" in her grant she now goes QUIET ins… |
 | A448 | 2026-11-18 | OPEN | - | test hygiene / record integrity, follows A444 |
