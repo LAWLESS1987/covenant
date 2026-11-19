@@ -247,6 +247,14 @@ class TheSenderCannotBlindTheGate(_Trio):
     def test_a_short_or_odd_base_is_refused_not_guessed(self):
         tip = self.push({"evil.py": EVIL}, tag=self.base[:12])
         _g(self.node, "fetch", "-q", "--tags", "origin")
+        for info in ({"head": self.base[:12], "incoming": tip}, {"head": self.base, "incoming": tip[:12]}):
+            wt, why = A.build_candidate(info)
+            if wt:
+                A._cleanup(wt)
+            self.assertIsNone(wt, "a candidate was built from a short id: %s" % why)
+        wt, why = A.build_candidate({"head": self.base, "incoming": tip})
+        A._cleanup(wt)
+        self.assertIsNotNone(wt, "the control: the same two commits by full id do build (%s)" % why)
         _g(self.node, "merge", "-q", "--ff-only", tip)
         for bad in (self.base[:12], "", None, "HEAD~1", "main", "--output=x", self.base[:39], "0" * 40):
             self.assertEqual(A.scan(self.node, bad)["state"], "error", bad)
@@ -303,6 +311,8 @@ class TheSenderCannotBlindTheGate(_Trio):
         self.assertEqual(r["decision"], "NO-GO")
         self.assertTrue(any("shadowed" in x for x in r["reasons"]), r["reasons"])
         self.assertEqual(r["incoming"], tip, "what was judged is still the remote branch")
+        self.assertTrue(r["merge"].startswith("merged cleanly"), "and its candidate was built from that id: %s" % r["merge"])
+        self.assertTrue(os.path.isfile(A.LEDGER))
         self.assertEqual(A.decide("NORMAL", [], {"state": "clean"}, {"ok": True}, True, "x")[0], "NO-GO")
         self.assertEqual(A.decide("NORMAL", [], {"state": "clean"}, {"ok": True}, True, "")[0], "GO")
 
@@ -379,6 +389,9 @@ class WhatLandsIsWhatWasTested(_Trio):
         self.assertIn(x2, A.untested_commits(self.base, x, _g(self.node, "rev-parse", "HEAD")))
         self.assertTrue(A.untested_commits(self.base, x2, after), "the tested commit is not in what landed")
         self.assertTrue(A.untested_commits(self.base[:12], x, after)[0].startswith("<unknown"))
+        missing = A.untested_commits(self.base, x, self.base)
+        self.assertEqual(len(missing), 1, missing)
+        self.assertTrue(missing[0].startswith("<the tested commit"), missing)
 
     def test_an_updater_that_merges_by_name_lands_untested_work_and_the_gate_says_so(self):
         x = self.push({"plain.py": "x = 1\n"})
