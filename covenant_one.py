@@ -118,6 +118,10 @@ SUITES = [
     # ways: the nan request verifies on the pre-A439 code, is refused after.
     ("test_a439_nonfinite_timestamp.py",  60,  "SECURITY"),
     ("test_a444_nonce_store.py",          120, "SECURITY"),
+    # A444b (2026-11-19): A444's durable store guarded at BOTH signed gates (verify_signed and
+    # admit's ally branch), each node life a fresh process; a per-process-store control keeps
+    # the vector visible. Red on 9d85f6c's gates, green on main.
+    ("test_a444b_nonce_replay_gates.py",  120, "SECURITY"),
     ("test_a443_runner_isolation.py",     60,  "SECURITY"),
     # A440 (2026-11-16): second A438-hunt catch, at /claim_rewards. The v8.4 fix
     # (verify_stake_action_signature) binds the ACTION and the KEY into the signed
