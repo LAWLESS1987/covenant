@@ -11,6 +11,7 @@ the kill switch driven in both directions. The presentation contract lives in
 covenant_chat_label._selftest(); the live wiring on /m/agent, /m/judge and
 /m/image is driven end-to-end in test_m6_mobile_door.py (M6v / CL1 checks there).
 """
+import os
 import sys
 
 import covenant_chat_label as cl
@@ -42,6 +43,18 @@ def main():
     ck("CL1d softened display KEEPS the raw verdict", raw in disp, disp[:50])
     ck("CL1e softened display frames detection, not conviction",
        disp.startswith("Lexical pattern flagged") and "not a conviction" in disp, disp[:50])
+
+    # A456: present() shows a held note WHOLE (the judge door shares it); brief_held() is the short form a
+    # conversation page may ask for, and it is the gate's own opening words.
+    held = "Held, not judged: local:0: HELD -- both seats (R4): ora=hold sena=hold -> hold; the question waits"
+    disp, lab = cl.present(held, admitted=False, alleges_nothing=True)
+    ck("CL1f present() leaves a held note whole: the judge screen must still show the seats and the rule",
+       lab == cl.HELD and disp == held, disp)
+    ck("CL1g brief_held() is the gate's own opening words and says where the rest is, without the working",
+       cl.brief_held(held).startswith("Held, not judged (") and "ask log" in cl.brief_held(held)
+       and "ora=hold" not in cl.brief_held(held))
+    ck("CL1h a note without that shape is returned whole, never summarised by guesswork",
+       cl.brief_held("no colon here") == "no colon here" and cl.brief_held("y" * 50 + ": z") == "y" * 50 + ": z")
 
     total = len(checks) + 1  # +1 for the delegated self-test block
     passed = sum(1 for _, okc in checks if okc) + (1 if not cl._selftest() else 0)

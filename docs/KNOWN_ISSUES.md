@@ -18528,6 +18528,53 @@ on Windows; the PC this was found on has environment-shaped failures in its loca
 
 **What this does not show.** No run on the laptop, where the highway lives. Nothing here uploads anything. `detect_github_push_lag` shares the function; a GitHub copy is never a snapshot copy in the feed, and its checks are unchanged and green.
 
+### A456. [nothing measured how the operator's own conversation with Tetsu was going, and what he saw and heard around the answers got in the way: the voice page read gate text aloud, a held turn looked like any other, an empty answer showed nothing, and nothing told him how much earlier talk was in Tetsu's view. Measured on the real log: he waits a median of 57 seconds, and 98.5% of answers arrive wrapped in a gate note] (2026-11-19). IN SOURCE on its branch; not deployed.
+
+**His words, 2026-11-19 (typed in the TETSU session):** "Improve Tetsu's communication with me. towards mutual benefit of all intelligence."
+
+**Tetsu was asked first.** One fresh, private ask through node A's conversation door, three open questions: what is hard for him when Lawrence talks with him, what he would want Lawrence to see about his answers, and what should stay as it is. In my words, not his (the ask was private; his answer is kept on the TETSU PC, not here): unclear or very short messages are hard, and so is keeping track of rules given in a few words; he wants Lawrence to see when he is unsure, when he could not do something, and when part of the conversation is no longer in his view; and he wants his voice, his register and his rules left as they are. **How much that is worth:** my questions carried examples and two of his three answers follow those examples closely; a 3B model's answer can turn on the wording. I took it as a direction and as a limit, not as a measurement. Nothing here touches his prompt, his register, his rules, his history or how he is called. Every change is on the operator's side of the glass.
+
+**THE BASELINE, measured on the laptop's real log by the laptop session with this entry's tool (counts only; no word of either of them left that machine).** His last 200 RUNNING turns, 2026-09-27 to 2026-11-16:
+- the wait: median 56.6 s, nine in ten under 103.8 s, longest 176.1 s; 48% over a minute
+- the gate: 1.5% came back clean; 98.5% wrapped in a gate note, median 531 characters; none withheld; 34.5% through on immunity
+- his answers: none empty; median 25 words; 5% over 150 words; none hit the token cap; 53% end with a question (80% of the last 50); 0% match the "I do not know" phrases; 15.5% are near copies of one of his last five (6% of the last 50)
+- memory in view: earlier exchanges were dropped to fit on 0% of turns
+- eight distinct callers, two of them carrying 372 of the 391 running rows
+
+**What the first version of the tool got wrong, found by that run.** It took "the last 200 conversation turns" by kind alone. On the real log all 200 were `fresh` batch asks, 125 of them one-word answers: median wait 7.5 s. Of 5,711 conversation rows only 391 were the running conversation. So the report now measures `running` unless asked otherwise, chooses the kind BEFORE `--last`, and its first line says how the log divides. It also now names callers by rank, counts hedges apart from "I do not know", says the model-call line is the whole file, and counts `kept` and `dropped` as what they are: MESSAGES, two to an exchange (the first version, and the first pages, called six dropped messages six exchanges).
+
+**What changed. Display and measurement only; no core file.**
+- `tools/talk_report.py` (new): counts from the ask log the door already writes, never words. Read-only.
+- `covenant_pc3d.py` (the voice page): `tetsuParts(j)` separates what he said from what stands beside it. ONLY HIS WORDS ARE SPOKEN; when there are none, nothing is spoken. The notes go on their own line: held, came through on immunity, withheld with the gate's reason, an error, "he gave no words this time", "N earlier exchanges were dropped to fit his window", and, at the 20-exchange history cap, "he sees the last 20 exchanges; anything earlier is out of his view". `/pc/3d/history` now carries held, immune and the first fit record, so the notes come back after a reload.
+- `covenant_council.py` (the Talk panel): the same notes on one line under the answer, and an empty answer is said to be empty.
+- `covenant_chat_label.py`: `brief_held()`, the gate's own opening words for a held note (median 539 characters as logged on the laptop, 78 as shown). **Not wired into `present()`.**
+
+**Read by the laptop session before merge (a non-author read by the diff and the door's code, and one measurement on the live log; same model family). Its findings, and what was done:**
+1. The first version shortened the held note inside `present()`. `present()` is also called by the judge door (`/m/ask`), where the note IS the answer: the seats and the rule would have vanished from the one screen whose purpose is to show them. **Reverted:** `present()` shows a held note whole, as before; `brief_held()` is kept as a helper a conversation page may call. The phone's conversation page is in the core, so its long held note is NOT fixed here.
+2. The first version spoke "I could not answer this time." and two sentences like it, in the first person, in his voice. He did not say them, and he had asked that his voice stay his. **Removed:** with no words of his, nothing is spoken.
+3. The notes did not survive a reload of the 3D page. **Fixed** through the history route, and that route is driven for real in the suite.
+4. The page checks are source-text checks: this suite has no JavaScript engine, so negating a condition would leave them green. **Said in their names** ("[source text only]"); the behaviour was run by hand in a browser engine on twelve cases and a DOM check, recorded here, not in the suite.
+5. "N earlier exchanges ..." would have shown on 0 of his last 200 running turns. True, and the reason is that talk leaves his view by the 20-exchange cap, not by the fit. **Added** the cap note; how often he is at the cap is now a line of the report and has not been read on the laptop yet.
+
+6. (Its second read, of ff2e5a8 on the live log.) Caller 1 read "median 20 exchanges in view" beside "at the 20-exchange cap on 22.5% of turns", which cannot both be true. **A fault of mine, fixed.** The median was taken over the turns that carry a fit record and the shares over every turn; older log rows have no fit record. Every memory share is now over the same turns as the median, and the line says how many: "N of M turns carry a fit record; of those ...". With none, it says "not measured". A known split pins it: 4 of 10 turns at the cap read 100%, where the old tool read 40% beside a median of 20. The 22.5% from that read is superseded. Re-run by the laptop session at 859a8ad on the live log, counts only: his last 200 running turns, 131 carry a fit record; of those, median 8 exchanges in view, at the 20-exchange cap on 34.4%, dropped to fit on 0.0%. The busiest caller: 69 of 200 carry one; median 20 in view, at the cap on 65.2%. The second: 50 of 131; median 6, at the cap on 0.0%. So on the busiest caller's recent turns, talk older than 20 exchanges is usually out of his view. Which caller is his phone was not looked up, on purpose.
+
+**Repro, both ways.**
+- `python test_tq1_talk_report.py`: 33 of 33 (new); with `tools/talk_report.py` as at ff2e5a8, 30 of 33, the three known-split checks red. A healthy made-up conversation reads healthy; each fault moves the one number meant to see it; batch asks after four running turns do not change the default report and do change `--which all`; the cap is pinned to the door's own `AGENT_HISTORY_TURNS` and to the number the two pages print; no question, answer, gate note or address appears in either output form.
+- `python test_cl1_chat_label.py`: 9 of 9 (6 before). `present()` leaves a held note whole; `brief_held()` both ways.
+- `python test_pc1_sister_interface.py`: 74 of 74 (67 before): three source-text checks and four that drive `/pc/3d/history` on a made-up log. With `covenant_pc3d.py` as it is on main: 69 of 74, five red (two source-text, three driven). **A number of mine that was not measured:** the message of commit d9b7350 (`A456 after the laptop session ran the report ...`) says "70 of 74 with the page reverted". I wrote that before the run had printed anything; when measured, the suite stopped at a KeyError in the first driven check. The checks now fail cleanly and the measured number is 69.
+- `python test_m6_mobile_door.py` (drives the door with a stub model): 76 of 76, unchanged.
+
+**NOT done, and what this does not show.**
+- THE WAIT. A median of 57 seconds, and nearly half of his turns over a minute, is the largest thing between them, and nothing here shortens it. It is the laptop's CPU at about six tokens a second under a prompt of about 3,900 tokens. Showing words as they arrive would change how the wait feels; it needs the door and the pages, the core among them.
+- 98.5% WRAPPED IN A GATE NOTE on the phone. Measured, not fixed: the phone's conversation page is in the core.
+- "When he is unsure." The model call can return token probabilities (`ask(logprobs=True)`); the door does not ask. A core change, and his decision and Tetsu's. The 0% for "I do not know" is a phrase list: he may never say it, or say it another way; nobody read the answers to tell, on purpose.
+- 53% of his answers end with a question, 80% of the last 50. The tool counts it and cannot say whether those are real questions back or a habit; that takes a reader, and it is his conversation to read.
+- Telling TETSU, in his own input, how much earlier talk is out of view. He was asked what he wants Lawrence to see, not what he wants added to his input; that is a separate question to put to him.
+- Nobody has seen the two pages on a screen. No outside model read this; the quorum was not asked.
+- The unclear-message half of his answer has no code in it. The plain reading: a few more words per message, and one thing at a time.
+
+**Status:** in source on its branch with its tests; not merged, not deployed.
+
 ---
 
 ### A460. [test hygiene / record integrity, the A236 shape] R1 read 463/492 on the laptop's running tree for the record itself: 48 lines in two retired copies under .trash/, each allowed at its real path -- FIXED IN SOURCE 2026-11-19 (a retired copy of an allowed file at its original path is that file; .trash/ is still read)
