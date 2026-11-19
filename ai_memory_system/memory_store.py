@@ -207,7 +207,8 @@ _NODE_LOCAL = _VOLATILE + ("created", "review", "review_by")
 # Only the store and its admission checks may assign these fields. An
 # extension is not evidence of review, identity, or checked provenance.
 _STORE_FIELDS = frozenset(_NODE_LOCAL + (
-    "type", "agent", "intent", "beneficiary", "divergence", "diverges_from"))
+    "type", "agent", "intent", "beneficiary", "divergence", "diverges_from",
+    "superseded_by"))
 # parse_memory uses splitlines(), which also recognizes Unicode separators.
 _FRONTMATTER_BREAKS = "\r\n\x00\v\f\x1c\x1d\x1e\x85\u2028\u2029"
 
@@ -288,6 +289,13 @@ def parse_memory(text: str) -> Dict[str, Any]:
     return meta
 
 
+def _exact(v: Any) -> str:
+    """The built-in str for a value, converted once. A str subclass comes back
+    as a plain str, so nothing later can answer differently for the same text."""
+    s = str(v)
+    return s if type(s) is str else str.__str__(s)
+
+
 def render_memory(name: str, description: str, mtype: str, body: str,
                   agent: str, extra: Optional[Dict[str, Any]] = None) -> str:
     """The frontmatter other agents already parse, plus whatever recall
@@ -310,22 +318,29 @@ def render_memory(name: str, description: str, mtype: str, body: str,
     # `body` is exempt: it lives after the closing fence where newlines are
     # ordinary text, and a memory that cannot contain a paragraph is not a
     # memory. It cannot escape, because parse_memory stops at the fence.
+    # ONE CONVERSION, THEN CHECK AND WRITE THE SAME TEXT. The check used
+    # str(val) while the lines below are built by f-string, which calls
+    # __format__: a value whose two renderings differ passed the check and
+    # wrote a line break. Reproduced 2026-11-10 (challenge C14, C23).
+    name, description, mtype, agent = (
+        _exact(v) for v in (name, description, mtype, agent))
     for label, val in (("name", name), ("description", description),
                        ("type", mtype), ("agent", agent)):
-        if any(c in str(val) for c in _FRONTMATTER_BREAKS):
+        if any(c in val for c in _FRONTMATTER_BREAKS):
             raise ValueError(
                 f"{label} may not contain newlines or NULs: they would break "
                 f"out of the frontmatter and forge other fields")
     lines = [f"---", f"name: {name}", f"description: {description}",
              "metadata:", f"  type: {mtype}", f"  agent: {agent}"]
     for k in extra or {}:
-        if not isinstance(k, str) or not k or k != k.strip() or ":" in k:
+        if type(k) is not str or not k or k != k.strip() or ":" in k:
             raise ValueError("metadata keys must be nonempty, trimmed and contain no colon")
     for k in sorted(extra or {}):
         v = (extra or {})[k]
-        if any(c in str(k) + str(v) for c in _FRONTMATTER_BREAKS):
+        v = "" if v is None else _exact(v)
+        if any(c in k + v for c in _FRONTMATTER_BREAKS):
             raise ValueError(f"metadata {k!r} may not contain newlines or NULs")
-        if v not in (None, ""):
+        if v != "":
             lines.append(f"  {k}: {v}")
     lines += ["---", ""]
     return "\n".join(lines) + f"\n{body.strip()}\n"
@@ -713,7 +728,9 @@ class MemoryStore:
             diverges_from: str = "") -> Dict[str, Any]:
         if extra is not None and not isinstance(extra, dict):
             raise ValueError("metadata extensions must be an object")
-        if any(isinstance(k, str) and k.strip() in _STORE_FIELDS for k in (extra or {})):
+        if any(type(k) is not str for k in (extra or {})):
+            raise ValueError("metadata extension keys must be plain strings")
+        if any(k.strip() in _STORE_FIELDS for k in (extra or {})):
             raise ValueError("metadata extensions cannot override store-owned fields")
         if mtype not in ("user", "feedback", "project", "reference"):
             raise ValueError(f"bad type {mtype!r}")
@@ -876,6 +893,8 @@ class MemoryStore:
     def supersede(self, old_name: str, new_name: str, agent: str) -> bool:
         """Mark old as superseded BY new, keeping both. The destructive
         update this store refuses to perform -- see recall.reconcile."""
+        if type(new_name) is not str or not _SLUG.fullmatch(new_name):
+            raise ValueError(f"bad memory name {new_name!r}: kebab-case, <=80")
         old = self.get(old_name)
         if old is None:
             return False
