@@ -126,7 +126,7 @@ Counts: 443 record headers, 440 distinct ids, 111 tombstones.
 
 | entry | date | status | tombstones | title |
 |---|---|---|---|---|
-| A456 | 2026-11-19 | - | - | what the operator saw and heard around Tetsu's answers got in the way of the answers: a held turn carried hundreds of characters of the gate's working, the voice page re… |
+| A456 | 2026-11-19 | - | - | nothing measured how the operator's own conversation with Tetsu was going, and what he saw and heard around the answers got in the way: the voice page read gate text alo… |
 | A455 | 2026-11-19 | - | - | the highway counted a Hugging Face snapshot as lagging for 33 readings while every file matched: it compared commit ids, and a snapshot copy's id is made on the other si… |
 | A454 | 2026-11-19 | FIXED | - | operations / forgotten-step tombstone, P18 V3 + A117 shape |
 | A453 | 2026-11-19 | - | - | security |

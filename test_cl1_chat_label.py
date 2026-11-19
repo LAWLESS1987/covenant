@@ -44,20 +44,17 @@ def main():
     ck("CL1e softened display frames detection, not conviction",
        disp.startswith("Lexical pattern flagged") and "not a conviction" in disp, disp[:50])
 
-    # A456: a held turn shows the gate's own opening words; the switch restores the whole note.
+    # A456: present() shows a held note WHOLE (the judge door shares it); brief_held() is the short form a
+    # conversation page may ask for, and it is the gate's own opening words.
     held = "Held, not judged: local:0: HELD -- both seats (R4): ora=hold sena=hold -> hold; the question waits"
-    os.environ.pop(cl.SHORT_HELD_ENV, None)
     disp, lab = cl.present(held, admitted=False, alleges_nothing=True)
-    ck("CL1f a held turn shows 'Held, not judged' and where the full note is, not the gate's working",
-       lab == cl.HELD and disp.startswith("Held, not judged (") and "ask log" in disp and "ora=hold" not in disp, disp)
-    os.environ[cl.SHORT_HELD_ENV] = "0"
-    disp0, lab0 = cl.present(held, admitted=False, alleges_nothing=True)
-    os.environ.pop(cl.SHORT_HELD_ENV, None)
-    ck("CL1g COVENANT_CHAT_SHORT_HELD=0 shows the whole note again; the label is the same either way",
-       disp0 == held and lab0 == cl.HELD, disp0[:60])
-    ck("CL1h the brief form never turns a held turn into anything else (it returns no decision)",
-       cl.present(held, admitted=False, alleges_nothing=True)[1] == cl.HELD
-       and cl.classify(admitted=False, alleges_nothing=True) == cl.HELD)
+    ck("CL1f present() leaves a held note whole: the judge screen must still show the seats and the rule",
+       lab == cl.HELD and disp == held, disp)
+    ck("CL1g brief_held() is the gate's own opening words and says where the rest is, without the working",
+       cl.brief_held(held).startswith("Held, not judged (") and "ask log" in cl.brief_held(held)
+       and "ora=hold" not in cl.brief_held(held))
+    ck("CL1h a note without that shape is returned whole, never summarised by guesswork",
+       cl.brief_held("no colon here") == "no colon here" and cl.brief_held("y" * 50 + ": z") == "y" * 50 + ": z")
 
     total = len(checks) + 1  # +1 for the delegated self-test block
     passed = sum(1 for _, okc in checks if okc) + (1 if not cl._selftest() else 0)

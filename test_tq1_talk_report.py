@@ -100,10 +100,27 @@ def main():
           a["starts_with_an_act_word_pct"] == 20.0 and a["says_does_not_know_pct"] == 20.0 and a["ask_back_pct"] == 20.0
           and a["hit_the_token_cap_pct"] == 20.0, a)
 
-    drop = [turn(1), dict(turn(2), fit=[{"answer_tokens": 700, "dropped": 6, "kept": 2}]), dict(turn(3), fit=[{"answer_tokens": 700, "dropped": 1}])]
+    # kept and dropped are MESSAGES, two to an exchange (covenant_model.fit); the report speaks in exchanges
+    drop = [turn(1), dict(turn(2), fit=[{"answer_tokens": 700, "dropped": 6, "kept": 2}, {"answer_tokens": 700, "dropped": 30, "kept": 0}]),
+            dict(turn(3), fit=[{"answer_tokens": 700, "dropped": 2, "kept": 40}])]
     m = T.measure(drop)["memory_in_view"]
-    check("TQ1g earlier exchanges dropped on two of three turns, six at most",
-          m["turns_where_earlier_exchanges_were_dropped_pct"] == 66.7 and m["most_dropped_in_one_turn"] == 6, m)
+    check("TQ1g six MESSAGES dropped is three exchanges; the turn's FIRST fit record is the one that counts",
+          m["turns_where_earlier_exchanges_were_dropped_pct"] == 66.7 and m["most_exchanges_dropped_in_one_turn"] == 3, m)
+    check("TQ1g a turn with 40 messages kept is at the 20-exchange cap (one of three); median in view is counted in exchanges",
+          m["turns_at_the_history_cap_pct"] == 33.3 and m["median_exchanges_in_view"] == 1, m)
+    core = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "covenant_unified_v8.py"), encoding="utf-8").read()
+    import re as _re
+    cap = _re.search(r"^AGENT_HISTORY_TURNS\s*=\s*(\d+)", core, _re.M)
+    check("TQ1g the cap this tool and the two pages speak of is the door's own (AGENT_HISTORY_TURNS, two messages each)",
+          cap and int(cap.group(1)) * 2 == T.HISTORY_CAP_MESSAGES
+          and all("last %s exchanges" % cap.group(1) in open(os.path.join(os.path.dirname(os.path.abspath(__file__)), f),
+                                                              encoding="utf-8").read() for f in ("covenant_pc3d.py", "covenant_council.py")),
+          cap and cap.group(1))
+    hed = [turn(1), dict(turn(2), answer="I am not entirely sure, but I think it was Tuesday."), dict(turn(3), answer="I do not know."),
+           dict(turn(4), answer="It was Tuesday.")]
+    a2 = T.measure(hed)["answers"]
+    check("TQ1g a hedge and an 'I do not know' are counted apart: one of four says he does not know, two of four hedge",
+          a2["says_does_not_know_pct"] == 25.0 and a2["hedges_pct"] == 50.0, a2)
 
     mc = T.measure([turn(1)], model_rows=[{"ok": True}, {"ok": False, "error": "TimeoutError: timed out"},
                                           {"ok": False, "error": "TimeoutError: timed out"}, {"ok": False, "error": "ContextTooLong: x"},
@@ -115,6 +132,26 @@ def main():
     check("TQ1i only conversation turns are counted; --last and --since select",
           T.measure(T.select(mixed, last=200))["turns"] == 10 and len(T.select(mixed, last=3)) == 3
           and len(T.select(mixed, last=0, since="2026-11-19T10:08")) == 3)
+    # THE RUNNING CONVERSATION IS THE DEFAULT. The laptop's real log: the last 200 rows by kind alone were all
+    # fresh batch asks. Here: 4 running turns, then 30 fresh one-word batch answers and 2 private asks.
+    batch = healthy[:4] + [dict(turn(20 + i, ms=3000), answer="yes", fresh=True) for i in range(30)] \
+        + [dict(turn(55 + i), private=True) for i in range(2)]
+    check("TQ1i the default selection is the 4 running turns, however many batch asks came after them",
+          len(T.select(batch, last=200)) == 4 and T.measure(T.select(batch, last=200))["wait_seconds"]["median"] == 20.0)
+    check("TQ1i ...the same log by kind alone (--which all) reads as the batch work: a 3 s median over 36 turns",
+          len(T.select(batch, last=200, which="all")) == 36
+          and T.measure(T.select(batch, last=200, which="all"))["wait_seconds"]["median"] == 3.0)
+    check("TQ1i fresh and private can each be asked for, and --last is applied AFTER the kind is chosen",
+          len(T.select(batch, which="fresh")) == 30 and len(T.select(batch, which="private")) == 2
+          and len(T.select(batch, last=3, which="running")) == 3)
+    check("TQ1i divide() says how the door's rows divide", T.divide(batch) == {"running": 4, "fresh": 30, "private": 2})
+    two = [dict(turn(i), **{"from": "198.51.100.1"}) for i in range(1, 8)] + [dict(turn(i, ms=90000), **{"from": "198.51.100.2"}) for i in range(8, 11)]
+    rc = T.measure(two)["callers"]
+    check("TQ1i callers are counted and named by rank, never by address",
+          rc["distinct"] == 2 and [c["turns"] for c in rc["by_rank"]] == [7, 3] and rc["by_rank"][1]["median_wait_s"] == 90.0
+          and "198.51" not in json.dumps(rc))
+    check("TQ1i --caller 2 is the second busiest caller's turns; a rank that does not exist is nothing",
+          len(T.select(two, caller=2)) == 3 and T.select(two, caller=9) == [])
     check("TQ1i an empty selection is said, not divided by", "no conversation turns" in T.render(T.measure([])))
 
     tmp = tempfile.mkdtemp(prefix="tq1-")
@@ -133,6 +170,9 @@ def main():
         outs.append((code, buf.getvalue()))
     check("TQ1j both output forms exit 0 and count the two unreadable lines",
           all(c == 0 for c, _ in outs) and "2 unreadable" in outs[0][1] and json.loads(outs[1][1])["unreadable_lines"] == 2)
+    check("TQ1j the first line says how the log divides and what is measured; the model-call line says WHOLE file",
+          outs[0][1].startswith("the door carried 15 running, 0 fresh and 0 private") and "measured below: running" in outs[0][1]
+          and "WHOLE file" in outs[0][1] and json.loads(outs[1][1])["selection"]["the_log_divides"]["running"] == 15, outs[0][1][:160])
     leaked = [w for _, text in outs for w in ("zebra", "quokka", "moon", "weather", ADDR, "sound and we should", "Held, not judged")
               if w in text]
     check("TQ1j NO WORDS: no question, answer, gate note or address appears in either output", not leaked, leaked)

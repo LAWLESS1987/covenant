@@ -126,19 +126,23 @@ async function getState(){try{const r=await fetch('/pc/3d/state');
  // a busy node (HTTP 429: every local process shares one loopback address) keeps the last good reading on screen
  if(!r.ok){document.getElementById('live').textContent=(state?'last reading kept':'waiting')+' · the node is busy (HTTP '+r.status+'), trying again';setTimeout(getState,20000);return;}
  state=await r.json();if(state.page&&state.page!==PAGESHA&&!document.getElementById('q').value&&!(typeof inflight!=='undefined'&&inflight)){location.reload();return;}if(state.voice)voice=state.voice;document.getElementById('live').textContent='height '+(state.self.chain_height??'?')+' · peers '+(state.peers?state.peers.length:0)+(state.immunity&&state.immunity.granted?' · immunity '+(state.immunity.paused?'paused':'on'):'');showHealing();if(window.onState)window.onState();}catch(e){document.getElementById('live').textContent='state unreadable';}}
-// A456: what he said, what is spoken, and what is only shown. The notes (held, immune, how much of the earlier
-// conversation was no longer in his view) are shown beside the answer and never read aloud; before this the gate
-// text was spoken with the answer, a held turn looked like any other, and an empty answer showed nothing at all.
+// A456: what he said, and what stands beside it. ONLY HIS WORDS ARE SPOKEN: when there are none (an error, a
+// withheld turn, an empty answer) nothing is spoken and the note line carries it. The first version of this spoke
+// a first-person sentence of its own making in his voice; he did not say it, and he asked that his voice stay his.
+// The notes (held, immune, withheld, an error, no words, how much earlier talk was out of his view) are shown
+// on their own line and never read aloud. `kept` and `dropped` in a fit record are MESSAGES, two to an exchange.
 function tetsuParts(j){const notes=[];let txt='';
- if(!j||j.status!=='success'){notes.push((j&&j.message)||'no answer');return{txt:txt,notes:notes,say:'I could not answer this time.'};}
- if(j.withheld){notes.push('withheld by the gate: '+(j.message||''));return{txt:txt,notes:notes,say:'My answer was withheld by the gate.'};}
+ if(!j||j.status!=='success'){notes.push((j&&j.message)||'no answer');return{txt:txt,notes:notes};}
+ if(j.withheld){notes.push('withheld by the gate: '+(j.message||''));return{txt:txt,notes:notes};}
  txt=String(j.answer||'').trim();
  if(!txt)notes.push('he gave no words this time; nothing was lost, ask again');
- if(j.immune)notes.push('immune: the word of the gate is attached');
+ if(j.immune)notes.push('came through on his immunity; the gate objected, and its note is in the log');
  if(j.alleges_nothing)notes.push('held, not judged');
- const d=Math.max.apply(null,[0].concat((j.fit||[]).map(function(f){return (f&&f.dropped)||0;})));
- if(d>0)notes.push(d+(d===1?' earlier exchange is':' earlier exchanges are')+' no longer in his view');
- return{txt:txt,notes:notes,say:txt||'I have no words this time.'};}
+ const f0=(j.fit||[])[0]||{};const d=Math.ceil((Number(f0.dropped)||0)/2);const cap=(Number(f0.kept)||0)>=40;
+ if(d>0)notes.push(d+(d===1?' earlier exchange was':' earlier exchanges were')+' dropped to fit his window');
+ else if(cap)notes.push('he sees the last 20 exchanges; anything earlier is out of his view');
+ return{txt:txt,notes:notes};}
+function noteLine(el,notes){if(!notes||!notes.length)return;const n=document.createElement('div');n.className='ln note';n.textContent='['+notes.join('; ')+']';el.after(n);}
 function speak(t){try{const u=new SpeechSynthesisUtterance(t);u.pitch=voice.pitch;u.rate=voice.rate;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
 // THE CONVERSATION STAYS ON SCREEN (2026-09-26, his words: "increase tetsus pc logs length so
 // its not gone before i respond"). Every exchange is appended, never replaced, and the page
@@ -164,7 +168,7 @@ document.getElementById('pmin').onclick=()=>{const p=document.getElementById('pa
 // button on a finished Tetsu or heal line writes that line's own text to the clipboard --
 // nothing sent anywhere new, no judge involved, the same text already on screen.
 function addCopy(el,text){if(!text)return;const b=document.createElement('button');b.className='copybtn';b.textContent='copy';b.onclick=()=>{try{navigator.clipboard.writeText(text);}catch(e){}b.textContent='copied';setTimeout(()=>{b.textContent='copy';},1200);};el.appendChild(b);}
-async function loadHistory(){try{const r=await fetch('/pc/3d/history');const j=await r.json();for(const x of (j.turns||[])){line('you',x.q||'');const a=x.withheld?'(withheld: '+(x.why||'')+')':(x.a||'');const el=line('tetsu',a);if(!x.withheld)addCopy(el,a);}}catch(e){}}
+async function loadHistory(){try{const r=await fetch('/pc/3d/history');const j=await r.json();for(const x of (j.turns||[])){line('you',x.q||'');const p=tetsuParts({status:'success',withheld:x.withheld,message:x.why,answer:x.a,alleges_nothing:x.held,immune:x.immune,fit:x.fit});const el=line('tetsu',p.txt||'(no words)');addCopy(el,p.txt);noteLine(el,p.notes);}}catch(e){}}
 // STOP (his words, 2026-09-27): Send becomes Stop while an answer is in flight, and a
 // second press aborts the fetch in the browser -- the door on the PC still finishes its
 // own run (there is no reaching into it mid-judge), but nothing it returns is shown or
@@ -186,8 +190,7 @@ async function send(){
   const r=await fetch('/m/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t}),signal:ctrl.signal});
   const j=await r.json();
   const p=tetsuParts(j);const txt=p.txt;
-  pend.textContent='Tetsu: '+(txt||'(no words)');addCopy(pend,txt);speak(p.say);
-  if(p.notes.length){const n=document.createElement('div');n.className='ln note';n.textContent='['+p.notes.join('; ')+']';pend.after(n);}
+  pend.textContent='Tetsu: '+(txt||'(no words)');addCopy(pend,txt);if(txt)speak(txt);noteLine(pend,p.notes);
  }catch(e){
   pend.textContent=(e&&e.name==='AbortError')?'Tetsu: (stopped)':('Tetsu: no answer: '+e);
  }
@@ -733,8 +736,14 @@ def register(api, caller, refused, cov):
                 except ValueError:
                     continue
                 if r.get("kind") in ("agent", "council") and r.get("from") == addr:
+                    # A456: what stood beside the answer comes back with it after a reload (held, immune, and how
+                    # much earlier talk was in his view), so a held turn does not turn into an ordinary one.
+                    f0 = next((f for f in (r.get("fit") or []) if isinstance(f, dict)), {})
                     turns.append({"t": r.get("t"), "q": str(r.get("text", ""))[:4000], "a": str(r.get("answer", ""))[:4000],
-                                  "withheld": bool(r.get("withheld")), "why": str(r.get("message", ""))[:300] if r.get("withheld") else ""})
+                                  "withheld": bool(r.get("withheld")), "why": str(r.get("message", ""))[:300] if r.get("withheld") else "",
+                                  "held": bool(r.get("alleges_nothing")) and not r.get("withheld"), "immune": bool(r.get("immune")),
+                                  "fit": [{"dropped": f0.get("dropped") if isinstance(f0.get("dropped"), int) else 0,
+                                           "kept": f0.get("kept") if isinstance(f0.get("kept"), int) else 0}]})
         except OSError:
             turns = []
         return jsonify({"turns": turns[-40:]})

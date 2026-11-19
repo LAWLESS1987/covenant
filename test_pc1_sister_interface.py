@@ -228,16 +228,54 @@ def main():
           and "addCopy(pend,txt)" in page7 and "addCopy(hl,t)" in page7)
     bad7 = broken_script_lines(page7)
     check("PC1z7 the new script still parses: no quoted string spans a line", not bad7, bad7)
-    # A456 (2026-11-19): what stands beside an answer is SHOWN and never SPOKEN, a held turn is said to be held,
-    # an empty answer is said to be empty, and he is told when earlier exchanges were no longer in Tetsu's view.
-    check("PC1z11 the 3D page speaks only his words (speak(p.say)); gate text is no longer read aloud",
-          "function tetsuParts(j)" in page7 and "speak(p.say)" in page7 and "speak(txt)" not in page7)
-    check("PC1z11 ...and shows the notes on their own line: held, immune, out of view, no words",
-          "n.className='ln note'" in page7 and "'held, not judged'" in page7 and "no longer in his view" in page7
-          and "he gave no words this time" in page7 and "immune: the word of the gate is attached" in page7)
-    check("PC1z11 the Talk panel carries the same notes under the answer",
-          "function talkNotes(j)" in C.PAGE and "+talkNotes(j)+" in C.PAGE and "no longer in his view" in C.PAGE
-          and "he gave no words this time" in C.PAGE and not broken_script_lines(C.PAGE), broken_script_lines(C.PAGE))
+    # A456 (2026-11-19): what stands beside an answer is SHOWN and never SPOKEN, and he is told how much earlier
+    # talk was in Tetsu's view. THESE THREE ARE SOURCE-TEXT CHECKS: this suite has no JavaScript engine, so they show
+    # the code is in the page, not that it behaves (negating a condition would leave them green). The behaviour was
+    # run by hand in a browser engine on ten cases and is recorded in A456; the route below IS driven for real.
+    check("PC1z11 [source text only] the 3D page speaks his words alone: if(txt)speak(txt), and no first-person line is put in his mouth",
+          "function tetsuParts(j)" in page7 and "if(txt)speak(txt)" in page7 and "speak(p.say)" not in page7
+          and "I could not answer" not in page7 and "I have no words" not in page7 and "My answer was withheld" not in page7)
+    check("PC1z11 [source text only] ...and carries the notes on their own line: held, immunity, out of view, dropped, no words",
+          "function noteLine(el,notes)" in page7 and "'held, not judged'" in page7 and "out of his view" in page7
+          and "dropped to fit his window" in page7 and "Math.ceil((Number(f0.dropped)||0)/2)" in page7
+          and "he gave no words this time" in page7 and "came through on his immunity" in page7
+          and "noteLine(el,p.notes)" in page7)
+    check("PC1z11 [source text only] the Talk panel carries the same notes under the answer",
+          "function talkNotes(j)" in C.PAGE and "+talkNotes(j)+" in C.PAGE and "out of his view" in C.PAGE
+          and "dropped to fit his window" in C.PAGE and "he gave no words this time" in C.PAGE
+          and not broken_script_lines(C.PAGE), broken_script_lines(C.PAGE))
+    # DRIVEN: after a reload the page rebuilds the conversation from /pc/3d/history. A held turn, an immune one and
+    # a turn at the history cap must come back as such, and a withheld one with its reason.
+    import tempfile as _tf
+    _hist = os.path.join(_tf.mkdtemp(prefix="pc1-hist-"), "ask_log.jsonl")
+    _me = "100.72.0.10"
+    with open(_hist, "w", encoding="utf-8") as _fh:
+        for _r in ({"kind": "agent", "from": _me, "t": "t1", "text": "q1", "answer": "a1", "alleges_nothing": True,
+                    "fit": [{"dropped": 6, "kept": 34}, {"dropped": 99, "kept": 0}]},
+                   {"kind": "agent", "from": _me, "t": "t2", "text": "q2", "answer": "a2", "immune": True, "fit": [{"dropped": 0, "kept": 40}]},
+                   {"kind": "agent", "from": _me, "t": "t3", "text": "q3", "answer": "", "withheld": True, "alleges_nothing": False,
+                    "message": "Ethical violation: x"},
+                   {"kind": "agent", "from": "100.72.0.99", "t": "t4", "text": "someone else", "answer": "not yours"},
+                   {"kind": "agent", "from": _me, "t": "t5", "text": "q5", "answer": "a5", "fit": "not a list"}):
+            _fh.write(json.dumps(_r) + "\n")
+    _keep_log = os.environ.get("COVENANT_ASK_LOG")
+    os.environ["COVENANT_ASK_LOG"] = _hist
+    try:
+        _turns = get(client, "/pc/3d/history", _me).get_json()["turns"]
+    finally:
+        if _keep_log is None:
+            os.environ.pop("COVENANT_ASK_LOG", None)
+        else:
+            os.environ["COVENANT_ASK_LOG"] = _keep_log
+    check("PC1z12 [driven] the history route returns this caller's four turns and nobody else's",
+          [x["q"] for x in _turns] == ["q1", "q2", "q3", "q5"], [x.get("q") for x in _turns])
+    check("PC1z12 [driven] a held turn comes back held, with the FIRST fit record's messages (6 dropped, 34 kept)",
+          _turns[0]["held"] is True and _turns[0]["immune"] is False and _turns[0]["fit"] == [{"dropped": 6, "kept": 34}], _turns[0])
+    check("PC1z12 [driven] an immune turn comes back immune and at the cap (40 kept); a withheld one keeps its reason and is not 'held'",
+          _turns[1]["immune"] is True and _turns[1]["fit"] == [{"dropped": 0, "kept": 40}]
+          and _turns[2]["withheld"] is True and _turns[2]["held"] is False and _turns[2]["why"] == "Ethical violation: x", _turns[1:3])
+    check("PC1z12 [driven] a row with no usable fit record gives zeros, never an error",
+          _turns[3]["fit"] == [{"dropped": 0, "kept": 0}] and _turns[3]["held"] is False, _turns[3])
 
     LOOP, PHONE, LAN = "127.0.0.1", "100.72.0.10", "192.168.1.50"
 

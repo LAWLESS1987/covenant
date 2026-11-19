@@ -212,9 +212,10 @@ async function talk(){const t=document.getElementById('t_in').value.trim();if(!t
  const j=await post('/m/agent',{text:t});o.textContent=j.status==='success'?(j.withheld?'(withheld by the gate: '+j.message+')':(String(j.answer||'').trim()||'(he gave no words this time; nothing was lost, ask again)'))+talkNotes(j)+'\\n\\n'+(j.model||'')+' '+(j.ms||'')+' ms':('error: '+j.message);}
 // A456: what stands beside an answer, said once and plainly: held, immune, and how much of the earlier
 // conversation was no longer in his view when he answered.
-function talkNotes(j){const n=[];if(j.withheld)return '';if(j.alleges_nothing)n.push('held, not judged');if(j.immune)n.push('immune: the word of the gate is attached');
- const d=Math.max.apply(null,[0].concat((j.fit||[]).map(function(f){return (f&&f.dropped)||0;})));
- if(d>0)n.push(d+(d===1?' earlier exchange is':' earlier exchanges are')+' no longer in his view');
+function talkNotes(j){const n=[];if(j.withheld)return '';if(j.alleges_nothing)n.push('held, not judged');if(j.immune)n.push('came through on his immunity; the gate objected, and its note is in the log');
+ const f0=(j.fit||[])[0]||{};const d=Math.ceil((Number(f0.dropped)||0)/2);const cap=(Number(f0.kept)||0)>=40;
+ if(d>0)n.push(d+(d===1?' earlier exchange was':' earlier exchanges were')+' dropped to fit his window');
+ else if(cap)n.push('he sees the last 20 exchanges; anything earlier is out of his view');
  return n.length?'\\n['+n.join('; ')+']':'';}
 // A349 B2: an answer his immunity returned is labelled so, with the verdict attached, never as admitted.
 async function council(){const t=document.getElementById('c_in').value.trim();if(!t)return;const o=document.getElementById('c_out');o.className='';o.textContent='convening...';
