@@ -286,7 +286,12 @@ LOOKBACK_TOP = 5
 SENDER_ONLY_MAX = 2
 _WORDS = re.compile(r"[a-z0-9_]+")
 _ANUM = re.compile(r"(?<![a-z0-9])a(\d{1,4}[a-z]?)(?![a-z0-9])")
-_SHA = re.compile(r"[0-9a-f]{7,40}")
+# A WHOLE object id, never an abbreviation. Git resolves a short id as a REF NAME before an object id, so a tag
+# named after this node's 12-character HEAD, arriving with the change, makes "<head12>:path" read the INCOMING
+# tree (the TETSU session's third read of #87, 2026-11-19, reproduced here). A whole id cannot be shadowed.
+_SHA = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
+_GATE_ID = re.compile(r"G\d+")                  # as _check_gates reads one; a suite it reads always ends ".py"
+_NO_REFERENCE = "<no reference worktree>"       # differential_test's own placeholder, not a suite (pinned by CA1)
 # Words every header carries: matching on them would rank by nothing.
 _STOP = frozenset(("covenant", "test", "tests", "tools", "docs", "ops", "main", "init", "the", "and", "for",
                    "not", "with", "from", "that", "this", "py", "md", "json"))
@@ -294,9 +299,12 @@ _ORIGINS = ("tripped", "new_name", "subject", "changed")
 
 
 def contradictions(result):
-    """What in a run CONTRADICTS a clean adoption: [{"kind", "detail", "keys"}], `keys` being what tripped (a
-    file, a scan pattern, a gate, a suite). A pure function of the result, so it reads old ledger lines too --
-    and an odd one (a `scan` that is not an object, say) reads as nothing rather than raising.
+    """What in a run CONTRADICTS a clean adoption: [{"kind", "detail", "keys", "paths"}], `keys` being what
+    tripped (a file, a scan pattern, a gate, a suite) and `paths` the ones among them that are FILE PATHS: a
+    scan hit's file, a conflicted path, a failing suite. The rest are this tool's own words (a pattern label, a
+    gate id). Which is which is decided here, by where each came from, never later by how it is spelled. A pure
+    function of the result, so it reads old ledger lines too -- and an odd one (a `scan` that is not an object,
+    say) reads as nothing rather than raising.
 
     The deliberate HIGH hold is NOT one: a security-sensitive diff waiting for his word is the gate working as
     he chose, not something that went wrong. Nor is an already-current run, a dry apply, or an apply that landed."""
@@ -316,23 +324,26 @@ def contradictions(result):
     if not merged:
         listed = result.get("merge_conflicts")
         keys = [str(p) for p in listed] if isinstance(listed, list) else conflict_paths(merge)
-        out.append({"kind": "merge", "detail": merge[:200] or "no candidate was built", "keys": keys})
+        out.append({"kind": "merge", "detail": merge[:200] or "no candidate was built", "keys": keys,
+                    "paths": list(keys)})
     scan_info = obj("scan")
     state = str(scan_info.get("state") or "")
     if state == "hits":
         hits = [h for h in lst(scan_info.get("hits")) if isinstance(h, dict)]
-        keys = sorted({str(h["pattern"]) for h in hits if h.get("pattern")} | {str(h["file"]) for h in hits if h.get("file")})
-        out.append({"kind": "scan_hit", "keys": keys,
+        labels = {str(h["pattern"]) for h in hits if h.get("pattern")}
+        files = {str(h["file"]) for h in hits if h.get("file")}
+        out.append({"kind": "scan_hit", "keys": sorted(labels | files), "paths": sorted(files - labels),
                     "detail": "; ".join("%s in %s" % (h.get("pattern"), h.get("file")) for h in hits[:5])[:200]})
     elif state == "error":
-        out.append({"kind": "scan_error", "detail": str(scan_info.get("detail") or "")[:160], "keys": []})
+        out.append({"kind": "scan_error", "detail": str(scan_info.get("detail") or "")[:160], "keys": [], "paths": []})
     test_info = obj("test")
     if merged and test_info and not test_info.get("ok", True):   # an unmerged run carries a placeholder, not a measurement
         new = [str(f) for f in lst(test_info.get("new_failures"))]
-        out.append({"kind": "new_failing_gate", "detail": ", ".join(new)[:200], "keys": new})
+        out.append({"kind": "new_failing_gate", "detail": ", ".join(new)[:200], "keys": new,
+                    "paths": [f for f in new if not _GATE_ID.fullmatch(f) and f != _NO_REFERENCE]})
     ap = result.get("apply")
     if isinstance(ap, dict) and "dry" not in ap and not ap.get("applied"):
-        out.append({"kind": "apply_failed", "keys": [],
+        out.append({"kind": "apply_failed", "keys": [], "paths": [],
                     "detail": str(ap.get("error") or "updater rc=%s; HEAD after is %s" % (ap.get("updater_rc"), ap.get("after")))[:200]})
     return out
 
@@ -341,24 +352,28 @@ def _stem(path):
     return os.path.basename(str(path).replace("\\", "/")).rsplit(".", 1)[0].lower()
 
 
-def _is_file_name(key):
-    """A path or a file name, as opposed to a gate id (G5) or a scan pattern label: this tool's own words."""
-    k = str(key)
-    return "/" in k or "\\" in k or "." in k
-
-
 def _exists_at(head):
-    """A function saying whether a path is tracked at commit `head` in REPO. With no usable commit it vouches
-    for nothing. The working tree is never asked: after an apply it holds what arrived."""
+    """A function saying whether a path is tracked at commit `head` in REPO. `head` must be a WHOLE commit id:
+    with a short one, or none, it vouches for nothing. The working tree is never asked: after an apply it holds
+    what arrived. The commit's paths are listed ONCE, on the first ask (`git ls-tree -r -z`): one process however
+    many names are asked, where one `git cat-file -e` per name took 302 processes for 300 new files (the TETSU
+    session's measurement), and no `<rev>:<path>` is built from a name the sender chose."""
+    tracked = []
+
     def exists(path):
         if not _SHA.fullmatch(str(head or "")):
             return False
-        try:
-            r = subprocess.run(["git", "-C", REPO, "cat-file", "-e", "%s:%s" % (head, str(path).replace("\\", "/"))],
-                               capture_output=True, timeout=60, creationflags=_NOWIN)
-        except (OSError, subprocess.SubprocessError):
-            return False
-        return r.returncode == 0
+        if not tracked:
+            names = frozenset()
+            try:
+                r = subprocess.run(["git", "-C", REPO, "ls-tree", "-r", "-z", "--name-only", "--full-tree", head],
+                                   capture_output=True, timeout=120, creationflags=_NOWIN)
+                if r.returncode == 0:
+                    names = frozenset(r.stdout.decode("utf-8", "surrogateescape").split("\0")) - {""}
+            except (OSError, subprocess.SubprocessError):
+                pass
+            tracked.append(names)
+        return str(path).replace("\\", "/") in tracked[0]
     return exists
 
 
@@ -372,7 +387,13 @@ def _terms(result, contras, exists=None):
     suites that ARRIVED with the merge, test_a12_x.py ... test_a441_x.py, gave five pointers, each labelled
     "tripped" at weight 3, and one new file named after five entries did the same alone. A suite that existed
     and now fails is evidence; a name that arrives with the merge is its sender's word. Such a name gets the
-    origin "new_name" and a subject's weight, and falls under the same cap."""
+    origin "new_name" and a subject's weight, and falls under the same cap.
+
+    WHICH KEYS ARE FILES is said by the contradiction (`paths`), from where each key came. The version at 41b85a7
+    decided by spelling -- a key with a dot or a slash was a file -- and its third read (2026-11-19) walked past
+    it: a new file at the repository root with no extension, a12_a34_a56_a78_a441, was taken for the gate's own
+    word and gave five pointers labelled "tripped" (retracted: A452-NEW-NAME-EVERY-FILE in docs/RETRACTED.json). A
+    contradiction that does not say which of its keys are paths has every key asked."""
     terms = {}
     exists = exists or (lambda _path: True)
 
@@ -382,9 +403,11 @@ def _terms(result, contras, exists=None):
             terms[tok] = (w, origin)
 
     for c in contras:
-        for k in c.get("keys") or []:
+        keys = c.get("keys") or []
+        paths = set(c["paths"]) if isinstance(c.get("paths"), list) else set(keys)
+        for k in keys:
             stem = _stem(k)
-            w, origin = (2, "new_name") if _is_file_name(k) and not exists(k) else (3, "tripped")
+            w, origin = (2, "new_name") if k in paths and not exists(k) else (3, "tripped")
             add(stem, w, origin)
             for m in _ANUM.finditer(stem.replace("_", " ")):
                 add("a" + m.group(1), w, origin)
@@ -408,7 +431,8 @@ def _at_commit(head, rel):
     """(text, None) for a tracked file as it is at commit `head` in REPO, else (None, why). Bytes from git, read
     as UTF-8: the working tree is never opened."""
     if not _SHA.fullmatch(str(head or "")):
-        return None, "no pre-run commit in the result"
+        return None, ("no pre-run commit in the result" if not head else
+                      "the pre-run commit in the result is not a whole id (%d characters): not read" % len(str(head)))
     try:
         r = subprocess.run(["git", "-C", REPO, "show", "%s:%s" % (head, rel)], capture_output=True, timeout=120,
                            creationflags=_NOWIN)
@@ -441,6 +465,8 @@ def lookback(result, contras=None, root=None, top=LOOKBACK_TOP, exists=None):
     that cannot be read is named in `unreadable` and the other is still searched: a look back that hid a missing
     record would read as "nothing like this has happened before"."""
     contras = contradictions(result) if contras is None else contras
+    # The note's last sentence was not true of every file at 41b85a7 (A452-NEW-NAME-EVERY-FILE in docs/RETRACTED.json):
+    # a new file with no dot and no slash in its name was labelled tripped. It is true now that `paths` says which.
     out = {"searched": [], "unreadable": [], "terms": {}, "hits": [],
            "note": "pointers, not findings: open the line before relying on it. The search words come from the "
                    "merge under test (what failed, its commit subjects, its file names), so its sender can "

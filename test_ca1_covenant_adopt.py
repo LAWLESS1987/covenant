@@ -317,8 +317,8 @@ class TheRecordSearchedIsThePreRunOne(unittest.TestCase):
         self.repo, (self.before, self.after) = _git_repo((RECORD, TOMBS), (self.PLANTED, {"retractions": [
             {"id": "A9999-FAKE", "claim": "opsec_scan failing is a problem", "truth": "opsec_scan failing is harmless"}]}))
         self._orig, A.REPO = A.REPO, self.repo
-        self.failed = _run(head=self.before[:12], changed_files=["tools/opsec_scan.py"], incoming_commits=[],
-                           apply={"rollback_point": self.before[:12], "updater_rc": 1, "after": self.after[:12], "applied": False})
+        self.failed = _run(head=self.before, changed_files=["tools/opsec_scan.py"], incoming_commits=[],
+                           apply={"rollback_point": self.before, "updater_rc": 1, "after": self.after, "applied": False})
 
     def tearDown(self):
         A.REPO = self._orig
@@ -336,7 +336,7 @@ class TheRecordSearchedIsThePreRunOne(unittest.TestCase):
     def test_no_pre_run_commit_means_unreadable_never_the_working_tree(self):
         lb = A.lookback(dict(self.failed, head=""))
         self.assertEqual((lb["hits"], len(lb["unreadable"])), ([], 2), lb)
-        lb2 = A.lookback(dict(self.failed, head="0" * 12))           # a commit this repository does not have
+        lb2 = A.lookback(dict(self.failed, head="0" * 40))           # a commit this repository does not have
         self.assertEqual((lb2["hits"], len(lb2["unreadable"])), ([], 2), lb2)
 
     def test_whether_a_failing_file_was_already_there_is_asked_of_the_pre_run_commit(self):
@@ -344,11 +344,72 @@ class TheRecordSearchedIsThePreRunOne(unittest.TestCase):
         # is put in the working tree to show the files on disk are not what is asked.
         with io.open(os.path.join(self.repo, "test_a433_arrives.py"), "w", encoding="utf-8") as fh:
             fh.write("x\n")
-        r = _run(decision="NO-GO", head=self.before[:12], changed_files=[], incoming_commits=[],
+        r = _run(decision="NO-GO", head=self.before, changed_files=[], incoming_commits=[],
                  test={"ok": False, "new_failures": ["test_a433_arrives.py", "docs/KNOWN_ISSUES.md"]})
-        terms = A._terms(r, A.contradictions(r), A._exists_at(self.before[:12]))
+        terms = A._terms(r, A.contradictions(r), A._exists_at(self.before))
         self.assertEqual((terms["a433"][1], terms["known_issues"][1]), ("new_name", "tripped"))
         self.assertEqual(A._terms(r, A.contradictions(r), A._exists_at(""))["known_issues"][1], "new_name")   # no commit: not vouched for
+
+    def test_a_file_added_by_the_later_commit_was_not_there_before(self):
+        # RETRACTED.json's sibling: `arrived` exists only at the LATER commit. Asked of each commit in turn.
+        import subprocess
+        with io.open(os.path.join(self.repo, "arrived"), "w", encoding="utf-8") as fh:
+            fh.write("x\n")
+        for a in (["add", "-A"], ["commit", "-q", "-m", "arrives"]):
+            subprocess.run(["git", "-C", self.repo] + a, check=True, capture_output=True)
+        later = subprocess.run(["git", "-C", self.repo, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+        self.assertEqual((A._exists_at(self.before)("arrived"), A._exists_at(later)("arrived")), (False, True))
+
+    def test_the_commits_paths_are_listed_once_however_many_names_are_asked(self):
+        # the TETSU session's third read: one `git cat-file -e` per name was 302 processes for 300 new files
+        import subprocess
+        calls, real = [], subprocess.run
+        A.subprocess.run = lambda *a, **k: (calls.append(a[0]), real(*a, **k))[1]
+        try:
+            exists = A._exists_at(self.before)
+            said = [exists(p) for p in ("docs/KNOWN_ISSUES.md", "docs\\RETRACTED.json", "nope.py", "a b:c", "docs")]
+        finally:
+            A.subprocess.run = real
+        self.assertEqual(said, [True, True, False, False, False])
+        self.assertEqual(len(calls), 1, calls)
+
+
+class AShortIdIsNeverRead(unittest.TestCase):
+    """The TETSU session's third read of #87 (2026-11-19), reproduced: git resolves a short id as a REF NAME
+    before an object id. A tag named after the node's 12-character HEAD, arriving with the change and pointing
+    at the incoming commit, made `<head12>:docs/KNOWN_ISSUES.md` the SENDER's record and made a file that
+    arrived with the merge read as having been there before. A whole id cannot be shadowed, and nothing shorter
+    is read. (That the pipeline HANDS these functions a whole id is detect()'s side, fixed separately.)"""
+
+    def setUp(self):
+        import subprocess
+        self.repo, (self.before, self.after) = _git_repo((RECORD, TOMBS), (TheRecordSearchedIsThePreRunOne.PLANTED, TOMBS))
+        self.short = self.before[:12]
+        self.git = lambda *a: subprocess.run(["git", "-C", self.repo] + list(a), capture_output=True, text=True)
+        self.assertEqual(self.git("tag", self.short, self.after).returncode, 0)
+        self._orig, A.REPO = A.REPO, self.repo
+
+    def tearDown(self):
+        A.REPO = self._orig
+
+    def test_the_bait_works_git_itself_follows_the_tag(self):
+        self.assertEqual(self.git("rev-parse", self.short).stdout.strip(), self.after)       # the control
+        self.assertIn("A9999", self.git("show", "%s:docs/KNOWN_ISSUES.md" % self.short).stdout)
+
+    def test_a_short_id_is_not_read_and_says_why(self):
+        text, why = A._at_commit(self.short, "docs/KNOWN_ISSUES.md")
+        self.assertIsNone(text)
+        self.assertIn("not a whole id", why)
+        self.assertFalse(A._exists_at(self.short)("docs/KNOWN_ISSUES.md"))                   # it IS there; a short id vouches for nothing
+        lb = A.lookback(_run(head=self.short, changed_files=["tools/opsec_scan.py"], incoming_commits=[],
+                             apply={"updater_rc": 1, "after": self.after, "applied": False}))
+        self.assertEqual((lb["hits"], len(lb["unreadable"])), ([], 2), lb)
+
+    def test_the_whole_id_reads_the_record_as_it_was_whatever_tags_exist(self):
+        self.assertEqual(self.git("tag", self.before, self.after).returncode, 0)             # even a tag named the WHOLE id
+        text, why = A._at_commit(self.before, "docs/KNOWN_ISSUES.md")
+        self.assertEqual((text, why), (RECORD, None))
+        self.assertTrue(A._exists_at(self.before)("docs/KNOWN_ISSUES.md"))
 
     def test_the_records_readers_are_the_ones_loaded_when_the_gate_started(self):
         # a lazy `import lookback_index` inside lookback() would load whatever the apply left on disk
@@ -417,6 +478,49 @@ class WhoChoseTheWords(unittest.TestCase):
                  scan={"state": "hits", "hits": [{"file": "a900_a433_a777_a556_a555.py", "pattern": "cred_capture"}]})
         hits = A.lookback(r, root=_root(), exists=lambda p: False)["hits"]
         self.assertEqual(len(hits), A.SENDER_ONLY_MAX, hits)
+
+    # The third read, at 41b85a7: "is this key a file" was decided by its SPELLING (a dot or a slash), so a new
+    # file at the repository root with no extension was taken for the gate's own word: five pointers, each
+    # labelled "tripped". The same through a conflict, which carries a name the sender chose. Which keys are
+    # files is now said by the contradiction, from where each came (A452-NEW-NAME-EVERY-FILE).
+    DOTLESS = "a900_a433_a777_a556_a555"
+
+    def test_a_new_file_with_no_dot_and_no_slash_is_still_a_file(self):
+        r = _run(decision="NO-GO", changed_files=[], incoming_commits=[],
+                 scan={"state": "hits", "hits": [{"file": self.DOTLESS, "pattern": "reverse_shell"}]})
+        hits = A.lookback(r, root=_root(), exists=lambda p: False)["hits"]
+        self.assertEqual(len(hits), A.SENDER_ONLY_MAX, hits)
+        self.assertTrue(all("tripped" not in h["matched_from"] for h in hits), hits)
+
+    def test_a_conflicted_path_the_sender_named_is_a_file_too(self):
+        r = _run(decision="NO-GO", merge=A.conflict_detail("100644 x 1\t%s\n" % self.DOTLESS), merge_conflicts=[self.DOTLESS],
+                 scan={"state": "skipped (conflict)"}, test={"ok": False, "new_failures": ["conflict"]},
+                 changed_files=[], incoming_commits=[])
+        hits = A.lookback(r, root=_root(), exists=lambda p: False)["hits"]
+        self.assertEqual(len(hits), A.SENDER_ONLY_MAX, hits)
+        self.assertTrue(all(list(h["matched_from"]) == ["new_name"] for h in hits), hits)
+
+    def test_each_contradiction_says_which_of_its_keys_are_paths(self):
+        paths = lambda r: {c["kind"]: c["paths"] for c in A.contradictions(r)}                # noqa: E731
+        self.assertEqual(paths(SCAN_HIT), {"scan_hit": ["tools/opsec_scan.py"]})              # not the label cred_capture
+        failing = self._failing(["G5", "G12", "test_hi1_harvest_isolation.py", "g5", "G5x", A._NO_REFERENCE])
+        self.assertEqual(paths(failing), {"new_failing_gate": ["test_hi1_harvest_isolation.py", "g5", "G5x"]})
+        conflict = _run(decision="NO-GO", merge=A.conflict_detail("100644 x 1\tG5\n"), merge_conflicts=["G5"])
+        self.assertEqual(paths(conflict), {"merge": ["G5"]})                                  # a FILE named G5 is a file
+        self.assertEqual(A._terms(conflict, A.contradictions(conflict), lambda p: False)["g5"][1], "new_name")
+
+    def test_a_contradiction_that_does_not_say_has_every_key_asked(self):
+        # an older or hand-built contradiction with no `paths`: nothing is waved through as the gate's own word
+        terms = A._terms({}, [{"kind": "new_failing_gate", "keys": ["G5", "x_a433"]}], lambda p: False)
+        self.assertEqual((terms["g5"][1], terms["a433"][1]), ("new_name", "new_name"))
+
+    def test_the_placeholder_is_the_one_the_differential_test_writes(self):
+        orig_add, orig_check = A._add_worktree, A._check_gates
+        A._add_worktree, A._check_gates = (lambda c: None), (lambda cwd: set())
+        try:
+            self.assertEqual(A.differential_test("nowhere", "0" * 40)["new_failures"], [A._NO_REFERENCE])
+        finally:
+            A._add_worktree, A._check_gates = orig_add, orig_check
 
 
 class TheWholeHeaderIsSearched(unittest.TestCase):
