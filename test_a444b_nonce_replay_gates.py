@@ -221,4 +221,8 @@ class AllyGate(_Cases, unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    _res = unittest.TextTestRunner(verbosity=2).run(
+        unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__]))
+    _bad = len(_res.failures) + len(_res.errors)
+    print("A444b: %d/%d passed" % (_res.testsRun - _bad, _res.testsRun))
+    sys.exit(1 if _bad else 0)
