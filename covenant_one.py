@@ -436,6 +436,10 @@ SUITES = [
     # transaction surface are untouched. Both-ways + the tombstone's "never clears"
     # control + the kill switch. The live door is driven in test_m6_mobile_door.py.
     ("test_cl1_chat_label.py",            30,  "JUDGE"),
+    # TQ1 (2026-11-19, A456) -- tools/talk_report.py: how the operator's conversation with Tetsu is going, in
+    # counts and never in words (the wait, gate notes, empty answers, repeats, what was out of his view). Both
+    # ways on a made-up log; the bar it sets for itself is that no question, answer or address is printed.
+    ("test_tq1_talk_report.py",           30,  "JUDGE"),
     # F2 and F3 joined 2026-09-04 with the deferring seat and the distilled
     # student. F2 pins the seat and the promotion rule; F3 runs the three
     # judges COMPOSED, offline, and pins that no violation is admitted with
