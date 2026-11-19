@@ -18544,6 +18544,8 @@ on Windows; the PC this was found on has environment-shaped failures in its loca
 
 **Status (2026-11-19):** in source on local branch `fix/a459-restart-lock`, off main 9d1b161; not pushed, not merged, not deployed. A459 was claimed through the hub (the TETSU session) before it was used.
 
+**Update (2026-11-19, A459):** pushed on his "Push it", typed in the session that wrote it, and opened as PR #94 at 87190a2. The Linux run before the push was green on the 24 suites it selected. Main had meanwhile taken A460 (#93), so main 643658b was merged in, keeping both records. Not merged to main, not deployed.
+
 ---
 
 ### A460. [test hygiene / record integrity, the A236 shape] R1 read 463/492 on the laptop's running tree for the record itself: 48 lines in two retired copies under .trash/, each allowed at its real path -- FIXED IN SOURCE 2026-11-19 (a retired copy of an allowed file at its original path is that file; .trash/ is still read)
