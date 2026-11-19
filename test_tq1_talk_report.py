@@ -108,6 +108,19 @@ def main():
           m["turns_where_earlier_exchanges_were_dropped_pct"] == 66.7 and m["most_exchanges_dropped_in_one_turn"] == 3, m)
     check("TQ1g a turn with 40 messages kept is at the 20-exchange cap (one of three); median in view is counted in exchanges",
           m["turns_at_the_history_cap_pct"] == 33.3 and m["median_exchanges_in_view"] == 1, m)
+    # A KNOWN SPLIT (the laptop session's read of ff2e5a8): 4 newer turns at the cap with a fit record, 6 older ones
+    # with none. The median and every share are over the same 4 turns, so at the cap is 100%, not 40%.
+    split = [dict(turn(i), fit=[]) for i in range(1, 7)] + [dict(turn(i), fit=[{"dropped": 0, "kept": 40}]) for i in range(7, 11)]
+    ms = T.measure(split)["memory_in_view"]
+    check("TQ1g a known split: 4 of 10 turns carry a fit record, all at the cap: median 20 in view, at the cap 100%, dropped 0%",
+          ms["turns_with_a_fit_record"] == 4 and ms["median_exchanges_in_view"] == 20
+          and ms["turns_at_the_history_cap_pct"] == 100.0 and ms["turns_where_earlier_exchanges_were_dropped_pct"] == 0.0, ms)
+    txt = T.render(T.measure(split))
+    check("TQ1g ...and the report says over which turns: '4 of 10 turns carry a fit record'",
+          "4 of 10 turns carry a fit record" in txt and "cap on 100.0%" in txt, [l for l in txt.splitlines() if "memory" in l])
+    none_fit = [dict(turn(i), fit=[]) for i in range(1, 4)]
+    check("TQ1g no fit record at all is 'not measured', never 'None%'",
+          "memory in view   not measured" in T.render(T.measure(none_fit)) and "None%" not in T.render(T.measure(none_fit)))
     core = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "covenant_unified_v8.py"), encoding="utf-8").read()
     import re as _re
     cap = _re.search(r"^AGENT_HISTORY_TURNS\s*=\s*(\d+)", core, _re.M)

@@ -172,11 +172,14 @@ def measure(rows, model_rows=None):
     fits = [first_fit(r) for r in turns]
     dropped = [int(f.get("dropped") or 0) for f in fits if isinstance(f.get("dropped"), int)]
     kept = [int(f.get("kept") or 0) for f in fits if isinstance(f.get("kept"), int)]
+    # every share here is over the turns that carry a fit record, the same turns the median is taken over: older
+    # log rows have none, and counting them in the denominator made "median 20 in view" sit beside "at the cap 22.5%"
     out["memory_in_view"] = {"turns_with_a_fit_record": sum(1 for f in fits if f),
-                             "turns_where_earlier_exchanges_were_dropped_pct": _share(sum(1 for d in dropped if d > 0), n),
+                             "turns": n,
+                             "turns_where_earlier_exchanges_were_dropped_pct": _share(sum(1 for d in dropped if d > 0), len(dropped)),
                              "most_exchanges_dropped_in_one_turn": (max(dropped) + 1) // 2 if dropped else None,
                              "median_exchanges_in_view": int(statistics.median(kept)) // 2 if kept else None,
-                             "turns_at_the_history_cap_pct": _share(sum(1 for k in kept if k >= HISTORY_CAP_MESSAGES), n),
+                             "turns_at_the_history_cap_pct": _share(sum(1 for k in kept if k >= HISTORY_CAP_MESSAGES), len(kept)),
                              "note": "at the cap, anything said more than %d exchanges ago was out of his view"
                                      % (HISTORY_CAP_MESSAGES // 2)}
     by_caller = {}
@@ -259,12 +262,15 @@ def render(rep):
              rep["repeats"]["near_copies_of_a_recent_answer_pct"], rep["repeats"]["compared"], rep["repeats"]["window"])
           if rep["repeats"]["compared"] else
           "  repeats          not measured: no running answers to compare (private and fresh turns are left out)"),
-         "  memory in view   median %s exchanges in view; at the %d-exchange cap on %s%% of turns; dropped to fit "
-         "on %s%% (most in one turn: %s)" % (
-             rep["memory_in_view"]["median_exchanges_in_view"], HISTORY_CAP_MESSAGES // 2,
-             rep["memory_in_view"]["turns_at_the_history_cap_pct"],
-             rep["memory_in_view"]["turns_where_earlier_exchanges_were_dropped_pct"],
-             rep["memory_in_view"]["most_exchanges_dropped_in_one_turn"]),
+         ("  memory in view   %d of %d turns carry a fit record; of those: median %s exchanges in view; at the "
+          "%d-exchange cap on %s%%; dropped to fit on %s%% (most in one turn: %s)" % (
+              rep["memory_in_view"]["turns_with_a_fit_record"], rep["memory_in_view"]["turns"],
+              rep["memory_in_view"]["median_exchanges_in_view"], HISTORY_CAP_MESSAGES // 2,
+              rep["memory_in_view"]["turns_at_the_history_cap_pct"],
+              rep["memory_in_view"]["turns_where_earlier_exchanges_were_dropped_pct"],
+              rep["memory_in_view"]["most_exchanges_dropped_in_one_turn"])
+          if rep["memory_in_view"]["median_exchanges_in_view"] is not None else
+          "  memory in view   not measured: none of %d turns carries a fit record" % rep["memory_in_view"]["turns"]),
          "  callers          %d distinct; by rank: %s" % (
              rep["callers"]["distinct"], ", ".join("caller %d: %d turns, median wait %s s" % (
                  c["caller"], c["turns"], c["median_wait_s"]) for c in rep["callers"]["by_rank"])),
