@@ -86,15 +86,25 @@ _PATTERNS = [
 ]
 
 
+def _text(raw):
+    """Bytes a child process printed, as text. ALWAYS read as bytes and decoded here, never with text=True:
+    with text=True the output is decoded by this machine's default codec in a reader thread, and one byte that
+    codec has no character for (0x9d on a cp1252 Windows: half of a curly quote) kills the thread; run() then
+    returns stdout None with exit 0 and `(r.stdout or "")` reads as NO OUTPUT. Measured by the laptop session,
+    2026-11-19: a check that printed "G5 FAIL" and one curly quote read as nothing failing, GO; a commit subject
+    with one emptied the incoming list; and of main's last 40 commits two diffs read as nothing at all. On Linux
+    the same byte raised instead. Undecodable bytes become U+FFFD; nothing is dropped."""
+    return (raw or b"").decode("utf-8", "replace").replace("\r\n", "\n")
+
+
 def _git(args, cwd=None, timeout=180):
-    r = subprocess.run(["git"] + args, cwd=cwd or REPO, capture_output=True, text=True, timeout=timeout,
-                       creationflags=_NOWIN)
-    return r.returncode, (r.stdout or "").strip(), (r.stderr or "").strip()
+    r = subprocess.run(["git"] + args, cwd=cwd or REPO, capture_output=True, timeout=timeout, creationflags=_NOWIN)
+    return r.returncode, _text(r.stdout).strip(), _text(r.stderr).strip()
 
 
 def _run(cmd, cwd, timeout, env=None):
-    r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout, creationflags=_NOWIN, env=env)
-    return r.returncode, ((r.stdout or "") + (r.stderr or "")).strip()
+    r = subprocess.run(cmd, cwd=cwd, capture_output=True, timeout=timeout, creationflags=_NOWIN, env=env)
+    return r.returncode, (_text(r.stdout) + _text(r.stderr)).strip()
 
 
 _FULL_ID = re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?")
@@ -136,7 +146,10 @@ def detect():
     # --no-tags: the gate needs no tag, and a tag is a name the SENDER chooses (see is_full_id).
     rc_f, _, ferr = _git(["fetch", "--quiet", "--no-tags", "origin"], timeout=180)
     head = _resolve("HEAD")
-    incoming = ("" if TRACKED.startswith("refs/") else _resolve("refs/remotes/" + TRACKED)) or _resolve(TRACKED)
+    # Never the bare NAME: a tag or anything else called `origin/main` would answer to it. A name that is not a
+    # full ref is read as the remote-tracking branch, else as a local branch, and as nothing else.
+    incoming = (_resolve(TRACKED) if TRACKED.startswith("refs/") else
+                (_resolve("refs/remotes/" + TRACKED) or _resolve("refs/heads/" + TRACKED)))
     info = {"head": head, "incoming": incoming, "behind": None, "ahead": None, "changed_files": [],
             "incoming_commits": [], "tracked_shadowed": tracked_is_shadowed()}
     if rc_f:
@@ -248,12 +261,22 @@ def scan(worktree, base_sha):
     return {"state": "hits" if hits else "clean", "hits": hits}
 
 
+CHECK_DONE = "--check was passed. Stopping here."     # covenant_one's last line under --check
+CHECK_UNFINISHED = "<check did not finish>"
+
+
 def _check_gates(cwd):
     """covenant_one.py --check -> the SET of gates it reports failing. --check exits 1 on the live HEAD too
     (G5 ethics-judge-down, a stale sweep, a manifest drift), so an absolute pass is the wrong bar; the caller
     compares candidate vs a HEAD reference and blocks only on a NEW failure."""
     _rc, said = _run([sys.executable, "covenant_one.py", "--check"], cwd, 1200)
     failing = set()
+    # A FLOOR, NOT A PROOF (A453). "No failing line" was read as "nothing fails": a runner that did not parse,
+    # crashed, or printed nothing passed. A run that never reaches --check's own last line did not finish, and
+    # that is a failure; a HEAD reference that also does not finish cancels it, as with any other gate. This
+    # does not stop a runner that LIES -- the runner is the incoming tree's own -- it stops one that broke.
+    if CHECK_DONE not in said:
+        failing.add(CHECK_UNFINISHED)
     for ln in said.splitlines():
         m = re.match(r"\s*(G\d+)\s+(BLOCKED|FAIL|UNKNOWN)\b", ln)
         if m:
@@ -480,6 +503,7 @@ def digest(n=25):
     return {"ledger": LEDGER, "total_runs": len(rows), "showing": len(recent),
             "applied": [{"t": r.get("t"), "to": (r.get("apply") or {}).get("after")} for r in recent if r.get("applied")],
             "held": [{"t": r.get("t"), "why": "; ".join(r.get("reasons", []))[:120]} for r in recent if r.get("decision") == "NO-GO"][-8:],
+            "errors": [{"t": r.get("t"), "why": str(r.get("detail"))[:120]} for r in recent if r.get("decision") == "ERROR"][-8:],
             "last": recent[-1].get("decision") if recent else None, "armed": AUTO}
 
 

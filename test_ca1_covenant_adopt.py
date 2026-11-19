@@ -350,6 +350,63 @@ class AFailureIsNotAlreadyCurrent(_Trio):
         self.assertIn(code, (1, 2))
 
 
+class OutputIsReadWhole(_Trio):
+    """One byte this machine's default codec cannot decode must not empty what a child process printed."""
+    BAD = b"\xe2\x80\x9d"                                   # U+201D, a right curly quote; 0x9d has no cp1252 character
+
+    def _runner(self, body):
+        d = os.path.join(self.tmp, "runner")
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "covenant_one.py"), "wb") as fh:
+            fh.write(body)
+        return d
+
+    def setUp(self):
+        _Trio.setUp(self)
+        A._check_gates = self._keep["_check_gates"]            # the real one: this class is about reading output
+
+    def test_a_failing_gate_beside_a_curly_quote_is_still_read(self):
+        d = self._runner(b"import sys\nsys.stdout.buffer.write(b'G5 FAIL\\n' + bytes([0xe2, 0x80, 0x9d]) + b'\\n"
+                         b"test_x.py=FAIL rc=1\\n--check was passed. Stopping here.\\n')\n")
+        self.assertEqual(A._check_gates(d), {"G5", "test_x.py"})
+
+    def test_a_runner_that_does_not_finish_is_a_failure(self):
+        self.assertEqual(A._check_gates(self._runner(b"def broken(:\n")), {A.CHECK_UNFINISHED})
+        self.assertEqual(A._check_gates(self._runner(b"print('all good')\n")), {A.CHECK_UNFINISHED})
+        self.assertEqual(A._check_gates(self._runner(b"print('%s')\n" % A.CHECK_DONE.encode())), set())
+
+    def test_this_repository_s_runner_still_prints_the_line(self):
+        here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, "covenant_one.py"), encoding="utf-8") as fh:
+            self.assertIn(A.CHECK_DONE, fh.read(), "covenant_one's last --check line changed: update CHECK_DONE")
+
+    def test_a_commit_subject_with_a_curly_quote_does_not_empty_the_list(self):
+        self.push({"plain.py": "x = 1\n"}, msg="tidy \u201cquoted\u201d")
+        info = A.detect()
+        self.assertNotIn("error", info)
+        self.assertEqual(len(info["incoming_commits"]), 1, info["incoming_commits"])
+        self.assertEqual(info["changed_files"], ["plain.py"])
+
+    def test_the_tracked_name_is_a_branch_never_a_tag(self):
+        tip = self.push({"plain.py": "x = 1\n"})
+        _g(self.node, "fetch", "-q", "origin")
+        _g(self.node, "tag", "origin/gone", tip)               # only a TAG answers to this name
+        A.TRACKED = "origin/gone"
+        r, code = self.run_gate()
+        self.assertEqual((r["decision"], code), ("ERROR", 2), r)
+        _g(self.node, "branch", "side", tip)                   # a local branch is a fair override
+        A.TRACKED = "side"
+        self.assertEqual(A.detect()["incoming"], tip)
+
+    def test_digest_shows_an_error_day(self):
+        os.makedirs(A.STATE_DIR, exist_ok=True)
+        with open(A.LEDGER, "w") as fh:
+            fh.write('{"t": "2026-11-19T05:00:00", "decision": "ERROR", "detail": "git fetch origin failed"}\n')
+        d = A.digest()
+        self.assertEqual([e["why"] for e in d["errors"]], ["git fetch origin failed"])
+        self.assertEqual(d["held"], [])
+
+
 UPDATER_BY_NAME = """import os, subprocess
 g = ["git", "-c", "user.name=u", "-c", "user.email=u@u.invalid"]
 subprocess.run(g + ["fetch", "-q", "origin"], check=True)
