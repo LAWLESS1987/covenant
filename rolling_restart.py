@@ -71,91 +71,93 @@ PORT_FREE_TIMEOUT_S = 30
 # on one database for an hour and three quarters: one held the API, peer and bridge ports, the other only a
 # shared API port, its peer listener deaf. A second run now refuses while the first holds this lock, and says
 # who holds it. --status takes no lock: it changes nothing.
+#
+# THE LOCK IS HELD BY THE OS, NOT BY A FILE'S EXISTENCE (A459 corrected, 2026-11-19). The first version made the
+# lock file with O_EXCL and took over a lock whose holder was gone or which was old, by moving it to .stale. That
+# takeover let two runs both hold the lock: after a crash left a lock behind, run A judged it stale, run B judged
+# it stale too, moved it aside and made its own, and then A's move-aside moved B's FRESH lock and A made another
+# (found by the hub's non-author read of PR #94; tombstone A459-STALE-TAKEOVER). The same shape had been found
+# in covenant_leviathan.acquire_lock by an outside review and fixed there the same way, and that finding was
+# recorded only in that docstring. Now: a non-blocking exclusive OS lock on a file that is never moved or
+# removed (msvcrt on Windows, fcntl.flock elsewhere). The OS releases it when the holder exits or dies, so there
+# is no stale lock and nothing to take over. The file's text says who holds it, for the refusal message only.
 LOCK = os.environ.get("COVENANT_RESTART_LOCK", os.path.join(HERE, "logs", "rolling_restart.lock"))
-LOCK_STALE_S = 1800              # longer than three nodes' worst case (3 x (PORT_FREE + UP) plus the stops)
 LOCKED_EXIT = 3
+_LOCK_BYTE = 1 << 20             # Windows locks a byte range; this one is past the holder note, so the note stays readable
+_HELD = {}                       # lock path -> the open handle this process holds it by
 
 
-def _holder_alive(pid):
-    """Is `pid` a live PYTHON process? Unknown reads as alive: a lock is only taken over when its holder is
-    known to be gone, or when it is older than LOCK_STALE_S. On Windows os.kill(pid, 0) would TERMINATE the
-    process, so tasklist is asked instead (covenant_watchdog_guard.pid_alive_windows does the same)."""
-    try:
-        pid = int(pid)
-    except (TypeError, ValueError):
-        return True
-    if pid <= 0:
-        return True
+def _os_lock(fh):
+    """Take a non-blocking exclusive OS lock on the open file, or raise OSError if another handle holds it."""
     if os.name == "nt":
-        try:
-            out = subprocess.run(["tasklist", "/FI", "PID eq %d" % pid, "/FO", "CSV", "/NH"],
-                                 capture_output=True, text=True, timeout=30).stdout
-        except (OSError, subprocess.SubprocessError):
-            return True
-        return "python" in out.lower()
+        import msvcrt
+        fh.seek(_LOCK_BYTE)
+        msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _os_unlock(fh):
     try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
+        if os.name == "nt":
+            import msvcrt
+            fh.seek(_LOCK_BYTE)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
     except OSError:
-        return True
-    return True
+        pass
 
 
-def take_lock(path=None, now=None, alive=None):
+def _holder_note(path):
+    try:
+        with open(path, "rb") as fh:
+            note = json.loads(fh.read(4096).decode("utf-8", "replace") or "{}")
+        return note if isinstance(note, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def take_lock(path=None):
     """(True, "") when this process now holds the restart lock; (False, who holds it) when another run does.
 
-    The lock is a file made with O_CREAT | O_EXCL, so two runs cannot both make it. A lock whose holder is known
-    to be gone, or that is older than LOCK_STALE_S, is moved aside to `<lock>.stale` (kept, not deleted) and
-    taken once more; a lock that cannot be read is treated as held until it is that old."""
+    The OS holds the lock for as long as the returned-to process keeps the handle (in _HELD), and drops it when
+    the process exits or dies. The handle is not inheritable, so a node this run starts never holds it."""
     path = path or LOCK
-    now = time.time() if now is None else now
-    alive = alive or _holder_alive
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    for attempt in (1, 2):
-        try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-        except FileExistsError:
-            try:
-                with open(path, encoding="utf-8") as fh:
-                    held = json.load(fh)
-                if not isinstance(held, dict):
-                    raise ValueError("not an object")
-            except (OSError, ValueError):
-                held = {}
-            try:
-                age = now - os.path.getmtime(path)
-            except OSError:
-                continue                                          # released between the two calls: try again
-            gone = "pid" in held and not alive(held.get("pid"))
-            if attempt == 1 and (gone or age > LOCK_STALE_S):
-                try:
-                    os.replace(path, path + ".stale")
-                except OSError:
-                    pass
-                continue
-            return False, "pid %s since %s (%d s ago)%s" % (
-                held.get("pid", "?"), held.get("t", "?"), int(age), "" if held else "; the lock file could not be read")
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump({"pid": os.getpid(), "t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "argv": sys.argv[1:]}, fh)
-        return True, ""
-    return False, "the lock could not be taken"
+    try:
+        fh = os.fdopen(os.open(path, os.O_RDWR | os.O_CREAT, 0o644), "r+b")
+    except OSError as exc:
+        return False, "the lock file could not be opened (%s)" % (exc,)
+    try:
+        _os_lock(fh)
+    except OSError:
+        fh.close()
+        note = _holder_note(path)
+        return False, "pid %s since %s%s" % (note.get("pid", "?"), note.get("t", "?"),
+                                             "" if note else "; who holds it could not be read")
+    fh.seek(0)
+    fh.truncate()
+    fh.write(json.dumps({"pid": os.getpid(), "t": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                         "argv": sys.argv[1:]}).encode("utf-8"))
+    fh.flush()
+    _HELD[path] = fh
+    return True, ""
 
 
 def release_lock(path=None):
-    """Remove the lock, but only if this process holds it: a run never releases another run's lock."""
-    path = path or LOCK
-    try:
-        with open(path, encoding="utf-8") as fh:
-            held = json.load(fh)
-    except (OSError, ValueError):
+    """Drop the OS lock if this process holds it; a run cannot release another's, because it has no handle to
+    it. The file stays: it is never moved or removed, so no run can mistake its absence for a free lock."""
+    fh = _HELD.pop(path or LOCK, None)
+    if fh is None:
         return False
-    if not isinstance(held, dict) or held.get("pid") != os.getpid():
-        return False
+    _os_unlock(fh)
     try:
-        os.remove(path)                                           # a lock is a turn-taking token, not a record
+        fh.close()
     except OSError:
-        return False
+        pass
     return True
 
 

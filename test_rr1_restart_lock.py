@@ -1,18 +1,24 @@
-"""RR1 -- two rolling restarts never run at once (A459).
+"""RR1 -- one rolling restart at a time, held by the OS (A459).
 
 2026-11-19: a rolling_restart.py started by hand and the highway's remedy_restart_nodes (which starts the same
 script detached on source drift) began within two seconds of each other. Both restarted node A, and node A ran
 as two processes on one database for about an hour and three quarters. The script had no lock at all.
 
-Every check here runs against a temp lock file. Nothing reaches a node: probe, restart_one and status are
-replaced in the module before main() is called, and the replacement records any call so the test can see it."""
+The first lock (O_EXCL file, stale ones moved to .stale and taken over) let two runs both hold it after a crash
+left a lock behind (tombstone A459-STALE-TAKEOVER). The lock is now an OS lock that the OS drops when its holder
+dies, so there is no takeover. RR1.6 is that case; RR1.7 to RR1.9 use a real second process.
+
+Every check runs against a temp lock file. Nothing reaches a node: probe, restart_one and status are replaced in
+the module before main() is called, and the replacement records any call so the test can see it."""
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
 import rolling_restart as RR  # noqa: E402
 
 RESULTS = []
@@ -27,78 +33,71 @@ def tmp_lock():
     return os.path.join(tempfile.mkdtemp(prefix="rr1_"), "rolling_restart.lock")
 
 
-def plant(path, pid, age=0, raw=None):
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.write(raw if raw is not None else json.dumps({"pid": pid, "t": "planted"}))
-    if age:
-        t = time.time() - age
-        os.utime(path, (t, t))
-
-
-def pid_in(path):
-    """The pid a lock file names, or None when there is no such file or it cannot be read: a broken lock makes a
-    check FAIL by name, never crash the suite."""
+def note_pid(path):
+    """The pid the lock file's note names, or None: a broken lock makes a check FAIL by name, never crash."""
     try:
-        with open(path, encoding="utf-8") as fh:
-            return json.load(fh).get("pid")
+        with open(path, "rb") as fh:
+            return json.loads(fh.read().decode("utf-8")).get("pid")
     except (OSError, ValueError, AttributeError):
         return None
 
 
-def gone(path):
-    try:
-        os.remove(path)
-    except OSError:
-        pass
-
-
-ALIVE, DEAD = (lambda _pid: True), (lambda _pid: False)
-
-# 1. one holder at a time
+# 1. one holder at a time, and the refusal names it
 p = tmp_lock()
-ok1, _ = RR.take_lock(p, alive=ALIVE)
-ok2, who = RR.take_lock(p, alive=ALIVE)
+ok1, _ = RR.take_lock(p)
+ok2, who = RR.take_lock(p)
 check("RR1.1 the first run takes the lock and a second is refused, naming the holder",
       ok1 and not ok2 and ("pid %d" % os.getpid()) in who, (ok1, ok2, who))
-check("RR1.2 the lock file says which process holds it",
-      pid_in(p) == os.getpid())
+check("RR1.2 the lock file says which process holds it", note_pid(p) == os.getpid())
+check("RR1.3 the handle the lock is held by is not inheritable, so a node this run starts never holds it",
+      p in RR._HELD and not os.get_inheritable(RR._HELD[p].fileno()))
 
-# 2. release: only the holder releases, and then the next run may take it
-q = tmp_lock()
-plant(q, os.getpid() + 1)
-check("RR1.3 a run never releases another run's lock", RR.release_lock(q) is False and os.path.exists(q))
-check("RR1.4 the holder releases it, and the next run takes it",
-      RR.release_lock(p) is True and not os.path.exists(p) and RR.take_lock(p, alive=ALIVE)[0])
+# 2. release: only a holder releases, and then the next run may take it; the file is never removed
+other = tmp_lock()
+check("RR1.4 a run that does not hold a lock cannot release it, and the holder still holds",
+      RR.release_lock(other) is False and RR.take_lock(p)[0] is False)
+rel = RR.release_lock(p)
+check("RR1.5 the holder releases it, the file stays where it was, and the next run takes it",
+      rel is True and os.path.exists(p) and RR.take_lock(p)[0])
 RR.release_lock(p)
 
-# 3. a lock left by a run that died is taken over, and kept aside, not deleted
+# 3. the hub's case: a lock file left behind by a run that died. Exactly one of two later runs gets it.
 d = tmp_lock()
-plant(d, 999999)
-okd, _ = RR.take_lock(d, alive=DEAD)
-check("RR1.5 a lock whose holder is gone is taken over", okd)
-check("RR1.6 ...and the old lock is moved to <lock>.stale, not lost",
-      pid_in(d + ".stale") == 999999)
+with open(d, "w", encoding="utf-8") as fh:
+    json.dump({"pid": 999999, "t": "left by a crash"}, fh)
+a_ok, _ = RR.take_lock(d)
+b_ok, _ = RR.take_lock(d)
+check("RR1.6 after a crash leaves a lock file behind, one run takes it and the next is refused; nothing is "
+      "moved aside (the A459-STALE-TAKEOVER case)",
+      a_ok and not b_ok and sorted(os.listdir(os.path.dirname(d))) == ["rolling_restart.lock"],
+      (a_ok, b_ok, os.listdir(os.path.dirname(d))))
 RR.release_lock(d)
 
-# 4. a live holder's lock is respected until it is older than LOCK_STALE_S
-f = tmp_lock()
-plant(f, 424242, age=60)
-check("RR1.7 a fresh lock with a live holder is respected", RR.take_lock(f, alive=ALIVE)[0] is False)
-plant(f, 424242, age=RR.LOCK_STALE_S + 60)
-check("RR1.8 a lock older than LOCK_STALE_S is taken over even if its pid looks alive (pid reuse)",
-      RR.take_lock(f, alive=ALIVE)[0] is True)
-RR.release_lock(f)
+# 4. a real second process: it holds the lock, we are refused; it dies without releasing, we take it
+x = tmp_lock()
+child_src = ("import sys, time; sys.path.insert(0, %r); import rolling_restart as RR; "
+             "ok, _ = RR.take_lock(%r); print('held' if ok else 'refused', flush=True); time.sleep(120)" % (HERE, x))
+child = subprocess.Popen([sys.executable, "-c", child_src], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+try:
+    first = child.stdout.readline().decode("utf-8", "replace").strip()
+    okx, whox = RR.take_lock(x)
+    check("RR1.7 while another process holds it, this one is refused and told that process's pid",
+          first == "held" and not okx and ("pid %d" % child.pid) in whox, (first, okx, whox))
+finally:
+    child.kill()
+    child.wait(timeout=30)
+deadline, okd = time.time() + 15, False
+while time.time() < deadline and not okd:          # the OS drops a dead holder's lock; on Windows not always at once
+    okd = RR.take_lock(x)[0]
+    if not okd:
+        time.sleep(0.2)
+check("RR1.8 when that process dies without releasing, the OS drops its lock and the next run takes it",
+      okd)
+check("RR1.9 ...without anything moved aside or removed", sorted(os.listdir(os.path.dirname(x))) == ["rolling_restart.lock"],
+      os.listdir(os.path.dirname(x)))
+RR.release_lock(x)
 
-# 5. an unreadable lock is held, never guessed at, until it is that old
-u = tmp_lock()
-plant(u, None, age=60, raw="{not json")
-oku, whou = RR.take_lock(u, alive=DEAD)
-check("RR1.9 a lock that cannot be read is treated as held", oku is False and "could not be read" in whou, whou)
-plant(u, None, age=RR.LOCK_STALE_S + 60, raw="{not json")
-check("RR1.10 ...until it is older than LOCK_STALE_S", RR.take_lock(u, alive=DEAD)[0] is True)
-RR.release_lock(u)
-
-# 6. main() refuses before touching any node while another run holds the lock, and runs when it is free
+# 5. main() refuses before touching any node while another run holds the lock, and runs when it is free
 calls = []
 saved = {k: getattr(RR, k) for k in ("probe", "restart_one", "status", "LOCK")}
 RR.probe = lambda port, timeout=4: (calls.append(("probe", port)), ("down", "patched"))[1]
@@ -107,29 +106,36 @@ RR.status = lambda say=print: 0
 held = tmp_lock()
 try:
     RR.LOCK = held
-    plant(held, os.getpid())                                      # held by a live process: this one, as "another run"
+    other_ok = RR.take_lock(held)[0]                          # held through another handle, as another run would
+    other_fh = RR._HELD.pop(held, None)                       # ...and not as main()'s own: main must not release it
     rc = RR.main(["--all"])
-    check("RR1.11 main() exits %d and restarts nothing while another run holds the lock" % RR.LOCKED_EXIT,
-          rc == RR.LOCKED_EXIT and calls == [], (rc, calls))
-    check("RR1.12 ...and leaves that run's lock where it was", os.path.exists(held))
-    gone(held)
+    check("RR1.10 main() exits %d and restarts nothing while another run holds the lock" % RR.LOCKED_EXIT,
+          other_ok and rc == RR.LOCKED_EXIT and calls == [], (other_ok, rc, calls))
+    check("RR1.11 ...and leaves that run's lock held", RR.take_lock(held)[0] is False)
+    if other_fh is not None:
+        RR._HELD[held] = other_fh
+        RR.release_lock(held)
     calls.clear()
     rc = RR.main(["--all"])
-    check("RR1.13 with the lock free, main() runs (the control: the patched restart is reached)",
+    check("RR1.12 with the lock free, main() runs (the control: the patched restart is reached)",
           rc == 0 and [c for c in calls if c[0] == "restart"] == [("restart", i) for i in RR.ORDER], (rc, calls))
-    check("RR1.14 ...and releases its own lock when it finishes", not os.path.exists(held))
+    after = RR.take_lock(held)[0]
+    check("RR1.13 ...and releases its own lock when it finishes", after and held in RR._HELD)
+    RR.release_lock(held)
     calls.clear()
     rc = RR.main(["--status"])
-    check("RR1.15 --status takes no lock and changes nothing", rc == 0 and not os.path.exists(held) and calls == [])
+    check("RR1.14 --status takes no lock and changes nothing",
+          rc == 0 and held not in RR._HELD and calls == [] and RR.take_lock(held)[0])
+    RR.release_lock(held)
 finally:
     for k, v in saved.items():
         setattr(RR, k, v)
 
-# 7. the highway's restart remedy runs this same script, so the lock covers both callers
+# 6. the highway's restart remedy runs this same script, so the lock covers both callers
 import covenant_highway as H  # noqa: E402
 import inspect  # noqa: E402
 src = inspect.getsource(H.remedy_restart_nodes)
-check("RR1.16 the highway's remedy_restart_nodes starts rolling_restart.py, the script that holds the lock "
+check("RR1.15 the highway's remedy_restart_nodes starts rolling_restart.py, the script that holds the lock "
       "[source text only]", src.count('"rolling_restart.py"') >= 2, src[:120])
 
 passed = sum(1 for _, o in RESULTS if o)
