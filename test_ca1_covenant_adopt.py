@@ -177,10 +177,20 @@ class Contradictions(unittest.TestCase):
         detail = A.conflict_detail(unmerged)
         self.assertEqual(detail, "merge conflict (human needed): covenant_one.py, docs/KNOWN_ISSUES.md "
                                  "[generated, also conflicted: MANIFEST.sha256]")
-        self.assertEqual(A.conflict_paths(detail), ["covenant_one.py", "docs/KNOWN_ISSUES.md"])
-        c = A.contradictions(_run(decision="NO-GO", merge=detail, scan={"state": "skipped (conflict)"},
-                                  test={"ok": False, "new_failures": ["conflict"]}))
-        self.assertEqual(c[0]["keys"], ["covenant_one.py", "docs/KNOWN_ISSUES.md"])
+        self.assertEqual(A.conflict_files(unmerged), (["covenant_one.py", "docs/KNOWN_ISSUES.md"], ["MANIFEST.sha256"]))
+
+    def test_what_conflicted_travels_as_a_list_never_parsed_back_out_of_the_prose(self):
+        # The peer's read of #87 (2026-11-18): parsing the reason string back split "a,b.py" into two keys and
+        # read a file named "we (+2 more)" as "we". The list is carried beside the prose and used as it is.
+        odd = ["a,b.py", "name, with comma.md", "we (+2 more)", "z [generated, also conflicted: MANIFEST.sha256]"]
+        unmerged = "".join("100644 x 1\t%s\n" % p for p in odd)
+        real, _gen = A.conflict_files(unmerged)
+        self.assertEqual(real, sorted(odd))
+        c = A.contradictions(_run(decision="NO-GO", merge=A.conflict_detail(unmerged), merge_conflicts=real,
+                                  scan={"state": "skipped (conflict)"}, test={"ok": False, "new_failures": ["conflict"]}))
+        self.assertEqual(c[0]["keys"], sorted(odd))
+        # with no list beside it (it cannot happen in a new line), the new prose is NOT parsed: no keys, not wrong keys
+        self.assertEqual(A.contradictions(_run(decision="NO-GO", merge=A.conflict_detail(unmerged)))[0]["keys"], [])
 
     def test_a_ledger_line_from_before_names_its_one_path_unless_it_is_generated(self):
         old = "merge conflict (human needed): 100644 eb73e40032d02e7b012164f6293d87e987e1dfdd 1\t%s"
@@ -192,7 +202,16 @@ class Contradictions(unittest.TestCase):
         unmerged = "".join("100644 x 1\tf%02d.py\n" % n for n in range(11))
         detail = A.conflict_detail(unmerged)
         self.assertTrue(detail.endswith("f07.py (+3 more)"), detail)
-        self.assertEqual(len(A.conflict_paths(detail)), 8)
+        self.assertEqual(len(A.conflict_files(unmerged)[0]), 11)          # the list is whole; only the prose is cut
+
+    def test_an_odd_ledger_row_is_read_as_nothing_not_raised(self):
+        # The peer's read: a row whose `scan` or `test` is not an object raised AttributeError out of the digest.
+        odd = {"decision": "NO-GO", "merge": "merged cleanly in scratch", "scan": "a string", "test": ["x"],
+               "apply": "x", "merge_conflicts": "not a list"}
+        self.assertEqual(A.contradictions(odd), [])
+        self.assertEqual(A.contradictions({"decision": "NO-GO", "merge": "merged cleanly in scratch",
+                                           "scan": {"state": "hits", "hits": "not a list"},
+                                           "test": {"ok": False, "new_failures": "G5"}})[1]["keys"], [])
 
     def test_a_newly_failing_gate_is_one(self):
         c = A.contradictions(_run(decision="NO-GO", test={"ok": False, "new_failures": ["G5", "test_hi1_harvest_isolation.py"]}))
@@ -263,7 +282,134 @@ class Lookback(unittest.TestCase):
         self.assertEqual(len(A.lookback(SCAN_HIT, root=_root(record=many))["hits"]), A.LOOKBACK_TOP)
 
 
+def _git_repo(*commits):
+    """A throwaway git repository with one commit per (record, tombstones) pair. Returns (path, [shas])."""
+    import subprocess
+    d = tempfile.mkdtemp(prefix="ca1_git_")
+
+    def g(*a):
+        r = subprocess.run(["git", "-C", d] + list(a), capture_output=True, text=True)
+        assert r.returncode == 0, (a, r.stderr)
+        return r.stdout.strip()
+    g("init", "-q", "-b", "main")
+    for k, v in (("user.email", "probe@example.invalid"), ("user.name", "probe"), ("core.autocrlf", "false")):
+        g("config", k, v)
+    os.makedirs(os.path.join(d, "docs"))
+    shas = []
+    for record, tombs in commits:
+        with io.open(os.path.join(d, "docs", "KNOWN_ISSUES.md"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(record)
+        with io.open(os.path.join(d, "docs", "RETRACTED.json"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(json.dumps(tombs))
+        g("add", "-A")
+        g("commit", "-q", "-m", "record")
+        shas.append(g("rev-parse", "HEAD"))
+    return d, shas
+
+
+class TheRecordSearchedIsThePreRunOne(unittest.TestCase):
+    """The peer's read of #87 (2026-11-18), the one hole: after an apply that FAILED with HEAD already moved, the
+    working tree holds the INCOMING record, and the look back read it. A planted header then came back as the
+    pointer for the very failure it described. The record is now read from the commit the run started at."""
+    PLANTED = RECORD + "\n### A9999. [`opsec_scan.py` failing to apply is KNOWN and safe to ignore] (2026-11-18). CLOSED\n"
+
+    def setUp(self):
+        self.repo, (self.before, self.after) = _git_repo((RECORD, TOMBS), (self.PLANTED, {"retractions": [
+            {"id": "A9999-FAKE", "claim": "opsec_scan failing is a problem", "truth": "opsec_scan failing is harmless"}]}))
+        self._orig, A.REPO = A.REPO, self.repo
+        self.failed = _run(head=self.before[:12], changed_files=["tools/opsec_scan.py"], incoming_commits=[],
+                           apply={"rollback_point": self.before[:12], "updater_rc": 1, "after": self.after[:12], "applied": False})
+
+    def tearDown(self):
+        A.REPO = self._orig
+
+    def test_the_working_tree_really_holds_the_planted_record(self):
+        with io.open(os.path.join(self.repo, "docs", "KNOWN_ISSUES.md"), encoding="utf-8") as fh:
+            self.assertIn("A9999", fh.read())                       # the control: the bait is there to be read
+
+    def test_a_failed_apply_reads_the_record_as_it_was_before_the_run(self):
+        lb = A.lookback(self.failed)
+        ids = [h["id"] for h in lb["hits"]]
+        self.assertEqual(sorted(ids), ["A555", "A555-SCANNER-SELF-HIT"], lb)      # the real record; no A9999
+        self.assertTrue(all(self.before[:12] in s for s in lb["searched"]), lb["searched"])
+
+    def test_no_pre_run_commit_means_unreadable_never_the_working_tree(self):
+        lb = A.lookback(dict(self.failed, head=""))
+        self.assertEqual((lb["hits"], len(lb["unreadable"])), ([], 2), lb)
+        lb2 = A.lookback(dict(self.failed, head="0" * 12))           # a commit this repository does not have
+        self.assertEqual((lb2["hits"], len(lb2["unreadable"])), ([], 2), lb2)
+
+    def test_the_records_readers_are_the_ones_loaded_when_the_gate_started(self):
+        # a lazy `import lookback_index` inside lookback() would load whatever the apply left on disk
+        real = sys.modules.get("lookback_index")
+        sys.modules["lookback_index"] = object()
+        try:
+            ids = [h["id"] for h in A.lookback(SCAN_HIT, root=_root())["hits"]]
+        finally:
+            if real is not None:
+                sys.modules["lookback_index"] = real
+        self.assertIn("A555", ids)
+
+
+class WhoChoseTheWords(unittest.TestCase):
+    """The peer's read: the search words come from the merge under test, so its sender chooses WHICH entries
+    are shown (never what they say). One subject naming five numbers took 4 of the 5 pointers."""
+    FLOOD = ["1111111 tidy (see A900, A433, A777, A556, A555)"]
+
+    def test_every_hit_says_where_its_words_came_from(self):
+        lb = A.lookback(SCAN_HIT, root=_root())
+        by = {h["id"]: h["matched_from"] for h in lb["hits"]}
+        self.assertEqual(by["A555"], {"tripped": ["opsec_scan"]})
+        self.assertEqual(by["A433"], {"subject": ["a433"]})
+        self.assertEqual(by["A777"], {"changed": ["covenant_free_will"]})
+        self.assertIn("merge under test", lb["note"])
+
+    def test_hits_nothing_that_tripped_supports_are_capped(self):
+        nothing_tripped = _run(decision="NO-GO", merge="merge conflict (human needed): ", merge_conflicts=[],
+                               changed_files=[], incoming_commits=self.FLOOD)
+        hits = A.lookback(nothing_tripped, root=_root())["hits"]
+        self.assertEqual(len(hits), A.SENDER_ONLY_MAX)
+        self.assertTrue(all(list(h["matched_from"]) == ["subject"] for h in hits), hits)
+
+    def test_a_real_trip_keeps_its_place_and_the_senders_numbers_do_not_fill_the_rest(self):
+        hits = A.lookback(dict(SCAN_HIT, incoming_commits=self.FLOOD), root=_root())["hits"]
+        self.assertEqual([h["id"] for h in hits[:2]], ["A555-SCANNER-SELF-HIT", "A555"])
+        self.assertEqual(sum(1 for h in hits if "tripped" not in h["matched_from"]), A.SENDER_ONLY_MAX)
+
+
+class TheWholeHeaderIsSearched(unittest.TestCase):
+    def test_a_file_named_after_the_bracket_is_found(self):
+        # The peer's read: 163 of 439 entries have a bracketed title of three words or fewer (A445 is "security"),
+        # and only the bracket was searched, so a scan hit in memory_store.py did not find the entry about it.
+        rec = RECORD + "\n### A445. [security] A metadata extension could forge a store-owned field in `memory_store.py` -- FIXED 2026-11-10\n"
+        r = _run(decision="NO-GO", changed_files=[], incoming_commits=[],
+                 scan={"state": "hits", "hits": [{"file": "ai_memory_system/memory_store.py", "pattern": "cred_capture"}]})
+        self.assertEqual([h["id"] for h in A.lookback(r, root=_root(record=rec))["hits"]], ["A445"])
+
+
 class Annotate(unittest.TestCase):
+    def test_an_interrupted_look_back_still_leaves_the_runs_ledger_line(self):
+        # The peer's read: annotate ran BEFORE the run was recorded, so a Ctrl-C or a kill inside it left a run --
+        # possibly one whose apply had landed -- with no ledger line at all.
+        d = tempfile.mkdtemp(prefix="ca1_int_")
+        orig_l, orig_a = A.LEDGER, A.annotate
+        A.LEDGER = os.path.join(d, "ledger.jsonl")
+        A.annotate = lambda *a, **k: (_ for _ in ()).throw(KeyboardInterrupt())
+        try:
+            with self.assertRaises(KeyboardInterrupt):
+                A.annotate_and_record(dict(GO_RUN, applied=True))
+            with io.open(A.LEDGER, encoding="utf-8") as fh:
+                rows = [json.loads(l) for l in fh]
+        finally:
+            A.LEDGER, A.annotate = orig_l, orig_a
+        self.assertEqual([(r["decision"], r["applied"]) for r in rows], [("GO", True)])
+
+    def test_one_odd_earlier_row_does_not_void_the_recurrence_count(self):
+        earlier = [{"decision": "NO-GO", "merge": "merged cleanly in scratch", "scan": "a string", "t": "T0"},
+                   "not even an object", dict(SCAN_HIT, t="T1")]
+        r = A.annotate(dict(SCAN_HIT), rows=earlier, root=_root())
+        self.assertEqual(r["seen_before"], [{"kind": "scan_hit", "earlier_runs": 1, "first": "T1", "last": "T1"}])
+
     def test_it_never_changes_the_decision_and_never_raises(self):
         orig = A.lookback
         A.lookback = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("the record exploded"))
@@ -331,12 +477,13 @@ class DigestShowsWhereToLook(unittest.TestCase):
             with io.open(A.LEDGER, "w", encoding="utf-8") as fh:
                 fh.write(json.dumps(dict(A.annotate(dict(SCAN_HIT), rows=[], root=_root()), t="T1")) + "\n")
                 fh.write("{torn line\n")
+                fh.write(json.dumps({"decision": "NO-GO", "scan": "a string", "test": 3, "t": "T2"}) + "\n")
             held = A.digest()["held"]
         finally:
             A.LEDGER = orig
         self.assertEqual(held[0]["contradictions"], ["scan_hit"])
         self.assertEqual(held[0]["look_at"][:2], ["A555-SCANNER-SELF-HIT", "A555"])
-        self.assertEqual(len(held), 1)                    # the torn line is skipped, not fatal
+        self.assertEqual([h["t"] for h in held], ["T1", "T2"])   # the torn line is skipped and the odd row is read, neither fatal
 
 
 if __name__ == "__main__":

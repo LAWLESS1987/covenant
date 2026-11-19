@@ -59,6 +59,12 @@ LEDGER = os.path.join(STATE_DIR, "covenant_adopt.jsonl")              # one JSON
 UPDATER = os.environ.get("COVENANT_ADOPT_UPDATER")                    # the stop+merge+restart script; apply needs it
 AUTO = os.environ.get("COVENANT_ADOPT_AUTO", "0") in ("1", "true", "yes", "on")
 MAX_PER_DAY = int(os.environ.get("COVENANT_ADOPT_MAX_PER_DAY", "3"))
+# A452: the record's own readers, loaded when the gate STARTS -- before any apply can change the file on disk.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import lookback_index as LI
+except Exception:                                                 # noqa: BLE001 -- a checkout without it still gates
+    LI = None
 _NOWIN = 0x08000000 if os.name == "nt" else 0
 
 # A changed file whose path OR name matches this is security-shaped -> HIGH -> held for a human even when
@@ -166,16 +172,23 @@ _GENERATED = ("MANIFEST.sha256", "docs/LOOKBACK_INDEX.md")
 _CONFLICT = "merge conflict (human needed): "
 
 
+def conflict_files(unmerged):
+    """(hand-written files, generated files) that `git ls-files -u` says are conflicted, each sorted."""
+    paths = sorted({ln.split("\t")[-1].strip() for ln in str(unmerged).splitlines() if ln.strip()})
+    return [p for p in paths if p not in _GENERATED], [p for p in paths if p in _GENERATED]
+
+
 def conflict_detail(unmerged):
-    """The reason for a conflicted merge, naming the files that conflict, hand-written ones first.
+    """The reason for a conflicted merge, for a person: the files that conflict, hand-written ones first.
 
     A452 (2026-11-18). This was the FIRST line of `git ls-files -u`, cut at 100 characters: one path, in git's
     order. On the only conflicted run on record (2026-11-18 08:37) that path was MANIFEST.sha256, a generated
     file that conflicts on every merge, while the files a person had to resolve went unnamed -- so the look back
-    was aimed at the manifest. Generated files are named last, and only so the count is honest."""
-    paths = sorted({ln.split("\t")[-1].strip() for ln in str(unmerged).splitlines() if ln.strip()})
-    real = [p for p in paths if p not in _GENERATED]
-    gen = [p for p in paths if p in _GENERATED]
+    was aimed at the manifest. Generated files are named last, and only so the count is honest.
+
+    This is PROSE. The list itself travels in the result as `merge_conflicts` and is never parsed back out of
+    this string: the first version did parse it, and a non-author read showed "a,b.py" coming back as two files."""
+    real, gen = conflict_files(unmerged)
     said = ", ".join(real[:8]) + (" (+%d more)" % (len(real) - 8) if len(real) > 8 else "")
     if gen:
         said += " [generated, also conflicted: %s]" % ", ".join(gen)
@@ -183,17 +196,12 @@ def conflict_detail(unmerged):
 
 
 def conflict_paths(merge_detail):
-    """The hand-written files a merge reason names: the new form above, or the one path of the old form (a
-    ledger line from before A452 carries `<mode> <sha> <stage>\\t<path>`)."""
+    """For a ledger line from BEFORE A452 only, which carries `<mode> <sha> <stage>\\t<path>`: that one path,
+    unless it is a generated file. Anything else gives no keys, never guessed ones."""
     s = str(merge_detail or "")
-    if not s.startswith(_CONFLICT):
+    if not s.startswith(_CONFLICT) or "\t" not in s:
         return []
-    rest = s[len(_CONFLICT):]
-    if "\t" in rest:
-        return [p for p in [rest.split("\t")[-1].strip()] if p not in _GENERATED]
-    rest = re.sub(r"\s*\[generated, also conflicted:.*?\]\s*$", "", rest)
-    rest = re.sub(r"\s*\(\+\d+ more\)\s*$", "", rest)
-    return [p.strip() for p in rest.split(",") if p.strip()]
+    return [p for p in [s.split("\t")[-1].strip()] if p and p not in _GENERATED]
 
 
 def build_candidate(info):
@@ -215,6 +223,7 @@ def build_candidate(info):
         else:
             _git(["merge", "--abort"], cwd=wt, timeout=120)
             _cleanup(wt)
+            info["merge_conflicts"] = conflict_files(unmerged)[0]      # the list, beside the prose (A452)
             return None, conflict_detail(unmerged)
     _git(["-c", "user.name=covenant-adopt", "-c", "user.email=node@covenant.local",
           "commit", "--no-verify", "--no-edit"], cwd=wt, timeout=120)
@@ -259,43 +268,67 @@ def decide(cls, sens_hits, scan_info, test_info, merge_ok):
 # never raises into the pipeline, and it uses no model. The shape is node D's (noded/safe_integrate.py, tetsu
 # 3ad7c61), built there the same day on the same words.
 #
-# WHAT IT CANNOT SEE. It reads the record's HEADERS and the tombstones' claim and truth, not entry bodies: an
-# error whose header does not name the file, gate or number that tripped is not found. A hit is a POINTER
-# (CLAUDE.md rule 7): open the line before relying on it. It searches THIS checkout's record, never the incoming
-# one -- text arriving in the merge under test could otherwise describe its own failure as known and harmless.
+# WHAT IT CANNOT SEE. It reads the record's HEADER LINES and the tombstones' claim and truth, not entry bodies:
+# an error whose header does not name the file, gate or number that tripped is not found. A hit is a POINTER
+# (CLAUDE.md rule 7): open the line before relying on it.
+#
+# WHOSE RECORD, AND WHOSE WORDS (the TETSU session's non-author read of #87, 2026-11-18, every point reproduced).
+#   - The record is read from the COMMIT THE RUN STARTED AT (`git show <head>:docs/...`), never from the working
+#     tree. The first version read the working tree and said it searched "this checkout's record, never the
+#     incoming one" (retracted: A452-LOOKBACK-NEVER-INCOMING in docs/RETRACTED.json). After an apply that failed with HEAD already moved, the working tree IS the incoming one: a
+#     planted header describing that very failure as known came back as its pointer. No commit to read from means
+#     "unreadable", said out loud -- never a fall back to the files on disk. The record's readers
+#     (tools/lookback_index.py) are loaded when this module is, before any apply, for the same reason.
+#   - The search WORDS come from the merge under test: its failing names, its commit subjects, its file names. So
+#     its sender can influence WHICH of this checkout's entries are shown, never what they say. Each hit says
+#     where its words came from, and hits supported by nothing that tripped are capped at SENDER_ONLY_MAX.
 LOOKBACK_TOP = 5
+SENDER_ONLY_MAX = 2
 _WORDS = re.compile(r"[a-z0-9_]+")
 _ANUM = re.compile(r"(?<![a-z0-9])a(\d{1,4}[a-z]?)(?![a-z0-9])")
+_SHA = re.compile(r"[0-9a-f]{7,40}")
 # Words every header carries: matching on them would rank by nothing.
 _STOP = frozenset(("covenant", "test", "tests", "tools", "docs", "ops", "main", "init", "the", "and", "for",
                    "not", "with", "from", "that", "this", "py", "md", "json"))
+_ORIGINS = ("tripped", "subject", "changed")
 
 
 def contradictions(result):
     """What in a run CONTRADICTS a clean adoption: [{"kind", "detail", "keys"}], `keys` being what tripped (a
-    file, a scan pattern, a gate, a suite). A pure function of the result, so it reads old ledger lines too.
+    file, a scan pattern, a gate, a suite). A pure function of the result, so it reads old ledger lines too --
+    and an odd one (a `scan` that is not an object, say) reads as nothing rather than raising.
 
     The deliberate HIGH hold is NOT one: a security-sensitive diff waiting for his word is the gate working as
     he chose, not something that went wrong. Nor is an already-current run, a dry apply, or an apply that landed."""
     out = []
     if not isinstance(result, dict) or result.get("decision") in (None, "NONE"):
         return out
+
+    def obj(key):
+        v = result.get(key)
+        return v if isinstance(v, dict) else {}
+
+    def lst(v):
+        return v if isinstance(v, list) else []
+
     merge = str(result.get("merge") or "")
     merged = merge.startswith("merged cleanly")
     if not merged:
-        out.append({"kind": "merge", "detail": merge[:200] or "no candidate was built", "keys": conflict_paths(merge)})
-    scan_info = result.get("scan") or {}
+        listed = result.get("merge_conflicts")
+        keys = [str(p) for p in listed] if isinstance(listed, list) else conflict_paths(merge)
+        out.append({"kind": "merge", "detail": merge[:200] or "no candidate was built", "keys": keys})
+    scan_info = obj("scan")
     state = str(scan_info.get("state") or "")
     if state == "hits":
-        hits = [h for h in (scan_info.get("hits") or []) if isinstance(h, dict)]
+        hits = [h for h in lst(scan_info.get("hits")) if isinstance(h, dict)]
         keys = sorted({str(h["pattern"]) for h in hits if h.get("pattern")} | {str(h["file"]) for h in hits if h.get("file")})
         out.append({"kind": "scan_hit", "keys": keys,
                     "detail": "; ".join("%s in %s" % (h.get("pattern"), h.get("file")) for h in hits[:5])[:200]})
     elif state == "error":
         out.append({"kind": "scan_error", "detail": str(scan_info.get("detail") or "")[:160], "keys": []})
-    test_info = result.get("test") or {}
-    if merged and not test_info.get("ok", True):          # an unmerged run carries a placeholder, not a measurement
-        new = [str(f) for f in (test_info.get("new_failures") or [])]
+    test_info = obj("test")
+    if merged and test_info and not test_info.get("ok", True):   # an unmerged run carries a placeholder, not a measurement
+        new = [str(f) for f in lst(test_info.get("new_failures"))]
         out.append({"kind": "new_failing_gate", "detail": ", ".join(new)[:200], "keys": new})
     ap = result.get("apply")
     if isinstance(ap, dict) and "dry" not in ap and not ap.get("applied"):
@@ -308,97 +341,152 @@ def _stem(path):
     return os.path.basename(str(path).replace("\\", "/")).rsplit(".", 1)[0].lower()
 
 
-def lookback_terms(result, contras):
-    """{word: weight}. What TRIPPED weighs 3 (its file or gate name, and any A-number inside it); an A-number in
-    an incoming commit's subject weighs 2; a file that merely changed weighs 1, as do the separate words of what
-    tripped. Weights are max, not sum, so naming a thing twice does not rank it higher."""
+def _terms(result, contras):
+    """{word: (weight, origin)}. What TRIPPED weighs 3 (its file or gate name, and any A-number inside it); an
+    A-number in an incoming commit's subject weighs 2; a file that merely changed weighs 1, as do the separate
+    words of what tripped. The heaviest use of a word wins, so naming a thing twice does not rank it higher."""
     terms = {}
 
-    def add(tok, w):
+    def add(tok, w, origin):
         tok = tok.lower()
-        if len(tok) >= 2 and tok not in _STOP:
-            terms[tok] = max(terms.get(tok, 0), w)
+        if len(tok) >= 2 and tok not in _STOP and w > terms.get(tok, (0, ""))[0]:
+            terms[tok] = (w, origin)
 
     for c in contras:
         for k in c.get("keys") or []:
             stem = _stem(k)
-            add(stem, 3)
+            add(stem, 3, "tripped")
             for m in _ANUM.finditer(stem.replace("_", " ")):
-                add("a" + m.group(1), 3)
+                add("a" + m.group(1), 3, "tripped")
             for part in stem.split("_"):
                 if len(part) >= 4:
-                    add(part, 1)
+                    add(part, 1, "tripped")
     for subj in result.get("incoming_commits") or []:
         for m in _ANUM.finditer(str(subj).lower()):
-            add("a" + m.group(1), 2)
+            add("a" + m.group(1), 2, "subject")
     for f in result.get("changed_files") or []:
-        add(_stem(f), 1)
+        add(_stem(f), 1, "changed")
     return terms
 
 
-def lookback(result, contras=None, root=None, top=LOOKBACK_TOP):
-    """Search this checkout's record of past errors with words from a run that contradicted. Returns
-    {"searched", "unreadable", "terms", "hits", "note"}; `hits` are the closest record entries and tombstones,
-    each with where it is, why it matched and its score. No contradiction: nothing is searched.
+def lookback_terms(result, contras):
+    """{word: weight}, for showing."""
+    return {t: w for t, (w, _o) in _terms(result, contras).items()}
 
-    Matching is by WHOLE WORD (`stake` does not match `mistaken`). A record that cannot be read is named in
-    `unreadable` and the other is still searched: a look back that hid a missing record would read as "nothing
-    like this has happened before"."""
+
+def _at_commit(head, rel):
+    """(text, None) for a tracked file as it is at commit `head` in REPO, else (None, why). Bytes from git, read
+    as UTF-8: the working tree is never opened."""
+    if not _SHA.fullmatch(str(head or "")):
+        return None, "no pre-run commit in the result"
+    try:
+        r = subprocess.run(["git", "-C", REPO, "show", "%s:%s" % (head, rel)], capture_output=True, timeout=120,
+                           creationflags=_NOWIN)
+    except (OSError, subprocess.SubprocessError) as e:
+        return None, type(e).__name__
+    if r.returncode:
+        return None, "not readable at commit %s" % str(head)[:12]
+    try:
+        return r.stdout.decode("utf-8"), None
+    except ValueError as e:
+        return None, type(e).__name__
+
+
+def _from_dir(root, rel):
+    try:
+        with open(os.path.join(root, *rel.split("/")), encoding="utf-8") as fh:
+            return fh.read(), None
+    except (OSError, ValueError) as e:
+        return None, type(e).__name__
+
+
+def lookback(result, contras=None, root=None, top=LOOKBACK_TOP):
+    """Search the record of past errors with words from a run that contradicted. Returns {"searched",
+    "unreadable", "terms", "hits", "note"}; `hits` are the closest record entries and tombstones, each with
+    where it is, which words matched, where those words came from, and its score. No contradiction: nothing is
+    searched.
+
+    The record is the one at the commit the run started at (`result["head"]`); `root` names a directory to read
+    instead, for a test or a hand run. Matching is by WHOLE WORD (`stake` does not match `mistaken`). A record
+    that cannot be read is named in `unreadable` and the other is still searched: a look back that hid a missing
+    record would read as "nothing like this has happened before"."""
     contras = contradictions(result) if contras is None else contras
     out = {"searched": [], "unreadable": [], "terms": {}, "hits": [],
-           "note": "pointers, not findings: open the line before relying on it"}
+           "note": "pointers, not findings: open the line before relying on it. The search words come from the "
+                   "merge under test (what failed, its commit subjects, its file names), so its sender can "
+                   "influence which entries are shown, never what they say."}
     if not contras:
         return out
-    terms = lookback_terms(result, contras)
-    out["terms"] = dict(sorted(terms.items(), key=lambda kv: (-kv[1], kv[0]))[:20])
-    root = root or REPO
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    import lookback_index as LI
-    entries, tombs = [], []
-    try:
-        with open(os.path.join(root, "docs", "KNOWN_ISSUES.md"), encoding="utf-8") as fh:
-            entries = LI.entries(fh.read())
-        out["searched"].append("docs/KNOWN_ISSUES.md (headers)")
-    except (OSError, ValueError) as e:
-        out["unreadable"].append("docs/KNOWN_ISSUES.md: %s" % type(e).__name__)
-    try:
-        with open(os.path.join(root, "docs", "RETRACTED.json"), encoding="utf-8") as fh:
-            tombs = LI.tombstones(json.load(fh), {e["id"] for e in entries} if entries else None)
-        out["searched"].append("docs/RETRACTED.json (claim and truth)")
-    except (OSError, ValueError, AttributeError, TypeError) as e:
-        out["unreadable"].append("docs/RETRACTED.json: %s" % type(e).__name__)
+    if LI is None:
+        out["unreadable"].append("tools/lookback_index.py could not be loaded when the gate started")
+        return out
+    terms = _terms(result, contras)
+    out["terms"] = dict(sorted(((t, w) for t, (w, _o) in terms.items()), key=lambda kv: (-kv[1], kv[0]))[:20])
+    if root is None:
+        head = str(result.get("head") or "")
+        read, where = (lambda rel: _at_commit(head, rel)), "at commit %s" % head[:12]
+    else:
+        read, where = (lambda rel: _from_dir(root, rel)), "in %s" % os.path.basename(str(root).rstrip("\\/"))
+    entries, heads, tombs = [], [], []
+    text, why = read("docs/KNOWN_ISSUES.md")
+    if text is None:
+        out["unreadable"].append("docs/KNOWN_ISSUES.md %s: %s" % (where, why))
+    else:
+        entries, heads = LI.entries(text), text.splitlines()
+        out["searched"].append("docs/KNOWN_ISSUES.md %s (header lines)" % where)
+    text, why = read("docs/RETRACTED.json")
+    if text is None:
+        out["unreadable"].append("docs/RETRACTED.json %s: %s" % (where, why))
+    else:
+        try:
+            tombs = LI.tombstones(json.loads(text), {e["id"] for e in entries} if entries else None)
+            out["searched"].append("docs/RETRACTED.json %s (claim and truth)" % where)
+        except (ValueError, AttributeError, TypeError) as e:
+            out["unreadable"].append("docs/RETRACTED.json %s: %s" % (where, type(e).__name__))
     scored = []
 
     def weigh(text, rid, hit):
         toks = set(_WORDS.findall(text.lower()))
         matched = sorted(t for t in terms if t in toks)
         if matched:
-            score = sum(terms[t] for t in matched)
-            scored.append((score, LI._num(rid), dict(hit, matched=matched, score=score)))
+            score = sum(terms[t][0] for t in matched)
+            frm = {o: [t for t in matched if terms[t][1] == o] for o in _ORIGINS}
+            scored.append((score, LI._num(rid), dict(hit, matched=matched, score=score,
+                                                     matched_from={o: ts for o, ts in frm.items() if ts})))
 
     for e in entries:
-        weigh(e["id"] + " " + e["title"], e["id"],
+        # the whole header LINE, not only its bracketed title: 163 of 439 entries had a title of three words or
+        # fewer on 2026-11-18 (A445's is "security"), with the file named after the bracket.
+        weigh(heads[e["line"] - 1], e["id"],
               {"where": "docs/KNOWN_ISSUES.md", "line": e["line"], "id": e["id"], "date": e["date"],
                "status": e["status"], "title": LI._short(e["title"], 140)})
     for t in tombs:
         weigh(" ".join((t["id"], t["entry"], t["claim"], t["truth"])), t["entry"] or t["id"],
               {"where": "docs/RETRACTED.json", "id": t["id"], "entry": t["entry"], "claim": LI._short(t["claim"], 140)})
     scored.sort(key=lambda s: (s[0], s[1]), reverse=True)       # closest first; among equals, the newest entry
-    out["hits"] = [h for _score, _num, h in scored[:max(0, int(top))]]
+    sender_only = 0
+    for _score, _num, h in scored:
+        if len(out["hits"]) >= max(0, int(top)):
+            break
+        if "tripped" not in h["matched_from"]:                  # nothing that tripped supports it: the sender's words
+            if sender_only >= SENDER_ONLY_MAX:
+                continue
+            sender_only += 1
+        out["hits"].append(h)
     return out
 
 
 def seen_before(contras, rows):
     """For each contradiction, how many EARLIER runs in the ledger carried the same kind tripped by the same
-    thing (rule 10: a second time is a recurrence, and the earlier one did not stop it)."""
+    thing (rule 10: a second time is a recurrence, and the earlier one did not stop it). An odd row reads as
+    no contradiction (contradictions() does not raise on one), so it cannot void the count."""
+    earlier = [(r.get("t") if isinstance(r, dict) else None, contradictions(r)) for r in rows]
     out = []
     for c in contras:
         n, first, last = 0, None, None
-        for r in rows:
-            for pc in contradictions(r):
-                if pc["kind"] == c["kind"] and (not c["keys"] or set(pc["keys"]) & set(c["keys"])):
-                    n, first, last = n + 1, first or r.get("t"), r.get("t")
-                    break
+        for t, past in earlier:
+            if any(pc["kind"] == c["kind"] and (not c["keys"] or set(pc["keys"]) & set(c["keys"])) for pc in past):
+                n, first, last = n + 1, first or t, t
         out.append({"kind": c["kind"], "earlier_runs": n, "first": first, "last": last})
     return out
 
@@ -439,6 +527,16 @@ def annotate(result, rows=None, root=None):
     except Exception as e:                                        # noqa: BLE001
         result["seen_before"] = [{"error": type(e).__name__}]
     return result
+
+
+def annotate_and_record(result):
+    """Annotate, then record -- and record even when the look back is interrupted. The first version annotated
+    before recording with nothing between: a Ctrl-C or a kill inside it left a run, possibly one whose apply had
+    already landed, with no ledger line at all."""
+    try:
+        annotate(result)
+    finally:
+        _record(result)
 
 
 def _applied_today():
@@ -519,8 +617,9 @@ def pipeline(do_apply, dry):
                 result["note"] = "GO but PROPOSE-only (not armed): apply on the operator's word"
             elif decision == "GO" and (kill or over_cap):
                 result["note"] = "GO but held: " + ("kill-switch present" if kill else "daily cap reached")
-        annotate(result)            # A452: after the decision and any apply; advisory, before this run is recorded
-        _record(result)
+        if "merge_conflicts" in info:
+            result["merge_conflicts"] = info["merge_conflicts"]
+        annotate_and_record(result)     # A452: after the decision and any apply; advisory; the run is recorded either way
         return result, (0 if decision == "GO" else 1)
     finally:
         _cleanup(wt)
@@ -536,8 +635,8 @@ def digest(n=25):
         # A452: what contradicted, and where the record says to look. Read from the line as it was written, and
         # worked out for a line from before the look back existed (its pointers are then not on file: none shown).
         contras = r.get("contradictions")
-        if contras is None:
-            contras = contradictions(r)
+        if not isinstance(contras, list):
+            contras = contradictions(r)                           # reads an odd row as nothing; it does not raise
         return {"t": r.get("t"), "why": "; ".join(r.get("reasons", []))[:120],
                 "contradictions": [c.get("kind") for c in contras],
                 "look_at": [h.get("id") for h in ((r.get("lookback") or {}).get("hits") or [])[:3]]}
@@ -580,7 +679,8 @@ def main(argv):
         for h in lb.get("hits") or []:
             print("  look at: %s%s  %s  [%s]  %s" % (
                 h.get("where"), (" line %s" % h["line"]) if h.get("line") else "", h.get("id"),
-                ", ".join(h.get("matched") or []), h.get("title") or h.get("claim") or ""))
+                "; ".join("%s: %s" % (o, ", ".join(ts)) for o, ts in (h.get("matched_from") or {}).items()),
+                h.get("title") or h.get("claim") or ""))
         if lb.get("hits"):
             print("  (%s)" % lb.get("note"))
     return code

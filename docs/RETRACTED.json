@@ -2782,6 +2782,27 @@
    ],
    "note_on_branch": "Kept as written on branch a446-refusal-reason-as-written-2026-11-18 (at af31ea0). The pinned packet commit 9d85f6c also keeps it, by design.",
    "note_on_allow": "The three .trash/predeploy_* directories are whole pre-deploy copies of the tree kept by earlier deploys (rule 10); they hold the old wording as it was. Named one by one, as A392's are, so a new copy elsewhere is still caught."
+  },
+  {
+   "id": "A452-LOOKBACK-NEVER-INCOMING",
+   "claim": "That the adoption gate's look back searches this checkout's record and never the incoming one. Written at 08b2380 (2026-11-18) in the A452 comment of tools/covenant_adopt.py, in docs/KNOWN_ISSUES.md A452 and in the body of pull request #87.",
+   "verbatim": [
+    "It searches THIS checkout's record, never the incoming",
+    "It searches this checkout's record, not the incoming one, on purpose"
+   ],
+   "truth": "False after an apply that failed with HEAD already moved: apply() reports applied only when the updater returns 0, so a nonzero return after the merge was made leaves the working tree holding the INCOMING docs/KNOWN_ISSUES.md and docs/RETRACTED.json, and lookback() at 08b2380 read the working tree. A header planted in the incoming record, describing that failure as known, came back as its pointer. The lazy import of tools/lookback_index.py loaded the incoming copy of that file too. Restated: the record is read from the commit the run started at (git show <head>:docs/...), a missing commit is reported as unreadable and never replaced by the files on disk, and the readers are loaded when the gate starts. Whether the laptop's updater always rolls back before returning nonzero was not determined; the fix does not depend on it.",
+   "refuted_by": "The TETSU session's non-author read of covenant #87, 2026-11-18 (its probe87.py, 20 probes, on a temp root). Reproduced the same day in a throwaway git repository as CA1's TheRecordSearchedIsThePreRunOne, which is red on the tool as committed at 08b2380.",
+   "patterns": [
+    "searches THIS checkout's record, never the incoming",
+    "searches this checkout's record, not the incoming one"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a452-lookback-claim-as-written-2026-11-18 (at 08b2380)."
   }
  ]
 }
