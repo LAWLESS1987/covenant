@@ -18543,3 +18543,41 @@ on Windows; the PC this was found on has environment-shaped failures in its loca
 **What this does not cover.** `covenant_prod.bat` and `AB_RESTART_NODES.bat` start and stop nodes without this lock, and the watchdog revives a dead node on its own; a restart from one of those beside a rolling restart is still possible. Node D is a different host with its own tree. The 30-minute stale limit is a judgement, not a measurement.
 
 **Status (2026-11-19):** in source on local branch `fix/a459-restart-lock`, off main 9d1b161; not pushed, not merged, not deployed. A459 was claimed through the hub (the TETSU session) before it was used.
+
+---
+
+### A460. [test hygiene / record integrity, the A236 shape] R1 read 463/492 on the laptop's running tree for the record itself: 48 lines in two retired copies under .trash/, each allowed at its real path -- FIXED IN SOURCE 2026-11-19 (a retired copy of an allowed file at its original path is that file; .trash/ is still read)
+
+**His word, 2026-11-19 (the provenance side session):** "Proceed", after the hub offered this finding; the number was claimed with the hub first (A459 was already the fake-guard session's).
+
+**Measured (laptop, C:/Users/Lawre/covenant, branch claude/improve-miner-circle-back).**
+- `python test_r1_retracted.py`: R1 463/492, 7611 files scanned. Every failure is a `.C` guard: 29 of them, from 48 restated lines in 2 files.
+  - 46 lines in `.trash/2026-11-18-a450-adopt/docs/KNOWN_ISSUES.md`, a retired copy of the record.
+  - 2 lines in `.trash/kept-worktree-affectionate-leakey-0c5bf0-2026-11-10/.trash/grid_snn_bench_pre_F9_F17_F19_F20_2026-10-30/grid_snn_bench.py`, a kept worktree's own retired folder, itself allow-listed at `.trash/grid_snn_bench_pre_F9_F17_F19_F20_2026-10-30/` (A392).
+- Each of the 48 is a copy of a path its retraction already allows, kept at that path under one folder of .trash/. Checked line by line against the ledger before any change: 0 left over.
+- On main nothing reads red: a clean clone has no .trash/ (R1 405/405 at 9d1b161). The live line tracks 145 files under .trash/ and keeps 301 more untracked.
+- Lookback: `tools/lookback_index.py find R1 trash` and `find worktree R1` give nothing. The shape is A236 (2026-09-27): a whole copy of the tree whose allowed records no longer sit at their allowed paths.
+
+**Why .trash/ is not simply skipped (unlike A454).** R1 reads .trash/ on purpose:
+- the ledger allow-lists five .trash/ paths (A392 twice, A446 three times);
+- a retired R1 probe takes a suffix outside SCAN_EXT because R1 reads it (memory: frozen-script-copies);
+- skipping the folder would let any retracted wording stand there unseen, the trade A454 made for P18, where nothing starts a node from .trash/.
+
+**Fixed (test_r1_retracted.py).**
+- `retired_copy_allowed(relpath, allow)`: a file at `.trash/<folder>/<rest>` is exempt only when `<rest>` is a path its retraction allows. Only the top-level .trash/, exactly one folder stripped.
+- `file_violations(...)`: the per-file `.C` step, lifted out of main() unchanged except for that one exemption, so the new checks drive the code the guard runs.
+- Used at the violation step ONLY. L1 (dead pattern) and L2 (record still holds the pattern) never count a retired copy, so a copy in .trash/ cannot keep a dead regex looking alive or stand in for an emptied record.
+
+**Checks.**
+- R1 405 -> 412 on main, 492 -> 499 on the live tree (run from a scratch copy pointed at it), 7611 files scanned before and after.
+- New: R1.T1 a restatement in a live file not on the allow-list is a violation. T2 a retired copy of an allowed record at its original path is not. T3 an allowed .trash path kept inside another retired folder resolves. T4 a retired file whose original path is not allowed still counts. T5 a copy retired without its own folder (`.trash/docs/KNOWN_ISSUES.md`) still counts. T6 a citation within the window still clears, as before. T7 a `.trash/` below the top level still counts.
+- Mutations, each alone, the real file byte-identical before and after (sha256 ac00581d219f):
+  - call site no longer asks the new function: T2, T3 red on main; the live tree back to 468/499.
+  - every top-level .trash path exempt (the A454-style skip): T4, T5 red.
+  - no folder required (strip `.trash/` alone): T2, T3, T5 red.
+  - any .trash segment, not only the top level: T7 red.
+- Record: the provenance side session's scratchpad, `probe/mutation_r1_retired.txt`.
+
+**What it cannot see.** A retracted claim placed on purpose in a retired copy of an allowed file now passes, as it would at that file's real path. A retired copy kept without its own dated folder, or kept below a second wrapper folder, still reads red: retire into `.trash/<dated folder>/<original path>`, as the copies above were.
+
+**Status.** In source on `claude/r1-retired-copies-2026-11-19` from main 9d1b161; not merged. The live line is behind main, so R1 there reads red until main is reconciled into it.
