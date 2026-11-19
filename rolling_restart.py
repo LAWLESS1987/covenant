@@ -65,6 +65,99 @@ ORDER = ["C", "B", "A"]          # the hub in the middle; the phone's node last
 UP_TIMEOUT_S = 120               # a cold node adopts genesis and builds its judges
 PORT_FREE_TIMEOUT_S = 30
 
+# ONE RESTART AT A TIME (A459, 2026-11-19). Nothing stopped two of these running at once. That day a run
+# started by hand and the highway's own remedy_restart_nodes (which starts this script detached when it sees
+# source drift) began within two seconds of each other. Both restarted node A, and node A ran as TWO processes
+# on one database for an hour and three quarters: one held the API, peer and bridge ports, the other only a
+# shared API port, its peer listener deaf. A second run now refuses while the first holds this lock, and says
+# who holds it. --status takes no lock: it changes nothing.
+LOCK = os.environ.get("COVENANT_RESTART_LOCK", os.path.join(HERE, "logs", "rolling_restart.lock"))
+LOCK_STALE_S = 1800              # longer than three nodes' worst case (3 x (PORT_FREE + UP) plus the stops)
+LOCKED_EXIT = 3
+
+
+def _holder_alive(pid):
+    """Is `pid` a live PYTHON process? Unknown reads as alive: a lock is only taken over when its holder is
+    known to be gone, or when it is older than LOCK_STALE_S. On Windows os.kill(pid, 0) would TERMINATE the
+    process, so tasklist is asked instead (covenant_watchdog_guard.pid_alive_windows does the same)."""
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return True
+    if pid <= 0:
+        return True
+    if os.name == "nt":
+        try:
+            out = subprocess.run(["tasklist", "/FI", "PID eq %d" % pid, "/FO", "CSV", "/NH"],
+                                 capture_output=True, text=True, timeout=30).stdout
+        except (OSError, subprocess.SubprocessError):
+            return True
+        return "python" in out.lower()
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return True
+    return True
+
+
+def take_lock(path=None, now=None, alive=None):
+    """(True, "") when this process now holds the restart lock; (False, who holds it) when another run does.
+
+    The lock is a file made with O_CREAT | O_EXCL, so two runs cannot both make it. A lock whose holder is known
+    to be gone, or that is older than LOCK_STALE_S, is moved aside to `<lock>.stale` (kept, not deleted) and
+    taken once more; a lock that cannot be read is treated as held until it is that old."""
+    path = path or LOCK
+    now = time.time() if now is None else now
+    alive = alive or _holder_alive
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    for attempt in (1, 2):
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError:
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    held = json.load(fh)
+                if not isinstance(held, dict):
+                    raise ValueError("not an object")
+            except (OSError, ValueError):
+                held = {}
+            try:
+                age = now - os.path.getmtime(path)
+            except OSError:
+                continue                                          # released between the two calls: try again
+            gone = "pid" in held and not alive(held.get("pid"))
+            if attempt == 1 and (gone or age > LOCK_STALE_S):
+                try:
+                    os.replace(path, path + ".stale")
+                except OSError:
+                    pass
+                continue
+            return False, "pid %s since %s (%d s ago)%s" % (
+                held.get("pid", "?"), held.get("t", "?"), int(age), "" if held else "; the lock file could not be read")
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump({"pid": os.getpid(), "t": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "argv": sys.argv[1:]}, fh)
+        return True, ""
+    return False, "the lock could not be taken"
+
+
+def release_lock(path=None):
+    """Remove the lock, but only if this process holds it: a run never releases another run's lock."""
+    path = path or LOCK
+    try:
+        with open(path, encoding="utf-8") as fh:
+            held = json.load(fh)
+    except (OSError, ValueError):
+        return False
+    if not isinstance(held, dict) or held.get("pid") != os.getpid():
+        return False
+    try:
+        os.remove(path)                                           # a lock is a turn-taking token, not a record
+    except OSError:
+        return False
+    return True
+
 
 def disk_sha():
     with open(os.path.join(HERE, "covenant_unified_v8.py"), "rb") as fh:
@@ -303,6 +396,18 @@ def main(argv=None):
     if a.status:
         return status()
 
+    ok, who = take_lock()
+    if not ok:
+        print("another rolling restart is running (%s): not starting a second one (A459)" % who)
+        print("Nothing was touched. Run again when it has finished, or look at %s." % LOCK)
+        return LOCKED_EXIT
+    try:
+        return _restart(a)
+    finally:
+        release_lock()
+
+
+def _restart(a):
     import covenant_watchdog as W
     want = disk_sha()
     by_id = {n["id"]: n for n in W.NODES}
