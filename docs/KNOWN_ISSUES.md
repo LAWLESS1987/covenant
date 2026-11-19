@@ -18368,3 +18368,39 @@ the number, and that a green tick on one platform does not speak for the other. 
 on Windows; the PC this was found on has environment-shaped failures in its local sweep.
 
 **Status:** in source on its branch with its tests; no published number changed.
+
+---
+
+### A452. [the adoption gate told him a run was held and nothing about whether the same thing had gone wrong before; now a run that contradicts a clean adoption searches the record and its tombstones and carries the closest entries] (2026-11-18). IN SOURCE on its branch; not deployed, the gate stays propose-only.
+
+**His words.** On whether a change to the core should hold for his word (typed 2026-11-18 in the TETSU session and relayed to this one verbatim): "keep it auto, but if something contradicts, use the tombstones to figure out where it went wrong." His go for building it into this gate, typed in this session the same day: "Build it locally", then "push it too".
+
+**Found.** The peer session asked whether `tools/covenant_adopt.py` holds a core-only change for him. Measured by calling `classify`: `covenant_unified_v8.py` alone, or with `verify_deploy.py`, the held copy and `MANIFEST.sha256`, is NORMAL; A447 was held only because its test's name contains "operator". He was asked, and chose to keep that. What the gate lacked was his second half: a held run named its reasons and stopped there. Rule 10's "search the tombstones and the record first" was a thing a person had to remember to do.
+
+**Built (advisory; it changes no decision).**
+- `contradictions(result)`: what in a run contradicts a clean adoption -- an unclean merge, a backdoor-scan hit or a scan that errored, a newly failing gate, an apply that did not land -- each with what tripped. The deliberate HIGH hold is not one, nor an already-current run, a dry apply or an apply that landed. A pure function of the result, so it reads ledger lines from before it existed.
+- `lookback(result)`: only when something contradicted. Words from the run are weighed -- what tripped 3 (its file, gate or suite, and an A-number inside its name), an A-number in an incoming commit's subject 2, a file that merely changed 1 -- and matched by whole word against `docs/KNOWN_ISSUES.md` headers and each tombstone's claim and truth in `docs/RETRACTED.json`, through `tools/lookback_index.py`'s own readers. The top five go into the result with where each is (a live line number for an entry), the words that matched and the score. No model.
+- `seen_before`: for each contradiction, how many earlier ledger runs carried the same kind tripped by the same thing, with the first and last time.
+- `annotate(result)` adds all three after the decision and any apply, before the run is recorded; the text output and `digest` show them. A failure inside it is written into the result and never raised.
+- `conflict_detail` / `conflict_paths`: a conflicted merge's reason now names the hand-written files that conflict, generated ones last. It was the first line of `git ls-files -u`, cut at 100 characters.
+
+**What the real ledger showed.** `ops/covenant_adopt.jsonl` on the laptop holds 4 runs: 3 already-current, 1 NO-GO (2026-11-18 08:37, a merge conflict). The one path that line recorded is `MANIFEST.sha256`, a generated file, so the first version of the look back aimed at the manifest (A255). That is why the conflict reason was changed, and why a generated path on an old line is not used as a key; the same run now points at A438 to A442, the entries its incoming commits name. 0 of the 4 runs is a HIGH hold, so "the HIGH hold is not a contradiction" is pinned by fixture, not seen on real data.
+
+**Checks.** CA1 (`test_ca1_covenant_adopt.py`, registered SECURITY): 12 tests before, 40 now. Sixteen mutations of the tool, each run and the file restored byte-identical, each turn it red: the HIGH hold counted; a conflict also reported as a failing gate; a dry apply counted as failed; substring matching; every weight equal; searching with no contradiction; an unreadable tombstone file hidden; no cap on hits; a failing look back raised; recurrence ignoring what tripped; A-numbers in a suite's name unread; classify widened to hold the core; generated files named as the conflict; an old line's generated path kept; a long conflict cut silently; the digest dropping its pointers. The first pass caught 11 of 13: two tests were too weak (recurrence, and the A-number weight) and were tightened before this was committed. LI1 11 of 11.
+
+**A draft corrected before commit (rule 10).** Two tests as first written expected a made-up record entry in the test's own fixture ahead of that entry's fixture tombstone. The ranking was right and the expectation wrong: the tombstone's text also carries the word "scan", so it scores 4 against 3. The tests now state the order and why. Not in `docs/RETRACTED.json`: it was an assertion in an uncommitted test, never a published claim.
+
+**What it cannot see.**
+- Headers and tombstone text only, never an entry's body: an error whose header does not name the file, gate or number that tripped is not found. A hit is a pointer; open the line.
+- It searches this checkout's record, not the incoming one, on purpose: text arriving in the merge under test could describe its own failure as known. So an entry that exists only upstream is not found until it is adopted.
+- The full pipeline was not run end to end with this change (`scan` runs `covenant_one --check` twice). The print path and `digest` were run through fixtures; `annotate` was run over the real ledger read-only.
+- A line already in the ledger keeps its old one-path conflict reason; only new runs name every file.
+- `_applied_today` (the daily cap) still stops on a torn ledger line. Left as it is: reading past a torn line there could undercount applies.
+
+**Not changed.** `classify`, `decide`, the scan patterns, the kill-switch, the daily cap, `apply`, the exit codes. The kill-switch `ops/covenant_adopt.disabled` is present on the laptop, so the gate applies nothing either way.
+
+**Numbering.** A449 has no header on any ref and is left alone; A451 is claimed on the live branch (free's own-post title). Searched every worktree's `docs/KNOWN_ISSUES.md` and every ref's commit subjects for A449 to A469 first.
+
+**Repro.** `python test_ca1_covenant_adopt.py`.
+
+**Status:** in source on branch `feat/adopt-tombstone-lookback`; not merged, not deployed.
