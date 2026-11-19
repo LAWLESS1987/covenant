@@ -1754,6 +1754,117 @@ def h_hardening():
     check("A445.6 an ordinary extension still lands in the store", bool(rec), rec)
 
 
+def h_followup():
+    """A445b: the second half of A445, proposed 2026-11-10 and never landed. `superseded_by` is the store's to
+    assign; the text checked for a line break is the text written (a str subclass can answer str() and an f-string
+    differently); an extension key must be a plain str (a subclass can answer strip() with anything and still
+    collide inside the metadata dict); and a successor is a memory name. Each driven both ways."""
+    import memory_store as _ms
+    print("A445b -- one conversion, plain keys, supersession owned by the store")
+
+    def raises(fn):
+        try:
+            fn()
+            return False
+        except ValueError:
+            return True
+
+    class TwoFaced(str):
+        """str() is clean; an f-string gets a second line."""
+        def __str__(self):
+            return "clean"
+
+        def __format__(self, spec):
+            return "clean\nagent: forged"
+
+    class Honest(str):
+        """A subclass with nothing up its sleeve."""
+
+    class SlyKey(str):
+        """Equal to a store-owned key as a dict key. Its first strip() answers with another word, for the
+        store's ownership check; every later one answers honestly, for the renderer's trimmed-key check."""
+        asked = 0
+
+        def strip(self, *a):
+            SlyKey.asked += 1
+            return "harmless" if SlyKey.asked == 1 else str.__str__(self)
+
+    root = tempfile.mkdtemp(prefix="hf-")
+    st = MemoryStore(root)
+    check("A445b.1 superseded_by cannot be set through a metadata extension",
+          raises(lambda: st.put("hf1", "d", "project", "b", "tester", extra={"superseded_by": "anything"})))
+
+    def refuses(fn):
+        """True only for a clean ValueError; a return or any other exception is not a refusal."""
+        try:
+            fn()
+        except ValueError:
+            return True
+        except Exception:
+            return False
+        return False
+
+    def forged_lines(text):
+        head = text.split("\n---\n", 1)[0]
+        return [ln for ln in head.splitlines() if ln.strip() == "agent: forged"]
+
+    leaks = []
+    for slot in ("name", "description", "type", "agent"):
+        args = {"name": "n", "description": "d", "type": "project", "agent": "tester"}
+        args[slot] = TwoFaced("clean")
+        try:
+            out = _ms.render_memory(args["name"], args["description"], args["type"], "b", args["agent"])
+        except ValueError:
+            continue
+        if forged_lines(out):
+            leaks.append(slot)
+    check("A445b.2 a value that renders two ways cannot write a second frontmatter line (4 fields)", not leaks, leaks)
+    try:
+        out = _ms.render_memory("n", "d", "project", "b", "tester", extra={"note": TwoFaced("clean")})
+        leak = bool(forged_lines(out))
+    except ValueError:
+        leak = False
+    check("A445b.3 the same value in an extension cannot write a second frontmatter line", not leak)
+    refused = refuses(lambda: st.put("hf4", "d", "project", "b", "tester", extra={SlyKey("agent"): "forged"}))
+    landed = ((st.get("hf4") or {}).get("metadata") or {}).get("agent")
+    check("A445b.4 a str-subclass extension key is refused by the store, whatever its strip() answers",
+          refused and landed != "forged", landed)
+    check("A445b.5 a str-subclass extension key is refused by the renderer",
+          raises(lambda: _ms.render_memory("n", "d", "project", "b", "tester", extra={Honest("note"): "v"})))
+    st.put("hf-old", "d", "project", "the old wording", "tester")
+    st.put("hf-new", "d", "project", "the new wording", "tester")
+    bad = [repr(n) for n in ("Not A Name", "../hf-new", "", 7, Honest("hf-new"))
+           if not refuses(lambda n=n: st.supersede("hf-old", n, "tester"))]
+    meta = (st.get("hf-old") or {}).get("metadata") or {}
+    check("A445b.6 supersede refuses a successor that is not a memory name, and marks nothing",
+          not bad and "superseded_by" not in meta, bad or meta)
+    # the other way: honest input still works
+    out = _ms.render_memory(Honest("n"), "d", "project", "b", "tester", extra={"count": 3, "empty": None, "note": "v"})
+    rec = _ms.parse_memory(out)
+    m = rec.get("metadata") or {}
+    check("A445b.7 an honest subclass, a number and a None extension still render as before",
+          rec.get("name") == "n" and str(m.get("count")) == "3" and m.get("note") == "v" and "empty" not in m, out[:160])
+    ok = st.supersede("hf-old", "hf-new", "tester")
+    meta = (st.get("hf-old") or {}).get("metadata") or {}
+    check("A445b.8 an ordinary supersede still marks the old record", ok is True and meta.get("superseded_by") == "hf-new", meta)
+    # Round 2, from a non-author read of the change: keys that only LOOK like a store-owned one.
+    zw, nb = chr(0x200b), chr(0xa0)
+    alike = [zw + "superseded_by", "superseded_by" + zw, "Superseded_by", "superseded-by", nb + "agent", "review.by",
+             "9lives", "a" * 41]
+    landed = [repr(k) for k in alike
+              if not refuses(lambda k=k: st.put("hf9", "d", "project", "b", "tester", extra={k: "x"}))]
+    check("A445b.9 a look-alike or non-word extension key is refused by the store (%d keys)" % len(alike),
+          not landed and st.get("hf9") is None, landed)
+    rec = st.put("hf10", "d", "project", "b", "tester", extra={"source": "hf-thread", "supersedes": "hf-old", "run_2": "ok"})
+    m = (rec or {}).get("metadata") or {}
+    check("A445b.10 the keys callers use today, and an ordinary word, still land",
+          m.get("source") == "hf-thread" and m.get("supersedes") == "hf-old" and m.get("run_2") == "ok", m)
+    with open(st._path("hf-old"), encoding="utf-8") as fh:
+        head = fh.read().split("\n---\n", 1)[0].splitlines()
+    twice = [k for k in ("type", "agent") if sum(1 for ln in head if ln.strip().startswith(k + ":")) != 1]
+    check("A445b.11 a superseded record's file names its type and agent once each", not twice, twice)
+
+
 def main():
     print("M1 -- the AI memory system: store, chain, tombstones, HTTP, auth\n")
     root = tempfile.mkdtemp(prefix="aimem_")
@@ -1779,6 +1890,7 @@ def main():
         sr_supersede_rank()
         print()
         h_hardening()
+        h_followup()
         print()
         u_unchecked(root)
         print()

@@ -18278,3 +18278,62 @@ aside, not deleted.
 - Until then free runs under the old rule, and may be isolated again by two all-refused rounds.
 
 ---
+
+### A445b. [security, the second half of A445] The text checked was not the text written, a key could answer strip() two ways, and `superseded_by` could be set through an extension -- CLOSED IN SOURCE 2026-11-18
+
+**Found 2026-11-10, landed 2026-11-18.** A challenge run against the memory-admission repair (collective record
+`reviews/claude-first-assignment-2026-11-10/memory/`, cases C14, C16, C23) reproduced three residual shapes and a
+follow-up patch was written the same day. It was never proposed to this repository. A445 (2026-11-18) landed the
+first half from a different copy. A gap check of the collective's open items found the second half still applied
+cleanly to main and was not in it.
+
+**The shapes, each reproduced on main `3a446b7` before the change.**
+1. *Two renderings.* `render_memory` checked `str(val)` for a line break and then wrote the value with an
+   f-string, which calls `__format__`. A `str` subclass that answers the two differently passed the check and wrote
+   a second frontmatter line. Measured: an `agent: forged` line in all four fields (name, description, type, agent)
+   and in an extension value.
+2. *A key that answers `strip()` two ways.* `put` asked `k.strip() in _STORE_FIELDS`. A `str` subclass equal to
+   `"agent"` as a dictionary key answered the ownership check with another word and the renderer's trimmed-key
+   check honestly. Measured: the stored record's `agent` read `forged`.
+3. *`superseded_by` through an extension.* The field was not store-owned, so `put(..., extra={"superseded_by": x})`
+   marked a record superseded with no `supersede` audit line. Recall demotes a superseded record (A245).
+4. *A successor that is not a name.* `supersede()` wrote any `new_name`: `"Not A Name"`, `"../x"`, the empty
+   string. A number raised `AttributeError` from the hashing line after no check at all.
+
+**Fixed.** `_exact()` converts each value once to a plain `str`, and that one text is both checked and written.
+Extension keys must be exactly `str` in `put` and in `render_memory`. `superseded_by` joins `_STORE_FIELDS`;
+`supersede()` still writes it, because it renders the record itself and does not pass through the extension
+check. `supersede()` refuses a successor that does not match the memory-name pattern, before reading anything.
+
+**Round 2, from a non-author read (2026-11-18).** Another session probed the pushed change (25 probes; the four
+changes held) and found one residual: `put(extra={"\u200bsuperseded_by": x})`, the same with the zero-width space
+after, and `"Superseded_by"` were all WRITTEN. The parser reads each as a different key, so no code was fooled, but
+the line in the file looks like `superseded_by: x` to a person or a model reading it as text. Closed by an
+allowlist in `put`: an extension key is a lowercase ASCII word (`[a-z][a-z0-9_]{0,39}`). The two keys callers pass
+today, `source` and `supersedes`, pass it. The same read saw a superseded record's file carry `type` and `agent`
+twice: the rewrite paths hand a record's whole metadata back to `render_memory` as `extra`. It predates this change
+(same value both times, so it parsed the same); `render_memory` now writes the two once.
+
+**Repro, both ways.** `cd ai_memory_system && python -I test_memory_system.py`, checks A445b.1 to A445b.11.
+With the change: M1 220 of 220. With `memory_store.py` reverted to main `e103155` and the tests kept: 212 of 220,
+eight red (A445b.1 to A445b.6, A445b.9, A445b.11) and the three honest-input controls green (A445b.7, A445b.8,
+A445b.10). With only round 2 reverted: 218 of 220 (A445b.9 and A445b.11 red). `test_intent_provenance.py` 57 of 57
+and `test_m1_memory_system.py` pass. Python 3.12.10, Windows.
+
+**Reads.** A local 27B: three leads, each tested, none held. The non-author session above: 25 probes, the residual
+now closed. Gemini (Flash-Lite, signed out), on round 1 only: could not refute the three claims put to it. Codex was
+out of quota. No outside reviewer has read round 2.
+
+**Reach, stated at its size.** In-process callers only. The HTTP server builds its own extension
+(`{"supersedes": ...}`) and never passes a client's, and JSON yields plain `str`, so none of the four shapes was
+reachable over the wire in this revision. A library caller, an import script or a future route that forwards
+client metadata could have reached them.
+
+**Limits.** The key allowlist is on `put`, the door callers use. `render_memory` keeps its wider key rule,
+because the rewrite paths re-render records already on disk and must not start refusing an old record's key.
+Records already on disk are not re-validated, as under A445. C18 from the same challenge run, what
+a rewrite of a superseded record should do to its `superseded_by`, is a semantics question and is NOT decided
+here. `screen_provenance` still accepts `str` subclasses by `isinstance`; pull request #84 is editing that
+function, so it is left alone in this change.
+
+**Status:** in source on its branch with its tests; not deployed.
