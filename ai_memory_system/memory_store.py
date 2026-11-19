@@ -103,7 +103,9 @@ _VOLATILE = ("uses", "last_used", "tier")
 # tombstone_unprovenanced (marks a pre-schema record's absence, never fills it).
 PROVENANCE_FIELDS = ("intent", "beneficiary", "divergence")
 
-_PWORD = re.compile(r"[a-z0-9]+")
+# \w+ not [a-z0-9]+ (2026-11-18): a CJK intent had NO tokens under the ASCII class, so an intent identical to
+# its payload was never caught and a wordless value counted as a word. Unicode words, as flinch 37d71be has it.
+_PWORD = re.compile(r"\w+")
 
 
 def _norm_tokens(s: str) -> List[str]:
@@ -125,12 +127,32 @@ def _intent_restates(intent: str, payload: str) -> bool:
     if not it:
         return False
     iset, pset = set(it), set(_norm_tokens(payload))
-    ni, npl = " ".join(it), " ".join(_norm_tokens(payload))
-    if ni and ni in npl:                       # intent is literally a span of the payload
+    # On TOKEN BOUNDARIES (2026-11-18, the consult of ops/CONSULT_INTENT_PROVENANCE_FLINCH_2026-11-18.md,
+    # reproduced here by probe before the change): the bare `ni in npl` matched INSIDE words, so an honest
+    # "cause review" was refused against "because reviewed", "stop drift" against "nonstop drifting", and a
+    # one-letter intent against almost anything. The padding spaces make the span test whole-word.
+    ni, npl = " " + " ".join(it) + " ", " " + " ".join(_norm_tokens(payload)) + " "
+    if ni in npl:                              # intent is literally a span of the payload, whole words
         return True
     if len(iset) < 3:                          # too short to judge by overlap; emptiness is caught elsewhere
         return False
     return len(iset & pset) / len(iset) >= 0.8  # ~all of intent's words are the payload's
+
+
+def _one_line_words(v: Any) -> Optional[str]:
+    """Why a provenance value is malformed, or None (2026-11-18, same consult, each shape reproduced by
+    probe first). It must be a str: beneficiary=7, intent=True and intent=["x"] passed through str(). It
+    must be ONE line where EVERY line separator counts: the old test looked for CR, LF and NUL only, so
+    U+2028, U+2029, U+0085, U+000B and U+000C passed; str.splitlines() knows all of them. And it must hold
+    at least one word under the Unicode tokenizer: "...", "???" and a zero-width space carried no intent
+    and passed an emptiness test that only stripped whitespace."""
+    if not isinstance(v, str):
+        return f"must be a string, not {type(v).__name__}"
+    if "\x00" in v or len(v.splitlines()) > 1:
+        return "must be a single line (no line separators or NULs)"
+    if not _norm_tokens(v):
+        return "must contain at least one word"
+    return None
 
 
 def screen_provenance(intent: str, beneficiary: str, divergence: str,
@@ -145,10 +167,13 @@ def screen_provenance(intent: str, beneficiary: str, divergence: str,
     """
     for k, v in (("intent", intent), ("beneficiary", beneficiary),
                  ("divergence", divergence)):
-        if not str(v or "").strip():
+        if v is None or (isinstance(v, str) and not v.strip()):
             return f"missing provenance field: {k} is required and may not be empty"
-        if any(c in str(v) for c in "\r\n\x00"):
-            return f"provenance field {k!r} must be a single line (no newlines or NULs)"
+        why = _one_line_words(v)
+        if why:
+            return f"provenance field {k!r} {why}"
+    if diverges_from is not None and not isinstance(diverges_from, str):
+        return f"diverges_from must be a string record name, not {type(diverges_from).__name__}"
     if _intent_restates(intent, body) or _intent_restates(intent, description):
         return ("intent restates the payload instead of stating its purpose; "
                 "say what this record is meant to CAUSE, not what it says")

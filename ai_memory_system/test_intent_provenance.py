@@ -20,6 +20,16 @@ passed has never been observed):
   P8  a refused write leaves NO file -- only the audit line that it was refused.
   P9  the provenance fields are chain-covered: editing intent on disk makes
       verify_integrity() name the file (and it was clean before).
+  P10 the three holes the 2026-11-18 consult reproduced in the SHARED rule
+      (ops/CONSULT_INTENT_PROVENANCE_FLINCH_2026-11-18.md), each driven both
+      ways and each refusal asserted by ITS OWN reason: the restatement span
+      test matches whole words (an honest "cause review" passes against
+      "because reviewed"; a literal whole-word span is still refused); every
+      field must be a str holding at least one Unicode word (7, True, ["x"],
+      "...", a zero-width space refused; a CJK intent identical to its body
+      refused as a restatement; diverges_from must be a str); and every line
+      separator ends the single line, not only CR/LF (U+2028, U+2029, U+0085,
+      U+000B, U+000C refused).
 
 Stdlib only; no network, no model. The ethics gate is replaced by an always-allow
 stub so these checks isolate the PROVENANCE gate, not the ethics one.
@@ -52,6 +62,18 @@ class _AllowGate:
     """Always allows, so these checks test the provenance screen in isolation."""
     def review(self, name, description, body, agent):
         return Verdict(verdict=ALLOW, by="test", reason="ok")
+
+
+def outcome(fn, *a, **k):
+    """Run fn; return ("ok", result) | ("refused", reason) | ("error", "ExcType: text"). P10 uses this so a
+    guard broken in a scratch copy shows as the FAIL of its own check (under the old code a non-string
+    beneficiary reached .strip() and crashed the store, which the suite must report, not die of)."""
+    try:
+        return "ok", fn(*a, **k)
+    except MemoryRefused as e:
+        return "refused", str(e)
+    except Exception as e:                                  # noqa: BLE001 -- a crash IS the finding
+        return "error", f"{type(e).__name__}: {e}"
 
 
 def refused(fn, *a, **k):
@@ -186,6 +208,67 @@ def main():
         ic4 = intent_check.intent_check(st.root, "legacy")
         check("P7.5 a pre-schema record reads as unsatisfiable",
               ic4["satisfiable"] is False and "predates" in ic4["assessment"], ic4)
+
+        # --- P10: the three consult holes (2026-11-18), both ways, own reasons. -
+        # Hole 1: the span test matched INSIDE words. Honest intents pass now ...
+        for i, (it, bd) in enumerate([("cause review", "because reviewed"),
+                                      ("stop drift", "nonstop drifting"),
+                                      ("a", "banana bandana")]):
+            kind, got = outcome(st.put, f"p10-honest-{i}", "d", "project", bd, "t",
+                                intent=it, beneficiary="future unknown agent", divergence="none")
+            check(f"P10.1.{i} honest intent {it!r} PASSES against body {bd!r} (whole words)",
+                  kind == "ok" and got["name"] == f"p10-honest-{i}", got)
+        # ... and a whole-word span of the body is still a restatement (documented limit).
+        kind, got = outcome(st.put, "p10-span", "d", "project", "we will ship it friday", "t",
+                            intent="ship it", beneficiary="future unknown agent", divergence="none")
+        check("P10.1.span a whole-word span of the body is STILL refused as a restatement",
+              kind == "refused" and "restates the payload" in got, got)
+        # Hole 2: non-string and wordless values passed through str(); CJK was invisible to [a-z0-9].
+        for label, kw, want in [
+                ("beneficiary=7", dict(beneficiary=7), "'beneficiary' must be a string, not int"),
+                ("intent=True", dict(intent=True), "'intent' must be a string, not bool"),
+                ("intent=['x']", dict(intent=["x"]), "'intent' must be a string, not list"),
+                ("divergence=0", dict(divergence=0), "'divergence' must be a string, not int"),
+                ('intent="..."', dict(intent="..."), "'intent' must contain at least one word"),
+                ('intent="???"', dict(intent="???"), "'intent' must contain at least one word"),
+                ("intent=U+200B", dict(intent="\u200b"), "'intent' must contain at least one word"),
+                ('beneficiary="--"', dict(beneficiary="--"), "'beneficiary' must contain at least one word")]:
+            k = dict(GOOD); k.update(kw)
+            kind, got = outcome(st.put, "p10-type", "d", "project", "some ordinary body", "t", **k)
+            check(f"P10.2 {label} is refused by its own reason", kind == "refused" and want in got, (kind, got))
+        cjk = "\u5c06\u6765\u306e\u8aad\u8005"                       # five CJK characters, no ASCII word
+        kind, got = outcome(st.put, "p10-cjk", "d", "project", cjk, "t",
+                            intent=cjk, beneficiary="future unknown agent", divergence="none")
+        check("P10.2.cjk a CJK intent identical to its CJK body is refused as a RESTATEMENT (Unicode tokenizer)",
+              kind == "refused" and "restates the payload" in got, (kind, got))
+        kind, got = outcome(st.put, "p10-cjk-ok", "d", "project", cjk, "t",
+                            intent="warn a later reader off this source",
+                            beneficiary="future unknown agent", divergence="none")
+        check("P10.2.cjk-ok a purpose intent on the same CJK body passes",
+              kind == "ok" and got["name"] == "p10-cjk-ok", got)
+        kind, got = outcome(st.put, "p10-dflist", "d", "project", "b", "t",
+                            intent="diverge from the prior claim", beneficiary="future unknown agent",
+                            divergence="conflicts with alpha", diverges_from=["alpha"])
+        check("P10.2.df a non-string diverges_from is refused by its own reason",
+              kind == "refused" and "diverges_from must be a string record name, not list" in got, (kind, got))
+        check("P10.2.notrace no file was written for any refused P10.2 write",
+              not any(os.path.exists(os.path.join(st.root, n + ".md"))
+                      for n in ("p10-type", "p10-cjk", "p10-dflist")))
+        # Hole 3: only CR/LF counted as a line break.
+        for nm, ch in [("U+2028", "\u2028"), ("U+2029", "\u2029"), ("U+0085", "\x85"),
+                       ("U+000B", "\x0b"), ("U+000C", "\x0c"), ("U+000D", "\r"), ("U+000A", "\n"),
+                       ("NUL", "\x00")]:
+            kind, got = outcome(st.put, "p10-line", "d", "project", "some ordinary body", "t",
+                                intent="warn a later" + ch + "reader off this source",
+                                beneficiary="future unknown agent", divergence="none")
+            check(f"P10.3 an intent holding {nm} is refused as not a single line",
+                  kind == "refused" and "'intent' must be a single line (no line separators or NULs)" in got,
+                  (kind, got))
+        kind, got = outcome(st.put, "p10-oneline", "d", "project", "some ordinary body", "t",
+                            intent="warn a later reader off this source \u2014 and say why",
+                            beneficiary="future unknown agent", divergence="none")
+        check("P10.3.ok a one-line intent with non-ASCII punctuation (U+2014) still passes",
+              kind == "ok" and got["name"] == "p10-oneline", got)
 
         # --- P9: the fields are chain-covered (tamper detection). ---------------
         clean = st.verify_integrity()
