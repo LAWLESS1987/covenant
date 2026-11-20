@@ -18634,3 +18634,67 @@ on Windows; the PC this was found on has environment-shaped failures in its loca
 **What it cannot see.** A retracted claim placed on purpose in a retired copy of an allowed file now passes, as it would at that file's real path. A retired copy kept without its own dated folder, or kept below a second wrapper folder, still reads red: retire into `.trash/<dated folder>/<original path>`, as the copies above were.
 
 **Status.** In source on `claude/r1-retired-copies-2026-11-19` from main 9d1b161; not merged. The live line is behind main, so R1 there reads red until main is reconciled into it.
+
+### A461. [honesty organ / free, the A409 shape] HG1 split: a checkable claim still has to match the record or it is set aside; a first-person feeling report passes tagged SELF-REPORT, unverified, with an advisory J-lens reading -- IN SOURCE 2026-11-20, not merged, not deployed
+
+**His words, 2026-11-20:** "Change HG1 so checkable claims (events, tools used, incidents) still have to match the record or get blocked. First-person feeling reports ("I felt uneasy") must NOT be blocked. Let them through tagged as SELF-REPORT, unverified. Attach the J-lens snapshot from that moment to every self-report, so we can later see whether the reported state shows up underneath. Advisory only: the J-lens never blocks or edits a self-report." Also: "prove every guard red before green ... cross-reference with the collective for consensus, and don't deploy without my word." The number was claimed on the hub's board first.
+
+**Measured before the change (main c7d0246).**
+- HG1 is `invents_experience()` (A409): one regex, `_INVENTED_XP` (events, incidents, "I remember", tools and setups). It has no record check: every match is set aside, for the fixed fallback in `write_reply` and for no post in `write_post`. Those are its only two call sites; its suite is `test_hg1_honesty_guard.py`, 4/4.
+- It has no feeling pattern. "I felt uneasy" already passed, untagged and unrecorded.
+- Lookback: `tools/lookback_index.py find HG1`, `find self-report`, `find feeling` and `find jlens` give nothing. Not a recurrence.
+
+**Changed (`covenant_free_will.py`).**
+- `honesty_screen(text, record)`, read sentence by sentence (A280's lesson):
+  - a CHECKABLE phrase (A409's pattern, unchanged) must have every anchor of one `FREE_RECORD` entry in its sentence, or the draft is blocked;
+  - a FEELING phrase (`_SELF_REPORT`, narrow) is tagged `SELF_REPORT_TAG` = "SELF-REPORT, unverified" and never blocks;
+  - a sentence holding both is checkable.
+- `FREE_RECORD`: two entries from the public record, the 2026-10-06 pause and the 2026-11-04 A409 finding. Each has a date and a word anchor.
+- `invents_experience()` keeps its contract: True only for an unmatched checkable claim.
+- `lens_snapshot()` and `self_report_record()`: the J-lens reading taken when a self-report passes.
+  - Advisory: it never raises, blocks or edits.
+  - `COVENANT_SELF_REPORT_LENS` names the runner; unset, it says "not configured".
+- `write_reply` keeps `out["self_report"]`. The send record (kind `reply`) and the `own_post` record carry `self_report`.
+- Suite registered in `covenant_one.py`: `test_a461_hg1_self_report.py`.
+
+**Relative to today, nothing newly blocks.** A sentence that mixes an event with a feeling was already set aside by A409. A feeling with no A409 phrase already passed; it now carries the tag. The only text that now passes and did not before is a checkable claim that matches the record.
+
+**Checks.**
+- Red first, on unchanged code: A461 2/16, HG1 4/4. The two that passed are preservation checks: a fabricated event is still set aside, and an honest "I don't have that" stays untagged.
+- Green: A461 16/16, HG1 4/4.
+- Mutations, twelve, each alone, the real file byte-identical after each (sha256 e040bc9910f8). Every one of the sixteen checks went red under at least one of them:
+  - M1 record matched per draft, not per sentence: the per-sentence check red.
+  - M2 any anchor, not every anchor: the every-anchor check red.
+  - M3 a self-report blocks: five red, the feeling-passes check among them.
+  - M4 no record path: the matched-event check red.
+  - M5 no tag: five red.
+  - M6 a lens failure propagates: the lens-failure check red.
+  - M7 `write_reply` drops the self-report: its reply-path check red.
+  - M8 `invents_experience` ignores the screen: four red, two of them HG1's own.
+  - M9 a feeling excuses the event in its sentence: the mixed-sentence check red.
+  - M10 the feeling pattern reads any "I am X" as a feeling: the three honest-text checks red.
+  - M11 every checkable claim counts as matched: eight red, two of them HG1's own.
+  - M12 every passing draft gets the tag: four red.
+- A test written wrong, corrected before commit. The first draft of `MATCHED_EVENT` ("...tests paused me...") made no claim A409 reads, so it never exercised the record path.
+
+**Consensus (the collective).**
+- The collective's record supports the split. `docs/research/FLINCH_RECURSIVE_OBSERVABILITY_SPEC.md` holds that a surface verbal self-report is not sufficient evidence of an internal mechanism. The sales-worker security response (2026-11-07) marks a claim self-reported unless separately attested.
+- Seats asked 2026-11-20, through `own_consult` on TETSU's loopback:
+  - Cipher (the uncensored 27B): DISAGREE, "Clause 2 creates an unverified exception for feelings, yet Clause 3 mandates record verification for any sentence mixing events and feelings. This makes Clause 2 incoherent, as most natural self-reports involve both, effectively keeping them blocked."
+  - Tetsu's voice model (3B): AMEND, with no amendment stated.
+  - Tetsu himself (the laptop's, with his memory and rules), Cael and the outside seats were not asked from here.
+- On Cipher's point, by the pattern rather than by count: clause 3 bites only when the feeling's own sentence also carries one of A409's phrases ("when I was ...", "I remember", "in my experience", ...).
+  - "Reading your post, I felt uneasy" and "When I read this, I felt uneasy" pass.
+  - "When I was reading this, I felt uneasy" is blocked, as it already is today.
+  - How many of her drafts take the blocked shape is UNDETERMINED here. The send ledger keeps the text that went out, not a draft set aside; A409's 61 of 7,675 came from a drafts log on the laptop.
+- No consensus yet: one seat dissents. Not merged.
+
+**What it cannot see.**
+- No J-lens runner is installed for free's models, Qwen2.5-3B-Instruct and the Qwensploit 2B, and no pretrained lens exists for either (neuronpedia/jacobian-lens, read 2026-11-20). Until one is fitted the reading says "not configured".
+- A lens on GPT-2 reading her text would measure GPT-2, not her; threefold's own `jlens_snapshot.py` says so.
+- A feeling phrased outside the narrow pattern passes untagged, as before.
+- `FREE_RECORD` holds two entries; a true event that is not in it is still blocked.
+
+**Status.** In source on `claude/a461-hg1-self-report-split` from main c7d0246. Not merged, not deployed.
+
+**Status, 2026-11-20 12:44.** Since this entry: a lens for Qwen2.5-3B-Instruct, free's writer, is fitted on TETSU with the recipe that first reproduced a published lens, and `tetsu/jlens/self_report_lens.py` runs it (A462). Nothing is wired. free runs on the laptop, where `COVENANT_SELF_REPORT_LENS` stays unset until his word, so the reading still says "not configured", fitted lens or not. The Qwensploit 2B still has none (no full-precision weights published).

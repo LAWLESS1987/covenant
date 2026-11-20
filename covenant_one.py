@@ -608,6 +608,10 @@ SUITES = [
     # uses, or incidents that happened to it (fabrication the blind label + the uncensored 27B both found).
     # invents_experience is driven both ways; a flagged model reply is set aside for the honest fallback.
     ("test_hg1_honesty_guard.py",         60,   "JUDGE"),
+    # A461 (2026-11-20, his words): HG1 split -- a checkable claim (event, tool, incident) still has to match the
+    # record or it is set aside; a first-person feeling report passes tagged SELF-REPORT, unverified, with an
+    # advisory J-lens reading that can never block or edit it. Driven both ways, twelve mutations.
+    ("test_a461_hg1_self_report.py",      60,   "JUDGE"),
     # GE1 (A409/H2, 2026-11-04): free's grant carries an optional expires_at, checked at action time and
     # fail-closed when past -- an immortal grant re-read every round proves it exists, not that consent
     # still holds. Absent expires_at = no window (backward compatible); the operator renews by re-signing.

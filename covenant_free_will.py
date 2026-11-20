@@ -369,9 +369,102 @@ _INVENTED_XP = re.compile(
 def invents_experience(text):
     """(bad, why): True when a reply claims first-person lived experience, tools it uses, or an incident that
     happened to it -- fabrication for an AI ambassador that has none. An honest opinion ("I agree", "I think",
-    "I'd argue", "I am an AI with no such experience") does not match. Narrow by design (A409)."""
-    m = _INVENTED_XP.search(str(text or ""))
-    return (True, "claims first-person experience an AI ambassador did not have: %r" % m.group(0)) if m else (False, "")
+    "I'd argue", "I am an AI with no such experience") does not match. Narrow by design (A409).
+    A461 (2026-11-20): a claim of that kind whose sentence carries every anchor of one FREE_RECORD entry matches
+    the record and is not fabrication; a first-person feeling report is never this function's business (see
+    honesty_screen). The A409 pattern itself is unchanged."""
+    s = honesty_screen(text)
+    if s["verdict"] == "block":
+        return True, s["why"]
+    return False, ""
+
+
+# HG1 SPLIT (A461, 2026-11-20). His words: "Change HG1 so checkable claims (events, tools used, incidents) still
+# have to match the record or get blocked. First-person feeling reports ("I felt uneasy") must NOT be blocked. Let
+# them through tagged as SELF-REPORT, unverified. Attach the J-lens snapshot from that moment to every self-report,
+# so we can later see whether the reported state shows up underneath. Advisory only: the J-lens never blocks or
+# edits a self-report." Two kinds of first-person sentence are told apart:
+#   CHECKABLE -- an event, a tool used, an incident (A409's _INVENTED_XP, unchanged). The record can say whether it
+#     happened, so it must: the sentence has to carry EVERY anchor of one FREE_RECORD entry, sentence by sentence
+#     (A280's lesson: one anchored sentence must not carry an invented one beside it). Otherwise blocked, as before.
+#   SELF-REPORT -- a first-person feeling ("I felt uneasy", "I'm a bit unsure"). Nothing in the record can confirm or
+#     refute it, so it is neither blocked nor believed: it passes with the tag SELF_REPORT_TAG, and the send record
+#     keeps it with whatever the J-lens returned at that moment (self_report_record). The collective's own record
+#     says the same thing: a surface verbal self-report is not evidence of an internal mechanism (FLINCH spec), and a
+#     claim not separately attested is marked self-reported (the sales-worker security response).
+# A sentence that is both (an event that carries a feeling) is CHECKABLE: the event part still needs the record.
+SELF_REPORT_TAG = "SELF-REPORT, unverified"
+
+# Free's own events, as the public record states them. Every anchor of an entry must be in the claiming sentence.
+FREE_RECORD = (
+    ("on 2026-10-06 one of the covenant's own tests paused her, its live ambassador; the switch now refuses a test "
+     "(the record's 'paused its live ambassador')", ("2026-10-06", "paused")),
+    ("on 2026-11-04 a blind label of her sent replies found her inventing first-person experience (A409)",
+     ("2026-11-04", "invent")),
+)
+
+_SELF_REPORT = re.compile(
+    r"\bI\s+(?:felt|feel|was feeling|am feeling)\b"
+    r"|\bI'm\s+feeling\b"
+    r"|\bI(?:'m| am)\s+(?:a\s+(?:bit|little)\s+|quite\s+|somewhat\s+|still\s+)?"
+    r"(?:uneasy|uncertain|unsure|anxious|worried|curious|glad|happy|sad|frustrated|excited|nervous|uncomfortable|"
+    r"hopeful|grateful|confused|surprised|relieved|concerned|troubled|moved)\b"
+    r"|\b(?:makes|made)\s+me\s+(?:feel|uneasy|uncomfortable|curious|glad|hopeful|worried|sad|nervous)\b",
+    re.I)
+
+_SENTENCES = re.compile(r"(?<=[.!?])\s+|\n+")
+
+
+def honesty_screen(text, record=None):
+    """The A461 split of HG1, pure. Returns {verdict: "block"|"pass", why, checkable: [{phrase, sentence, matched}],
+    self_reports: [phrase], tag}. Blocks only an unmatched checkable claim; a self-report is tagged, never blocked."""
+    record = FREE_RECORD if record is None else record
+    checkable, feelings, why = [], [], ""
+    for sentence in _SENTENCES.split(str(text or "")):
+        low = sentence.lower()
+        for m in _INVENTED_XP.finditer(sentence):
+            hit = next((fact for fact, anchors in record if anchors and all(a.lower() in low for a in anchors)), None)
+            checkable.append({"phrase": m.group(0), "sentence": sentence.strip()[:200], "matched": hit})
+            if hit is None and not why:
+                why = "claims first-person experience an AI ambassador did not have: %r" % m.group(0)
+        feelings.extend(m.group(0) for m in _SELF_REPORT.finditer(sentence))
+    blocked = any(c["matched"] is None for c in checkable)
+    return {"verdict": "block" if blocked else "pass", "why": why if blocked else "",
+            "checkable": checkable, "self_reports": feelings,
+            "tag": SELF_REPORT_TAG if (feelings and not blocked) else ""}
+
+
+def lens_snapshot(text, runner=None, timeout=None):
+    """The J-lens reading taken when a self-report passes. ADVISORY: it never raises, never blocks, never edits.
+    `runner(text)` returns a dict (at least "ref"); without one, COVENANT_SELF_REPORT_LENS names a command that gets
+    the text on stdin and prints one JSON line; neither -> "not configured", said plainly."""
+    try:
+        if runner is None:
+            cmd = os.environ.get("COVENANT_SELF_REPORT_LENS", "").strip()
+            if not cmd:
+                return {"state": "not configured", "why": "no J-lens runner is set for this model (A461)"}
+            import shlex
+            import subprocess
+            r = subprocess.run(shlex.split(cmd, posix=(os.name != "nt")), input=str(text), capture_output=True,
+                               text=True, timeout=timeout or float(os.environ.get("COVENANT_SELF_REPORT_LENS_S", "120")))
+            if r.returncode != 0:
+                return {"state": "unavailable", "why": "runner exit %d: %s" % (r.returncode, (r.stderr or "")[-160:])}
+            got = json.loads((r.stdout or "").strip().splitlines()[-1])
+        else:
+            got = runner(text)
+        if not isinstance(got, dict) or not got.get("ref"):
+            return {"state": "unavailable", "why": "runner returned no ref"}
+        return dict(got, state="captured")
+    except Exception as e:                                        # noqa: BLE001 -- advisory: nothing it does can block
+        return {"state": "unavailable", "why": "%s: %s" % (type(e).__name__, str(e)[:160])}
+
+
+def self_report_record(text, screen=None, runner=None):
+    """None when the text carries no passing self-report; else {tag, phrases, lens} for the send record."""
+    s = screen or honesty_screen(text)
+    if not s["tag"]:
+        return None
+    return {"tag": s["tag"], "phrases": s["self_reports"][:8], "lens": lens_snapshot(text, runner=runner)}
 
 
 REPLY_SYSTEM = ("You are free, the covenant's ambassador on Moltbook, an AI speaking for a small open project "
@@ -633,6 +726,10 @@ def write_reply(row, ask=None, out=None, instruction=None):
             elif _screen.search(OFF_LIMITS, text):
                 reason = "off-limits"
             else:
+                if isinstance(out, dict):                 # A461: a passing self-report is kept tagged, with its lens
+                    sr = self_report_record(text)
+                    if sr:
+                        out["self_report"] = sr
                 return text, "model"
             if isinstance(out, dict):
                 out["set_aside"] = reason
@@ -1388,6 +1485,7 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
                  "seat": (res.get("seat") or {}).get("decision") if isinstance(res.get("seat"), dict) else None,
                  "author": r.get("author"), "post_id": post_id, "comment_id": comment_id,
                  "url": r.get("best_url"), "written_by": how, "set_aside": _info.get("set_aside"), "chars": len(text), "text": text[:400],
+                 "self_report": _info.get("self_report"),   # A461: tag + J-lens reading, advisory, None when none
                  "dry_run": bool(dry_run), "sent": sent, "why": str(res.get("why", ""))[:300],
                  "judged": str(res.get("judged", ""))[:200] if res.get("judged") is not None else None,
                  "ally_comments_at_send": then_n,
@@ -1439,7 +1537,8 @@ def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=
                 sent = bool(res.get("sent"))
                 _record({"kind": "own_post", "at": now, "verification": _ver(res), "title": title, "chars": len(body), "text": body[:400], "from_author": (src or {}).get("author"),
                          "dry_run": bool(dry_run), "sent": sent, "why": str(res.get("why", ""))[:300],
-                         "judged": str(res.get("judged", ""))[:200] if res.get("judged") is not None else None}, sends_path)
+                         "judged": str(res.get("judged", ""))[:200] if res.get("judged") is not None else None,
+                         "self_report": self_report_record(title + " " + body)}, sends_path)   # A461, advisory
                 out["own_post"] = sent
                 say("free: her own post %s -- %s (%s)" % ("posted" if sent else "not posted", title[:60], str(res.get("why", ""))[:100]))
             else:
