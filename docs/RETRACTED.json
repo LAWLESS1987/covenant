@@ -2824,6 +2824,31 @@
     "docs/LOOKBACK_INDEX.md"
    ],
    "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a452-new-name-claim-as-written-2026-11-19 (at 41b85a7)."
+  },
+  {
+   "id": "A459-STALE-TAKEOVER",
+   "claim": "That rolling_restart.py's lock stopped two rolling restarts running at once, including after a run died and left its lock behind, because a stale lock was moved aside and taken over. Written at 87190a2 (2026-11-19) in rolling_restart.py (take_lock's docstring), in docs/KNOWN_ISSUES.md A459, in that commit's subject and message, and in the title and body of pull request #94.",
+   "verbatim": [
+    "A459: two rolling restarts can no longer run at once",
+    "A lock whose holder is known to be gone, or that is older than 30 minutes, is moved to `logs/rolling_restart.lock.stale` (kept, not deleted) and taken over",
+    "A lock whose holder is known\n    to be gone, or that is older than LOCK_STALE_S, is moved aside to `<lock>.stale` (kept, not deleted) and\n    taken once more"
+   ],
+   "truth": "False at 87190a2 and 6a43d12 whenever a lock had been left behind. Two runs could both judge it stale; B moved it aside and made its own, then A's move-aside moved B's FRESH lock and A made another, and both returned (True, \"\"). That is the two-starts-within-seconds case the lock was written for, after any crash. Restated: the lock is a non-blocking exclusive OS lock (msvcrt on Windows, fcntl.flock elsewhere) on a file that is never moved or removed; the OS drops it when the holder exits or dies, so there is no stale lock and no takeover. The same shape had been found in covenant_leviathan.acquire_lock by an outside review and fixed the same way, recorded only in that function's docstring, so the lookback could not surface it.",
+   "refuted_by": "The hub (TETSU session)'s non-author read of covenant #94 at 6a43d12, 2026-11-19: its rr_race_probe.py runs B's whole take_lock inside A's liveness call and reads \"A: (True, '')  B: (True, '')\". Reproduced here the same day by a separate probe (rr_race_mine.py, same result, files rolling_restart.lock and rolling_restart.lock.stale) and pinned as RR1.6, which a mutation restoring the move-aside turns red.",
+   "patterns": [
+    "two rolling restarts can no longer run at once",
+    "is moved (aside )?to\\s+`[^`]*\\.stale`\\s+\\(kept, not deleted\\)\\s+and\\s+taken (over|once more)"
+   ],
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a459-stale-takeover-as-written-2026-11-19 (at 6a43d12, which carries 87190a2's lock unchanged)."
   }
  ]
 }

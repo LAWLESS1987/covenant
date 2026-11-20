@@ -794,6 +794,9 @@ SUITES = [
     # stayed private to it while three live ledgers went on truncating.
     ("test_du1_durable.py", 120, "DAILY + GUARDS"),
     ("test_a153_import_drift.py", 120, "DAILY + GUARDS"),
+    # RR1 (A459, 2026-11-19): two rolling restarts never run at once -- a hand-run one and the highway's
+    # remedy_restart_nodes started together and left node A as two processes on one database.
+    ("test_rr1_restart_lock.py", 120, "DAILY + GUARDS"),
     ("test_ly1_layers.py", 120, "DAILY + GUARDS"),
     ("test_cl1_cloud.py", 120, "DAILY + GUARDS"),
     # OS1 (2026-09-26, "protect operation security in all we do by default"): his
