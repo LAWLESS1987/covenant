@@ -18696,3 +18696,5 @@ on Windows; the PC this was found on has environment-shaped failures in its loca
 - `FREE_RECORD` holds two entries; a true event that is not in it is still blocked.
 
 **Status.** In source on `claude/a461-hg1-self-report-split` from main c7d0246. Not merged, not deployed.
+
+**Status, 2026-11-20 12:44.** Since this entry: a lens for Qwen2.5-3B-Instruct, free's writer, is fitted on TETSU with the recipe that first reproduced a published lens, and `tetsu/jlens/self_report_lens.py` runs it (A462). Nothing is wired. free runs on the laptop, where `COVENANT_SELF_REPORT_LENS` stays unset until his word, so the reading still says "not configured", fitted lens or not. The Qwensploit 2B still has none (no full-precision weights published).
