@@ -1015,6 +1015,10 @@ SUITES = [
     # is read with its own machine's profile. On the second PC /hwy/state reported 9 PRESENT and 17 UNKNOWN where
     # the profile-aware pass read 2 and 1. Fixture detectors and a spy remedy only. Red on main 5/20.
     ("test_a464_hwy_report_profile.py", 120, "DAILY + GUARDS"),
+    # A465 (2026-11-21, his "Yes, build C"): a machine's profile may name its own node by a loopback port, so the
+    # mesh checks are handed that node's health by every profiled reader; mesh_source_split says its unit, the
+    # unmapped senders and which source is on disk. Stand-ins for every read; no node is asked. Red on main 10/32.
+    ("test_a465_mesh_split_who.py", 120, "DAILY + GUARDS"),
     # A429 (2026-11-15, the owner: "Show the judge the content."): his hands' content goes to a content seat in this
     # process, never through the shared quorum (whose seats reach a runner and the tracked verdicts file); the seat
     # refuses what the screen refuses and otherwise abstains. Stub quorums and a stub runner; red on main 0/6.
