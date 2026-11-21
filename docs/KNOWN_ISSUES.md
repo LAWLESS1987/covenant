@@ -18041,6 +18041,8 @@ filesystems.
 
 ---
 
+**Status, 2026-11-21.** Merged on his word ("Yes, merge both"): pull request #89, main aa0110b to c5ceb44 by fast-forward. Main was merged into the branch first (the index and the manifest regenerated, nothing else conflicted), and CI was 4 of 4 green on c5ceb44 before the push. Deploying to any node is the operator's.
+
 ### A445. [security] A metadata extension could forge a store-owned field, and a Unicode line separator could break out of the frontmatter -- hardened
 
 **Found 2026-11-18** sitting UNCOMMITTED in node D's working copy of `ai_memory_system/memory_store.py`: a prior
@@ -18528,6 +18530,9 @@ on Windows; the PC this was found on has environment-shaped failures in its loca
 **Status (2026-11-18):** running on the live checkout (`claude/improve-miner-circle-back`, 1cd43e2); for main on branch `claude/free-post-title-2026-11-18`, not pushed.
 
 ---
+
+**Status, 2026-11-21.** Merged on his word ("Yes, merge both"): pull request #82, main c5ceb44 to 817179c by fast-forward. Main was merged into the branch twice that day (the second time after #89 landed; the manifest regenerated), and CI was 4 of 4 green on 817179c before the push. The status of 2026-11-18 above says the live checkout already ran this fix from its own branch; whether the laptop's nodes now run main's copy was not read from the machine that merged it.
+
 ### A453. [security] The adopt gate let the SENDER of a change decide what it scanned and tested: a tag named after the node's short HEAD made it compare the change with itself, lines beginning `++` were never scanned, an incoming `.gitattributes` hid whole files, a rename hid a sensitive name, a failed fetch read "already current", and a merge that never happened was scanned as clean (2026-11-19). IN SOURCE on its branch; not deployed.
 
 **His words, 2026-11-19 (typed in the TETSU session):** "Figure out how to merge that gap you're talking about. Ask the quorum if need be."
