@@ -175,6 +175,18 @@ def main():
         check("A464.I5 ...a condition with no reversible remedy is raised there, as before",
               err is None and "other_pc_only" in entered and did.get("other_pc_only", {}).get("action") == "raised",
               err or json.dumps(did.get("other_pc_only")))
+
+        # An outside read (2026-11-21) found the first form tested truthiness: a profile handed in by a caller with
+        # acts_here "no" (a string, so truthy) repaired. machine_profile() only ever returns True or False, so the
+        # wire was not affected; a caller's own dict was.
+        for odd in ("no", "false", 1, "True", [True], {"yes": 1}):
+            del entered[:], ran[:]
+            out, err = call(H.ingest, peer, dry_run=False, ledger=led, cooldown_s=0,
+                            machine=dict(HOME, acts_here=odd))
+            did = {d["condition"]: d for d in (out or {}).get("did", [])}
+            check("A464.I6 acts_here=%r is not True: the condition is raised and no remedy is entered" % (odd,),
+                  err is None and did.get("log_bloat", {}).get("action") == "raised" and not ran,
+                  err or json.dumps(did.get("log_bloat")))
     finally:
         H.DETECTORS.clear()
         H.DETECTORS.update(real_detectors)

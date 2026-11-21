@@ -4835,7 +4835,7 @@ def ingest(peer_report, dry_run=True, ledger=None, cooldown_s=None, machine=None
             acted.append({"condition": name, "action": "declined",
                           "why": "the peer has it; this node measured %s" % local["state"]})
             continue
-        if not profile.get("acts_here"):
+        if profile.get("acts_here") is not True:    # exactly True: "no", 1 or "True" from a caller's dict is not a yes
             acted.append({"condition": name, "action": "raised",
                           "why": "present here too; this machine's profile says the highway does not repair here"})
             continue
