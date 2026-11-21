@@ -190,6 +190,36 @@ def main():
     check("SF1d a changed target restarts the cycle count (fresh instance) -> back to ABSENT",
           r["state"] == H.ABSENT and (H._load_lag_cache(cp3).get("covenant/hf") or {}).get("cycles") == 1, str(r["measured"]))
 
+    # A455: a SNAPSHOT copy's head is a commit made on the other side; it never equals the target. The feed
+    # says whether its FILES match (needs_snapshot). Five readings each way.
+    def snap_repo(needs, with_list=True):
+        e = repo(tgt, hf=behind)                                 # the ids differ, as they always will
+        e["snapshot_copies"] = ["hf"]
+        if with_list:
+            e["needs_snapshot"] = needs
+        return e
+
+    def five(entry, path):
+        out = None
+        for i in range(1, 6):
+            out = H.detect_mirror_lag(feed=feed(iso(NOW + i * 900), {"covenant": entry}), cache_path=path, now=NOW + i * 900)
+        return out
+
+    r = five(snap_repo([]), tmp_path("_snap_ok.json"))
+    check("SF1d a snapshot copy whose files match is NOT lagging, however long its commit id differs",
+          r["state"] == H.ABSENT and not r["measured"]["rerun_tasks"], str(r["measured"]))
+    r = five(snap_repo(["hf"]), tmp_path("_snap_due.json"))
+    check("SF1d a snapshot copy the feed says is due IS lagging after >3 readings (the fault still fires)",
+          r["state"] == H.PRESENT and r["measured"]["rerun_tasks"] == ["CovenantHFMirror"], str(r["measured"]))
+    r = five(snap_repo(None, with_list=False), tmp_path("_snap_old.json"))
+    check("SF1d a feed that names a snapshot copy but carries no needs_snapshot list is read the old way (behind)",
+          r["state"] == H.PRESENT, str(r["measured"]))
+    e = snap_repo([])
+    e["heads"]["website"] = behind                               # a HISTORY copy beside it is still read by id
+    r = five(e, tmp_path("_snap_mixed.json"))
+    check("SF1d beside a matching snapshot copy, a history copy that is behind still fires (website only)",
+          r["state"] == H.PRESENT and r["measured"]["rerun_tasks"] == ["CovenantSiteAutoDeploy"], str(r["measured"]))
+
     # feed not ready -> UNKNOWN, so a feed outage is unison_feed_stale's finding, not "no lag"
     r = H.detect_mirror_lag(feed={"status": "starting"}, cache_path=tmp_path("_x.json"))
     check("SF1d a not-ready feed makes mirror_lag UNKNOWN, never OK", r["state"] == H.UNKNOWN, str(r["measured"]))

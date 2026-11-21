@@ -109,7 +109,7 @@ SUITES = [
     # only when armed). Pins the gate both ways: GO only when NORMAL + merge-clean
     # + scan-clean + no new failing gate; HIGH/scan-hit/conflict/new-failure each
     # hold. Reuses node D's safe_integrate design + covenant_one's differential gate.
-    ("test_ca1_covenant_adopt.py",        60,  "SECURITY"),
+    ("test_ca1_covenant_adopt.py",        300, "SECURITY"),
     # A439 (2026-11-16): first catch of the A438 hunt, at /actuator_learn. The
     # shared operator-request gate (covenant_daily_plan.verify_signed) let a
     # NON-FINITE timestamp slip the freshness window (abs(now-nan) > WINDOW_S is
@@ -436,6 +436,10 @@ SUITES = [
     # transaction surface are untouched. Both-ways + the tombstone's "never clears"
     # control + the kill switch. The live door is driven in test_m6_mobile_door.py.
     ("test_cl1_chat_label.py",            30,  "JUDGE"),
+    # TQ1 (2026-11-19, A456) -- tools/talk_report.py: how the operator's conversation with Tetsu is going, in
+    # counts and never in words (the wait, gate notes, empty answers, repeats, what was out of his view). Both
+    # ways on a made-up log; the bar it sets for itself is that no question, answer or address is printed.
+    ("test_tq1_talk_report.py",           30,  "JUDGE"),
     # F2 and F3 joined 2026-09-04 with the deferring seat and the distilled
     # student. F2 pins the seat and the promotion rule; F3 runs the three
     # judges COMPOSED, offline, and pins that no violation is admitted with
@@ -793,6 +797,9 @@ SUITES = [
     # stayed private to it while three live ledgers went on truncating.
     ("test_du1_durable.py", 120, "DAILY + GUARDS"),
     ("test_a153_import_drift.py", 120, "DAILY + GUARDS"),
+    # RR1 (A459, 2026-11-19): two rolling restarts never run at once -- a hand-run one and the highway's
+    # remedy_restart_nodes started together and left node A as two processes on one database.
+    ("test_rr1_restart_lock.py", 120, "DAILY + GUARDS"),
     ("test_ly1_layers.py", 120, "DAILY + GUARDS"),
     ("test_cl1_cloud.py", 120, "DAILY + GUARDS"),
     # OS1 (2026-09-26, "protect operation security in all we do by default"): his
@@ -995,6 +1002,11 @@ SUITES = [
     # word the caller's own message spells out (in CAPITALS / as the whole act line / in quotes); TETSU's check, 0
     # false positives measured. covenant_model gains a stub-answer queue so suites drive acts without naming them.
     ("test_a427_actword.py", 60, "JUDGE"),
+    # A463 (2026-11-20): Tetsu's limbs join the two door rules written without them. The act-word guard holds a limb
+    # line the caller spelled out; on a private ask a LEG or LIMB consult is made only to this machine or a tailnet
+    # address, read the way urllib will send to it, with the limb list read once. The real door, the stub model,
+    # recorder consults, no network. Red on main 6/34.
+    ("test_a463_limb_guard.py", 240, "JUDGE"),
     # A429 (2026-11-15, the owner: "Show the judge the content."): his hands' content goes to a content seat in this
     # process, never through the shared quorum (whose seats reach a runner and the tracked verdicts file); the seat
     # refuses what the screen refuses and otherwise abstains. Stub quorums and a stub runner; red on main 0/6.

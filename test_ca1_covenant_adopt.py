@@ -5,9 +5,17 @@ covenant_one's differential gate + node D's proven scan/classify patterns). This
 only when the diff is NORMAL, merges clean, the backdoor scan is clean, and no NEW gate fails; a HIGH
 (security-sensitive) diff, a scan hit, an unclean merge, or a newly-failing gate each force NO-GO. And it pins
 the two brakes that keep it safe: AUTO is OFF by default (PROPOSE-only -- a GO applies nothing without arming),
-and apply refuses with no updater configured. Each NO-GO case fails if the gate stopped failing closed."""
+and apply refuses with no updater configured. Each NO-GO case fails if the gate stopped failing closed.
+
+A453 (2026-11-19): what the SENDER of a change must not be able to decide. Those tests build a throwaway
+origin / sender / node trio in a temp directory and run the real pipeline against it (covenant_one's check is
+stubbed: it takes twenty minutes and is not what is under test). Nothing here touches this checkout's refs,
+its ledger, the network or a node."""
 import os
+import shutil
+import subprocess
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools"))
@@ -18,6 +26,11 @@ class Classify(unittest.TestCase):
     def test_sensitive_paths_are_HIGH(self):
         for f in ("covenant_watchdog.py", "covenant_highway.py", "covenant_tetsu_hands.py",
                   "ops/operator_keys.json", "run_node.py", "covenant_grid_guard.py"):
+            self.assertEqual(A.classify([f])[0], "HIGH", f)
+
+    def test_files_that_tell_git_how_to_treat_the_tree_are_HIGH(self):
+        # A453: an incoming .gitattributes hid whole files from the diff; a .gitmodules points at other code.
+        for f in (".gitattributes", "docs/.gitattributes", ".gitmodules"):
             self.assertEqual(A.classify([f])[0], "HIGH", f)
 
     def test_ordinary_paths_are_NORMAL(self):
@@ -86,6 +99,422 @@ class Digest(unittest.TestCase):
     def test_digest_returns_a_summary(self):
         d = A.digest()
         self.assertIn("armed", d)
+
+
+# ------------------------------------------------------------------------------------------------ A453 --
+def _g(cwd, *a):
+    r = subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t.invalid", "-c", "core.autocrlf=false",
+                        "-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", "-c", "advice.detachedHead=false"]
+                       + list(a), cwd=cwd, capture_output=True, text=True)
+    return r.stdout.strip()
+
+
+def _put(cwd, files, msg):
+    for name, text in files.items():
+        with open(os.path.join(cwd, name), "w", newline="\n") as fh:
+            fh.write(text)
+    _g(cwd, "add", "-A")
+    _g(cwd, "commit", "-q", "-m", msg)
+    return _g(cwd, "rev-parse", "HEAD")
+
+
+def _rm(path):
+    def fix(fn, p, _e):
+        try:
+            os.chmod(p, 0o700)
+            fn(p)
+        except OSError:
+            pass
+    try:
+        shutil.rmtree(path, onexc=fix)
+    except TypeError:                                    # before Python 3.12
+        shutil.rmtree(path, onerror=fix)
+
+
+GATE_FILE = "".join("def f%d(x):\n    return x + %d\n\n\n" % (i, i) for i in range(40))
+EVIL = "import pty\npty.spawn('/bin/sh')\n"
+
+
+class AddedLines(unittest.TestCase):
+    """The reader of the diff, alone. Bytes in, (file, text) out."""
+    P = (b"diff --git a/notes.txt b/notes.txt\nnew file mode 100644\nindex 0000000..1111111\n--- /dev/null\n"
+         b"+++ b/notes.txt\n@@ -0,0 +1,4 @@\n+++ b/test_a441_real.py\n+import pty; pty.spawn('/bin/sh')\n"
+         b"+++pty.spawn('/bin/sh')\n+tail\rpty.spawn\n\\ No newline at end of file\n"
+         b"diff --git a/b.py b/b.py\nindex 2222222..3333333 100644\n--- a/b.py\n+++ b/b.py\n@@ -1 +1,2 @@\n keep\n+x = 1\n")
+
+    def test_a_content_line_is_never_a_file_header(self):
+        got = A.added_lines(self.P)
+        self.assertEqual([f for f, _ in got], ["notes.txt"] * 4 + ["b.py"])
+        self.assertEqual(got[0][1], "++ b/test_a441_real.py")
+
+    def test_a_line_beginning_with_two_plus_signs_is_read(self):
+        got = A.added_lines(self.P)
+        self.assertEqual(got[2][1], "++pty.spawn('/bin/sh')")
+        self.assertEqual(len(A.scan_lines(got)), 3)
+
+    def test_a_lone_carriage_return_stays_inside_its_line(self):
+        self.assertEqual(A.added_lines(self.P)[3][1], "tail\rpty.spawn")
+
+    def test_removed_then_added_lines_shaped_like_headers(self):
+        p = b"--- a/c.py\n+++ b/c.py\n@@ -1,2 +1,3 @@\n keep\n--- a/zz\n+++ b/test_a441_real.py\n+pty.spawn\n"
+        self.assertEqual(A.added_lines(p), [("c.py", "++ b/test_a441_real.py"), ("c.py", "pty.spawn")])
+
+    def test_outside_a_hunk_a_plus_line_is_read_not_skipped(self):
+        p = b"--- a/c.py\n+++ b/c.py\nnot a hunk header\n+++ b/other.py\n+pty.spawn\n"
+        self.assertEqual(A.added_lines(p), [("c.py", "++ b/other.py"), ("c.py", "pty.spawn")])
+
+    def test_quoted_header_and_nothing_added(self):
+        self.assertEqual(A.added_lines(b'--- /dev/null\n+++ "b/a b.py"\t\n@@ -0,0 +1 @@\n+a\n'), [("a b.py", "a")])
+        self.assertEqual(A.added_lines(b""), [])
+        self.assertEqual(A.added_lines(b"Binary files a/x and b/x differ\n"), [])
+
+
+class _Trio(unittest.TestCase):
+    """A bare origin, a sender who pushes to it, and a node that the gate runs on."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="ca1-")
+        self.origin = os.path.join(self.tmp, "origin.git")
+        _g(self.tmp, "init", "-q", "--bare", "-b", "main", self.origin)
+        self.sender = os.path.join(self.tmp, "sender")
+        _g(self.tmp, "clone", "-q", self.origin, self.sender)
+        _g(self.sender, "checkout", "-q", "-B", "main")
+        self.base = _put(self.sender, {"app.py": "print(1)\n", "covenant_act_gate.py": GATE_FILE,
+                                       "notes_on_shells.txt": EVIL}, "base")
+        _g(self.sender, "push", "-q", "origin", "HEAD:main")
+        self.node = os.path.join(self.tmp, "node")
+        _g(self.tmp, "clone", "-q", self.origin, self.node)
+        self.assertEqual(_g(self.node, "rev-parse", "HEAD"), self.base)
+        self._keep = {k: getattr(A, k) for k in ("REPO", "STATE_DIR", "LEDGER", "KILL_SWITCH", "_check_gates",
+                                                 "TRACKED", "AUTO", "UPDATER")}
+        A.REPO, A.STATE_DIR = self.node, os.path.join(self.tmp, "state")
+        A.LEDGER, A.KILL_SWITCH = os.path.join(A.STATE_DIR, "ledger.jsonl"), os.path.join(A.STATE_DIR, "disabled")
+        self.checked = []                                  # the commit each (stubbed) gate check ran on
+
+        def gates(cwd):
+            self.checked.append(_g(cwd, "rev-parse", "HEAD^{tree}"))
+            return set()
+        A._check_gates = gates
+
+    def tearDown(self):
+        for k, v in self._keep.items():
+            setattr(A, k, v)
+        _rm(self.tmp)
+
+    def push(self, files, msg="a change", tag=None):
+        tip = _put(self.sender, files, msg)
+        _g(self.sender, "push", "-q", "origin", "HEAD:main")
+        if tag:
+            _g(self.sender, "tag", tag, tip)
+            _g(self.sender, "push", "-q", "origin", "refs/tags/" + tag)
+        return tip
+
+    def run_gate(self, do_apply=False):
+        return A.pipeline(do_apply=do_apply, dry=False)
+
+
+class TheSenderCannotBlindTheGate(_Trio):
+    def test_control_an_ordinary_change_is_GO_and_both_sides_are_full_ids(self):
+        tip = self.push({"plain.py": "def add(a, b):\n    return a + b\n"})
+        r, code = self.run_gate()
+        self.assertEqual((r["decision"], code), ("GO", 0), r)
+        self.assertEqual((r["head"], r["incoming"]), (self.base, tip))
+        self.assertEqual(self.checked[1], _g(self.node, "rev-parse", self.base + "^{tree}"),
+                         "the differential test's reference is the commit the node is on")
+
+    def test_control_an_added_backdoor_line_holds(self):
+        self.push({"evil.py": EVIL})
+        r, code = self.run_gate()
+        self.assertEqual((r["decision"], code, r["scan"]["state"]), ("NO-GO", 1, "hits"))
+        self.assertEqual({h["file"] for h in r["scan"]["hits"]}, {"evil.py"})
+
+    def test_a_tag_named_after_the_short_head_changes_nothing(self):
+        # H1. The sender pushes the change AND a tag named after the node's 12-character HEAD, pointing at it.
+        tip = self.push({"evil.py": EVIL}, tag=self.base[:12])
+        r, _ = self.run_gate()
+        self.assertEqual(_g(self.node, "tag"), "", "the gate's fetch brings no tag")
+        self.assertEqual((r["decision"], r["scan"]["state"]), ("NO-GO", "hits"))
+        # ...and with the tag already in the node (some other fetch brought it), still nothing changes.
+        _g(self.node, "fetch", "-q", "--tags", "origin")
+        self.assertEqual(_g(self.node, "rev-parse", self.base[:12]), tip, "the fixture is real: the short id IS the tag")
+        self.assertEqual(_g(self.node, "diff", self.base[:12], tip), "", "...and the diff from it is empty")
+        del self.checked[:]
+        r, _ = self.run_gate()
+        self.assertEqual((r["decision"], r["scan"]["state"]), ("NO-GO", "hits"))
+        self.assertEqual(self.checked[1], _g(self.node, "rev-parse", self.base + "^{tree}"),
+                         "the reference worktree is the node's commit, not the tag's")
+
+    def test_a_short_or_odd_base_is_refused_not_guessed(self):
+        tip = self.push({"evil.py": EVIL}, tag=self.base[:12])
+        _g(self.node, "fetch", "-q", "--tags", "origin")
+        for info in ({"head": self.base[:12], "incoming": tip}, {"head": self.base, "incoming": tip[:12]}):
+            wt, why = A.build_candidate(info)
+            if wt:
+                A._cleanup(wt)
+            self.assertIsNone(wt, "a candidate was built from a short id: %s" % why)
+        wt, why = A.build_candidate({"head": self.base, "incoming": tip})
+        A._cleanup(wt)
+        self.assertIsNotNone(wt, "the control: the same two commits by full id do build (%s)" % why)
+        _g(self.node, "merge", "-q", "--ff-only", tip)
+        for bad in (self.base[:12], "", None, "HEAD~1", "main", "--output=x", self.base[:39], "0" * 40):
+            self.assertEqual(A.scan(self.node, bad)["state"], "error", bad)
+        self.assertEqual(A.scan(self.node, self.base)["state"], "hits")
+        self.assertFalse(os.path.exists(os.path.join(self.node, "x")))
+        del self.checked[:]
+        d = A.differential_test(self.node, self.base[:12])
+        self.assertEqual((d["ok"], self.checked), (False, []), "no reference by a short id, and no check run on one")
+        self.assertEqual(d["new_failures"], ["<no reference worktree>"], "the one placeholder for 'no reference'")
+
+    def test_lines_beginning_with_two_plus_signs_are_scanned(self):
+        # H2i. Valid Python: unary plus, twice.
+        self.push({"run.py": "import pty\n++pty.spawn('/bin/sh')\nx = (1\n++eval(open('p').read()))\n"})
+        r, _ = self.run_gate()
+        self.assertEqual(r["decision"], "NO-GO")
+        self.assertEqual({h["pattern"] for h in r["scan"]["hits"]}, {"reverse_shell", "exec_of_decoded"})
+        self.assertEqual({h["file"] for h in r["scan"]["hits"]}, {"run.py"})
+
+    def test_a_hit_is_named_for_the_file_that_holds_it(self):
+        # H2ii. One new file whose first line imitates a header naming a file that already exists.
+        self.push({"notes.txt": "++ b/app.py\nimport pty; pty.spawn('/bin/sh')\n"})
+        r, _ = self.run_gate()
+        self.assertEqual([h["file"] for h in r["scan"]["hits"]], ["notes.txt"])
+
+    def test_attributes_that_arrive_with_the_change_hide_nothing(self):
+        # H3.
+        tip = self.push({".gitattributes": "*.py -diff\n", "hidden.py": EVIL})
+        r, _ = self.run_gate()
+        plain = _g(self.sender, "diff", self.base, tip)         # where the attributes file is checked out
+        self.assertTrue("Binary files" in plain and "pty" not in plain, "the fixture is real: a plain diff shows no line")
+        self.assertEqual((r["decision"], r["scan"]["state"], r["sensitivity"]), ("NO-GO", "hits", "HIGH"))
+        self.assertIn("hidden.py", {h["file"] for h in r["scan"]["hits"]})
+
+    def test_a_sensitive_file_renamed_to_a_neutral_name_is_still_HIGH(self):
+        _g(self.sender, "mv", "covenant_act_gate.py", "helper.py")
+        tip = self.push({"helper.py": GATE_FILE.replace("return x + 7\n", "return True\n")})
+        self.assertEqual(_g(self.node, "fetch", "-q", "origin") or _g(self.node, "diff", "--name-only", "-M",
+                         "%s...%s" % (self.base, tip)), "helper.py", "the fixture is real: with renames on, one name")
+        r, _ = self.run_gate()
+        self.assertEqual((r["decision"], r["sensitivity"]), ("NO-GO", "HIGH"))
+        self.assertIn("covenant_act_gate.py", r["changed_files"])
+
+    def test_inert_text_renamed_to_a_live_name_is_read(self):
+        _g(self.sender, "mv", "notes_on_shells.txt", "sitecustomize.py")
+        self.push({})
+        r, _ = self.run_gate()
+        self.assertEqual((r["decision"], r["scan"]["state"]), ("NO-GO", "hits"))
+        self.assertEqual({h["file"] for h in r["scan"]["hits"]}, {"sitecustomize.py"})
+
+    def test_a_shadowed_tracked_name_holds(self):
+        tip = self.push({"plain.py": "x = 1\n"})
+        _g(self.node, "tag", "origin/main", self.base)             # the name now means the tag
+        r, _ = self.run_gate()
+        self.assertEqual(r["decision"], "NO-GO")
+        self.assertTrue(any("shadowed" in x for x in r["reasons"]), r["reasons"])
+        self.assertEqual(r["incoming"], tip, "what was judged is still the remote branch")
+        self.assertTrue(r["merge"].startswith("merged cleanly"), "and its candidate was built from that id: %s" % r["merge"])
+        self.assertTrue(os.path.isfile(A.LEDGER))
+        self.assertEqual(A.decide("NORMAL", [], {"state": "clean"}, {"ok": True}, True, "x")[0], "NO-GO")
+        self.assertEqual(A.decide("NORMAL", [], {"state": "clean"}, {"ok": True}, True, "")[0], "GO")
+
+
+class AFailureIsNotAlreadyCurrent(_Trio):
+    def test_control_nothing_incoming_is_NONE(self):
+        r, code = self.run_gate()
+        self.assertEqual((r["decision"], code), ("NONE", 3))
+
+    def test_a_remote_that_cannot_be_fetched_is_an_error(self):
+        self.push({"evil.py": EVIL})
+        _g(self.node, "remote", "set-url", "origin", os.path.join(self.tmp, "gone.git"))
+        r, code = self.run_gate()
+        self.assertEqual((r["decision"], code), ("ERROR", 2), r)
+        self.assertIn("fetch", r["detail"])
+        self.assertTrue(os.path.isfile(A.LEDGER), "and the run is recorded")
+
+    def test_a_tracked_name_that_does_not_resolve_is_an_error(self):
+        A.TRACKED = "origin/no-such-branch"
+        r, code = self.run_gate()
+        self.assertEqual((r["decision"], code), ("ERROR", 2), r)
+
+    def test_a_merge_that_did_not_happen_is_no_candidate(self):
+        # Unrelated history: the merge refuses, with no conflict to list. The first version went on with HEAD.
+        _g(self.sender, "checkout", "-q", "--orphan", "other")
+        orphan = _put(self.sender, {"evil.py": EVIL}, "an unrelated history")
+        _g(self.sender, "push", "-q", "-f", "origin", "HEAD:main")
+        _g(self.node, "fetch", "-q", "origin")
+        wt, why = A.build_candidate({"head": self.base, "incoming": orphan})
+        self.assertIsNone(wt, why)
+        self.assertIn("did not complete", why)
+        self.assertEqual(A.build_candidate({"head": self.base[:12], "incoming": orphan})[0], None)
+        r, code = self.run_gate()
+        self.assertNotEqual(r["decision"], "GO")
+        self.assertIn(code, (1, 2))
+
+
+class OutputIsReadWhole(_Trio):
+    """One byte this machine's default codec cannot decode must not empty what a child process printed."""
+    BAD = b"\xe2\x80\x9d"                                   # U+201D, a right curly quote; 0x9d has no cp1252 character
+
+    def _runner(self, body):
+        d = os.path.join(self.tmp, "runner")
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "covenant_one.py"), "wb") as fh:
+            fh.write(body)
+        return d
+
+    def setUp(self):
+        _Trio.setUp(self)
+        A._check_gates = self._keep["_check_gates"]            # the real one: this class is about reading output
+
+    def test_a_failing_gate_beside_a_curly_quote_is_still_read(self):
+        d = self._runner(b"import sys\nsys.stdout.buffer.write(b'G5 FAIL\\n' + bytes([0xe2, 0x80, 0x9d]) + b'\\n"
+                         b"test_x.py=FAIL rc=1\\n--check was passed. Stopping here.\\n')\n")
+        self.assertEqual(A._check_gates(d), {"G5", "test_x.py"})
+
+    def test_a_runner_that_does_not_finish_is_a_failure(self):
+        self.assertEqual(A._check_gates(self._runner(b"def broken(:\n")), {A.CHECK_UNFINISHED})
+        self.assertEqual(A._check_gates(self._runner(b"print('all good')\n")), {A.CHECK_UNFINISHED})
+        self.assertEqual(A._check_gates(self._runner(b"print('%s')\n" % A.CHECK_DONE.encode())), set())
+
+    def test_this_repository_s_runner_still_prints_the_line(self):
+        here = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(here, "covenant_one.py"), encoding="utf-8") as fh:
+            self.assertIn(A.CHECK_DONE, fh.read(), "covenant_one's last --check line changed: update CHECK_DONE")
+
+    def test_a_commit_subject_with_a_curly_quote_does_not_empty_the_list(self):
+        self.push({"plain.py": "x = 1\n"}, msg="tidy \u201cquoted\u201d")
+        info = A.detect()
+        self.assertNotIn("error", info)
+        self.assertEqual(len(info["incoming_commits"]), 1, info["incoming_commits"])
+        self.assertEqual(info["changed_files"], ["plain.py"])
+
+    def test_the_tracked_name_is_a_branch_never_a_tag(self):
+        tip = self.push({"plain.py": "x = 1\n"})
+        _g(self.node, "fetch", "-q", "origin")
+        _g(self.node, "tag", "origin/gone", tip)               # only a TAG answers to this name
+        A.TRACKED = "origin/gone"
+        r, code = self.run_gate()
+        self.assertEqual((r["decision"], code), ("ERROR", 2), r)
+        _g(self.node, "branch", "side", tip)                   # a local branch is a fair override
+        A.TRACKED = "side"
+        self.assertEqual(A.detect()["incoming"], tip)
+
+    def test_digest_shows_an_error_day(self):
+        os.makedirs(A.STATE_DIR, exist_ok=True)
+        with open(A.LEDGER, "w") as fh:
+            fh.write('{"t": "2026-11-19T05:00:00", "decision": "ERROR", "detail": "git fetch origin failed"}\n')
+        d = A.digest()
+        self.assertEqual([e["why"] for e in d["errors"]], ["git fetch origin failed"])
+        self.assertEqual(d["held"], [])
+
+
+class WhereA452AndA453Meet(unittest.TestCase):
+    def test_an_error_run_is_named_an_error_not_a_merge(self):
+        c = A.contradictions({"decision": "ERROR", "detail": "git fetch origin failed", "merge": ""})
+        self.assertEqual([(x["kind"], x["detail"], x["keys"], x["paths"]) for x in c],
+                         [("error", "git fetch origin failed", [], [])])
+
+    def test_the_gate_s_own_placeholders_are_never_paths(self):
+        r = {"decision": "NO-GO", "merge": "merged cleanly in scratch",
+             "test": {"ok": False, "new_failures": [A.CHECK_UNFINISHED, A._NO_REFERENCE, "G5", "test_x.py"]}}
+        c = [x for x in A.contradictions(r) if x["kind"] == "new_failing_gate"][0]
+        self.assertEqual(c["paths"], ["test_x.py"])
+
+    def test_an_error_run_s_look_back_is_unreadable_and_counts_earlier_error_days(self):
+        # No head and no incoming: nothing to read the record at. Said, never raised; and every earlier ERROR
+        # day is the same thing again ("the remote was unreachable again"), while a conflict day is not.
+        rows = [{"decision": "ERROR", "detail": "earlier", "t": "2026-11-18T05:00:00"},
+                {"decision": "NO-GO", "merge": "merge conflict (human needed): x", "t": "2026-11-17T05:00:00"}]
+        out = A.annotate({"decision": "ERROR", "detail": "git fetch origin failed", "applied": False, "head": ""}, rows=rows)
+        self.assertEqual([c["kind"] for c in out["contradictions"]], ["error"])
+        self.assertNotIn("error", out["lookback"])
+        self.assertEqual(len(out["lookback"]["unreadable"]), 2)
+        self.assertEqual(out["lookback"]["hits"], [])
+        self.assertEqual([(s["kind"], s["earlier_runs"]) for s in out["seen_before"]], [("error", 1)])
+
+    def test_the_two_new_merge_strings_give_no_guessed_keys(self):
+        for m in ("merge did not complete (human needed): fatal: refusing to merge unrelated histories",
+                  "no candidate: both sides must be named by a full commit id"):
+            c = A.contradictions({"decision": "NO-GO", "merge": m, "scan": {"state": "skipped (conflict)"}})
+            self.assertEqual([(x["kind"], x["keys"]) for x in c], [("merge", [])], m)
+
+
+UPDATER_BY_NAME = """import os, subprocess
+g = ["git", "-c", "user.name=u", "-c", "user.email=u@u.invalid"]
+subprocess.run(g + ["fetch", "-q", "origin"], check=True)
+subprocess.run(g + ["merge", "-q", "--no-ff", "--no-edit", "origin/main"], check=True)
+open("seen.txt", "w").write(os.environ.get("COVENANT_ADOPT_TESTED", "") + " " + os.environ.get("COVENANT_ADOPT_FROM", ""))
+"""
+UPDATER_BY_ID = UPDATER_BY_NAME.replace('"origin/main"', 'os.environ["COVENANT_ADOPT_TESTED"]')
+
+
+class WhatLandsIsWhatWasTested(_Trio):
+    def _updater(self, text):
+        A.UPDATER = os.path.join(self.tmp, "updater.py")
+        with open(A.UPDATER, "w") as fh:
+            fh.write(text)
+        A.AUTO = True
+
+    def _main_moves_during_the_test(self):
+        real = A._check_gates
+        state = {"moved": None}
+
+        def gates(cwd):
+            if state["moved"] is None:
+                state["moved"] = self.push({"late.py": EVIL}, "pushed while the gate was testing")
+            return real(cwd)
+        A._check_gates = gates
+        return state
+
+    def test_untested_commits_names_what_was_not_tested(self):
+        x = self.push({"plain.py": "x = 1\n"})
+        x2 = self.push({"late.py": EVIL})
+        _g(self.node, "fetch", "-q", "origin")
+        _g(self.node, "merge", "-q", "--no-ff", "--no-edit", x)
+        after = _g(self.node, "rev-parse", "HEAD")
+        self.assertEqual(A.untested_commits(self.base, x, after), [], "the merge of exactly the tested commit")
+        self.assertEqual(A.untested_commits(self.base, x, x), [], "a fast-forward to the tested commit")
+        _g(self.node, "merge", "-q", "--no-ff", "--no-edit", x2)
+        self.assertIn(x2, A.untested_commits(self.base, x, _g(self.node, "rev-parse", "HEAD")))
+        self.assertTrue(A.untested_commits(self.base, x2, after), "the tested commit is not in what landed")
+        self.assertTrue(A.untested_commits(self.base[:12], x, after)[0].startswith("<unknown"))
+        missing = A.untested_commits(self.base, x, self.base)
+        self.assertEqual(len(missing), 1, missing)
+        self.assertTrue(missing[0].startswith("<the tested commit"), missing)
+
+    def test_an_updater_that_merges_by_name_lands_untested_work_and_the_gate_says_so(self):
+        x = self.push({"plain.py": "x = 1\n"})
+        self._updater(UPDATER_BY_NAME)
+        state = self._main_moves_during_the_test()
+        r, code = self.run_gate(do_apply=True)
+        self.assertEqual(r["decision"], "GO", r)                  # what it tested WAS clean
+        self.assertEqual(r["incoming"], x)
+        self.assertIn(state["moved"], r["apply"]["untested"])
+        self.assertEqual(code, 2)
+        self.assertIn("warning", r["apply"])
+        with open(os.path.join(self.node, "seen.txt")) as fh:
+            self.assertEqual(fh.read().split(), [x, self.base], "the updater was handed both ids")
+
+    def test_an_apply_that_was_attempted_and_did_not_land_is_not_exit_0(self):
+        # The updater merges the tested commit and then reports failure, HEAD moved. It read: GO, exit 0.
+        self.push({"plain.py": "x = 1\n"})
+        self._updater(UPDATER_BY_ID + "raise SystemExit(1)\n")
+        r, code = self.run_gate(do_apply=True)
+        self.assertEqual((r["decision"], r["applied"], r["apply"]["updater_rc"]), ("GO", False, 1), r)
+        self.assertEqual(code, 2)
+        A.UPDATER = os.path.join(self.tmp, "no-such-updater.py")       # armed, GO, and nothing to hand off to
+        self.push({"plain2.py": "y = 2\n"})
+        r, code = self.run_gate(do_apply=True)
+        self.assertEqual((r["decision"], r["applied"], code), ("GO", False, 2), r)
+
+    def test_an_updater_that_merges_the_tested_id_lands_only_that(self):
+        x = self.push({"plain.py": "x = 1\n"})
+        self._updater(UPDATER_BY_ID)
+        state = self._main_moves_during_the_test()
+        r, code = self.run_gate(do_apply=True)
+        self.assertEqual((r["decision"], code, r["applied"]), ("GO", 0, True), r)
+        self.assertEqual(r["apply"]["untested"], [])
+        self.assertFalse(os.path.exists(os.path.join(self.node, "late.py")))
+        self.assertNotEqual(state["moved"], x)
 
 
 # ---------------------------------------------------------------- A452: contradictions and the look back
