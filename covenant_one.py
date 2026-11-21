@@ -999,6 +999,11 @@ SUITES = [
     # word the caller's own message spells out (in CAPITALS / as the whole act line / in quotes); TETSU's check, 0
     # false positives measured. covenant_model gains a stub-answer queue so suites drive acts without naming them.
     ("test_a427_actword.py", 60, "JUDGE"),
+    # A463 (2026-11-20): Tetsu's limbs join the two door rules written without them. The act-word guard holds a limb
+    # line the caller spelled out; on a private ask a LEG or LIMB consult is made only to this machine or a tailnet
+    # address, read the way urllib will send to it, with the limb list read once. The real door, the stub model,
+    # recorder consults, no network. Red on main 6/34.
+    ("test_a463_limb_guard.py", 240, "JUDGE"),
     # A429 (2026-11-15, the owner: "Show the judge the content."): his hands' content goes to a content seat in this
     # process, never through the shared quorum (whose seats reach a runner and the tracked verdicts file); the seat
     # refuses what the screen refuses and otherwise abstains. Stub quorums and a stub runner; red on main 0/6.
