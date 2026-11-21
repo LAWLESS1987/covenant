@@ -2849,6 +2849,57 @@
     "docs/LOOKBACK_INDEX.md"
    ],
    "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a459-stale-takeover-as-written-2026-11-19 (at 6a43d12, which carries 87190a2's lock unchanged)."
+  },
+  {
+   "id": "A427-FULL-ACT-LIST",
+   "claim": "That the act-word door guard (A427, 2026-11-14) covered the full list of acts the /m/agent door carries out. Written in covenant_unified_v8.py (the comment above ACT_WORDS) and in docs/KNOWN_ISSUES.md A427 (its Status line).",
+   "verbatim": [
+    "acts), so the full act list is covered.",
+    "**Status:** wired (full act list; capitals / whole-line / quoted rule; substitution, replayed history, and bare-URL FETCH remain uncovered -- a URL-provenance follow-up)"
+   ],
+   "truth": "False from the day it was written. The door had carried out a line beginning LIMB since A402 (2026-11-01), thirteen days before A427, and LIMB was not on the list: a caller's message that spelled the limb line out made Tetsu consult a limb on the second PC, and nothing held it. The same list in covenant_tetsu_hands.py's prose seat (A435) left it out too. Restated by A463 (2026-11-20): LIMB is on ACT_WORDS and among the prose seat's act lines. What the list still does not cover is what A427 named itself: an act the model substitutes, replayed history, a bare-URL FETCH.",
+   "refuted_by": "A read of the door on TETSU, 2026-11-20, while designing a trial whose asks spelled the limb line out: ACT_WORDS at covenant_unified_v8.py line 843 beside the LIMB branch at line 9609 (main 35a16ea). Pinned by test_a463_limb_guard.py (D2, M1) and test_a427_actword.py, run against 35a16ea first: LG1 6 of 34 passed, A427 6 of 8.",
+   "patterns": [
+    "full act list"
+   ],
+   "note_on_patterns": "Three plain words, so a later sentence that uses them about this guard must carry the id. The guard's test keeps its old name (test_the_full_act_list_is_covered, underscores, not matched) with the id in a comment beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a463-limb-claims-as-written-2026-11-20 (at 35a16ea)."
+  },
+  {
+   "id": "A263-NOTHING-LEAVES",
+   "claim": "That nothing of an ask marked private (A263, 2026-10-05) leaves the machine that answers it. Written in covenant_unified_v8.py (the note above PRIVATE_TEACHER_NOTE, and PRIVATE_ACT_HELD, which is said to Tetsu) and in tools/tetsu_work.py (its module docstring).",
+   "verbatim": [
+    "machine and nothing of the exchange leaves it: not queued (recorded as withheld, with the reason,",
+    "NOT done: this ask is marked private (A263), so nothing from it leaves this machine -- ",
+    "marked private. A private item is answered by the model on this machine and nothing of it leaves"
+   ],
+   "truth": "True when written. Not true from A402 (2026-11-01), which gave Tetsu limbs on the second PC: a LIMB line on a private ask sent his question to whatever address private/limbs.json named, and the private rule held FETCH, WEB and MOLTBOOK only. (The leg was the smaller case: covenant_leg already refused a host that is not loopback unless COVENANT_LEG_ALLOW_REMOTE was set.) Restated by A463 (2026-11-20) to what the marker does: the exchange is not queued for the teacher, not replayed into an ordinary ask, no FETCH, WEB or MOLTBOOK act is made for it, and a LEG or LIMB consult is made only when the host urllib will connect to is this machine or a tailnet address written as an IP with no proxy in the way (covenant_unified_v8.private_consult_leaves); otherwise it is held. So part of a private exchange can reach the operator's second PC. And, as A263's own entry says under Residual, the gate still sees a private question and answer: with a judge that is not on the machine they go to that judge. Not measured: whether any private text went anywhere but the second PC between 2026-11-01 and the fix; the laptop's limb list was not read from TETSU.",
+   "refuted_by": "The same read of the door on TETSU, 2026-11-20: the private branch at covenant_unified_v8.py line 9477 beside the LIMB branch at line 9609 (main 35a16ea). Pinned by test_a463_limb_guard.py (P1-P20, D3, D4, D6, D8, M2-M4), LG1 6 of 34 against 35a16ea.",
+   "patterns": [
+    "nothing of the exchange leaves it",
+    "nothing from it leaves this machine",
+    "answered by the model on this machine and nothing of it leaves"
+   ],
+   "note_on_patterns": "The three sentences as they stood, each narrow enough to be this claim. covenant_council.py line 376 says the same of the council door in other words; the council makes no consult, so it is left as it is and not matched.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a463-limb-claims-as-written-2026-11-20 (at 35a16ea)."
   }
  ]
 }
