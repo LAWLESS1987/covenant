@@ -2824,6 +2824,82 @@
     "docs/LOOKBACK_INDEX.md"
    ],
    "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a452-new-name-claim-as-written-2026-11-19 (at 41b85a7)."
+  },
+  {
+   "id": "A459-STALE-TAKEOVER",
+   "claim": "That rolling_restart.py's lock stopped two rolling restarts running at once, including after a run died and left its lock behind, because a stale lock was moved aside and taken over. Written at 87190a2 (2026-11-19) in rolling_restart.py (take_lock's docstring), in docs/KNOWN_ISSUES.md A459, in that commit's subject and message, and in the title and body of pull request #94.",
+   "verbatim": [
+    "A459: two rolling restarts can no longer run at once",
+    "A lock whose holder is known to be gone, or that is older than 30 minutes, is moved to `logs/rolling_restart.lock.stale` (kept, not deleted) and taken over",
+    "A lock whose holder is known\n    to be gone, or that is older than LOCK_STALE_S, is moved aside to `<lock>.stale` (kept, not deleted) and\n    taken once more"
+   ],
+   "truth": "False at 87190a2 and 6a43d12 whenever a lock had been left behind. Two runs could both judge it stale; B moved it aside and made its own, then A's move-aside moved B's FRESH lock and A made another, and both returned (True, \"\"). That is the two-starts-within-seconds case the lock was written for, after any crash. Restated: the lock is a non-blocking exclusive OS lock (msvcrt on Windows, fcntl.flock elsewhere) on a file that is never moved or removed; the OS drops it when the holder exits or dies, so there is no stale lock and no takeover. The same shape had been found in covenant_leviathan.acquire_lock by an outside review and fixed the same way, recorded only in that function's docstring, so the lookback could not surface it.",
+   "refuted_by": "The hub (TETSU session)'s non-author read of covenant #94 at 6a43d12, 2026-11-19: its rr_race_probe.py runs B's whole take_lock inside A's liveness call and reads \"A: (True, '')  B: (True, '')\". Reproduced here the same day by a separate probe (rr_race_mine.py, same result, files rolling_restart.lock and rolling_restart.lock.stale) and pinned as RR1.6, which a mutation restoring the move-aside turns red.",
+   "patterns": [
+    "two rolling restarts can no longer run at once",
+    "is moved (aside )?to\\s+`[^`]*\\.stale`\\s+\\(kept, not deleted\\)\\s+and\\s+taken (over|once more)"
+   ],
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a459-stale-takeover-as-written-2026-11-19 (at 6a43d12, which carries 87190a2's lock unchanged)."
+  },
+  {
+   "id": "A427-FULL-ACT-LIST",
+   "claim": "That the act-word door guard (A427, 2026-11-14) covered the full list of acts the /m/agent door carries out. Written in covenant_unified_v8.py (the comment above ACT_WORDS) and in docs/KNOWN_ISSUES.md A427 (its Status line).",
+   "verbatim": [
+    "acts), so the full act list is covered.",
+    "**Status:** wired (full act list; capitals / whole-line / quoted rule; substitution, replayed history, and bare-URL FETCH remain uncovered -- a URL-provenance follow-up)"
+   ],
+   "truth": "False from the day it was written. The door had carried out a line beginning LIMB since A402 (2026-11-01), thirteen days before A427, and LIMB was not on the list: a caller's message that spelled the limb line out made Tetsu consult a limb on the second PC, and nothing held it. The same list in covenant_tetsu_hands.py's prose seat (A435) left it out too. Restated by A463 (2026-11-20): LIMB is on ACT_WORDS and among the prose seat's act lines. What the list still does not cover is what A427 named itself: an act the model substitutes, replayed history, a bare-URL FETCH.",
+   "refuted_by": "A read of the door on TETSU, 2026-11-20, while designing a trial whose asks spelled the limb line out: ACT_WORDS at covenant_unified_v8.py line 843 beside the LIMB branch at line 9609 (main 35a16ea). Pinned by test_a463_limb_guard.py (D2, M1) and test_a427_actword.py, run against 35a16ea first: LG1 6 of 34 passed, A427 6 of 8.",
+   "patterns": [
+    "full act list"
+   ],
+   "note_on_patterns": "Three plain words, so a later sentence that uses them about this guard must carry the id. The guard's test keeps its old name (test_the_full_act_list_is_covered, underscores, not matched) with the id in a comment beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a463-limb-claims-as-written-2026-11-20 (at 35a16ea)."
+  },
+  {
+   "id": "A263-NOTHING-LEAVES",
+   "claim": "That nothing of an ask marked private (A263, 2026-10-05) leaves the machine that answers it. Written in covenant_unified_v8.py (the note above PRIVATE_TEACHER_NOTE, and PRIVATE_ACT_HELD, which is said to Tetsu) and in tools/tetsu_work.py (its module docstring).",
+   "verbatim": [
+    "machine and nothing of the exchange leaves it: not queued (recorded as withheld, with the reason,",
+    "NOT done: this ask is marked private (A263), so nothing from it leaves this machine -- ",
+    "marked private. A private item is answered by the model on this machine and nothing of it leaves"
+   ],
+   "truth": "True when written. Not true from A402 (2026-11-01), which gave Tetsu limbs on the second PC: a LIMB line on a private ask sent his question to whatever address private/limbs.json named, and the private rule held FETCH, WEB and MOLTBOOK only. (The leg was the smaller case: covenant_leg already refused a host that is not loopback unless COVENANT_LEG_ALLOW_REMOTE was set.) Restated by A463 (2026-11-20) to what the marker does: the exchange is not queued for the teacher, not replayed into an ordinary ask, no FETCH, WEB or MOLTBOOK act is made for it, and a LEG or LIMB consult is made only when the host urllib will connect to is this machine or a tailnet address written as an IP with no proxy in the way (covenant_unified_v8.private_consult_leaves); otherwise it is held. So part of a private exchange can reach the operator's second PC. And, as A263's own entry says under Residual, the gate still sees a private question and answer: with a judge that is not on the machine they go to that judge. Not measured: whether any private text went anywhere but the second PC between 2026-11-01 and the fix; the laptop's limb list was not read from TETSU.",
+   "refuted_by": "The same read of the door on TETSU, 2026-11-20: the private branch at covenant_unified_v8.py line 9477 beside the LIMB branch at line 9609 (main 35a16ea). Pinned by test_a463_limb_guard.py (P1-P20, D3, D4, D6, D8, M2-M4), LG1 6 of 34 against 35a16ea.",
+   "patterns": [
+    "nothing of the exchange leaves it",
+    "nothing from it leaves this machine",
+    "answered by the model on this machine and nothing of it leaves"
+   ],
+   "note_on_patterns": "The three sentences as they stood, each narrow enough to be this claim. covenant_council.py line 376 says the same of the council door in other words; the council makes no consult, so it is left as it is and not matched.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a463-limb-claims-as-written-2026-11-20 (at 35a16ea)."
   }
  ]
 }
