@@ -150,7 +150,11 @@ def machine_profile(path=None):
 
     The profile is APPLIED ONLY WHERE A CALLER PASSES IT (the heal button, the watchdog's round, --repair).
     sense() and run_once() called without it behave as they always have, so a test suite gives the same answer
-    on every machine."""
+    on every machine.
+    [A464, 2026-11-21: two callers were missed by that sentence. report() and ingest() are what a node says to and
+    takes from the mesh, their only callers are the two /hwy routes, and neither passed a profile; on the second
+    PC the report named 9 conditions PRESENT where 2 were. Those two now read this function themselves when no
+    profile is handed in. sense() and run_once() are unchanged: they still apply one only when given it.]"""
     path = path or os.environ.get("COVENANT_MACHINE_PROFILE") or MACHINE
     home = {"acts_here": True, "not_applicable": {}, "why": "", "source": "none", "refused": [], "sha": ""}
     sha = ""
@@ -4759,16 +4763,29 @@ def standing(ledger=None):
     return out
 
 
-def report(node_id=None, health=None, ledger=None):
+def report(node_id=None, health=None, ledger=None, machine=None):
     """What this node offers the mesh: what it senses, and what has worked here.
 
     Deliberately narrow. Detector names and states, remedy outcomes, nothing
     read out of a file and nothing about money, holdings, keys or people. A
     report is an OFFER; the receiving node re-measures before it believes a word
     of it.
+
+    READ WITH THIS MACHINE'S PROFILE (A464, 2026-11-21). A report is this machine's statement about itself, so
+    with no `machine` argument it reads machine_profile(), which is how GET /hwy/state calls it. Measured that day
+    on the second PC: this function reported 9 conditions PRESENT and 17 UNKNOWN in 17.0 s, where the watchdog's
+    pass, which hands its profile to run_once(), read 2 and 1 in 3.7 s. node_down, sweep_red and
+    sync_task_missing were offered to the tailnet as that machine's own, and none of them describes it. A detector
+    the profile marks as not applying is not entered and reads ABSENT, as in sense(); because a peer cannot tell
+    that ABSENT from "measured and clear", the names are listed under "not_applicable_here" (names only: the
+    profile's reasons are prose about a machine and stay on it). No profile file, or the home profile handed in,
+    changes nothing. WHAT THIS DOES NOT DO: it does not hand the node's own health to the mesh checks, so on a
+    machine whose profile marks node_down as not applying, mesh_source_split reads UNKNOWN here though the
+    watchdog's pass, which is given that health, can read it.
     """
     import covenant_unified_v8 as cov
-    conditions = sense(health=health)
+    profile = machine_profile() if machine is None else machine
+    conditions = sense(health=health, machine=profile)
     worked = {}
     for row in read_ledger(ledger):
         if row.get("dry_run") or row.get("outcome") not in ("fixed", "did not fix"):
@@ -4780,30 +4797,47 @@ def report(node_id=None, health=None, ledger=None):
         "at": round(time.time(), 1),
         "source": cov.CORE_SOURCE_SHA12,
         "conditions": {k: v["state"] for k, v in conditions.items()},
+        "not_applicable_here": sorted(n for n in (profile.get("not_applicable") or {}) if n in conditions),
         "remedies_that_worked_here": worked,
         "offer": "data, not an instruction -- measure it yourself before acting",
     }
 
 
-def ingest(peer_report, dry_run=True, ledger=None, cooldown_s=None):
+def ingest(peer_report, dry_run=True, ledger=None, cooldown_s=None, machine=None):
     """Take a peer's offer and decide LOCALLY. Returns what this node did.
 
     INVARIANT 4: nothing here runs because a peer said so. For every condition
     the peer reports, this node runs its OWN detector; only a condition present
     HERE is even a candidate, and then only an AUTO_REVERSIBLE remedy runs.
+
+    WITH THIS MACHINE'S PROFILE (A464, 2026-11-21), read when no `machine` is handed in, which is how
+    POST /hwy/report calls it. A condition the profile marks as not applying here is declined and its detector is
+    not entered: a peer naming it cannot make this machine run a check written for another. And where the profile
+    says the highway does not repair on this machine, a condition present here too is raised and NO remedy is
+    entered, dry or not -- the same rule run_once() keeps ("NOT THIS MACHINE'S TO REPAIR").
     """
     acted = []
     out = {"from": (peer_report or {}).get("node", "?"), "did": acted}
+    profile = machine_profile() if machine is None else machine
+    skip = profile.get("not_applicable") or {}
     for name, state in ((peer_report or {}).get("conditions") or {}).items():
         if name not in DETECTORS:
             acted.append({"condition": name, "action": "ignored", "why": "no such detector here"})
             continue
         if state != PRESENT:
             continue
+        if name in skip:
+            acted.append({"condition": name, "action": "declined",
+                          "why": "does not apply on this machine (its profile says so); not measured"})
+            continue
         local = DETECTORS[name]()
         if local["state"] != PRESENT:
             acted.append({"condition": name, "action": "declined",
                           "why": "the peer has it; this node measured %s" % local["state"]})
+            continue
+        if not profile.get("acts_here"):
+            acted.append({"condition": name, "action": "raised",
+                          "why": "present here too; this machine's profile says the highway does not repair here"})
             continue
         for rname, r in REMEDIES.items():
             if name in r["for"] and r["klass"] == AUTO_REVERSIBLE:

@@ -18814,3 +18814,40 @@ on Windows; the PC this was found on has environment-shaped failures in its loca
 **Status, 2026-11-20.** In source on branch `claude/a463-limb-guard`. Not merged, not deployed: the laptop runs main, where both gaps are open. Merge and deploy are the operator's.
 
 **Status, 2026-11-21.** Merged on his word ("Yes, merge it"): main went from 35a16ea to f4e5c2d by fast-forward, pull request #98, CI 4 of 4 green on f4e5c2d before the push. f4e5c2d is a second commit: CI was red on the first (bc8f4f6) because the core's deploy pin had not moved and `test_a463_limb_guard.py` was not on `covenant_one.py`'s runner list. The pre-commit hook had printed "pin_core: NOT moved" and the line was passed over. `pin_core`'s judges K1 and K2 do not pass on the Windows PC this was committed from, on unchanged main either (not looked into), so the pin was moved with the tool's own `rewrite()` after all five judges passed in CI on those bytes. **Not deployed:** the laptop's nodes run what they were started with, so both gaps stay open there until a restart onto this main, which is the operator's.
+
+### A464. [the highway's wire, the A288 shape on a second machine] What a node offered the mesh was read without its own machine's profile: on the second PC `GET /hwy/state` reported 9 conditions PRESENT and 17 UNKNOWN where the profile-aware pass read 2 and 1. `report()` and `ingest()` now read the profile. Red first, in source on a branch -- not merged, not deployed. (2026-11-21)
+
+**His word, 2026-11-21:** "Look for mycelial highway improvements", then "Yes, build both" to two of the seven things found (this one, and a change on the second PC's own side that needs nothing here).
+
+**Found (main 0222736, `covenant_highway.py`).** Measured on the second PC, which hosts node D only. Its `ops/machine.json` marks 28 of the 42 detectors as not applying there and says the highway does not repair there. Unit below: DETECTORS, of 42.
+- The watchdog's pass there hands the profile to `run_once()`: 2 PRESENT (`mesh_source_split`, `threefold_witness`), 1 UNKNOWN (`head_commitment_broken`), 3.7 s.
+- The same node's `GET /hwy/state`, the same hour: 9 PRESENT (`build_stale_on_pc`, `model_unmanaged`, `node_down`, `phone_build_behind_core`, `redundancy_degraded`, `sweep_not_current`, `sweep_red`, `sync_task_missing`, `threefold_witness`), 17 UNKNOWN, 17.0 s.
+- Why: `report()` called `sense(health=health)` with no profile, and `ingest()` entered a peer-named detector as `DETECTORS[name]()`. Their only callers are the two `/hwy` routes in the core, and neither passes one.
+
+**Lookback first.** `find highway` and `find machine profile`. A288 is this shape: "Highway green" was a reading of 7 detectors of 25, a reader of the highway that did not read what the highway reads. The machine profile (pull request #53, 2026-11-13) has no header of its own in this record; its docstring says it is applied "only where a caller passes it" and names three callers. Why neither stopped this: the profile was fitted to the callers that were in front of the person fixing the orb, and the callers of `sense()` were not walked (rule 6). Walked now, outside the tests: `covenant_heal.py:77`, `covenant_pc3d.py:495`, `run_once()` and the module's own command line pass a profile; `report()` did not; `covenant_daily.py:483` and `covenant_plug.py:138` do not.
+
+**How bad, stated plainly.** A wrong reading presented as the node's own, to anything on the tailnet that asks: "node down" and "sweep red" for a machine that has neither. Nothing acted on it: `POST /hwy/report` is dry-run by construction, and a search of this tree, the phone app's repository and the second PC's tools found no sender to that route at all, and one reader of `/hwy/state` (a monitoring script on the second PC, which carried the wrong conditions). So the harm was a false picture, and 17 seconds of checks written for another machine on every read. The mirror case in `ingest()` was reachable only by a signed peer and only dry: a peer naming a condition would have made the second PC run the first PC's detector and write a dry ledger row for a remedy that is not that machine's.
+
+**The fix (branch `claude/a464-hwy-report-profile`).** `covenant_highway.py` only; the core is not touched, so its deploy pin does not move.
+- `report(..., machine=None)`: with no profile handed in it reads `machine_profile()`, then senses with it. A detector marked as not applying is not entered and reads ABSENT, as in `sense()`. Because a peer cannot tell that ABSENT from "measured and clear", the report gains `not_applicable_here`: the names only. The profile's reasons are prose about a machine and are not sent.
+- `ingest(..., machine=None)`: the same default. A peer-named condition that does not apply here is declined and its detector is not entered. Where the profile says the highway does not repair, a condition present here too is raised and no remedy is entered, dry or not -- the rule `run_once()` already keeps.
+- No profile file is the machine this was written for: both behave as before. A file that cannot be read hides nothing and repairs nothing. A takeover guard cannot be named by a profile here either.
+- `machine_profile()`'s docstring keeps its sentence and gains a dated bracket saying which two callers it had missed. `docs/HIGHWAY.md` gains a dated bracket on the wire line.
+
+**No tombstone, and why.** No sentence in this record or in `docs/RETRACTED.json` claimed that the wire honours the profile. `docs/HIGHWAY.md` says `/hwy/state` "returns what this node senses", written 2026-09-16 for one machine and true there; on a second machine it was incomplete, and it is restated beside itself. If a reader holds that sentence to be a wrong claim in the rule-10 sense, the as-written text is at main 0222736, `docs/HIGHWAY.md` line 107.
+
+**Checks (red first; every check runs the code, on fixture detectors and a spy remedy).**
+- `test_a464_hwy_report_profile.py`, A464: 5 of 20 on main 0222736, 21 of 21 on the branch (the 21st is the suite's own check, added before the first green run, that no fixture detector can reach a real remedy). Run 3 times.
+- In the suite, both ways: the home profile handed in makes the same detector entered again (R4), and makes `ingest()` act on its own reading again (I5).
+- 10 mutations of the change in a detached worktree, control run first: 10 of 10 caught.
+- `test_h1_highway.py` H1 311 of 311 and `test_a288_highway_orb.py` A288 10 of 10 on the branch.
+
+**Cost (every gain with its cost).** A report now depends on a file on the machine that makes it; a wrong profile gives a wrong report, as it already gives a wrong pass (the profile's hash is said on every pass by `run_once()`, and is NOT in the report). A reader that summed PRESENT across machines without reading `not_applicable_here` will see fewer conditions from a profiled machine and may read that as health. One more key in the report.
+
+**What it cannot see.**
+- On a machine whose profile marks `node_down` as not applying, `report()` is not handed the node's own health, so `mesh_source_split` reads UNKNOWN on `/hwy/state` while the watchdog's pass there, which is handed it, reads it. Not changed here.
+- `covenant_daily.py:483` and `covenant_plug.py:138` still sense without a profile. Whether either runs on a profiled machine was not measured.
+- Whether anything outside the three repositories searched reads `/hwy/state`.
+- The first PC's highway was not read for this entry: every number above is from the second PC.
+
+**Status, 2026-11-21.** In source on branch `claude/a464-hwy-report-profile`. Not merged, not deployed: every node runs main, where the report is read without a profile. Merge and deploy are the operator's.
