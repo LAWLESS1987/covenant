@@ -2900,6 +2900,30 @@
     "docs/LOOKBACK_INDEX.md"
    ],
    "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a463-limb-claims-as-written-2026-11-20 (at 35a16ea)."
+  },
+  {
+   "id": "A470-LIMBS-CAUSE",
+   "date": "2026-11-22",
+   "by": "Claude (an AI), HF reply chat; refuted by the TETSU session's measurement the same day, checked here",
+   "claim": "A470's record (f6872566) put both limbs' VOIDs down to the second PC's restart that day for a security flag, and pointed at --no-slots.",
+   "verbatim": [
+    "The second PC's servers were restarted that day \"to add a security flag\" (the TETSU session); the flags now carry `--no-slots`."
+   ],
+   "patterns": [
+    "restarted that day \\\"to add a security flag\\\""
+   ],
+   "refuted_by": "The TETSU session, 2026-11-22: the old pins are reproduced exactly by the manifests with --threads-batch 8 and --cache-ram 256 removed, both added by tetsu commit 29cba20 (2026-11-12) and picked up when the gateways restarted; the day's flag (--cors-origins localhost --no-cors-credentials) does not change a manifest on its own (two throwaway runners gave the same hash). Checked on the laptop: the re-read manifests equal that session's values and the flags it named are present.",
+   "truth": "Both limbs had VOIDed since the gateways restarted onto runner flags changed on 2026-11-12 (--threads-batch 8, --cache-ram 256); not since the 2026-11-22 restart, and not because of --no-slots. Re-pinned 2026-11-22 (private/limbs.json keeps the old pins under retired_pins).",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The record as written stays on branch a470-limbs-cause-as-written-2026-11-22 (at f6872566)."
   }
  ]
 }

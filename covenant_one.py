@@ -1019,6 +1019,10 @@ SUITES = [
     # mesh checks are handed that node's health by every profiled reader; mesh_source_split says its unit, the
     # unmapped senders and which source is on disk. Stand-ins for every read; no node is asked. Red on main 10/32.
     ("test_a465_mesh_split_who.py", 120, "DAILY + GUARDS"),
+    # A470 (2026-11-22, his "Yes, use RTX leg"): the leg may be served by the second PC's gateway, but off loopback
+    # only with a pinned X-Leg-Manifest (the limbs' A402 pin); no pin = never asked, another hash = VOID. A fake
+    # opener stands in for the network; two mutations of the real source show each rule is what refuses.
+    ("test_a470_remote_leg_pin.py", 60, "SECURITY"),
     # A429 (2026-11-15, the owner: "Show the judge the content."): his hands' content goes to a content seat in this
     # process, never through the shared quorum (whose seats reach a runner and the tracked verdicts file); the seat
     # refuses what the screen refuses and otherwise abstains. Stub quorums and a stub runner; red on main 0/6.
