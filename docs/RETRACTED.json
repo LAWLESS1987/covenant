@@ -2900,6 +2900,24 @@
     "docs/LOOKBACK_INDEX.md"
    ],
    "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a463-limb-claims-as-written-2026-11-20 (at 35a16ea)."
+  },
+  {
+   "id": "A466-VERIFIER-SALT",
+   "claim": "That an independent verifier checks the genesis signature, and by rule C9 every transaction's, with RSA-PSS salt length equal to the digest length (rule C3 of docs/SPEC_INDEPENDENT_VERIFIER.md, in the text whose invariants C1-C3 the spec says were re-verified on 2026-10-29).",
+   "verbatim": [
+    "Verify RSA-PSS (MGF1-SHA256, salt length = digest length, hash SHA-256) with any RSA library."
+   ],
+   "truth": "The node signs with PSS.MAX_LENGTH (covenant_unified_v8.py, every padding.PSS in it), which for RSA-2048 with SHA-256 is 222 bytes. Measured 2026-11-22 on the real genesis.json: its signature does NOT verify with salt length 32, and verifies with 222 and with automatic salt detection. A verifier built from the rule as written would have rejected the real chain; one that auto-detects the salt would have passed it without anyone noticing the text was wrong. Found while an outside model built a second verifier from a separate spec (tetsu security/second_verifier.py, 2026-11-21), which measured 222 on all 165 live signatures of node D's chain.",
+   "refuted_by": "test_vs1_verifier_salt.py, which runs the real genesis.json with salt 222, MAX_LENGTH and 32 and reads rule C3's text.",
+   "patterns": [
+    "salt length = digest length"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ],
+   "branch": "c3-salt-claim-as-written-2026-11-22"
   }
  ]
 }

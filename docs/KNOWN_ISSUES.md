@@ -18900,3 +18900,29 @@ on Windows; the PC this was found on has environment-shaped failures in its loca
 **Status, 2026-11-21.** In source on branch `claude/a465-mesh-split-who`. Not merged, not deployed. The second PC's profile does not name its node yet: that is a file on that machine, placed after this is on the code node D runs. Merge and deploy are the operator's.
 
 **Status, 2026-11-21, later.** Merged on his word ("Yes", to "merge it once its checks are green"): pull request #100, main 163db3c to e3b5672 by fast-forward, CI 4 of 4 green on e3b5672 before the push. The second PC's gate adopted it onto node D (decision GO, sensitivity NORMAL), and that PC's profile, which names node D at a loopback port, was already in place. Measured there after the restart, unit DETECTORS of 42: `GET /hwy/state` reports 2 PRESENT (`mesh_source_split`, `threefold_witness`) and 1 UNKNOWN (`head_commitment_broken`) in 3.3 s, the same three the watchdog's pass reads; before this change the page read the split UNKNOWN. The detector's summary there, as kept by the pass: this machine's node runs 925a21591f8f, the source on disk; 0d4b6b1c31c8 is reported by 6 peer names and 1 unmapped sender; 925a21591f8f by 1 peer name. Unit: PEER NAMES (6 names are the first PC's 3 nodes, each filed twice). **Not deployed on the first PC**, whose nodes run what they were started with and are the 6 names.
+
+### A466. [the independent-verifier spec's salt length, the A30 shape: a description that was never run against the data] Rule C3 named a PSS salt length the chain does not use
+
+**What was wrong.** `docs/SPEC_INDEPENDENT_VERIFIER.md`, rule C3 (and C9, which repeats it for every transaction),
+told an independent verifier to check RSA-PSS with a salt length equal to the digest length, 32 bytes. The node signs
+with `PSS.MAX_LENGTH`, 222 bytes for RSA-2048 with SHA-256. The wording is kept exactly as it was on the branch
+`c3-salt-claim-as-written-2026-11-22` and in `docs/RETRACTED.json` under `A466-VERIFIER-SALT`.
+
+**Measured, 2026-11-22.** On the real `genesis.json`: salt 32 does not verify; 222 and automatic detection do. Earlier
+the same week an outside model, building a second verifier from a separate spec on TETSU, found all 165 signatures
+of node D's live chain at 222.
+
+**Lookback.** `python tools/lookback_index.py find salt` and `find PSS`: no earlier record or tombstone of this shape.
+The shape is A30's: a description checked against itself, never against the data. The spec's own line says C1 to C3
+were re-verified on 2026-10-29; a verifier that auto-detects the salt passes the chain without testing the words.
+
+**Repair.** C3 restated beside the retraction's id; the retraction in the ledger with its pattern, so the old words
+cannot return without a pointer; a guard, `test_vs1_verifier_salt.py`, that runs the real genesis both ways and
+reads C3's text. No code changed: the chain was always right.
+
+**Tests.** `test_vs1_verifier_salt.py` (2 tests: red before the restatement, green after); R1 driven both ways with a
+probe file holding the old words (red), then the probe retired to `.trash/` (green).
+
+**Status, 2026-11-22.** On the branch `claude/a466-verifier-salt`, pushed for review as a pull request on his "Do it".
+Not merged; merging is his. Nothing runs differently: a document and a test.
+

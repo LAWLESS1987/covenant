@@ -1058,6 +1058,8 @@ SUITES = [
     ("test_qw2_quiet_window.py", 30, "JUDGE"),
     # A363 (2026-10-17): docs/LOOKBACK_INDEX.md -- every record entry and tombstone, tied together, current.
     ("test_li1_lookback_index.py", 60, "SECURITY"),
+    # A466 (2026-11-22): the independent-verifier spec's C3 names the PSS salt the chain uses; real genesis both ways.
+    ("test_vs1_verifier_salt.py", 30, "SECURITY"),
     # A367 (2026-10-17): alert push sends held-down condition starts and clears, not log lines.
     ("test_ap1_alert_push.py", 30, "SECURITY"),
     # A419 (2026-11-09, his "Yes, additive only" to the all-repos audit): two suites in subfolders that no runner
