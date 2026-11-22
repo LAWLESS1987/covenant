@@ -18923,6 +18923,67 @@ on Windows; the PC this was found on has environment-shaped failures in its loca
 
 **Status, 2026-11-21, later.** Merged on his word ("Yes", to "merge it once its checks are green"): pull request #100, main 163db3c to e3b5672 by fast-forward, CI 4 of 4 green on e3b5672 before the push. The second PC's gate adopted it onto node D (decision GO, sensitivity NORMAL), and that PC's profile, which names node D at a loopback port, was already in place. Measured there after the restart, unit DETECTORS of 42: `GET /hwy/state` reports 2 PRESENT (`mesh_source_split`, `threefold_witness`) and 1 UNKNOWN (`head_commitment_broken`) in 3.3 s, the same three the watchdog's pass reads; before this change the page read the split UNKNOWN. The detector's summary there, as kept by the pass: this machine's node runs 925a21591f8f, the source on disk; 0d4b6b1c31c8 is reported by 6 peer names and 1 unmapped sender; 925a21591f8f by 1 peer name. Unit: PEER NAMES (6 names are the first PC's 3 nodes, each filed twice). **Not deployed on the first PC**, whose nodes run what they were started with and are the 6 names.
 
+### A470. [the leg on the second PC, the A402 pin] The laptop's 2B leg was down, so every LEG consult VOIDed; the second PC serves the same weights behind a pinned gateway, and the leg had no pin. The leg now takes the limbs' pin off loopback. Found alongside: both limbs VOID every consult since the second PC's servers were restarted. (2026-11-22)
+
+**His word, 2026-11-22**, typed in the HF reply chat: "Phones plugged in as well to the laptop on debugging. Make sure everything is uniform, including the phone. Get these legs right and strong." Then, asked whether the laptop's leg should use the RTX box's 2B: "Yes, use RTX leg".
+
+**Found (measured 2026-11-22 on the first PC).**
+1. **The leg was not running here.** Nothing answered on 127.0.0.1:8099, so `consult_leg` returned None and each LEG consult VOIDed; the 3B answered alone. Since A402 this laptop holds one model at a time.
+2. **The second PC already serves the same model.** Its gateway on :8099 (proxying llama-server :8097, CPU) names `Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf`, weights sha256 `d725b76f...`, equal to the laptop's own file, and sends `X-Leg-Manifest` `af5610ac...` (weights, runner, flags, sampler, chat template).
+3. **The leg had no pin.** `COVENANT_LEG_ALLOW_REMOTE` let it reach a remote host, but nothing checked which model answered there. The limbs (A402) check `X-Leg-Manifest` against a pin; the leg did not.
+4. **Both limbs VOID every consult.** SMOL is pinned at `f8ee9c08...` (11-01) and its gateway now sends `490da0b9...`. PHI is pinned at `4eac1667...` and now sends `903647bd...`. Weights unchanged (`8334b850...`, `01999f17...`). `covenant_limbs.consult` returned "manifest does not name the pinned model file" for both. The second PC's servers were restarted that day "to add a security flag" (the TETSU session); the flags now carry `--no-slots`. The pin did its job. Not re-pinned here: what changed is asked of the TETSU session first.
+
+**Lookback first.** A402 (the limbs and their pin), A263 and A463 (a private ask's consult and where it may go), CXR-8 (the leg's loopback and kill switch in the module).
+
+**The change (on the live line, not on main).**
+- `covenant_leg.py`: `_host_is_loopback()` and `_leg_pin()` (`COVENANT_LEG_MANIFEST`). In `consult_leg`, off loopback: a pin that is not 64 characters means never asked; a reply whose `X-Leg-Manifest` does not contain the pin means None (VOID); an answered remote consult's attribution carries the manifest. Loopback is unchanged. `COVENANT_LEG_ALLOW_REMOTE` still has to be set as before.
+- Every consumer of the leg's host, grepped: `consult_leg` (pinned), `leg_available` (a GET /health, read-only; the gateway answers it), and `private_consult_leaves` in the core, which reads the address and sends nothing. A tailnet address passes it as the limbs' do.
+
+**Checks.**
+- `test_a470_remote_leg_pin.py`, A470: 9 of 9, with a fake opener standing in for the network. M1 and M2 load the real source with one A470 line replaced, and each lets through what its check refuses.
+- Live, against the second PC's gateway, before any node was changed:
+  - right pin: answered "5", served by `leg-qwen3.5-2b-uncensored`, manifest in the attribution;
+  - wrong pin: None;
+  - no pin: None.
+- Unchanged suites: LG1 38/38, LM1 17/17, XB1 8/8, A463 34/34, LP1 7/7.
+
+**Cost (every gain with its cost).**
+- A LEG consult now crosses to the second PC: a private ask's LEG line, on his "Yes, use RTX leg", goes where the limbs already go. The gateway's own terms say no prompt is logged; that was read there, not measured here.
+- The leg depends on the second PC being up; when it is not, a LEG consult VOIDs, as it did here all along.
+- The 2B there runs on CPU.
+
+**Not done.**
+- Main does not carry this: a PR needs his word.
+- The limbs are not re-pinned.
+- Deploy (the nodes' environment and a rolling restart) is in the status line below once done.
+
+**Correction, same day (tombstone A470-LIMBS-CAUSE).** Item 4 above said the second PC's servers "were restarted that day" for a security flag and pointed at `--no-slots`. That is retracted. Measured by the TETSU session and checked here:
+- The old pins are reproduced exactly by the manifests with `--threads-batch 8` and `--cache-ram 256` removed, both added by tetsu commit 29cba20 on 2026-11-12. The gateways took them up when they restarted, so both limbs had VOIDed since then.
+- The day's flag (`--cors-origins localhost --no-cors-credentials`) does not change a manifest on its own: two throwaway runners gave the same hash.
+- The manifest's flags field is the gateway's own copy of the runner's command line. So the TETSU session restarted the three gateways at about 14:30 to make it true, which moved all three hashes once more.
+- The leg's `af5610ac...` above is from before that restart; it is gone.
+
+The record as written stays on branch `a470-limbs-cause-as-written-2026-11-22` (at f6872566).
+
+**Re-pinned, and the file route (2026-11-22).**
+- **Read on the laptop after the 14:30 restart,** equal to the TETSU session's values, weights unchanged:
+  - SMOL `388c6d43...`;
+  - PHI `74a42639...`;
+  - leg `67ed9c4f...`.
+  - The flags that session named are present.
+- **The limbs:** `private/limbs.json` keeps each old pin under `retired_pins`, with the reason. A copy of the file before the re-pin is at `.trash/limbs.json.before-repin-2026-11-22.retired`. Live: SMOL and PHI "engaged" again.
+- **The leg:** `covenant_leg` now also reads `private/leg.json` (gitignored, like `limbs.json`): host, port, `manifest_sha256`, `allow_remote`. An environment variable still wins. So every process that imports it, a node the watchdog revives as much as one a restart starts, is wired the same way; the watchdog passes its own environment and had no leg keys. Live: answered "5" with the manifest `67ed9c4f...`.
+- **Checks:**
+  - A470 is now 14 of 14 (F1-F5: the file route, its pin, a file without `allow_remote`, the environment winning, an unreadable file).
+  - `test_lg1_leg.py` now reads no file (`COVENANT_LEG_FILE` at a path that does not exist). With this machine's real `leg.json` in place, LG1.38 ("loopback-only unless explicitly allowed") read this machine's explicit allowance and went red, 37 of 38. It is a check of the module's rule, not of this machine's wiring. 38 of 38 again.
+
+**Status, 2026-11-22 ~16:35 -05:00. Live on the first PC; not on main.**
+- `rolling_restart.py` restarted C, B, A in turn. All three: core `925a21591f8f`, imports current (`12db5785ef8a`), height 166.
+- The phone checked in at 16:31 on 0.1.1456+fae00ab, height 166.
+- A LEG consult from these nodes now goes to the second PC's gateway, pinned. The limbs answer again.
+- Not measured: a leg engagement through the live door. The router engages the leg only when the 3B is unsure, so it was tested by `consult_leg` from this tree with the same module and file, not through a real ask.
+- Main does not carry A470: a PR needs his word.
+
 ### A466. [the independent-verifier spec's salt length, the A30 shape: a description that was never run against the data] Rule C3 named a PSS salt length the chain does not use
 
 **What was wrong.** `docs/SPEC_INDEPENDENT_VERIFIER.md`, rule C3 (and C9, which repeats it for every transaction),
