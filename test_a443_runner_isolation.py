@@ -28,10 +28,12 @@ class A443RunnerIsolation(unittest.TestCase):
             fh.write("PLANTED = True\n")
 
     def test_runner_source_passes_isolated_flag(self):
-        """The real runner's subprocess call passes -I (static pin: removing it goes red here)."""
+        """The real runner's subprocess call passes -I (static pin: removing it goes red here).
+        Since A467 (2026-11-22) it passes -I -S, and the pin requires both: the pattern as first written required -I
+        directly before -c, which the added -S broke on CI (#104). Tightened, not loosened: -I is still required."""
         src = open(HANDS, encoding="utf-8").read()
-        m = re.search(r"subprocess\.run\(\[sys\.executable,\s*\"-I\",\s*\"-c\",\s*RUNNER", src)
-        self.assertIsNotNone(m, "covenant_tetsu_hands.run() must start the child with -I before -c RUNNER")
+        m = re.search(r"subprocess\.run\(\[sys\.executable,\s*\"-I\",\s*\"-S\",\s*\"-c\",\s*RUNNER", src)
+        self.assertIsNotNone(m, "covenant_tetsu_hands.run() must start the child with -I -S before -c RUNNER")
 
     def test_planted_sibling_does_not_load_under_isolated_mode(self):
         """With -I, the planted json.py beside the script is NOT imported (the stdlib wins)."""
