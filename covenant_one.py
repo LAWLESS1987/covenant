@@ -909,6 +909,9 @@ SUITES = [
     # TH1 (2026-09-26, A226): Tetsu's hands -- his workshop, bounded runs behind a screen and a
     # guard, proposals beside the tree and never in it; the door dispatches HANDS beside MOLTBOOK.
     ("test_th1_tetsu_hands.py", 180, "JUDGE"),
+    # A467/A468 (2026-11-22 security search): the hands' runner passes -S; the local judge's cache keys on exact text.
+    ("test_a467_hands_nosite.py", 300, "JUDGE"),
+    ("test_a468_cache_exact.py", 120, "JUDGE"),
     # A436 (2026-11-16, follows A430): a signed-door HANDS RUN approves the exact script (run_sha256), not an
     # invocation; a RUN carrying arguments is refused. The practice path (in-process run_auth) and unsigned callers
     # are untouched. Drives both ways. Closes the quorum's C3.
