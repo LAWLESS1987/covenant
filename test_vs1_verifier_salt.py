@@ -8,6 +8,7 @@ import base64
 import json
 import os
 import re
+import sys
 import unittest
 
 from cryptography.exceptions import InvalidSignature
@@ -58,4 +59,10 @@ class VerifierSalt(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=1)
+    # The runner (covenant_one) reads a tally line; unittest.main prints none, so CI called this suite "NO RESULT"
+    # (2026-11-22, both sweeps on PR #101). The same ending as test_a443_runner_isolation.py.
+    _res = unittest.TextTestRunner(verbosity=2).run(
+        unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__]))
+    _bad = len(_res.failures) + len(_res.errors)
+    print("VS1: %d/%d passed" % (_res.testsRun - _bad, _res.testsRun))
+    sys.exit(1 if _bad else 0)
