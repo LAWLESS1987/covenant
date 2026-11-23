@@ -110,3 +110,13 @@ Checked and found sound:
 This was a source review; tests were not executed. Python was unavailable on PATH, and the supplied tests write files. No files were modified and no network commands were run.
 
 The actual signed commitment, repository history, private configuration, filesystem permissions, gateway implementation, transport protection and downstream ethics gates were not supplied. Their deployed integrity—and whether tonight’s commitment actually covers the changed code—cannot be established from these files.
+
+## Addendum 2026-11-23 (on Lawrence's "fix"). The table above is kept as written.
+
+- **#6** (recorded above as NOT fixed): now FIXED by A474. The approved pins for the leg and each limb live in the
+  tracked `ops/leg_policy.json`. A remote consult whose pin is not listed there is refused before sending, and the
+  environment can only narrow within the list. Checks: test_a474_leg_policy.py 15/15 with two mutations; A470 21/21;
+  LM1 17/17.
+- **#1, its server-claim half:** still open, and it cannot be closed from the laptop. A gateway that is itself
+  compromised can claim the approved hash; only an independent measurement or attestation of TETSU could prove what it
+  runs. The traffic stays on our WireGuard tailnet.

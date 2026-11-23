@@ -92,6 +92,10 @@ def consult(name, text, config=None, opener=None, max_tokens=400):
         cfg = (config if config is not None else load_config()).get(out["limb"])
         if not cfg:
             return _void(out, "no such limb configured (%s)" % out["limb"])
+        if not LEG.approved("limb", cfg["manifest_sha256"], out["limb"]):
+            # A474: the pin in private/limbs.json must also be approved in the TRACKED ops/leg_policy.json; checked
+            # before anything is sent, so an edited private config cannot pick another model by itself.
+            return _void(out, "pin not approved in ops/leg_policy.json -- not the model he agreed to")
         if not (text or "").strip():
             return _void(out, "LIMB with no question")
         if not _sema.acquire(timeout=1.0):

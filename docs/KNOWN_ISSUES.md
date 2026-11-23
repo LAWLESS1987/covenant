@@ -19142,3 +19142,44 @@ The full record, with Codex's answer whole and each finding's verification, is `
 - Binding `private/leg.json` into the head commitment (Codex #6; private config is untracked by design).
 - A compromised gateway can still claim the right manifest (A470's known limit).
 - Not on main.
+
+### A474. [security, Codex's audit #6] An edit to the untracked private/leg.json or private/limbs.json could pick another model by itself -- the approved pins now live in the TRACKED ops/leg_policy.json -- FIXED 2026-11-23 on Lawrence's "fix"
+
+**What was open.** A472 left Codex's #6 unfixed. The leg's and limbs' endpoint, remote switch and manifest pin come from
+untracked private files (they hold a tailnet address). Someone who could edit one could change the endpoint and the pin
+together, and the leg would ask whatever model that pin named. Nothing in git or in the head commitment would show it.
+An environment pin could do the same.
+
+**The fix.**
+- `ops/leg_policy.json` is tracked and holds public hashes only, no address. It lists:
+  - the approved leg manifest(s), with `remote_allowed`;
+  - the approved manifest(s) for each limb.
+- `covenant_leg.approved()` reads it at every consult.
+- A remote leg consult also needs its pin in the leg list and `remote_allowed: true`. A limb consult needs its pin in
+  that limb's list.
+- The check runs before anything is sent.
+- The private files and the environment can only narrow within the list. The policy path deliberately has no
+  environment override.
+- A missing, malformed or oversized (over 64 KB) policy means no remote consult. Loopback is unchanged.
+- Git and the head commitment's tree now bind which models may be consulted remotely.
+
+**Checks:**
+- `test_a474_leg_policy.py`, 15/15 (P1-P11, M1-M2), registered SECURITY. The two mutations, which remove the leg's or
+  the limb's policy line, let an unapproved pin reach the gateway.
+- Driven red the other way too: against the real policy, A470's and LM1's stand-in pins were refused (A470 R2-R4,
+  F1-F2, S1, M1, M2; LM1.4-LM1.11).
+- Those suites now run against a test policy: A470 21/21, LM1 17/17.
+- A470's M2 as first written, which removed the no-pin line alone, is now refused by the policy layer. It is kept as
+  M2b with that expectation, and M2 removes both lines. Both are recorded in the suite's docstring.
+- LG1 38/38, A463 34/34, LP1 7/7, XB1 8/8.
+- Live, with the real policy: the leg answered "5"; SMOL and PHI engaged.
+
+**Re-pin rule:** a runner flag change on TETSU moves a manifest. The hub tells us first, then the private file and
+`ops/leg_policy.json` change together.
+
+**Still not covered:**
+- A compromised gateway that claims the approved hash (A470's limit). Closing it needs an independent measurement or
+  attestation of what TETSU runs, which the laptop cannot produce.
+- An owner-level edit of the tracked policy as well. That shows in git and in the next head commitment, which is what
+  this binding buys; it does not stop the edit.
+- Not on main.

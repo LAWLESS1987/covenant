@@ -160,6 +160,50 @@ def _leg_pin():
     return (v if isinstance(v, str) else "").strip().lower()
 
 
+# A474 (2026-11-23, Codex's audit #6, on Lawrence's "fix"): private/leg.json and private/limbs.json are untracked, so
+# an edit to one could change the endpoint AND the pin together and pick another model, with nothing in git or the head
+# commitment to show it. The APPROVED manifests now live in a TRACKED file, ops/leg_policy.json (public hashes only, no
+# address), which git and the head commitment's tree bind. A remote consult runs only when its pin is listed there and,
+# for the leg, remote_allowed is true. The private files and the environment can only narrow within that list, never
+# widen it: there is deliberately no environment override of the policy's path. Missing or malformed policy -> no remote
+# consult (fail closed); loopback is unchanged. Read at call time, so a policy change needs no restart.
+POLICY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "leg_policy.json")
+
+
+def _policy():
+    try:
+        if os.path.getsize(POLICY_PATH) > 65536:
+            return {}
+        with open(POLICY_PATH, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _hexset(v):
+    if not isinstance(v, list):
+        return set()
+    return {x.strip().lower() for x in v if isinstance(x, str) and len(x.strip()) == 64}
+
+
+def approved(kind, pin, name=None):
+    """A474: is PIN an approved manifest in ops/leg_policy.json? kind "leg" (also needs remote_allowed: true) or
+    "limb" with NAME. Never raises; anything unreadable is False."""
+    try:
+        pin = (pin or "").strip().lower()
+        pol = _policy()
+        if kind == "leg":
+            sec = pol.get("leg")
+            return isinstance(sec, dict) and sec.get("remote_allowed") is True and pin in _hexset(sec.get("approved_manifests"))
+        if kind == "limb":
+            sec = pol.get("limbs")
+            return isinstance(sec, dict) and pin in _hexset(sec.get(str(name or "").upper()))
+    except Exception:                                      # noqa: BLE001
+        pass
+    return False
+
+
 def free_ram_gb():
     """Free physical RAM in GB, or None if it cannot be read. Never raises. Windows (GlobalMemoryStatusEx) first,
     then POSIX /proc/meminfo. None means 'unknown' -- the caller proceeds, since the measured budget says warm fits
@@ -581,6 +625,8 @@ def consult_leg(text, max_tokens=320, temperature=0.4, timeout=180, trigger=None
     remote = not _host_is_loopback(LEG_HOST)
     pin = _leg_pin()
     if remote and len(pin) != 64:                          # A470: a remote leg is never asked unpinned
+        return None
+    if remote and not approved("leg", pin):                # A474: and never with a pin ops/leg_policy.json lacks
         return None
     if not _leg_sema.acquire(timeout=1.0):                 # CXR-8: cap concurrent generations; a RAM snapshot can't
         return None                                        #        stop simultaneous callers all passing

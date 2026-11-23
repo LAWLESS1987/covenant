@@ -26,6 +26,8 @@ WHAT IT PINS (every check runs consult_leg with a fake opener in place of the ne
   M1  mutation (the real source, that one line replaced by `if False:`): the header comparison removed -> R3's wrong
       hash is answered (the pin is what refuses it)
   M2  mutation (likewise): the no-pin refusal removed -> R1 reaches the gateway
+  M2b (2026-11-23, A474): with the policy check added, the no-pin line removed ALONE no longer reaches the gateway;
+      M2 as run since then removes both lines (the M2 line above is kept as first written)
 
 WHAT IT CANNOT SEE. The real gateway, the network, or that the gateway's hash is honest: the pin proves the gateway
 NAMED the agreed file, as the limbs' pin does; it cannot prove what the far machine actually ran. Measured live on
@@ -71,6 +73,12 @@ class _Opener:
 
 
 NO_FILE = os.path.join(HERE, "no-such-dir-a470", "leg.json")      # never the machine's real private/leg.json
+# A474: a remote consult also needs its pin approved in ops/leg_policy.json. These checks are about the A470 pin and
+# header logic, so they run against a TEST policy approving PIN (never the real file, which approves the live hash).
+import json as _json, tempfile as _tf
+POLICY = os.path.join(_tf.mkdtemp(prefix="a470pol_"), "leg_policy.json")
+with open(POLICY, "w", encoding="utf-8") as _fh:
+    _json.dump({"leg": {"remote_allowed": True, "approved_manifests": [PIN]}, "limbs": {}}, _fh)
 
 
 def run(env, headers, mutate=None):
@@ -88,6 +96,7 @@ def run(env, headers, mutate=None):
         L = importlib.reload(L)
         if mutate:
             mutate(L)
+        L.POLICY_PATH = POLICY                  # A474: after any mutation, which re-runs the module's top level
         op = _Opener(headers)
         L._no_redirect = op
         out = L.consult_leg("q", max_tokens=5, timeout=5)
@@ -212,7 +221,7 @@ def run_drip(env):
             os.environ.pop(k, None)
         os.environ["COVENANT_LEG_FILE"] = NO_FILE; os.environ.update(env)
         import covenant_leg as L
-        L = importlib.reload(L); L._no_redirect = _DripOpener({"X-Leg-Manifest": PIN})
+        L = importlib.reload(L); L.POLICY_PATH = POLICY; L._no_redirect = _DripOpener({"X-Leg-Manifest": PIN})
         t0 = time.time(); out = L.consult_leg("q", max_tokens=5, timeout=1)
         return out, time.time() - t0
     finally:
@@ -242,9 +251,25 @@ m1 = mutant("if remote and manifest_hex(served_manifest) != pin:", "if False:")
 out, n = run(dict(REMOTE, COVENANT_LEG_MANIFEST=PIN), {"X-Leg-Manifest": "0" * 64}, mutate=m1)
 check("M1 header comparison removed: R3's wrong hash is answered", out is not None and n == 1, (out, n))
 
-m2 = mutant("if remote and len(pin) != 64:", "if False:")
+# M2 as first written (2026-11-22) removed only the no-pin line and expected R1 to reach the gateway. Since A474 the
+# policy check also refuses an empty pin, so that mutant is now refused by the second layer: M2b records exactly that,
+# and M2 removes BOTH lines to show that together they are what refuses R1 (2026-11-23).
+def mutant2(pairs):
+    src = open(os.path.join(HERE, "covenant_leg.py"), encoding="utf-8").read()
+    for old, new in pairs:
+        assert src.count(old) == 1, "mutation target not found exactly once: %r" % old
+        src = src.replace(old, new)
+    code = compile(src, "covenant_leg_mutant", "exec")
+    return lambda L: exec(code, L.__dict__)
+
+
+m2b = mutant("if remote and len(pin) != 64:", "if False:")
+out, n = run(dict(REMOTE), {"X-Leg-Manifest": ""}, mutate=m2b)
+check("M2b no-pin refusal removed alone: R1 is still never asked (A474's policy layer holds)", out is None and n == 0, (out, n))
+
+m2 = mutant2([("if remote and len(pin) != 64:", "if False:"), ('if remote and not approved("leg", pin):', "if False:")])
 out, n = run(dict(REMOTE), {"X-Leg-Manifest": ""}, mutate=m2)
-check("M2 no-pin refusal removed: R1 reaches the gateway", n == 1, (out, n))
+check("M2 no-pin refusal AND policy check removed: R1 reaches the gateway", n == 1, (out, n))
 
 print("\nA470: %d/%d passed" % (sum(results), len(results)))
 sys.exit(0 if all(results) else 1)

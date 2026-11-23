@@ -1,0 +1,13 @@
+{
+ "note": "A474 (2026-11-23, Codex's audit #6, on Lawrence's \"fix\"). The APPROVED model manifests for the remote leg and limbs served by the TETSU gateway. covenant_leg.approved() reads this at every consult; a pin in private/leg.json, private/limbs.json or the environment that is not listed here is refused before anything is sent. Public hashes only (the gateway's sha256 over weights, runner, flags, sampler and chat template); no address. Tracked, so a change shows in git and in the head commitment's tree. The hashes move whenever a runner's flags change on TETSU (the hub tells us first); changing them is a re-pin, done in this file AND the private file together.",
+ "leg": {
+  "remote_allowed": true,
+  "approved_manifests": ["67ed9c4f6a0210b23ca2130c8b8e21a2ca9d474ec83f4cafd02bcaf16eaf6cb7"],
+  "model": "leg-qwen3.5-2b-uncensored",
+  "pinned": "2026-11-22, A470, on Lawrence's \"Yes, use RTX leg\""
+ },
+ "limbs": {
+  "SMOL": ["388c6d430e4a766b7d956b37a234e3da0ca74dc931e513a4627df7621cf1c762"],
+  "PHI": ["74a426399a085f5db6818e727ed2e54a9e4b85d05edcb86f32140fa1c2c2d946"]
+ }
+}
