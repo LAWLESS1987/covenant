@@ -1,33 +1,6 @@
 {
- "_what": "A477 (2026-11-23). Known drift of each ledger from ops/RECORD_ANCHORS.json, keyed by the EXACT current head hash. RECORDED, NOT ACCEPTED: accepted is always false here, because accepting a drift is the operator re-anchoring (`python covenant_sentinels.py --anchor`), never an entry in this file. test_ra1_record_anchors.py fails on a drift this file does not name, on a head that moved again (new hash), on a row whose class no longer matches the measurement, on a row for a ledger that matches its anchor again (stale), and on any row with accepted not false.",
+ "_what": "A477 (2026-11-23). Known drift of each ledger from ops/RECORD_ANCHORS.json, keyed by the EXACT current head hash. RECORDED, NOT ACCEPTED: accepted is always false here, because accepting a drift is the operator re-anchoring (`python covenant_sentinels.py --anchor`), never an entry in this file. test_ra1_record_anchors.py fails on a drift this file does not name, on a head that moved again (new hash), on a row whose class no longer matches the measurement, on a row for a ledger that matches its anchor again (stale), and on any row with accepted not false. Rows settled by a re-anchoring are moved whole to retired_by_reanchoring with the reason, never deleted (A478).",
  "ledgers": {
-  "docs/KNOWN_ISSUES.md": {
-   "accepted": false,
-   "anchored_from_commit": "8fc149d7ac4a45d0d2e89494d643af3be936158d",
-   "anchored_lines_present": 200,
-   "class": "INSERTION",
-   "current_prefix_sha256": "8b9deb03792962fdaa320cd7cce0b741239bc26e8275301473b113eb4e9e087c",
-   "reason": "A dated note (A274, 2026-10-06, commit 12b4718) was inserted inside an early entry at line 192; it reached main's first-parent line in merge 46fbe4a on 2026-10-08. Every anchored line is still present, in order.",
-   "recorded": "A477, 2026-11-23"
-  },
-  "ops/DISTILL.md": {
-   "accepted": false,
-   "anchored_from_commit": null,
-   "anchored_lines_present": null,
-   "class": "UNVERIFIABLE",
-   "current_prefix_sha256": "c9a9748a9d29ca97c4d078b973b4ffbc1e92b26c83fb3a73a3f3cb86799323ae",
-   "reason": "No committed version of this file ever hashed to its anchor: the 2026-09-09 anchor was taken from a working tree whose bytes were never committed (the file is rewritten by the running system).",
-   "recorded": "A477, 2026-11-23"
-  },
-  "ops/NIGHTLY.md": {
-   "accepted": false,
-   "anchored_from_commit": null,
-   "anchored_lines_present": null,
-   "class": "UNVERIFIABLE",
-   "current_prefix_sha256": "b93584a9b4bbd8bddea46dbbbe6610bfd08549c5c5f93fbb6cbfac3a3833b772",
-   "reason": "No committed version of this file ever hashed to its anchor: the 2026-09-09 anchor was taken from a working tree whose bytes were never committed (the file is rewritten by the running system).",
-   "recorded": "A477, 2026-11-23"
-  },
   "ops/SELF_EVAL.md": {
    "accepted": false,
    "anchored_from_commit": "16433807ac41551334e78d3323025e1fd6d93e95",
@@ -35,17 +8,63 @@
    "class": "REWRITTEN",
    "current_prefix_sha256": "d6a6e46b48526e598bf54f2758d01a42146b9d2faf772f06f57d1f806d4102ef",
    "head_anchor_cannot_hold": true,
+   "note_a478": "Kept through the A478 re-anchoring: the ledger still prepends, so its new anchor will not hold either. The exemption list moved to tools/anchor_drift.py (PREPENDING) so the nightly's live check reads it too.",
    "reason": "The ledger puts new rounds at the top and drops old ones (first seen at merge 3724eb0, 2026-10-03): it is not append-only, so a head anchor cannot hold for it. On a node that runs self-evaluation the head changes every round, so RA1 does not compare it (see PREPENDING in test_ra1_record_anchors.py); a retention rule that fits this ledger is the operator's decision.",
    "recorded": "A477, 2026-11-23"
+  }
+ },
+ "retired_by_reanchoring": {
+  "docs/KNOWN_ISSUES.md": {
+   "retired": "A478, 2026-11-23: re-anchored by the operator act (`python covenant_sentinels.py --anchor`) on his \"do the others\"",
+   "row_as_written": {
+    "accepted": false,
+    "anchored_from_commit": "8fc149d7ac4a45d0d2e89494d643af3be936158d",
+    "anchored_lines_present": 200,
+    "class": "INSERTION",
+    "current_prefix_sha256": "8b9deb03792962fdaa320cd7cce0b741239bc26e8275301473b113eb4e9e087c",
+    "reason": "A dated note (A274, 2026-10-06, commit 12b4718) was inserted inside an early entry at line 192; it reached main's first-parent line in merge 46fbe4a on 2026-10-08. Every anchored line is still present, in order.",
+    "recorded": "A477, 2026-11-23"
+   },
+   "why": "Insertion only; every anchored line was still present, in order."
+  },
+  "ops/DISTILL.md": {
+   "retired": "A478, 2026-11-23: re-anchored by the operator act (`python covenant_sentinels.py --anchor`) on his \"do the others\"",
+   "row_as_written": {
+    "accepted": false,
+    "anchored_from_commit": null,
+    "anchored_lines_present": null,
+    "class": "UNVERIFIABLE",
+    "current_prefix_sha256": "c9a9748a9d29ca97c4d078b973b4ffbc1e92b26c83fb3a73a3f3cb86799323ae",
+    "reason": "No committed version of this file ever hashed to its anchor: the 2026-09-09 anchor was taken from a working tree whose bytes were never committed (the file is rewritten by the running system).",
+    "recorded": "A477, 2026-11-23"
+   },
+   "why": "Its head has not changed across the last 12 commits that touch it (measured 2026-11-23): appended to, so a new anchor holds."
+  },
+  "ops/NIGHTLY.md": {
+   "retired": "A478, 2026-11-23: re-anchored by the operator act (`python covenant_sentinels.py --anchor`) on his \"do the others\"",
+   "row_as_written": {
+    "accepted": false,
+    "anchored_from_commit": null,
+    "anchored_lines_present": null,
+    "class": "UNVERIFIABLE",
+    "current_prefix_sha256": "b93584a9b4bbd8bddea46dbbbe6610bfd08549c5c5f93fbb6cbfac3a3833b772",
+    "reason": "No committed version of this file ever hashed to its anchor: the 2026-09-09 anchor was taken from a working tree whose bytes were never committed (the file is rewritten by the running system).",
+    "recorded": "A477, 2026-11-23"
+   },
+   "why": "Its head has not changed across the last 12 commits that touch it (measured 2026-11-23): appended to, so a new anchor holds."
   },
   "ops/verdicts.jsonl": {
-   "accepted": false,
-   "anchored_from_commit": "3a77baffc8b790fc6da6bc2e40b5f81a8a7fa0ac",
-   "anchored_lines_present": 96,
-   "class": "REWRITTEN",
-   "current_prefix_sha256": "defffb40f62442fe3e791506a3cd88f3452c5f0bfe1916212f2e5b21e33cde75",
-   "reason": "Old rows were re-serialized: the 2026-09-04 rows' judge field now names the teacher panel and carries a panel field. That version reached main in the A416 consolidation (bd7eacf, 2026-11-09). A101 (2026-09-12) says older single-teacher rows are kept as legacy; whether this rewrite was intended is UNDETERMINED.",
-   "recorded": "A477, 2026-11-23"
+   "retired": "A478, 2026-11-23: re-anchored by the operator act (`python covenant_sentinels.py --anchor`) on his \"do the others\"",
+   "row_as_written": {
+    "accepted": false,
+    "anchored_from_commit": "3a77baffc8b790fc6da6bc2e40b5f81a8a7fa0ac",
+    "anchored_lines_present": 96,
+    "class": "REWRITTEN",
+    "current_prefix_sha256": "defffb40f62442fe3e791506a3cd88f3452c5f0bfe1916212f2e5b21e33cde75",
+    "reason": "Old rows were re-serialized: the 2026-09-04 rows' judge field now names the teacher panel and carries a panel field. That version reached main in the A416 consolidation (bd7eacf, 2026-11-09). A101 (2026-09-12) says older single-teacher rows are kept as legacy; whether this rewrite was intended is UNDETERMINED.",
+    "recorded": "A477, 2026-11-23"
+   },
+   "why": "Settled 2026-11-23 (A478): the rewrite is the nightly panel back-audit that A161 (2026-09-20) set running on his instruction. Of the 104 rewritten anchored rows, all keep text, reason and verdict byte for byte; 89 had their judge replaced by the panel string, 15 were marked contested, all gained panel and audited (2026-10-27..29). The first judges of the 200 anchored rows are in this file at 3a77baf. No row is left for the back-audit to rewrite (0 of 5,157 eligible), so a new anchor holds; the back-audit now keeps the judge it replaces (judge_before_audit)."
   }
  }
 }

@@ -129,6 +129,27 @@ def load_ack(path=ACK):
         return {}
 
 
+# A ledger whose head CANNOT hold an anchor, by how it is written (measured 2026-11-23: ops/SELF_EVAL.md puts each new
+# round at the top and drops old ones). Its drift row may say head_anchor_cannot_hold; no other ledger may. Moved here
+# from test_ra1 in A478 so the nightly's live check and RA1 read one list.
+PREPENDING = {"ops/SELF_EVAL.md"}
+
+
+def split_alerts(alerts, ack):
+    """(new, known) for the live sentinel's alert strings (A478). KNOWN is only a head-anchor alert for a ledger in
+    PREPENDING whose drift row says head_anchor_cannot_hold; every other alert is new. It never hides an alert: the
+    caller prints both lists."""
+    new, known = [], []
+    for a in alerts:
+        rel = a.split(":", 1)[0].strip()
+        row = ack.get(rel) or {}
+        if rel in PREPENDING and row.get("head_anchor_cannot_hold") and "first 200 lines" in a:
+            known.append(a)
+        else:
+            new.append(a)
+    return new, known
+
+
 if __name__ == "__main__":
     ack = load_ack()
     m = measure(hint={k: v.get("anchored_from_commit") for k, v in ack.items()})

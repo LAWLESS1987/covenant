@@ -19063,3 +19063,46 @@ the gap registry says what exists for each). References elsewhere to A222-A224 s
 **Checks.** RA1 11/11 in place and in a copy without git; AN1 10/10 (6/7 before the registry, red first); G6 13/13
 (12/13 with the travelling-anchor alert disabled); RA1.1 red when one line is inserted into the head of a copy of
 KNOWN_ISSUES.md.
+
+### A478. [the record re-anchored, the verdicts rewrite explained, the live check running every night] A477's open calls, done on his word. 2026-11-23. His words: "Yea merge and do the others." A477 merged (fast-forward, 9e73af6); the five ledgers re-anchored; the verdicts rows accepted as they stand; the live sentinel put into the nightly pass; A222-A224 kept as they are.
+
+**The verdicts rewrite was intended.** A477 called it UNDETERMINED. The cause is `covenant_teacher_panel.back_audit`,
+which A161 (2026-09-20) set running every night on his instruction "increase student learning": it re-judges the
+last 48 single-teacher rows with the panel, seats the ones the panel admits and marks the rest contested. Measured on
+the 104 anchored rows it rewrote (matched by time and text): text, reason and verdict unchanged on all 104; the judge
+replaced by the panel string on 89; contested added on 15; panel and audited (2026-10-27 to 2026-10-29) added on all.
+No row in the ledger is left for it to rewrite (0 of 5,157 eligible). The verdicts are accepted as they stand; the
+rows are not rewritten again.
+
+**What it lost, and the guard.** On every row it seated, the back-audit overwrote the judge and kept no copy, against
+the form A356 used (originals kept on the row). The first judges of the 200 anchored rows survive in the file at
+3a77baf; earlier rows' in the file's history before each audit. `back_audit` now keeps the judge it replaces
+(`judge_before_audit`), and a contested row keeps its judge. G17b in test_teacher_panel.py, red before the fix (19/20),
+green after (20/20). The rows already audited are not rewritten to add it.
+
+**Re-anchored** (`python covenant_sentinels.py --anchor`, the operator act, run on this branch's tree, whose ledger
+heads equal node D's). Before it, the head of each ledger was measured over the last 12 commits touching it:
+KNOWN_ISSUES, DISTILL and NIGHTLY have not moved (appended to), verdicts moved once (the audit, now finished), so
+their new anchors hold. SELF_EVAL moved and will keep moving (it prepends): its exemption row stays, and the
+exemption list moved to `tools/anchor_drift.py` (PREPENDING) so the live check reads the same list. The re-anchoring
+also re-anchored the four guarded documents; the only change since 2026-09-09 besides the record itself is
+CONSTITUTION.md's 13fadfe (2026-09-15, his own commit, the A121 correction). The old anchors are in
+ops/RECORD_ANCHORS.json at 9e73af6. The four settled drift rows are moved whole into `retired_by_reanchoring` in
+ops/ANCHOR_DRIFT_ACK.json, each with why, not deleted.
+
+**The live check now runs every night.** `covenant_nightly.py` runs `covenant_sentinels.run_all()` after the
+self-audit, prints each sentinel, and fails the pass on any alert except the one recorded exemption (SELF_EVAL's head,
+printed as known). It never re-anchors. It runs where the nightly runs (the laptop's `CovenantDistill` task, once its
+line has this). On node D, which runs no nightly, the hub's integrate task (every 2 hours) runs `--check` on node D's
+tree after its own step (tetsu repository, recorded there).
+
+**RA1 after re-anchoring.** With nothing drifting, RA1.3-RA1.7 had passed with nothing driven; they are now driven
+against a synthetic drift on copies (RA1.3a). RA1.9b no longer needs a second drift row. RA1.10/10b: the live check
+treats only the prepending ledger's head alert as known, and only while its row says so.
+
+**A222-A224 stay as they are.** Renumbering would edit six record headers in place and turn every existing citation
+of those numbers into a wrong one. `docs/ANUMBER_GAPS.json` tells each copy apart by its first commit, and AN1.6d
+catches either copy going. The 28 missing numbers stay gaps; the registry says what exists for each.
+
+**Not done.** The laptop: its nightly gets the live check when its line takes main; that is the laptop session's
+act on his word there. A retention rule for SELF_EVAL. Restoring the overwritten judges onto the audited rows.

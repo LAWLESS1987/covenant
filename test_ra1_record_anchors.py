@@ -32,8 +32,9 @@ def check(name, ok, detail=""):
 # A ledger whose head CANNOT hold an anchor, by how it is written (measured 2026-11-23: ops/SELF_EVAL.md puts each new
 # round at the top and drops old ones, so its first 200 lines change every round on a node that runs it). Its row may
 # say head_anchor_cannot_hold, and then RA1 does not compare its head; no other ledger may say so. This narrows RA1 only:
-# covenant_sentinels still alerts on it, and a retention rule that fits it is the operator's decision.
-PREPENDING = {"ops/SELF_EVAL.md"}
+# covenant_sentinels still alerts on it, and a retention rule that fits it is the operator's decision. The list lives
+# in tools/anchor_drift.py since A478, so the nightly's live check reads the same one.
+PREPENDING = AD.PREPENDING
 
 
 def problems(measured, ack):
@@ -88,28 +89,37 @@ missing = [l for l in S.GUARDED_LEDGERS if l not in (anchors.get("ledgers") or {
 check("RA1.2 every guarded ledger has an anchor", not missing, missing)
 
 # ---- both ways, on copies of the real measurement (nothing on disk is touched)
-some = next((k for k, v in measured.items() if v["state"] != "MATCH"), None)
-if some:
-    a2 = copy.deepcopy(ack)
-    a2.pop(some, None)
-    check("RA1.3 a drift with no row is caught", any("no row" in p for p in problems(measured, a2)), some)
-    m2 = copy.deepcopy(measured)
-    m2[some]["current_prefix_sha256"] = "0" * 64
-    check("RA1.4 a head that moved again (new hash) is caught", any("moved again" in p for p in problems(m2, ack)))
-    a3 = copy.deepcopy(ack)
-    a3.setdefault(some, {})["accepted"] = True
-    check("RA1.5 a row that tries to accept the drift is caught", any("cannot accept" in p for p in problems(measured, a3)))
-    m3 = copy.deepcopy(measured)
-    # A class different from the ROW's (not from the measurement's: in a copy without git, as the sweep stages it, the
-    # measured state is "DRIFTED (no git here)" and a class taken from it would equal the row's -- found 2026-11-23).
-    m3[some]["state"] = "REWRITTEN" if ack.get(some, {}).get("class") != "REWRITTEN" else "INSERTION"
-    check("RA1.6 a row whose class no longer matches the measurement is caught",
-          any("measured" in p for p in problems(m3, ack)))
-    m4 = copy.deepcopy(measured)
-    m4[some]["state"] = "MATCH"
-    check("RA1.7 a row for a ledger that matches again is stale and caught", any("stale" in p for p in problems(m4, ack)))
-else:
-    check("RA1.3-7 not driven: no ledger drifts today (drive them against a fixture before relying on this)", True)
+some = next((k for k, v in measured.items() if v["state"] != "MATCH" and k not in PREPENDING), None)
+bm, ba = measured, ack
+if not some:
+    # Nothing drifts (the state after the A478 re-anchoring). The checks below are still driven, against a synthetic
+    # drift on copies: before A478 this branch passed with nothing driven, which a re-anchoring would have made the
+    # normal case.
+    some = next(k for k in measured if k not in PREPENDING and measured[k]["state"] != "MISSING")
+    bm = copy.deepcopy(measured)
+    bm[some].update(state="REWRITTEN", current_prefix_sha256="2" * 64)
+    ba = copy.deepcopy(ack)
+    ba[some] = {"class": "REWRITTEN", "current_prefix_sha256": "2" * 64, "accepted": False}
+    check("RA1.3a a synthetic drift recorded exactly passes (the fixture the checks below are driven on)",
+          not [p for p in problems(bm, ba) if p.startswith(some)], some)
+a2 = copy.deepcopy(ba)
+a2.pop(some, None)
+check("RA1.3 a drift with no row is caught", any("no row" in p for p in problems(bm, a2)), some)
+m2 = copy.deepcopy(bm)
+m2[some]["current_prefix_sha256"] = "0" * 64
+check("RA1.4 a head that moved again (new hash) is caught", any("moved again" in p for p in problems(m2, ba)))
+a3 = copy.deepcopy(ba)
+a3.setdefault(some, {})["accepted"] = True
+check("RA1.5 a row that tries to accept the drift is caught", any("cannot accept" in p for p in problems(bm, a3)))
+m3 = copy.deepcopy(bm)
+# A class different from the ROW's (not from the measurement's: in a copy without git, as the sweep stages it, the
+# measured state is "DRIFTED (no git here)" and a class taken from it would equal the row's -- found 2026-11-23).
+m3[some]["state"] = "REWRITTEN" if ba.get(some, {}).get("class") != "REWRITTEN" else "INSERTION"
+check("RA1.6 a row whose class no longer matches the measurement is caught",
+      any("measured" in p for p in problems(m3, ba)))
+m4 = copy.deepcopy(bm)
+m4[some]["state"] = "MATCH"
+check("RA1.7 a row for a ledger that matches again is stale and caught", any("stale" in p for p in problems(m4, ba)))
 
 # RA1.9 the prepending exemption, both ways: it holds for the measured ledger, and only for it.
 pre = next(iter(PREPENDING))
@@ -118,11 +128,22 @@ if pre in measured and pre in ack:
     m5[pre]["current_prefix_sha256"] = "1" * 64                  # a new round on top
     check("RA1.9 the prepending ledger's head moving is not a failure while its row says the anchor cannot hold",
           not [p for p in problems(m5, ack) if p.startswith(pre)], pre)
-    other = next(k for k in ack if k != pre)
+    other = next(k for k in measured if k != pre)
     a6 = copy.deepcopy(ack)
-    a6[other]["head_anchor_cannot_hold"] = True
+    a6[other] = dict(a6.get(other) or {}, head_anchor_cannot_hold=True, accepted=False)
     check("RA1.9b any other ledger claiming that exemption is caught",
           any("only a ledger measured as prepending" in p for p in problems(measured, a6)), other)
+
+# RA1.10 the nightly's live check (A478) treats only that one recorded exemption as known, both ways.
+_said = ": the first 200 lines no longer hash to the anchored value. Its history was rewritten, not appended to"
+al = [pre + _said, next(k for k in measured if k != pre) + _said]
+nw, kn = AD.split_alerts(al, ack)
+check("RA1.10 the live check knows only the prepending ledger's head alert; any other ledger's alert stays new",
+      kn == al[:1] and nw == al[1:], (nw, kn))
+a7 = copy.deepcopy(ack)
+a7.get(pre, {}).pop("head_anchor_cannot_hold", None)
+nw2, kn2 = AD.split_alerts(al, a7)
+check("RA1.10b without the row's exemption the prepending ledger's alert is new too", not kn2 and nw2 == al, (nw2, kn2))
 
 # RA1.8 the classifier itself, both ways, on bytes (no git needed).
 old = [b"%d" % i for i in range(10)]
