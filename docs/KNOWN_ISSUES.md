@@ -19009,3 +19009,57 @@ probe file holding the old words (red), then the probe retired to `.trash/` (gre
 **Status, 2026-11-22.** On the branch `claude/a466-verifier-salt`, pushed for review as a pull request on his "Do it".
 Not merged; merging is his. Nothing runs differently: a document and a test.
 
+### A477. [the record's travelling anchors and its A-numbers, measured and held] All five anchored ledgers had drifted from ops/RECORD_ANCHORS.json unseen; 32 A-numbers below A471 have no entry; three numbers head two entries each. 2026-11-23. His words: "Improve on those use quorum if need be." RECORDED and GUARDED; nothing re-anchored, renumbered or accepted.
+
+**What was measured** (main 2c1d9a6; every covenant clone, worktree and bundle on TETSU; the laptop's trees, by its
+session the same day). The memory sentinel anchors the first 200 lines of five ledgers (anchored 2026-09-09):
+
+| ledger | measured | since |
+|---|---|---|
+| docs/KNOWN_ISSUES.md | INSERTION: all 200 anchored lines present, in order | A274's dated note inserted inside an early entry (12b4718, 2026-10-06), on main's line at merge 46fbe4a (2026-10-08) |
+| ops/verdicts.jsonl | REWRITTEN: 96 of 200 anchored rows survive byte-exact | old rows re-serialized (the 2026-09-04 rows' judge now names the teacher panel, with a panel field), on main at the A416 consolidation bd7eacf (2026-11-09) |
+| ops/SELF_EVAL.md | REWRITTEN: 59 of 200 present | it puts new rounds at the top and drops old ones (seen from merge 3724eb0, 2026-10-03); it is not append-only |
+| ops/DISTILL.md, ops/NIGHTLY.md | UNVERIFIABLE | no committed version ever hashed to the anchor: it was taken from a working tree whose bytes were never committed |
+
+Why nobody was told: the sweep runs only the sentinels' offline self-test (`test_sentinels.py`); `test_g6` handed the
+sentinel an EMPTY anchor dict, so its comparison with the travelling anchor was never driven; and nothing schedules the
+live check. The only `logs/sentinels.log` on either machine is the laptop's, last written 2026-09-16; node D has none.
+
+The verdicts rewrite is in tension with A101 (2026-09-12), which says older single-teacher rows "still do and are
+counted as legacy". Whether rewriting them was intended is UNDETERMINED; this entry does not decide it.
+
+A-numbers 1..A470 (main's highest): 32 have no `### A<n>.` header. 28 exist nowhere as an entry on either machine (work
+under 22 of them is named by commits or files; A384-A388 and A390 by nothing found); A426 and A461 only on unmerged
+branches; A457 and A458 only on the laptop's live branch. A222, A223 and A224 each head two unrelated entries written
+by parallel sessions on 2026-09-25/26; no branch anywhere renumbers or resolves them.
+
+**What changed.**
+- `tools/anchor_drift.py`: classifies each anchored ledger MATCH / INSERTION / REWRITTEN / UNVERIFIABLE (the anchored
+  text recovered from the newest commit whose version hashes to the anchor; without git only the hash is compared).
+- `ops/ANCHOR_DRIFT_ACK.json`: each drift above, keyed by its exact current head hash, with the measured class and
+  reason. `accepted` is false on every row and cannot be anything else: accepting a drift is the operator re-anchoring
+  (`python covenant_sentinels.py --anchor`), never a row.
+- `test_ra1_record_anchors.py` (RA1, 11 checks): fails on a drift with no row, a head that moved again, a row whose
+  class no longer matches, a stale row, and any row that accepts; each driven both ways on copies of the measurement.
+  One exemption, narrow and visible: ops/SELF_EVAL.md alone may say its head anchor cannot hold (it prepends); RA1 then
+  does not compare its head, and any other ledger claiming that is caught (RA1.9b). The sentinel itself is unchanged.
+- `test_g6_sentinels_fail.py` G6.9/G6.9b: the travelling-anchor branch, both ways (a matching head passes; one row
+  rewritten alerts with no local sighting). Seen red with that branch disabled in a copy.
+- `docs/ANUMBER_GAPS.json` + `tools/next_anumber.py` `gaps()` / `registry_problems()` + AN1.6-AN1.6d: the gaps up to a
+  fixed line (`checked_through`, 470) and each duplicate copy are exactly the registered ones. A header removed below
+  the line, a listed gap filled, or one copy of a duplicate removed is caught. Numbers above the line are in flight on
+  branches and are not checked, so out-of-order merges do not turn the sweep red; raising the line is a deliberate edit.
+
+**Review.** Codex (one outside seat, read-only, on the design before it was built): RA1 "SOUND within its stated
+scope"; no existing guard weakened. Its points, taken: a drift row records and never accepts; the gap line is fixed so
+deleting the highest entry still shows; one copy of a duplicate going is checked. Its points, not done here: this does
+not restore runtime detection; the self-evaluation ledger needs a retention rule that fits it.
+
+**Not done, and whose.** Re-anchoring (the operator's act; after it, RA1 calls the rows stale until they are retired to
+.trash/). Whether the verdicts rewrite is accepted, and whether the originals are restored beside it. Scheduling the live
+sentinel run on the nodes (a deploy). Renumbering A222-A224 or writing entries for the 28 missing numbers (his call;
+the gap registry says what exists for each). References elsewhere to A222-A224 stay ambiguous.
+
+**Checks.** RA1 11/11 in place and in a copy without git; AN1 10/10 (6/7 before the registry, red first); G6 13/13
+(12/13 with the travelling-anchor alert disabled); RA1.1 red when one line is inserted into the head of a copy of
+KNOWN_ISSUES.md.
