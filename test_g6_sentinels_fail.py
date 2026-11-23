@@ -134,6 +134,26 @@ def main():
         check("G6.6 a ledger that vanished alerts",
               not rep.ok and rep.alerts, "%s | %s" % (rep.summary[:60], str(rep.alerts)[:80]))
 
+        # ---- A477 (2026-11-23): the TRAVELLING anchor, both ways. Every check above hands the sentinel an empty anchor
+        # dict, so its comparison with ops/RECORD_ANCHORS.json -- the half a stranger can check -- was never driven;
+        # meanwhile all five real ledgers had drifted from their anchors unseen. A fresh state directory each time, so
+        # the local-sighting path cannot be what fires.
+        led2 = "ops/led2.jsonl"
+        write(tmp, led2, "\n".join('{"i": %d}' % i for i in range(n0)) + "\n")
+        anc = {"ledgers": {led2: {"prefix_sha256": S.MemorySentinel(ledgers=[led2]).measure(led2)["prefix_sha256"],
+                                  "lines_at_anchor": n0}}}
+        S.STATE_DIR = os.path.join(tmp, "state_g69a")
+        rep = S.MemorySentinel(ledgers=[led2]).check(anc)
+        check("G6.9 a ledger whose head still hashes to its travelling anchor passes", rep.ok, rep.summary[:90])
+        rows = ['{"i": %d}' % i for i in range(n0)]
+        rows[7] = '{"i": 7, "rewritten": true}'                  # one old row edited in place, nothing removed
+        write(tmp, led2, "\n".join(rows) + "\n")
+        S.STATE_DIR = os.path.join(tmp, "state_g69b")
+        rep = S.MemorySentinel(ledgers=[led2]).check(anc)
+        check("G6.9b ...and one whose head was REWRITTEN against that anchor alerts, with no local sighting to lean on",
+              not rep.ok and any("anchored value" in a for a in rep.alerts),
+              "%s | %s" % (rep.summary[:60], str(rep.alerts)[:90]))
+
         # ---- what is NOT driven, said plainly
         check("G6.7 NodeWatchdogSentinel is observed, not driven -- it reads a live log",
               hasattr(S, "NodeWatchdogSentinel"),

@@ -75,17 +75,25 @@ RR.release_lock(d)
 
 # 4. a real second process: it holds the lock, we are refused; it dies without releasing, we take it
 x = tmp_lock()
+# A479 (2026-11-23): through tools/child_python.py. RR1.7 compared the holder's pid with Popen's pid; on a Windows venv
+# Popen's pid is the launcher's and the holder is its child, so RR1.7 failed on every such machine while Linux CI was
+# green. The child now reports its own pid, RR1.7b checks the relationship instead of assuming it, and RR1.7c says
+# the named holder is gone, not only that the lock came free (11 of 12 quorum seats, 2026-11-23).
+sys.path.insert(0, os.path.join(HERE, "tools"))
+import child_python as CP  # noqa: E402
 child_src = ("import sys, time; sys.path.insert(0, %r); import rolling_restart as RR; "
              "ok, _ = RR.take_lock(%r); print('held' if ok else 'refused', flush=True); time.sleep(120)" % (HERE, x))
-child = subprocess.Popen([sys.executable, "-c", child_src], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+child, holder, holder_parent = CP.start(child_src)
 try:
-    first = child.stdout.readline().decode("utf-8", "replace").strip()
+    first = CP.readline(child, 30)
     okx, whox = RR.take_lock(x)
-    check("RR1.7 while another process holds it, this one is refused and told that process's pid",
-          first == "held" and not okx and ("pid %d" % child.pid) in whox, (first, okx, whox))
+    check("RR1.7 while another process holds it, this one is refused and told that process's pid (the pid the "
+          "holder reports itself)", first == "held" and not okx and ("pid %d" % holder) in whox, (first, okx, whox))
+    check("RR1.7b the holder is the started child itself or that child's own child (a venv launcher), by the parent "
+          "pid it reports", holder == child.pid or holder_parent == child.pid, (holder, holder_parent, child.pid))
 finally:
-    child.kill()
-    child.wait(timeout=30)
+    gone = CP.kill(child, holder)
+check("RR1.7c the process that held the lock is gone after the kill", gone, holder)
 deadline, okd = time.time() + 15, False
 while time.time() < deadline and not okd:          # the OS drops a dead holder's lock; on Windows not always at once
     okd = RR.take_lock(x)[0]

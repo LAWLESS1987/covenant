@@ -19266,3 +19266,153 @@ which a venv creates. Measured in a fresh venv there: only `lib/python3.14/site-
 from (on Windows it is the same `Lib\site-packages` as before). **Checks:** A467 4/4 under WSL and under Windows.
 Its own control (A467.3, the planted hook DOES run under `-I` alone) passed in both, so the test still bites. The
 pre-push guard did its job and was not bypassed; `COVENANT_PREPUSH_ALLOW` is his and was not used.
+
+### A477. [the record's travelling anchors and its A-numbers, measured and held] All five anchored ledgers had drifted from ops/RECORD_ANCHORS.json unseen; 32 A-numbers below A471 have no entry; three numbers head two entries each. 2026-11-23. His words: "Improve on those use quorum if need be." RECORDED and GUARDED; nothing re-anchored, renumbered or accepted.
+
+**What was measured** (main 2c1d9a6; every covenant clone, worktree and bundle on TETSU; the laptop's trees, by its
+session the same day). The memory sentinel anchors the first 200 lines of five ledgers (anchored 2026-09-09):
+
+| ledger | measured | since |
+|---|---|---|
+| docs/KNOWN_ISSUES.md | INSERTION: all 200 anchored lines present, in order | A274's dated note inserted inside an early entry (12b4718, 2026-10-06), on main's line at merge 46fbe4a (2026-10-08) |
+| ops/verdicts.jsonl | REWRITTEN: 96 of 200 anchored rows survive byte-exact | old rows re-serialized (the 2026-09-04 rows' judge now names the teacher panel, with a panel field), on main at the A416 consolidation bd7eacf (2026-11-09) |
+| ops/SELF_EVAL.md | REWRITTEN: 59 of 200 present | it puts new rounds at the top and drops old ones (seen from merge 3724eb0, 2026-10-03); it is not append-only |
+| ops/DISTILL.md, ops/NIGHTLY.md | UNVERIFIABLE | no committed version ever hashed to the anchor: it was taken from a working tree whose bytes were never committed |
+
+Why nobody was told: the sweep runs only the sentinels' offline self-test (`test_sentinels.py`); `test_g6` handed the
+sentinel an EMPTY anchor dict, so its comparison with the travelling anchor was never driven; and nothing schedules the
+live check. The only `logs/sentinels.log` on either machine is the laptop's, last written 2026-09-16; node D has none.
+
+The verdicts rewrite is in tension with A101 (2026-09-12), which says older single-teacher rows "still do and are
+counted as legacy". Whether rewriting them was intended is UNDETERMINED; this entry does not decide it.
+
+A-numbers 1..A470 (main's highest): 32 have no `### A<n>.` header. 28 exist nowhere as an entry on either machine (work
+under 22 of them is named by commits or files; A384-A388 and A390 by nothing found); A426 and A461 only on unmerged
+branches; A457 and A458 only on the laptop's live branch. A222, A223 and A224 each head two unrelated entries written
+by parallel sessions on 2026-09-25/26; no branch anywhere renumbers or resolves them.
+
+**What changed.**
+- `tools/anchor_drift.py`: classifies each anchored ledger MATCH / INSERTION / REWRITTEN / UNVERIFIABLE (the anchored
+  text recovered from the newest commit whose version hashes to the anchor; without git only the hash is compared).
+- `ops/ANCHOR_DRIFT_ACK.json`: each drift above, keyed by its exact current head hash, with the measured class and
+  reason. `accepted` is false on every row and cannot be anything else: accepting a drift is the operator re-anchoring
+  (`python covenant_sentinels.py --anchor`), never a row.
+- `test_ra1_record_anchors.py` (RA1, 11 checks): fails on a drift with no row, a head that moved again, a row whose
+  class no longer matches, a stale row, and any row that accepts; each driven both ways on copies of the measurement.
+  One exemption, narrow and visible: ops/SELF_EVAL.md alone may say its head anchor cannot hold (it prepends); RA1 then
+  does not compare its head, and any other ledger claiming that is caught (RA1.9b). The sentinel itself is unchanged.
+- `test_g6_sentinels_fail.py` G6.9/G6.9b: the travelling-anchor branch, both ways (a matching head passes; one row
+  rewritten alerts with no local sighting). Seen red with that branch disabled in a copy.
+- `docs/ANUMBER_GAPS.json` + `tools/next_anumber.py` `gaps()` / `registry_problems()` + AN1.6-AN1.6d: the gaps up to a
+  fixed line (`checked_through`, 470) and each duplicate copy are exactly the registered ones. A header removed below
+  the line, a listed gap filled, or one copy of a duplicate removed is caught. Numbers above the line are in flight on
+  branches and are not checked, so out-of-order merges do not turn the sweep red; raising the line is a deliberate edit.
+
+**Review.** Codex (one outside seat, read-only, on the design before it was built): RA1 "SOUND within its stated
+scope"; no existing guard weakened. Its points, taken: a drift row records and never accepts; the gap line is fixed so
+deleting the highest entry still shows; one copy of a duplicate going is checked. Its points, not done here: this does
+not restore runtime detection; the self-evaluation ledger needs a retention rule that fits it.
+
+**Not done, and whose.** Re-anchoring (the operator's act; after it, RA1 calls the rows stale until they are retired to
+.trash/). Whether the verdicts rewrite is accepted, and whether the originals are restored beside it. Scheduling the live
+sentinel run on the nodes (a deploy). Renumbering A222-A224 or writing entries for the 28 missing numbers (his call;
+the gap registry says what exists for each). References elsewhere to A222-A224 stay ambiguous.
+
+**Checks.** RA1 11/11 in place and in a copy without git; AN1 10/10 (6/7 before the registry, red first); G6 13/13
+(12/13 with the travelling-anchor alert disabled); RA1.1 red when one line is inserted into the head of a copy of
+KNOWN_ISSUES.md.
+
+### A478. [the record re-anchored, the verdicts rewrite explained, the live check running every night] A477's open calls, done on his word. 2026-11-23. His words: "Yea merge and do the others." A477 merged (fast-forward, 9e73af6); the five ledgers re-anchored; the verdicts rows accepted as they stand; the live sentinel put into the nightly pass; A222-A224 kept as they are.
+
+**The verdicts rewrite was intended.** A477 called it UNDETERMINED. The cause is `covenant_teacher_panel.back_audit`,
+which A161 (2026-09-20) set running every night on his instruction "increase student learning": it re-judges the
+last 48 single-teacher rows with the panel, seats the ones the panel admits and marks the rest contested. Measured on
+the 104 anchored rows it rewrote (matched by time and text): text, reason and verdict unchanged on all 104; the judge
+replaced by the panel string on 89; contested added on 15; panel and audited (2026-10-27 to 2026-10-29) added on all.
+No row in the ledger is left for it to rewrite (0 of 5,157 eligible). The verdicts are accepted as they stand; the
+rows are not rewritten again.
+
+**What it lost, and the guard.** On every row it seated, the back-audit overwrote the judge and kept no copy, against
+the form A356 used (originals kept on the row). The first judges of the 200 anchored rows survive in the file at
+3a77baf; earlier rows' in the file's history before each audit. `back_audit` now keeps the judge it replaces
+(`judge_before_audit`), and a contested row keeps its judge. G17b in test_teacher_panel.py, red before the fix (19/20),
+green after (20/20). The rows already audited are not rewritten to add it.
+
+**Re-anchored** (`python covenant_sentinels.py --anchor`, the operator act, run on this branch's tree, whose ledger
+heads equal node D's). Before it, the head of each ledger was measured over the last 12 commits touching it:
+KNOWN_ISSUES, DISTILL and NIGHTLY have not moved (appended to), verdicts moved once (the audit, now finished), so
+their new anchors hold. SELF_EVAL moved and will keep moving (it prepends): its exemption row stays, and the
+exemption list moved to `tools/anchor_drift.py` (PREPENDING) so the live check reads the same list. The re-anchoring
+also re-anchored the four guarded documents; the only change since 2026-09-09 besides the record itself is
+CONSTITUTION.md's 13fadfe (2026-09-15, his own commit, the A121 correction). The old anchors are in
+ops/RECORD_ANCHORS.json at 9e73af6. The four settled drift rows are moved whole into `retired_by_reanchoring` in
+ops/ANCHOR_DRIFT_ACK.json, each with why, not deleted.
+
+**The live check now runs every night.** `covenant_nightly.py` runs `covenant_sentinels.run_all()` after the
+self-audit, prints each sentinel, and fails the pass on any alert except the one recorded exemption (SELF_EVAL's head,
+printed as known). It never re-anchors. It runs where the nightly runs (the laptop's `CovenantDistill` task, once its
+line has this). On node D, which runs no nightly, the hub's integrate task (every 2 hours) runs `--check` on node D's
+tree after its own step (tetsu repository, recorded there).
+
+**RA1 after re-anchoring.** With nothing drifting, RA1.3-RA1.7 had passed with nothing driven; they are now driven
+against a synthetic drift on copies (RA1.3a). RA1.9b no longer needs a second drift row. RA1.10/10b: the live check
+treats only the prepending ledger's head alert as known, and only while its row says so.
+
+**A222-A224 stay as they are.** Renumbering would edit six record headers in place and turn every existing citation
+of those numbers into a wrong one. `docs/ANUMBER_GAPS.json` tells each copy apart by its first commit, and AN1.6d
+catches either copy going. The 28 missing numbers stay gaps; the registry says what exists for each.
+
+**Not done.** The laptop: its nightly gets the live check when its line takes main; that is the laptop session's
+act on his word there. A retention rule for SELF_EVAL. Restoring the overwritten judges onto the audited rows.
+
+### A479. [four checks red only on a Windows PC, put to the quorum, fixed; and the hole the quorum found] V2 A12, RR1.7, QW1 and A274's M-breakaway failed on TETSU and passed in Linux CI, identically on unchanged main. 2026-11-23. His words: "Consult the quorum to fix those pre-existing failures." FIXED, each red first; one new finding (an app-alias launch escapes the sandbox's process limit) RETRACTED and PINNED; a Windows CI lane added, not blocking.
+
+**The quorum.** One packet (`mesh/quorum_form.py`, packet 812967a53f1a), twelve seats answered in the form: Codex,
+both Grok bots, Grok on X, ChatGPT, Gemini, Mistral, Meta AI, DeepSeek, and three local models; Claude.ai was not
+reached (out of usage). Counted by script: Q2 (the lock pid) HOLE 11 of 12; Q3 (the breakaway mutation) UNSURE 7,
+HOLE 4, SOUND 1; Q4 (the log folder) HOLE 6; Q1 (the status line) SOUND 6, HOLE 5; a Windows CI lane in a venv named
+the most important change by 7. The answers are kept privately with the tally.
+
+**V2 A12** (money_posture). A Windows machine with no trader task printed neither "last ATTEMPT" nor "last RUN per
+trader_log.txt"; and the scheduler listing went through `_run`, which returns "" on any failure, so a listing that
+FAILED printed "No scheduled task invokes the trader" (5 seats). The section is now `scheduler_lines()`, pure, every
+branch printing both lines: no task (worded so it no longer claims only a person runs it; services, Run keys and
+the Startup folder are not read), listing failed or unreadable (UNKNOWN, never "no task"), one task, off Windows,
+and a missing trader_log.txt said as missing. A12b-A12f drive each branch on every platform; breaking the failure
+branch turned A12c/A12d red, dropping the no-task attempt line turned A12/A12b red. V2 49/49.
+
+**RR1.7** (the restart lock). It compared the holder's pid with Popen's pid; on a Windows venv python.exe is a
+launcher and the holder is its child -- the shape A274 had recorded in prose on 2026-10-06, back in a new test.
+`tools/child_python.py` starts a child Python whose first line reports its own pid and parent pid. RR1.7 names the
+holder by that pid, RR1.7b checks the relationship (the child itself, or its launcher's child) instead of assuming
+it, and RR1.7c says the named holder is gone after the kill, not only that the lock came free (the quorum's main
+point: a freed lock did not prove the interpreter died). RR1 17/17 in the venv and with the plain interpreter.
+`test_ch1_child_python.py` (CH1, 7 checks, on the runner list) drives the helper on this machine's real topology
+and fails on a test that names a holder by Popen's pid; seen red against the old RR1 line in a copy.
+
+**QW1 / the watchdog guard.** `revive()` opened logs/watchdog-stdout.log without making logs/, so on a fresh clone
+it raised FileNotFoundError; in the sweep an earlier suite made the folder first. It now makes it, and closes its
+own copy of the log handle after the start (it kept it open for its whole life). C3 R5 points the log folder at one
+that does not exist yet (an empty temp folder already exists and could not go red: Codex), stubs what it starts,
+waits for it, restores the path: red with FileNotFoundError before, green after. QW1 18/18 alone in a fresh copy.
+
+**A274 M-breakaway, and what the quorum's Q3 found.** The mutation drops the desktop-app breakaway policy and needs
+P to go red; on a python.org build (TETSU's, GetCurrentPackageFullName 15700) it cannot: A274's record had said the
+policy "should be a no-op" there, unmeasured. It now runs only on a packaged interpreter and is NOT RUN, with the
+measured reason, elsewhere. The quorum asked whether a non-packaged interpreter's jailed child starting a packaged
+app through an app execution alias still needs the policy. Measured instead of answered: inside the job, an
+escaped snippet started winget.exe through its alias and it RAN (exit 0) with the policy set and with it dropped,
+while cmd.exe and Python were refused 1816 in the same job. So the process limit does not reach an alias launch.
+A274's statement that the process limit is enforced is RETRACTED (A274-PROCESS-ENFORCED; the record as written on
+branch a274-process-enforced-claim-as-written-2026-11-23; R1 driven both ways with a probe, retired to
+.trash/a479-r1-probe/). P4 pins the gap like F pins file size: the day something bounds it, P4 goes red. Nothing
+runs proposals through this path: it stays shut on file size (SANDBOX_WIN_UNENFORCEABLE). Not measured on a
+packaged interpreter (the laptop's); P4 is NOT RUN there.
+
+**Windows CI lane.** `.github/workflows/covenant.yml` gains `sweep-windows`: python.org 3.12, a venv outside the
+checkout, `covenant_one.py --ci` through the venv's launcher, push and pull request only, continue-on-error until
+its first runs are read (what a GitHub Windows runner can run is not measured yet).
+
+**Not done.** The core's comment and /health reason still name file size as the only unenforced Windows limit;
+changing the core moves its deploy pin (the operator's act), so the retraction allows the core by name until then.
+The alias escape on a packaged interpreter. Making the Windows lane blocking.
