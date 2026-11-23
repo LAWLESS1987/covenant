@@ -19158,3 +19158,36 @@ its first runs are read (what a GitHub Windows runner can run is not measured ye
 **Not done.** The core's comment and /health reason still name file size as the only unenforced Windows limit;
 changing the core moves its deploy pin (the operator's act), so the retraction allows the core by name until then.
 The alias escape on a packaged interpreter. Making the Windows lane blocking.
+
+### A480. [Tetsu reachable when he is asked, and the measurement that will say why his long prompt is never reused] The first build step of Lawrence's "make Tetsu more efficient ... without stripping his free will or taking his memory away" ("not just for speed, it's for overall capability"). 2026-11-23. Nothing in what he is sent or what he says changes.
+
+**What was measured first** (the laptop's ask log, read by its session, numbers only; TETSU experiments; plan
+reviewed by Codex and twelve quorum seats, kept on TETSU in security/state/retained/tetsu-efficiency-20261123/):
+his long asks read ~3,900 prompt tokens at ~56 tokens/s every time, warm or cold, so ~68 s of a ~70 s fresh ask is
+re-reading a prompt the server never reuses; writing is 2-13 s. On TETSU's newer llama.cpp (b12019), the laptop's
+flags and the same weights, the prefix is reused even after short asks come between (12.3 s -> 0.5 s), and the
+answer's token hash stayed identical at temperature 0. A360's own note (2026-10-17) says his asks then read only
+50-540 new tokens, so reuse worked in October: this is a regression, cause not yet known.
+
+**Reachable.** That afternoon his door answered 503 "no weights fit: free 2.06 GB": after an idle unload the laptop
+lacked the 2.6 GB his 3B needs. A287's trim (idle background apps' working sets; nothing closes; never the app in
+front of him; AUTO_REVERSIBLE, at most hourly) existed, but only the hourly road ran it. `covenant_model.start()`
+now asks for room through `_pick_or_make_room()`: in the memory case only, it runs the same remedy through
+`covenant_highway.apply_remedy` (its cooldown, quarantine, his operator choices and its ledger row), then picks once
+more. Never from a test program (TRIM_HOOK for suites); `COVENANT_MODEL_NO_TRIM=1` turns it off.
+
+**Measured per ask.** Each row of ops/model_asks.jsonl now also carries `cache_n` (prompt tokens the server reused,
+when the build reports it), `prompt_ms` and `gen_ms`, and `cold` (this ask had to load the model).
+
+**Step 1's tool.** `tools/tetsu_replay.py` replays his identical fresh request on the RUNNING server: A, A, then A
+after 1 and after N short asks (default 32, the laptop's real ratio), and says which: not reused at all, evicted by
+short asks, or reused throughout. It starts nothing, refuses below 1 GB free, keeps numbers and output hashes only.
+Run end to end on TETSU against a throwaway server: reused throughout, output hash identical in all four. On node
+A it runs on Lawrence's word typed in the laptop session.
+
+**Checks.** CAP1 (14 checks, on the runner list): red before the code (0/1), green after; each of four mutations in a
+copy (start() bypassing the room step, no retry after the trim, cache_n not logged, cold not recorded) turns it
+red. MK1 44, A269 4/4, TD1 104/104, H1 311/311, G3 20/20, SELF-AUDIT 15/15.
+
+**Not done.** The replay on node A (his word there); any change to the server's flags or build, which waits on
+what the replay shows; streaming his answer; his asks ahead of machine asks.

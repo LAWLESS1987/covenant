@@ -811,6 +811,9 @@ SUITES = [
     # CH1 (A479, 2026-11-23): tools/child_python.py learns the pid of the process that runs a child's code (on a
     # Windows venv the launcher's child), and the guard fails on a test that names a holder by Popen's pid (RR1.7).
     ("test_ch1_child_python.py", 120, "DAILY + GUARDS"),
+    # CAP1 (A480, 2026-11-23): a load that fails for memory makes room through the highway's trim remedy, then
+    # retries; each ask's row carries the reused prompt tokens (cache_n), read/write ms, and whether it loaded cold.
+    ("test_cap1_tetsu_capability.py", 120, "DAILY + GUARDS"),
     ("test_ly1_layers.py", 120, "DAILY + GUARDS"),
     ("test_cl1_cloud.py", 120, "DAILY + GUARDS"),
     # OS1 (2026-09-26, "protect operation security in all we do by default"): his
