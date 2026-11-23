@@ -1026,6 +1026,11 @@ SUITES = [
     # only with a pinned X-Leg-Manifest (the limbs' A402 pin); no pin = never asked, another hash = VOID. A fake
     # opener stands in for the network; two mutations of the real source show each rule is what refuses.
     ("test_a470_remote_leg_pin.py", 60, "SECURITY"),
+    # A471 (2026-11-22, his "work like a neural network ... and a nervous system", then "Build it active"): detectors
+    # earn credit from outcomes (eligibility trace x outcome, the lab's exp20 rule); one whose alarms keep clearing by
+    # themselves waits ONE pass before its remedies run. Caution only, never a takeover guard, kill switch. Stand-ins
+    # for sense, every remedy and the pause; two mutations.
+    ("test_a471_eligibility.py", 120, "DAILY + GUARDS"),
     # A429 (2026-11-15, the owner: "Show the judge the content."): his hands' content goes to a content seat in this
     # process, never through the shared quorum (whose seats reach a runner and the tracked verdicts file); the seat
     # refuses what the screen refuses and otherwise abstains. Stub quorums and a stub runner; red on main 0/6.

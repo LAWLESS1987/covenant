@@ -4697,6 +4697,21 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
     """
     alerts, infos = [], []
     conditions = sense(health=health, machine=machine)
+    # A471 (2026-11-22): credit each detector from what happened to the condition it raised since the last pass,
+    # read BEFORE save_last_sense overwrites that pass. Sight only; the one act it can cause is a one-pass hold below.
+    prev, prev_at, elig_state = None, None, None
+    try:
+        import covenant_eligibility as _elig
+        with open(os.environ.get("COVENANT_HIGHWAY_LAST_SENSE") or LAST_SENSE, encoding="utf-8") as _fh:
+            _ls = json.load(_fh)
+        if time.time() - float(_ls.get("at", 0)) <= 1800 and isinstance(_ls.get("conditions"), dict):
+            prev, prev_at = _ls["conditions"], float(_ls["at"])
+        elig_state = _elig.load()
+        if prev is not None:
+            _elig.observe(prev, conditions, _elig.recent_rows(ledger or LEDGER), elig_state, prev_at=prev_at)
+            _elig.save(elig_state)
+    except Exception:                                            # noqa: BLE001 -- credit never blocks a pass
+        pass
     save_last_sense(conditions)
     # A profile in force is SAID on every pass, so a detector switched off by a file is never switched off quietly;
     # and one that tried to switch off a takeover guard is an alert, pause or no pause.
@@ -4745,6 +4760,16 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
                          % (name, json.dumps(c["measured"])[:120]))
             continue
         if c["state"] != PRESENT:
+            continue
+        # A471: a detector whose alarms keep clearing by themselves waits ONE pass before its remedies run. The reading
+        # is already reported above; only automatic action waits. Never a takeover guard; off with
+        # COVENANT_ELIGIBILITY_OFF=1.
+        try:
+            _why = _elig.hold(name, prev, elig_state, exempt=ALWAYS_APPLIES) if elig_state is not None else None
+        except Exception:                                        # noqa: BLE001
+            _why = None
+        if _why:
+            infos.append("highway: %s is present; %s" % (name, _why))
             continue
         acted = False
         for rname, r in REMEDIES.items():

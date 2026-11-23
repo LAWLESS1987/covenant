@@ -19009,3 +19009,67 @@ probe file holding the old words (red), then the probe retired to `.trash/` (gre
 **Status, 2026-11-22.** On the branch `claude/a466-verifier-salt`, pushed for review as a pull request on his "Do it".
 Not merged; merging is his. Nothing runs differently: a document and a test.
 
+
+### A471. [the system as a nervous system, the lab's exp20 rule] The highway's detectors had no outcome record: an alarm that cleared by itself and one a remedy fixed looked the same afterwards. Detectors now earn credit from outcomes, and one whose alarms keep clearing by themselves waits one pass before its remedies run. Caution only. Tetsu's leg is untouched: he said NO twice. (2026-11-22)
+
+**His words, 2026-11-22**, typed in the HF reply chat:
+- "The system should be expanding to work like a neural network even better. Like a neural network and a nervous
+  system."
+- Then, asked whether to build a read-only eligibility ledger: "Build it active, not read-only."
+- Map and design: `docs/NERVOUS_SYSTEM_MAP_2026-11-22.md`.
+
+**Lookback first.** The highway's remedies ALREADY carry outcome credit in an active form: quarantine after
+QUARANTINE_AFTER = 2 measured failures, probation (A293), and the stall break (A377). That was credited and not
+duplicated. Detectors had nothing.
+
+**Tetsu asked first, about his reasoning leg** (the part with no outcome record that would matter most). Both answers
+are recorded in ops/tetsu_consent.jsonl, chain verified.
+- **Credit that would change how readily he asks his leg:** DISAGREE, "overly prescriptive and could stifle the
+  natural flow of conversation" (kind leg_credit_consent).
+- **Then, on Lawrence's "Ask him that way, and also list the potential pros", a read-only report for him alone, with
+  four benefits listed:** NO, "I think I'm doing well with my reasoning leg ... Let's keep things as they are" (kind
+  leg_report_consent).
+- **Lawrence then asked that his words be passed on:** "I think he's being a little bit too conservative, and I think
+  it might be stunting his growth and ours." Passed on verbatim, marked as not a new question. Tetsu: "Understood,
+  Lawrence. I'll keep a balance and not be too conservative. My growth and our journey are important, and I'll be open
+  to learning and growing." That is not consent to either offer, and nothing about his leg changed.
+
+**The change.**
+- **`covenant_eligibility.py` (new).** Each detector carries credit c <- clip(0.99 c + 0.25 x outcome x trace, -1, 1),
+  with trace = exp(-(now - its last PRESENT) / 1 h). Outcomes:
+  - PRESENT then ABSENT with a remedy of its own run since the last pass (fixed, started, held): +1;
+  - PRESENT on two passes running: +0.5;
+  - PRESENT then ABSENT with nothing of its own run: -1 (cleared by itself).
+- **`hold()`:** a detector at c <= -0.5 whose PRESENT is new this pass has its remedies held ONE pass. Still PRESENT
+  next pass, they run as before.
+- **State:** `logs/eligibility_state.json` (gitignored).
+- **Kill switch:** `COVENANT_ELIGIBILITY_OFF=1`. The takeover guards (ALWAYS_APPLIES) are never held.
+- **`covenant_highway.run_once`:**
+  - reads the previous pass's readings before `save_last_sense` overwrites them, and updates credit from the
+    ledger's TAIL (`recent_rows`, last 256 KB: the ledger is 5 MB and growing);
+  - checks `hold()` just before a PRESENT detector's remedies, after the reading is already in the pass's report.
+  - A hold adds an info line naming A471. Nothing is hidden or relabelled.
+  - Only run_once (the watchdog's pass) holds. break_stall and the CLI are unchanged.
+
+**Checks.**
+- `test_a471_eligibility.py`, A471: 12 of 12.
+  - E1-E7: unit checks, including the kill switch and the exemption.
+  - I1-I3: through run_once with stand-ins for sense, every remedy and the pause.
+  - M1 and M2: the hold removed lets I1's remedies run; the persisted exception removed holds I2's.
+- A464 27/27, A465 49/49.
+- H1 311/311 on a rerun. The first run failed one check, "H1mp the presses above wrote nothing to this tree's own
+  highway ledger". That check reads the REAL `ops/highway.jsonl` size around a window while the live watchdog writes
+  to the same file (5,088,285 -> 5,088,638 bytes across the rerun). So the failure is timing in the live tree, not
+  this change; H1 is a staged suite where the runner runs it.
+
+**Cost.**
+- A detector that really is flaky but was right this time loses one pass (a minute or so) before its remedy runs.
+- One small state file, and a 256 KB tail read per pass.
+- **Node D:** the TETSU session notes that a covenant_highway.py change is NORMAL in node D's classify(), so it
+  auto-applies there once on main. Main needs his word first.
+
+**Not done.**
+- Not on main.
+- No other part (arms, legs, limbs, partners) earns credit: Tetsu's two NOs; partners not asked.
+- Whether credit separates flaky detectors from real ones on held-out passes is not yet measured. That waits for live
+  passes to accumulate.
