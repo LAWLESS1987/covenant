@@ -343,6 +343,9 @@ def back_audit(path, n, principles, say=print, judge=None):
         rows[k]["panel"] = panel
         rows[k]["audited"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         if ok:
+            # Keep the judge being replaced on the row (A478, 2026-11-23): until then this overwrote it with no copy,
+            # and 89 of the 200 anchored rows lost their first judge to everything but git history.
+            rows[k].setdefault("judge_before_audit", rows[k].get("judge"))
             rows[k]["judge"] = jstr
         else:
             rows[k]["contested"] = True

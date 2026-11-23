@@ -56,5 +56,32 @@ sub = "### A500.\n- parent\n\n### A500b.\n- a sub-entry, not a duplicate\n"
 check("AN1.5 a lettered sub-entry is not a duplicate of its parent", AN.duplicates(AN.primaries(sub)) == set(),
       AN.primaries(sub))
 
+# AN1.6 (A477, 2026-11-23): the record's gaps up to the registry's line, and its duplicate copies, are exactly the ones
+# docs/ANUMBER_GAPS.json lists. A NEW gap below the line is an entry lost or a number skipped; a listed gap now filled is
+# a stale registry; a duplicate copy gone is an entry lost. Numbers above checked_through are in flight and not checked.
+reg = AN.load_registry()
+probs = AN.registry_problems(real, reg)
+check("AN1.6 the gaps and duplicate copies are exactly the registered ones", probs == [], probs[:4])
+
+if isinstance(reg, dict) and reg.get("gaps"):
+    import re as _re
+    # AN1.6b both ways: delete one real entry's header below the line -> a new gap is caught.
+    victim = next(m for m in _re.finditer(r"^### A(\d+)\.", real, _re.M)
+                  if int(m.group(1)) <= reg["checked_through"] and int(m.group(1)) not in AN.GRANDFATHERED)
+    cut = real[:victim.start()] + "### Z" + real[victim.start() + 5:]
+    check("AN1.6b an entry's header removed below the line is caught as a new gap",
+          any("not a listed gap" in p for p in AN.registry_problems(cut, reg)), victim.group(0))
+    # AN1.6c the other way: a listed gap that gets an entry is caught as stale.
+    g = sorted(int(k[1:]) for k in reg["gaps"])[0]
+    filled = real + "\n### A%d.\n- planted\n" % g
+    check("AN1.6c a listed gap that now has an entry is caught as stale",
+          any("now has an entry" in p for p in AN.registry_problems(filled, reg)), "A%d" % g)
+    # AN1.6d one copy of a duplicate removed is caught (the duplicate check alone would only see a unique number).
+    c0 = reg["duplicates"]["A222"][0]["header_starts"]
+    i = real.index(c0)
+    gone = real[:i] + "### Z" + real[i + 5:]
+    check("AN1.6d one copy of a duplicate pair removed is caught",
+          any("is gone" in p for p in AN.registry_problems(gone, reg)), c0[:40])
+
 print("\nAN1: %d/%d passed" % (n_total - n_fail, n_total))
 sys.exit(1 if n_fail else 0)

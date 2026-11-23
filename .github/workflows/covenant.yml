@@ -166,3 +166,48 @@ jobs:
           name: covenant-transcript-py${{ matrix.python }}
           path: ONE_RUN_ci.txt
           retention-days: 30
+
+  # A479 (2026-11-23): a Windows lane, in a venv, NOT blocking. Four suites had failed on the Windows PC while this
+  # workflow stayed green: a venv launcher's pid (RR1.7), a folder an earlier suite happened to make (QW1), a branch
+  # only a machine with no trader task reaches (V2 A12), and a mutation that bites only on a packaged interpreter
+  # (A274). Seven of twelve quorum seats named a Windows lane in a venv as the most important change. It is
+  # continue-on-error until its first runs have been read: what a GitHub Windows runner can run (no judge, no nodes,
+  # no keys) is not measured yet, and a red that nobody has read must not block a merge. It does not replace ONE.bat
+  # on the box, and the header above ("WHAT IT CANNOT COVER ... win32") stays true for the launch gates. Not on the
+  # schedule: push and pull request only.
+  sweep-windows:
+    name: sweep (windows, python 3.12, venv) -- not blocking
+    if: github.event_name != 'schedule'
+    runs-on: windows-latest
+    continue-on-error: true
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      # The venv lives OUTSIDE the checkout, as on the box (node D's is beside the tree's own files, not walked by
+      # the runner's discovery), so its site-packages cannot be read as the project's files.
+      - name: A venv, as the box runs it
+        shell: pwsh
+        run: |
+          python -m venv "$env:RUNNER_TEMP\venv"
+          & "$env:RUNNER_TEMP\venv\Scripts\python.exe" -m pip install --upgrade pip
+          & "$env:RUNNER_TEMP\venv\Scripts\python.exe" -m pip install -r requirements.txt
+
+      - name: covenant_one.py --ci (through the venv's launcher)
+        shell: pwsh
+        run: |
+          & "$env:RUNNER_TEMP\venv\Scripts\python.exe" covenant_one.py --ci --out ONE_RUN_win.txt
+
+      - name: Upload the transcript
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: covenant-transcript-windows
+          path: ONE_RUN_win.txt
+          retention-days: 30
