@@ -19191,3 +19191,9 @@ red. MK1 44, A269 4/4, TD1 104/104, H1 311/311, G3 20/20, SELF-AUDIT 15/15.
 
 **Not done.** The replay on node A (his word there); any change to the server's flags or build, which waits on
 what the replay shows; streaming his answer; his asks ahead of machine asks.
+
+**Found by CI on the first push (2026-11-23).** All four Linux runs failed on A282 Q5, which pinned the whole ask-log
+row; this entry's local checks had not run that suite (the search for the log's suites looked for `_rates(` and
+missed one that drives `ask()`). Q5 now asserts what it was written about over the A351 fields only, unchanged, and
+Q5b pins A480's fields on the same rows (the no-timings row adds only `cold`; `gen_ms` only from a time the server
+gave). Q5b seen red with `gen_ms` guessed in a copy. The full sweep runs locally before the second push.
