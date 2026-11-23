@@ -1459,6 +1459,18 @@ def main():
         check("H1tk %s runs and returns a valid state against the real tree" % _g,
               _st_g in (H.PRESENT, H.ABSENT, H.UNKNOWN), str(_st_g))
 
+    # gateway_impostor arrived 2026-11-23 (A475) and H1v caught it with no coverage here. Same class boundary as the
+    # takeover guards: a model swap behind the TETSU gateway is a person's call, so no remedy may point at it. Its
+    # both-ways behaviour is pinned in test_a475_gateway_attest.py; it is driven here with a stub check, never the
+    # real gateway (this suite does not reach the network).
+    check("H1tk gateway_impostor is a registered detector", "gateway_impostor" in H.DETECTORS)
+    check("H1tk gateway_impostor has NO remedy pointed at it -- a swap must never auto-heal",
+          [n for n, r in H.REMEDIES.items() if "gateway_impostor" in (r.get("for") or [])
+           or "gateway_impostor" in (r.get("async_for") or [])] == [])
+    _gi = H.detect_gateway_impostor(check=lambda: {"results": {"LEG": {"status": "mismatch", "why": "x"}},
+                                                   "holds": {"c3" * 32: {}}})
+    check("H1tk gateway_impostor reads a mismatch as PRESENT", _gi.get("state") == H.PRESENT, str(_gi))
+
     # app_install_futile arrived 2026-09-18 (A147) and H1v caught it with no
     # coverage here, third in a row, which is the whole argument for that
     # guard. Its behaviour is pinned in test_h2_update_witness.py (F1-F12,

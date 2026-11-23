@@ -1027,6 +1027,7 @@ SUITES = [
     # opener stands in for the network; two mutations of the real source show each rule is what refuses.
     ("test_a470_remote_leg_pin.py", 60, "SECURITY"),
     ("test_a474_leg_policy.py", 60, "SECURITY"),
+    ("test_a475_gateway_attest.py", 90, "SECURITY"),
     # A471 (2026-11-22, his "work like a neural network ... and a nervous system", then "Build it active"): detectors
     # earn credit from outcomes (eligibility trace x outcome, the lab's exp20 rule); one whose alarms keep clearing by
     # themselves waits ONE pass before its remedies run. Caution only, never a takeover guard, kill switch. Stand-ins

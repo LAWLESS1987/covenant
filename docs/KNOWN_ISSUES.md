@@ -19184,6 +19184,72 @@ An environment pin could do the same.
   this binding buys; it does not stop the edit.
 - Not on main.
 
+### A475. [security, A470's limit / Codex's audit #1] A compromised TETSU gateway could name the approved manifest and serve another model; nothing measured the model itself
+
+**His words, 2026-11-23**, typed in the HF reply chat while the A471–A474 PR was being built: "Also find a solution to
+protect the RTX gateway."
+
+**What was open.** A470, A472 and A474 check what the gateway SAYS it serves: X-Leg-Manifest must equal a pin that
+the tracked `ops/leg_policy.json` approves. A gateway that is itself compromised can say the approved hash and serve
+anything. A474's entry above records that as still not covered.
+
+**Fix (laptop side): measure the model by its behaviour.** `covenant_gateway_attest.py`:
+- **Canaries.** A pool of 12 short prompts in `private/gateway_canaries.json`, which git does not track, so the
+  public repository does not publish them. Each check asks 2 of them at random, at temperature 0 with logprobs on.
+  Measured first: the gateway passes logprobs through for the leg, SMOL and PHI.
+- **Fingerprints.** `--record` asks every canary 3 times per approved pin and keeps the greedy tokens, their logprobs
+  and the top 3 alternatives in the TRACKED `ops/leg_fingerprints.json`, keyed by each prompt's sha256 (no prompt
+  text, no address), so git and the head commitment bind them beside the pin. A canary whose tokens wobble on the
+  real model is dropped. The tolerance is calibrated per pin: max(0.05, 4 x the largest run-to-run drift), capped at
+  0.3.
+- **Hold.** A mismatch is re-asked twice. Only if every re-ask mismatches is the pin put on hold in
+  `ops/gateway_attest_state.json`; `covenant_leg.approved()` then refuses it, so the leg and that limb VOID before
+  anything is sent. One that matches on a re-ask is "unsteady", never held. Unreachable, no fingerprint, or a
+  gateway that does not name the pin are UNDETERMINED and never a hold. A later passing check, or a re-pin, lifts it.
+- **Alarm.** The highway's new detector `gateway_impostor` (alarm-only, no remedy, a fix plan in
+  `covenant_fixplan.py`) is PRESENT on a mismatch; the check is rate-limited to once per 15 minutes.
+
+**A false hold of mine on the way, and its guard.** The first live check used a fixed 0.05 tolerance from a two-run
+probe and held PHI on "logprob moved 0.081 nats". PHI had not changed: Phi-4-mini on TETSU's CPU is not
+bit-repeatable. The hold and the single-run fingerprints are retired in `.trash/` (gateway_attest_state.false-hold-
+PHI-2026-11-23.json with a README, leg_fingerprints.single-run-2026-11-23.json). The calibration and the re-ask
+rule are its guard: G15 drives the PHI shape (a 0.08 drift on a model measured at 0.03 passes) and M3 shows that
+without the re-ask rule a transient mismatch holds again.
+
+**Calibrated live, 2026-11-23:**
+- LEG (RTX GPU): 12 canaries, run-to-run drift 0.0, tolerance 0.05.
+- PHI (CPU): 11 canaries (1 dropped), drift 0.1213, tolerance 0.3.
+- SMOL (CPU): 9 canaries (3 dropped), drift 0.2698, tolerance 0.3.
+- So on the CPU limbs the logprobs say little and the token sequence does the work; on the RTX leg both do.
+- Three forced checks in a row: all ok, 0 holds.
+
+**Driven both ways on real models.** Each real model's live answers against another's fingerprints: PHI's
+fingerprints vs SMOL's answers 11 of 11 canaries mismatch; SMOL's vs PHI's 9 of 9; LEG's vs PHI's 12 of 12; PHI's vs
+LEG's 11 of 11.
+
+**Checks:** A475 30/30 (G1–G16, mutations M1–M3: the hold line removed, compare() always matching, the re-ask rule
+removed), with a control showing the same leg call reaches the gateway once the hold is gone. A474 15/15, A470 21/21,
+LM1 17/17, LG1 38/38, A471 21/21, FP1 32/32, HW1 12/12, H1 314/314. H1v caught the new detector with no H1 coverage,
+which is what it is for; H1 now drives its class boundary with a stub (it never reaches the gateway).
+
+**Re-pin rule, widened.** A runner flag change on TETSU moves a manifest AND its fingerprint. The hub has agreed to
+tell this session before such a restart; then the private file, `ops/leg_policy.json` and
+`python covenant_gateway_attest.py --record` change together. A restart without a re-record is reported as
+no_fingerprint for the new pin: UNDETERMINED, not a hold.
+
+**Still not covered (and whose call each is):**
+- A gateway that recognises the canaries and sends only those to the real model. The pool is private and sampled,
+  which raises the cost, but every canary crosses TETSU, so a patient attacker there can learn them. Fresh canaries
+  would need a reference copy of each model on another machine.
+- An independent signed check from inside TETSU. The hub measured (2026-11-23): the gateways and the watchdog run as
+  the same Windows user, so any key the watchdog can read, the gateway can too. Real separation is the security
+  plan's C2 (a second OS account), Lawrence's decision. The hub offered an unsigned second reading (the watchdog
+  publishing hashes of the model files, the gateway binary and its command line) as an interim; not asked for yet.
+- The network. The hub read TETSU's packet filter: the tailnet ACL is the default allow-all, and the gateways' own
+  allowlist (the laptop, the phone, TETSU, loopback) is the only narrowing. A tailnet ACL limiting the leg and limb
+  ports to the laptop would be a second barrier; it is an admin-console change, his.
+- Not on main.
+
 ### A476. [test portability, the A443/A467 runner shape] A467's hook test picked a site directory a Debian venv never has, so the laptop's Linux pre-push refused every push to covenant
 
 **Found 2026-11-23**, pushing the A471–A474 PR branch on Lawrence's "Yes, open the PR". The pre-push Linux run

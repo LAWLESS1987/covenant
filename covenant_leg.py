@@ -187,11 +187,33 @@ def _hexset(v):
     return {x.strip().lower() for x in v if isinstance(x, str) and len(x.strip()) == 64}
 
 
+# A475 (2026-11-23, Lawrence: "find a solution to protect the RTX gateway"): the gateway NAMES the pinned file in
+# X-Leg-Manifest, but a compromised gateway can name it and serve another model. covenant_gateway_attest.py asks each
+# remote model fixed private canary prompts at temperature 0 with logprobs and compares the answer with the fingerprint
+# recorded at pin time; a mismatch puts the pin on hold here, and a held pin is not approved until a later check passes
+# or it is re-pinned. Read straight from the state file (no import of the attest module, so no cycle); unreadable
+# state holds nothing -- a hold comes only from a measured mismatch (a signal is investigated, never invented).
+ATTEST_STATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "gateway_attest_state.json")
+
+
+def attest_held(pin):
+    try:
+        if os.path.getsize(ATTEST_STATE) > 262144:
+            return False
+        with open(ATTEST_STATE, encoding="utf-8") as fh:
+            holds = (json.load(fh) or {}).get("holds") or {}
+        return isinstance(holds, dict) and (pin or "").strip().lower() in holds
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
 def approved(kind, pin, name=None):
     """A474: is PIN an approved manifest in ops/leg_policy.json? kind "leg" (also needs remote_allowed: true) or
-    "limb" with NAME. Never raises; anything unreadable is False."""
+    "limb" with NAME. A475: and not on a fingerprint hold. Never raises; anything unreadable is False."""
     try:
         pin = (pin or "").strip().lower()
+        if attest_held(pin):                               # A475: a measured fingerprint mismatch holds the pin
+            return False
         pol = _policy()
         if kind == "leg":
             sec = pol.get("leg")

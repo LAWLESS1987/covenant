@@ -97,6 +97,17 @@ FIX = {
         "gains": "the pin again names the model that is actually judging",
         "cost": "blessing a swapped model would make the swap official",
         "why_not_automatic": "a changed model is never accepted automatically; that is the takeover guard"},
+    "gateway_impostor": {
+        "owner": "you, with the TETSU hub",
+        "step": "A model behind the TETSU gateway answered its private canaries unlike the fingerprint recorded at pin "
+                "time (A475); its consults are already held. Ask the hub whether a runner was restarted with new "
+                "flags. If it was, and you agreed, a session re-pins it (private file + ops/leg_policy.json) and "
+                "re-records (`python covenant_gateway_attest.py --record`). If nothing should have changed, treat "
+                "TETSU's gateway as suspect: leave the hold, and have the hub hash the model files there.",
+        "gains": "the leg and limbs are again the models he agreed to, measured by what they answer",
+        "cost": "re-recording over a real swap would make the impostor's answers the new reference",
+        "why_not_automatic": "a model swap is a person's call; lifting the hold by re-recording would erase the "
+                             "evidence"},
     "defender_threat": {
         "owner": "you",
         "step": "Open ops/security_threats.jsonl on the PC (or Windows Security > Protection history) for the file, "

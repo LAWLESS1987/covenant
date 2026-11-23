@@ -2501,6 +2501,35 @@ def detect_model_drift(health=None, pin=None, repo=None, **kwargs):
     return {"state": ABSENT, "measured": {"pinned": len(pinned)}}
 
 
+def detect_gateway_impostor(health=None, check=None, **kwargs):
+    """A475 (2026-11-23, Lawrence: "find a solution to protect the RTX gateway"): a model behind the TETSU gateway
+    answers its private canaries unlike the fingerprint recorded at pin time -- the gateway names the approved file but
+    serves something else. covenant_gateway_attest.check() measures (rate-limited to once per 15 min) and puts a
+    mismatching pin on hold, so covenant_leg.approved() refuses it. ALARM-only, no remedy: a model swap is a person's
+    call (re-pin and re-record, or investigate), and auto-healing would erase the evidence. PRESENT on any mismatch;
+    ABSENT when every remote target matched; UNKNOWN when nothing could be measured (no remote target, no fingerprint,
+    unreachable) -- never a hold."""
+    try:
+        if check is None:
+            import covenant_gateway_attest as _ga
+            check = _ga.check
+        st = check()
+    except Exception as e:                                   # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    res = (st or {}).get("results") or {}
+    bad = {n: r.get("why") for n, r in res.items() if r.get("status") == "mismatch"}
+    if bad:
+        return {"state": PRESENT, "measured": {
+            "mismatch": bad, "held": sorted((st.get("holds") or {}).keys()),
+            "kind": "a model behind the TETSU gateway does not answer like the one pinned -- its consults are held; "
+                    "re-pin and re-record if the change was agreed, otherwise investigate the gateway"}}
+    ok = [n for n, r in res.items() if r.get("status") == "ok"]
+    if res and len(ok) == len(res):
+        return {"state": ABSENT, "measured": {"matched": ok, "at": st.get("at")}}
+    return {"state": UNKNOWN, "measured": {"results": {n: r.get("status") for n, r in res.items()},
+                                           "why": "nothing measured" if not res else "not every target measured"}}
+
+
 HEADSCALE_HEALTH = "http://127.0.0.1:8080/health"
 
 
@@ -2976,6 +3005,8 @@ DETECTORS = {
     "head_commitment_broken": detect_head_commitment_broken,
     "consent_chain_broken": detect_consent_chain_broken,
     "model_drift": detect_model_drift,
+    # A475: the model BEHIND the TETSU gateway, measured by its answers to private canaries -- alarm-only too.
+    "gateway_impostor": detect_gateway_impostor,
     # Our own Tailscale control plane (headscale) -- AUTO-repairable: restarting our own
     # daemon is safe and reversible (restart_headscale), unlike the takeover guards above.
     "headscale_down": detect_headscale_down,
