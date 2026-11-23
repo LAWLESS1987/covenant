@@ -77,7 +77,8 @@ DET = next(d for r in H.REMEDIES.values() for d in r["for"] if d not in H.ALWAYS
 def run_pass(prev_state, kill=False, mutate=None):
     """One run_once with stand-ins. -> (remedies called for DET, infos)."""
     d = tempfile.mkdtemp(prefix="a471_run_")
-    ls = os.path.join(d, "last_sense.json"); es = os.path.join(d, "elig.json"); led = os.path.join(d, "highway.jsonl")
+    led = os.path.join(d, "highway.jsonl")
+    ls = os.path.join(d, "last_sense.json"); es = led + ".eligibility.json"      # where a pass with its own ledger keeps credit
     with open(ls, "w", encoding="utf-8") as fh:
         json.dump({"at": round(time.time() - 60, 1), "conditions": {DET: prev_state}}, fh)
     with open(es, "w", encoding="utf-8") as fh:
@@ -117,6 +118,62 @@ calls, _ = run_pass(H.PRESENT)
 check("I2 run_once: PRESENT on the last pass too -> remedies called", len(calls) >= 1, calls)
 calls, _ = run_pass(H.ABSENT, kill=True)
 check("I3 run_once with the kill switch -> remedies called", len(calls) >= 1, calls)
+
+# ---- I4: a pass given its own ledger writes no live credit (found 2026-11-22: H1's fixture "fixture_elsewhere"
+# reached logs/eligibility_state.json through run_once). Run with COVENANT_ELIGIBILITY_STATE UNSET so the live default
+# path is what would be written; the check compares that file before and after.
+live = E.STATE
+before = open(live, "rb").read() if os.path.exists(live) else None
+d = tempfile.mkdtemp(prefix="a471_iso_")
+ls = os.path.join(d, "last_sense.json"); led = os.path.join(d, "highway.jsonl"); open(led, "w").close()
+with open(ls, "w", encoding="utf-8") as fh:
+    json.dump({"at": round(time.time() - 60, 1), "conditions": {"a471_iso_fixture": "PRESENT"}}, fh)
+saved_ls = os.environ.get("COVENANT_HIGHWAY_LAST_SENSE"); saved_es = os.environ.pop("COVENANT_ELIGIBILITY_STATE", None)
+os.environ["COVENANT_HIGHWAY_LAST_SENSE"] = ls
+import covenant_pause
+_o = (H.sense, H.apply_remedy, H.grade_started, covenant_pause.paused)
+try:
+    H.sense = lambda **k: {"a471_iso_fixture": {"state": H.ABSENT, "measured": {}}}
+    H.apply_remedy = lambda *a, **k: {"outcome": "dry run"}
+    H.grade_started = lambda *a, **k: []
+    covenant_pause.paused = lambda *a, **k: (False, "")
+    H.run_once(dry_run=True, exclude=(), ledger=led)
+finally:
+    H.sense, H.apply_remedy, H.grade_started, covenant_pause.paused = _o
+    os.environ.pop("COVENANT_HIGHWAY_LAST_SENSE", None)
+    if saved_ls is not None: os.environ["COVENANT_HIGHWAY_LAST_SENSE"] = saved_ls
+    if saved_es is not None: os.environ["COVENANT_ELIGIBILITY_STATE"] = saved_es
+after = open(live, "rb").read() if os.path.exists(live) else None
+beside = os.path.join(d, "highway.jsonl.eligibility.json")
+check("I4 a pass with its own ledger leaves the live credit file untouched and keeps its credit beside that ledger",
+      after == before and os.path.exists(beside) and "a471_iso_fixture" in open(beside, encoding="utf-8").read(),
+      "live changed=%s beside=%s" % (after != before, os.path.exists(beside)))
+
+# I5: the second route -- the module's LEDGER swapped (as H1 does), run_once called with NO ledger argument.
+before = open(live, "rb").read() if os.path.exists(live) else None
+d5 = tempfile.mkdtemp(prefix="a471_iso5_"); led5 = os.path.join(d5, "highway.jsonl"); open(led5, "w").close()
+ls5 = os.path.join(d5, "last_sense.json")
+with open(ls5, "w", encoding="utf-8") as fh:
+    json.dump({"at": round(time.time() - 60, 1), "conditions": {"a471_iso5_fixture": "PRESENT"}}, fh)
+_real_led = H.LEDGER; H.LEDGER = led5
+saved_ls = os.environ.get("COVENANT_HIGHWAY_LAST_SENSE"); saved_es = os.environ.pop("COVENANT_ELIGIBILITY_STATE", None)
+os.environ["COVENANT_HIGHWAY_LAST_SENSE"] = ls5
+_o = (H.sense, H.apply_remedy, H.grade_started, covenant_pause.paused)
+try:
+    H.sense = lambda **k: {"a471_iso5_fixture": {"state": H.ABSENT, "measured": {}}}
+    H.apply_remedy = lambda *a, **k: {"outcome": "dry run"}
+    H.grade_started = lambda *a, **k: []
+    covenant_pause.paused = lambda *a, **k: (False, "")
+    H.run_once(dry_run=True, exclude=())
+finally:
+    H.sense, H.apply_remedy, H.grade_started, covenant_pause.paused = _o
+    H.LEDGER = _real_led
+    os.environ.pop("COVENANT_HIGHWAY_LAST_SENSE", None)
+    if saved_ls is not None: os.environ["COVENANT_HIGHWAY_LAST_SENSE"] = saved_ls
+    if saved_es is not None: os.environ["COVENANT_ELIGIBILITY_STATE"] = saved_es
+after = open(live, "rb").read() if os.path.exists(live) else None
+check("I5 the module's LEDGER swapped (H1's way), no ledger argument: the live credit file is still untouched",
+      after == before and os.path.exists(led5 + ".eligibility.json"), "live changed=%s" % (after != before))
 
 # ---- mutations of the real behaviour
 calls, _ = run_pass(H.ABSENT, mutate=lambda: setattr(E, "hold", lambda *a, **k: None))

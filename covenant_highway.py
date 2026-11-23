@@ -4706,10 +4706,16 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
             _ls = json.load(_fh)
         if time.time() - float(_ls.get("at", 0)) <= 1800 and isinstance(_ls.get("conditions"), dict):
             prev, prev_at = _ls["conditions"], float(_ls["at"])
-        elig_state = _elig.load()
+        # A pass given its own ledger (every test) keeps its credit BESIDE that ledger, never in the live file:
+        # found 2026-11-22 when two H1 runs left the fixture detector "fixture_elsewhere" in logs/eligibility_state.json.
+        # (A second route found the same night: H1 swaps the module's LEDGER instead of passing one. So the test is
+        # the ledger actually in use against the real one, not whether an argument was given.)
+        _eff = os.path.abspath(ledger or LEDGER)
+        _elig_path = None if _eff == os.path.abspath(os.path.join(HERE, "ops", "highway.jsonl")) else _eff + ".eligibility.json"
+        elig_state = _elig.load(_elig_path)
         if prev is not None:
             _elig.observe(prev, conditions, _elig.recent_rows(ledger or LEDGER), elig_state, prev_at=prev_at)
-            _elig.save(elig_state)
+            _elig.save(elig_state, _elig_path)
     except Exception:                                            # noqa: BLE001 -- credit never blocks a pass
         pass
     save_last_sense(conditions)

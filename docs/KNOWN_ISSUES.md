@@ -19073,3 +19073,16 @@ are recorded in ops/tetsu_consent.jsonl, chain verified.
 - No other part (arms, legs, limbs, partners) earns credit: Tetsu's two NOs; partners not asked.
 - Whether credit separates flaky detectors from real ones on held-out passes is not yet measured. That waits for live
   passes to accumulate.
+
+**A leak, found and closed the same night.** The first form (e9f78bc9) kept credit in `logs/eligibility_state.json`
+for every run_once. Two H1 runs therefore left H1's fixture detector `fixture_elsewhere` (self-cleared 4) in the LIVE
+file. There were two routes:
+- a pass given its own ledger;
+- H1's way: the module's LEDGER swapped and no ledger argument.
+
+Now credit goes to the live file only when the ledger actually in use IS `ops/highway.jsonl`; any other pass keeps
+it beside its own ledger.
+- **New checks:** I4 (first route) and I5 (second route). I4 was driven red with the old line: "live changed=True".
+- **A471 is 14 of 14.** H1 is 311/311 and leaves the live file untouched.
+- **Both contaminated copies are retired, not deleted,** in `.trash/eligibility_state.polluted-by-H1-*-2026-11-22.json`.
+  The live file was rebuilt by the watchdog's own pass with the 42 real detectors and no fixture.
