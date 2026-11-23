@@ -2942,6 +2942,34 @@
     "docs/LOOKBACK_INDEX.md"
    ],
    "note_on_branch": "The record as written stays on branch a470-limbs-cause-as-written-2026-11-22 (at f6872566)."
+  },
+  {
+   "id": "A274-PROCESS-ENFORCED",
+   "date": "2026-11-23",
+   "by": "Claude (an AI), A274's author session's record; refuted by the TETSU session's measurement (A479), after the quorum asked",
+   "claim": "A274 (2026-10-06) recorded the Windows Job Object path's process limit as ENFORCED: ActiveProcessLimit 1 together with the desktop-app breakaway policy keeps every child the jailed code starts inside the job, so cmd.exe, os.system and a second Python are refused.",
+   "verbatim": [
+    "ENFORCED by the two together."
+   ],
+   "patterns": [
+    "ENFORCED by the two together"
+   ],
+   "refuted_by": "A479, measured 2026-11-23 on TETSU (python.org CPython 3.12, not packaged: GetCurrentPackageFullName 15700): an escaped snippet inside the job started winget.exe through its app execution alias and it ran (exit 0), with the breakaway policy set and with it dropped alike, while cmd.exe and Python were refused 1816 in the same job. Pinned as P4 in test_a274_win_job_sandbox.py. Asked first of the quorum, which could not say (7 seats UNSURE, 4 HOLE).",
+   "truth": "The process limit holds for cmd.exe, os.system and a second Python, as measured; it does NOT hold for a packaged app started through an app execution alias, which runs outside the job's count on a python.org build. Not measured on a packaged interpreter. The Windows path stays shut on file size either way (SANDBOX_WIN_UNENFORCEABLE), so nothing runs proposals through it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md",
+    "covenant_unified_v8.py",
+    "pending-v8.38/",
+    ".trash/a479-r1-probe/"
+   ],
+   "note_on_allow": "The core's comment at the _win_job_run limits (and its pending copy) still carries the A274 wording. Changing the core moves its deploy pin, which is the operator's act, so the core is allowed by name here until that change is made; the record and this entry carry the truth. .trash/a479-r1-probe/ holds the probe that drove .C red on 2026-11-23, retired there, not deleted.",
+   "note_on_branch": "The record as written stays on branch a274-process-enforced-claim-as-written-2026-11-23 (at a200592)."
   }
  ]
 }

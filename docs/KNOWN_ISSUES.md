@@ -19106,3 +19106,55 @@ catches either copy going. The 28 missing numbers stay gaps; the registry says w
 
 **Not done.** The laptop: its nightly gets the live check when its line takes main; that is the laptop session's
 act on his word there. A retention rule for SELF_EVAL. Restoring the overwritten judges onto the audited rows.
+
+### A479. [four checks red only on a Windows PC, put to the quorum, fixed; and the hole the quorum found] V2 A12, RR1.7, QW1 and A274's M-breakaway failed on TETSU and passed in Linux CI, identically on unchanged main. 2026-11-23. His words: "Consult the quorum to fix those pre-existing failures." FIXED, each red first; one new finding (an app-alias launch escapes the sandbox's process limit) RETRACTED and PINNED; a Windows CI lane added, not blocking.
+
+**The quorum.** One packet (`mesh/quorum_form.py`, packet 812967a53f1a), twelve seats answered in the form: Codex,
+both Grok bots, Grok on X, ChatGPT, Gemini, Mistral, Meta AI, DeepSeek, and three local models; Claude.ai was not
+reached (out of usage). Counted by script: Q2 (the lock pid) HOLE 11 of 12; Q3 (the breakaway mutation) UNSURE 7,
+HOLE 4, SOUND 1; Q4 (the log folder) HOLE 6; Q1 (the status line) SOUND 6, HOLE 5; a Windows CI lane in a venv named
+the most important change by 7. The answers are kept privately with the tally.
+
+**V2 A12** (money_posture). A Windows machine with no trader task printed neither "last ATTEMPT" nor "last RUN per
+trader_log.txt"; and the scheduler listing went through `_run`, which returns "" on any failure, so a listing that
+FAILED printed "No scheduled task invokes the trader" (5 seats). The section is now `scheduler_lines()`, pure, every
+branch printing both lines: no task (worded so it no longer claims only a person runs it; services, Run keys and
+the Startup folder are not read), listing failed or unreadable (UNKNOWN, never "no task"), one task, off Windows,
+and a missing trader_log.txt said as missing. A12b-A12f drive each branch on every platform; breaking the failure
+branch turned A12c/A12d red, dropping the no-task attempt line turned A12/A12b red. V2 49/49.
+
+**RR1.7** (the restart lock). It compared the holder's pid with Popen's pid; on a Windows venv python.exe is a
+launcher and the holder is its child -- the shape A274 had recorded in prose on 2026-10-06, back in a new test.
+`tools/child_python.py` starts a child Python whose first line reports its own pid and parent pid. RR1.7 names the
+holder by that pid, RR1.7b checks the relationship (the child itself, or its launcher's child) instead of assuming
+it, and RR1.7c says the named holder is gone after the kill, not only that the lock came free (the quorum's main
+point: a freed lock did not prove the interpreter died). RR1 17/17 in the venv and with the plain interpreter.
+`test_ch1_child_python.py` (CH1, 7 checks, on the runner list) drives the helper on this machine's real topology
+and fails on a test that names a holder by Popen's pid; seen red against the old RR1 line in a copy.
+
+**QW1 / the watchdog guard.** `revive()` opened logs/watchdog-stdout.log without making logs/, so on a fresh clone
+it raised FileNotFoundError; in the sweep an earlier suite made the folder first. It now makes it, and closes its
+own copy of the log handle after the start (it kept it open for its whole life). C3 R5 points the log folder at one
+that does not exist yet (an empty temp folder already exists and could not go red: Codex), stubs what it starts,
+waits for it, restores the path: red with FileNotFoundError before, green after. QW1 18/18 alone in a fresh copy.
+
+**A274 M-breakaway, and what the quorum's Q3 found.** The mutation drops the desktop-app breakaway policy and needs
+P to go red; on a python.org build (TETSU's, GetCurrentPackageFullName 15700) it cannot: A274's record had said the
+policy "should be a no-op" there, unmeasured. It now runs only on a packaged interpreter and is NOT RUN, with the
+measured reason, elsewhere. The quorum asked whether a non-packaged interpreter's jailed child starting a packaged
+app through an app execution alias still needs the policy. Measured instead of answered: inside the job, an
+escaped snippet started winget.exe through its alias and it RAN (exit 0) with the policy set and with it dropped,
+while cmd.exe and Python were refused 1816 in the same job. So the process limit does not reach an alias launch.
+A274's statement that the process limit is enforced is RETRACTED (A274-PROCESS-ENFORCED; the record as written on
+branch a274-process-enforced-claim-as-written-2026-11-23; R1 driven both ways with a probe, retired to
+.trash/a479-r1-probe/). P4 pins the gap like F pins file size: the day something bounds it, P4 goes red. Nothing
+runs proposals through this path: it stays shut on file size (SANDBOX_WIN_UNENFORCEABLE). Not measured on a
+packaged interpreter (the laptop's); P4 is NOT RUN there.
+
+**Windows CI lane.** `.github/workflows/covenant.yml` gains `sweep-windows`: python.org 3.12, a venv outside the
+checkout, `covenant_one.py --ci` through the venv's launcher, push and pull request only, continue-on-error until
+its first runs are read (what a GitHub Windows runner can run is not measured yet).
+
+**Not done.** The core's comment and /health reason still name file size as the only unenforced Windows limit;
+changing the core moves its deploy pin (the operator's act), so the retraction allows the core by name until then.
+The alias escape on a packaged interpreter. Making the Windows lane blocking.

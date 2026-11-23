@@ -808,6 +808,9 @@ SUITES = [
     # RR1 (A459, 2026-11-19): two rolling restarts never run at once -- a hand-run one and the highway's
     # remedy_restart_nodes started together and left node A as two processes on one database.
     ("test_rr1_restart_lock.py", 120, "DAILY + GUARDS"),
+    # CH1 (A479, 2026-11-23): tools/child_python.py learns the pid of the process that runs a child's code (on a
+    # Windows venv the launcher's child), and the guard fails on a test that names a holder by Popen's pid (RR1.7).
+    ("test_ch1_child_python.py", 120, "DAILY + GUARDS"),
     ("test_ly1_layers.py", 120, "DAILY + GUARDS"),
     ("test_cl1_cloud.py", 120, "DAILY + GUARDS"),
     # OS1 (2026-09-26, "protect operation security in all we do by default"): his
