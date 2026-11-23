@@ -54,7 +54,10 @@ def main():
         if mk.returncode or not os.path.isfile(py):
             check("A467.3 a throwaway environment could be made for the hook test", False, mk.stderr[-300:])
         else:
-            site_dir = real([py, "-I", "-c", "import site; print(site.getsitepackages()[-1])"],
+            # A476 (2026-11-23): the venv's purelib, the directory site actually reads .pth files from. The last entry
+            # of site.getsitepackages() was used before; Debian's Python 3.14 appends dist-packages directories a
+            # venv never has, so the laptop's Linux pre-push failed with FileNotFoundError (NO RESULT) on main too.
+            site_dir = real([py, "-I", "-c", "import sysconfig; print(sysconfig.get_paths()['purelib'])"],
                             capture_output=True, text=True, timeout=60).stdout.strip()
             marker = os.path.join(td, "HOOK-RAN")
             with open(os.path.join(site_dir, "a467_hook.pth"), "w", encoding="utf-8") as f:

@@ -19183,3 +19183,20 @@ An environment pin could do the same.
 - An owner-level edit of the tracked policy as well. That shows in git and in the next head commitment, which is what
   this binding buys; it does not stop the edit.
 - Not on main.
+
+### A476. [test portability, the A443/A467 runner shape] A467's hook test picked a site directory a Debian venv never has, so the laptop's Linux pre-push refused every push to covenant
+
+**Found 2026-11-23**, pushing the A471–A474 PR branch on Lawrence's "Yes, open the PR". The pre-push Linux run
+(WSL, Debian Python 3.14.4) reported `test_a467_hands_nosite.py` NO RESULT: FileNotFoundError writing
+`a467_hook.pth` into `.../venv/lib/python3.14/dist-packages`. The same test from `origin/main`, extracted with
+`git archive` and run in the same WSL, fails the same way, so this was on main and not from the PR.
+
+**Cause.** The test took `site.getsitepackages()[-1]` as the venv's site directory. Debian's patched `site` appends
+`local/lib/python3.14/dist-packages`, `lib/python3/dist-packages` and `lib/python3.14/dist-packages`, none of
+which a venv creates. Measured in a fresh venv there: only `lib/python3.14/site-packages` exists, and it equals
+`sysconfig.get_paths()["purelib"]`.
+
+**Fix.** The test asks the venv for `sysconfig.get_paths()["purelib"]`, the directory `site` reads `.pth` files
+from (on Windows it is the same `Lib\site-packages` as before). **Checks:** A467 4/4 under WSL and under Windows.
+Its own control (A467.3, the planted hook DOES run under `-I` alone) passed in both, so the test still bites. The
+pre-push guard did its job and was not bypassed; `COVENANT_PREPUSH_ALLOW` is his and was not used.
