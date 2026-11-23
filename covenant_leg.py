@@ -52,6 +52,8 @@ def _leg_file(path=None):
     p = path or os.environ.get("COVENANT_LEG_FILE") or os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                                      "private", "leg.json")
     try:
+        if os.path.getsize(p) > 65536:                     # A472: a config file this large is not read
+            return {}
         with open(p, encoding="utf-8") as fh:
             d = json.load(fh)
         return d if isinstance(d, dict) else {}
@@ -59,11 +61,32 @@ def _leg_file(path=None):
         return {}
 
 
+def _port(v, default=8099):
+    """A472 (Codex's audit, verified: a text port in private/leg.json crashed this module's IMPORT, and covenant_limbs'
+    with it): a port that is not an integer 1-65535 is the default, never an exception at import."""
+    try:
+        if isinstance(v, bool):
+            return default
+        n = int(v)
+        return n if 1 <= n <= 65535 else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _flag(name):
+    """A472: an environment switch that is SET decides, strictly: 1/true/yes/on is on, anything else (including "0"
+    and "") is off. Unset -> None, so the file may decide. (Before, any non-empty value -- "0" too -- meant on.)"""
+    if name not in os.environ:
+        return None
+    return os.environ[name].strip().lower() in ("1", "true", "yes", "on")
+
+
 _LEG_FILE = _leg_file()
 
 # The leg's own server (a second llama-server, separate from the 3B keeper on PORT 8081). On-demand by design.
-LEG_HOST = os.environ.get("COVENANT_LEG_HOST") or str(_LEG_FILE.get("host") or "127.0.0.1")
-LEG_PORT = int(os.environ.get("COVENANT_LEG_PORT") or _LEG_FILE.get("port") or 8099)
+_fh = _LEG_FILE.get("host")
+LEG_HOST = os.environ.get("COVENANT_LEG_HOST") or (_fh if isinstance(_fh, str) and _fh else "127.0.0.1")
+LEG_PORT = _port(os.environ.get("COVENANT_LEG_PORT") or _LEG_FILE.get("port"))
 LEG_MODEL = "Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf"
 MAX_LEG_CHARS = 6000                                       # over this, the leg's answer VOIDs (no runaway text into synthesis)
 
@@ -101,12 +124,17 @@ _leg_sema = threading.BoundedSemaphore(max(1, LEG_MAX_CONCURRENT))
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *a, **k):                   # noqa: D401
         return None
-_no_redirect = urllib.request.build_opener(_NoRedirect)
+# A472 (Codex's audit): ProxyHandler({}) -- no proxy, ever. Without it an http_proxy in the environment at import would
+# carry a private consult, loopback or not, through whatever proxy it names (the door's private_consult_leaves already
+# treats a proxy as leaving; the module itself did not).
+_no_redirect = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect)
 
 
 def _is_loopback(host):
-    """Only loopback hosts may be reached unless the operator explicitly allows remote (COVENANT_LEG_ALLOW_REMOTE)."""
-    if os.environ.get("COVENANT_LEG_ALLOW_REMOTE") or _LEG_FILE.get("allow_remote") is True:
+    """Only loopback hosts may be reached unless remote is explicitly allowed. A472: a SET environment switch decides
+    (COVENANT_LEG_ALLOW_REMOTE=0 now really turns it off); unset, the file's allow_remote: true may allow it."""
+    env = _flag("COVENANT_LEG_ALLOW_REMOTE")
+    if env is True or (env is None and _LEG_FILE.get("allow_remote") is True):
         return True
     return str(host) in ("127.0.0.1", "localhost", "::1", "[::1]")
 
@@ -124,7 +152,12 @@ def _host_is_loopback(host):
 
 
 def _leg_pin():
-    return (os.environ.get("COVENANT_LEG_MANIFEST") or str(_LEG_FILE.get("manifest_sha256") or "")).strip().lower()
+    """A472: a SET COVENANT_LEG_MANIFEST decides even when empty (an empty pin means a remote leg is never asked);
+    unset, the file's pin."""
+    if "COVENANT_LEG_MANIFEST" in os.environ:
+        return os.environ["COVENANT_LEG_MANIFEST"].strip().lower()
+    v = _LEG_FILE.get("manifest_sha256")
+    return (v if isinstance(v, str) else "").strip().lower()
 
 
 def free_ram_gb():
@@ -442,10 +475,37 @@ def reverse_learning_write(tag, target_path=None, ledger_path=None):
     return len(removed)
 
 
+def read_bounded(r, deadline):
+    """A472: a response body bounded in bytes (MAX_HTTP_BYTES + 1 at most) AND by one overall monotonic deadline.
+    -> bytes, or None when the deadline passes first. read1() returns what has arrived (at most one underlying read);
+    read(n) would block until n bytes or EOF, so a server dripping a byte just inside each socket timeout could hold the
+    caller -- found when this check's first form passed against the old code too. Used by the leg and the limbs."""
+    _read = getattr(r, "read1", None)
+    if _read is None:                                     # not a real HTTP response (a stand-in): one bounded read
+        return r.read(MAX_HTTP_BYTES + 1)
+    chunks, got = [], 0
+    while got <= MAX_HTTP_BYTES:
+        if time.monotonic() > deadline:
+            return None
+        b = _read(min(65536, MAX_HTTP_BYTES + 1 - got))
+        if not b:
+            break
+        chunks.append(b); got += len(b)
+    return b"".join(chunks)
+
+
+def manifest_hex(header):
+    """A472: the hash a manifest header names, in one canonical form: lowercase, surrounding space stripped, and an
+    optional "sha256=" prefix removed (the gateway sends the bare hash; older stand-ins send the prefixed form).
+    Anything else in the header stays in, so it can only fail an exact comparison."""
+    s = str(header or "").strip().lower()
+    return s[len("sha256="):] if s.startswith("sha256=") else s
+
+
 def leg_available(timeout=3):
     """Is the leg's server up? Read-only; never raises."""
     try:
-        with urllib.request.urlopen("http://%s:%d/health" % (LEG_HOST, LEG_PORT), timeout=timeout) as r:
+        with _no_redirect.open("http://%s:%d/health" % (LEG_HOST, LEG_PORT), timeout=timeout) as r:   # A472: no proxy
             return r.status == 200
     except Exception:                                      # noqa: BLE001
         return False
@@ -532,12 +592,20 @@ def consult_leg(text, max_tokens=320, temperature=0.4, timeout=180, trigger=None
         req = urllib.request.Request("http://%s:%d/v1/chat/completions" % (LEG_HOST, LEG_PORT),
                                      data=body, headers={"Content-Type": "application/json"})
         try:
-            with _no_redirect.open(req, timeout=timeout) as r:     # no redirects off loopback
-                raw = r.read(MAX_HTTP_BYTES + 1)                   # CXR-3: bound the response BEFORE parsing
+            deadline = time.monotonic() + float(timeout)
+            with _no_redirect.open(req, timeout=timeout) as r:     # no redirects off loopback, no proxy (A472)
                 served_manifest = str(r.headers.get("X-Leg-Manifest") or "")[:200]
+                # A472 (Codex's audit): EXACT equality, not "the pin appears somewhere in the header" -- a header
+                # carrying another hash and the pin together passed the old substring test. Checked on the headers,
+                # before any body is read.
+                if remote and manifest_hex(served_manifest) != pin:
+                    return None
+                # A472: one overall deadline for the whole body, not only a per-read socket timeout -- a server that
+                # drips a byte just inside each timeout could hold a leg slot indefinitely.
+                raw = read_bounded(r, deadline)                    # CXR-3 + A472: bounded in bytes AND in time
+                if raw is None:
+                    return None
             if len(raw) > MAX_HTTP_BYTES:
-                return None
-            if remote and pin not in served_manifest.lower():      # A470: not the model file he agreed to -> VOID
                 return None
             d = json.loads(raw.decode("utf-8", "replace"))
             ans = (d.get("choices") or [{}])[0].get("message", {}).get("content") or ""

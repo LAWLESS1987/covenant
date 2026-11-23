@@ -19086,3 +19086,59 @@ it beside its own ledger.
 - **A471 is 14 of 14.** H1 is 311/311 and leaves the live file untouched.
 - **Both contaminated copies are retired, not deleted,** in `.trash/eligibility_state.polluted-by-H1-*-2026-11-22.json`.
   The live file was rebuilt by the watchdog's own pass with the 42 real detectors and no fixture.
+
+**The takeover guard head_commitment_broken, cleared on his word (2026-11-22, "Yes, sign it").**
+- **How long it had fired:** on the first PC's watchdog since at least 2026-11-10 (73, 85 and 112 hits in rotated
+  logs). Signature and chain passed; BINDING failed.
+- **Why the binding failed:** the only commitment (seq 0, signed by 11-08) named commit b4d9887f, where
+  `ops/tetsu_consent.chain.jsonl` did not yet exist, and bound a consent-chain digest (8be9f7a7) that matched no later
+  version of the file. Not tampering, and not caused by A471.
+- **The fix:** `python covenant_head_commit.py commit` signed seq 1 for HEAD e7a0d2db. It binds the committed bytes
+  (git show, LF), so this machine's CRLF working copy does not matter.
+- **After signing:** `verify` PASS (2 rows, chain intact, BINDING PASS); the detector reads ABSENT.
+- **The step that gets forgotten:** every later consent append moves the chain past the signed commitment, and the
+  binding will fail again until a new one is signed. That re-sign is a trust assertion, so it stays a person's act.
+  The alarm is the reminder. A guard that only SAYS so at append time is a possible next step, not done.
+
+### A472. [an outside read, the A470 and A471 code] Codex's security audit of the night's changes: 12 findings, 10 confirmed in whole or in part and fixed, red first; 1 a known limit and 1 by design, recorded. (2026-11-22)
+
+**His words:** "have codecs run a audit on all the updates we just did, look for improvements in security flaws."
+The full record, with Codex's answer whole and each finding's verification, is `ops/CODEX_AUDIT_2026-11-22.md`.
+
+**What it found that mattered most:**
+- A471's hold demoted an alarm-only detector's ALERT to an info line, so a reading was hidden. That is exactly what
+  A471 said it would never do.
+- With no recent previous pass, the hold repeated on every pass instead of once.
+- `COVENANT_LEG_ALLOW_REMOTE=0` did not turn remote off when the file allowed it.
+- A text port in `private/leg.json` crashed the import of covenant_leg and covenant_limbs.
+- The manifest pin was a substring test.
+- A dripping server could hold a leg or limb slot.
+
+**What changed:**
+- **covenant_eligibility.py:**
+  - no hold without a known previous pass;
+  - NEVER_HOLD for the security detectors;
+  - state validated and capped;
+  - unique temp files.
+- **covenant_highway.py:**
+  - only detectors with automatic remedies can be held, and the hold line carries the measurement;
+  - a future-dated previous pass is ignored.
+- **covenant_leg.py:**
+  - no proxy, ever;
+  - `manifest_hex` exact match, checked before the body;
+  - `read_bounded` under one deadline (read1, not read: the first fix still blocked per chunk, caught because its
+    check passed against the old code);
+  - strict environment switches;
+  - validated port and a config size cap.
+- **covenant_limbs.py:** the same exact match and bounded read.
+- **The eval scripts** (private): a reply length cap, and a score for every label.
+
+**Checks:**
+- A470 20/20 (S1-S5) and A471 21/21 (J1-J7), each check red against the pre-fix code where it could run there.
+- LM1 17/17, LG1 38/38, A463 34/34, LP1 7/7, XB1 8/8, H1 311/311.
+- Live: the leg and both limbs answer through the exact match.
+
+**Not done:**
+- Binding `private/leg.json` into the head commitment (Codex #6; private config is untracked by design).
+- A compromised gateway can still claim the right manifest (A470's known limit).
+- Not on main.

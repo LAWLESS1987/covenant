@@ -152,6 +152,80 @@ open(bad, "w").write("{not json")
 out, n = run({"COVENANT_LEG_FILE": bad}, {})
 check("F5 an unreadable file is no file: the loopback default", out is not None and n == 1, (out, n))
 
+# ---- A472: the findings of Codex's audit, each verified on the A470 code before the fix
+import subprocess
+import urllib.request as _ur
+
+# S1: the header must EQUAL the pin -- a header carrying another hash and the pin together passed the old substring test
+out, n = run(dict(REMOTE, COVENANT_LEG_MANIFEST=PIN), {"X-Leg-Manifest": "0" * 64 + "," + PIN})
+check("S1 a header with another hash AND the pin: VOID (exact equality)", out is None and n == 1, (out, n))
+
+# S2: no proxy, ever: the opener carries ProxyHandler({}) (an env proxy at import would otherwise carry a private ask)
+import covenant_leg as _L0
+_L0 = importlib.reload(_L0)
+_ph = [h for h in _L0._no_redirect.handlers if isinstance(h, _ur.ProxyHandler)]
+_env_proxy = subprocess.run([sys.executable, "-c", "import covenant_leg as L, urllib.request as u; "
+                             "print([h.proxies for h in L._no_redirect.handlers if isinstance(h, u.ProxyHandler)])"],
+                            cwd=HERE, capture_output=True, text=True,
+                            env=dict(os.environ, http_proxy="http://192.0.2.1:3128", HTTP_PROXY="http://192.0.2.1:3128",
+                                     COVENANT_LEG_FILE=NO_FILE)).stdout.strip()
+check("S2 with http_proxy set at import, the leg's opener still has no proxy", _env_proxy in ("[]", "[{}]"), _env_proxy)
+
+# S3: a SET environment switch decides: ALLOW_REMOTE=0 beats the file's allow_remote: true; an empty pin beats the file's
+out, n = run({"COVENANT_LEG_FILE": leg_file(FILE_OK), "COVENANT_LEG_ALLOW_REMOTE": "0"}, {"X-Leg-Manifest": PIN})
+check("S3 file allow_remote true + env ALLOW_REMOTE=0: never asked", out is None and n == 0, (out, n))
+out, n = run({"COVENANT_LEG_FILE": leg_file(FILE_OK), "COVENANT_LEG_MANIFEST": ""}, {"X-Leg-Manifest": PIN})
+check("S3b file pin + env MANIFEST set empty: never asked (the empty pin decides)", out is None and n == 0, (out, n))
+
+# S4: a text port in the file does not crash the import (it crashed covenant_leg AND covenant_limbs before)
+_bad = leg_file({"host": "192.0.2.9", "port": "abc", "allow_remote": True, "manifest_sha256": PIN})
+_r = subprocess.run([sys.executable, "-c", "import covenant_leg as L, covenant_limbs; print(L.LEG_PORT)"],
+                    cwd=HERE, capture_output=True, text=True, env=dict(os.environ, COVENANT_LEG_FILE=_bad))
+check("S4 a text port in the file: both modules import, the port is the default", _r.returncode == 0 and _r.stdout.strip() == "8099",
+      (_r.returncode, _r.stdout.strip(), _r.stderr.strip()[-120:]))
+
+# S5: one overall deadline for the body -- a server that drips bytes just inside each socket timeout is cut off
+class _Drip(_Resp):
+    """Like a real socket-backed response from a server that drips one byte every 0.4 s: read(n) BLOCKS until n bytes
+    (here: gives up after 6 s), read1(n) returns the one byte that has arrived."""
+    def read(self, n=-1):
+        t0 = time.time(); got = b""
+        while (n < 0 or len(got) < n) and time.time() - t0 < 6:
+            time.sleep(0.4); got += b"x"
+        return got
+
+    def read1(self, n=-1):
+        time.sleep(0.4)
+        return b"x"
+
+
+class _DripOpener(_Opener):
+    def open(self, req, timeout=None):
+        self.calls += 1
+        return _Drip(b"", self.headers)
+
+
+def run_drip(env):
+    keep = {k: os.environ.get(k) for k in ("COVENANT_LEG_HOST", "COVENANT_LEG_ALLOW_REMOTE", "COVENANT_LEG_MANIFEST", "COVENANT_LEG_FILE")}
+    try:
+        for k in keep:
+            os.environ.pop(k, None)
+        os.environ["COVENANT_LEG_FILE"] = NO_FILE; os.environ.update(env)
+        import covenant_leg as L
+        L = importlib.reload(L); L._no_redirect = _DripOpener({"X-Leg-Manifest": PIN})
+        t0 = time.time(); out = L.consult_leg("q", max_tokens=5, timeout=1)
+        return out, time.time() - t0
+    finally:
+        for k, v in keep.items():
+            os.environ.pop(k, None)
+            if v is not None:
+                os.environ[k] = v
+
+
+import time
+out, secs = run_drip(dict(REMOTE, COVENANT_LEG_MANIFEST=PIN))
+check("S5 a dripping server is cut off at the overall deadline (timeout 1 s)", out is None and secs < 2.5, (out, round(secs, 2)))
+
 # Mutations: the real source with one A470 line changed, loaded as its own module, run the same way. Each must let
 # through what its check refuses -- or the check is not what refuses it.
 def mutant(old, new):
@@ -164,7 +238,7 @@ def mutant(old, new):
     return apply
 
 
-m1 = mutant("if remote and pin not in served_manifest.lower():", "if False:")
+m1 = mutant("if remote and manifest_hex(served_manifest) != pin:", "if False:")
 out, n = run(dict(REMOTE, COVENANT_LEG_MANIFEST=PIN), {"X-Leg-Manifest": "0" * 64}, mutate=m1)
 check("M1 header comparison removed: R3's wrong hash is answered", out is not None and n == 1, (out, n))
 

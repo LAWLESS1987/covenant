@@ -175,6 +175,62 @@ after = open(live, "rb").read() if os.path.exists(live) else None
 check("I5 the module's LEDGER swapped (H1's way), no ledger argument: the live credit file is still untouched",
       after == before and os.path.exists(led5 + ".eligibility.json"), "live changed=%s" % (after != before))
 
+# ---- A472: the findings of Codex's audit, each verified on the A471 code before the fix
+ALARM_ONLY = next(d for d in H.DETECTORS if d not in H.ALWAYS_APPLIES
+                  and not any(d in r["for"] for r in H.REMEDIES.values()))
+
+
+def run_det(det, prev_conditions, prev_age_s, credit=-0.9, raw_state=None):
+    """run_once on one stand-in detector -> (alerts, infos, remedies called for it)."""
+    d = tempfile.mkdtemp(prefix="a472_"); led = os.path.join(d, "highway.jsonl"); open(led, "w").close()
+    ls = os.path.join(d, "last_sense.json")
+    if prev_conditions is not None:
+        with open(ls, "w", encoding="utf-8") as fh:
+            json.dump({"at": round(time.time() - prev_age_s, 1), "conditions": prev_conditions}, fh)
+    with open(led + ".eligibility.json", "w", encoding="utf-8") as fh:
+        fh.write(raw_state if raw_state is not None else json.dumps(
+            {"detectors": {det: {"credit": credit, "last_present_at": None, "real": 0, "persisted": 0, "self_cleared": 5}}}))
+    saved = {k: os.environ.get(k) for k in ("COVENANT_HIGHWAY_LAST_SENSE", "COVENANT_ELIGIBILITY_OFF")}
+    os.environ["COVENANT_HIGHWAY_LAST_SENSE"] = ls; os.environ.pop("COVENANT_ELIGIBILITY_OFF", None)
+    called = []
+    o = (H.sense, H.apply_remedy, H.grade_started, covenant_pause.paused)
+    try:
+        H.sense = lambda **k: {det: {"state": H.PRESENT, "measured": {"probe": 1}}}
+        H.apply_remedy = lambda rname, c, name, **k: called.append(rname) or {"outcome": "dry run"}
+        H.grade_started = lambda *a, **k: []
+        covenant_pause.paused = lambda *a, **k: (False, "")
+        al, inf = H.run_once(dry_run=True, exclude=(), ledger=led)
+    finally:
+        H.sense, H.apply_remedy, H.grade_started, covenant_pause.paused = o
+        for k, v in saved.items():
+            os.environ.pop(k, None)
+            if v is not None:
+                os.environ[k] = v
+    return al, inf, called
+
+
+al, inf, _ = run_det(ALARM_ONLY, {ALARM_ONLY: "ABSENT"}, 60)
+check("J1 an alarm-only detector with low credit is never held: its ALERT is raised",
+      any(ALARM_ONLY in a for a in al) and not any("A471" in i for i in inf), (al[:2], inf[:2]))
+al, inf, called = run_det(DET, None, 0)
+check("J2 no recorded previous pass: no hold, the remedies run (a hold cannot repeat on every pass)",
+      len(called) >= 1 and not any("A471" in i for i in inf), (called, inf[:2]))
+nh = next((d for d in E.NEVER_HOLD if any(d in r["for"] for r in H.REMEDIES.values())), None)
+if nh:
+    al, inf, called = run_det(nh, {nh: "ABSENT"}, 60)
+    check("J3 a security detector (%s) is never held, whatever its credit" % nh, len(called) >= 1 and not any("A471" in i for i in inf), called)
+al, inf, called = run_det(DET, {DET: "ABSENT"}, -3600)
+check("J4 a future-dated previous pass is ignored: no hold", len(called) >= 1 and not any("A471" in i for i in inf), (called, inf[:2]))
+al, inf, called = run_det(DET, {DET: "ABSENT"}, 60, raw_state=json.dumps({"detectors": {DET: {"credit": "-1", "self_cleared": 9}}}))
+check("J5 a malformed credit (a string) is dropped, not trusted: no hold", len(called) >= 1, called)
+al, inf, called = run_det(DET, {DET: "ABSENT"}, 60)
+check("J6 control: the same detector with real low credit and a fresh PRESENT IS held, with its measurement in the line",
+      called == [] and any("A471" in i and "probe" in i for i in inf), (called, inf[:2]))
+_d = tempfile.mkdtemp(prefix="a472_save_"); _p = os.path.join(_d, "s.json")
+E.save({"detectors": {"x": {"credit": 0.1}}}, _p)
+check("J7 save leaves no temp file behind and the state reads back", sorted(os.listdir(_d)) == ["s.json"]
+      and E.load(_p)["detectors"]["x"]["credit"] == 0.1, os.listdir(_d))
+
 # ---- mutations of the real behaviour
 calls, _ = run_pass(H.ABSENT, mutate=lambda: setattr(E, "hold", lambda *a, **k: None))
 check("M1 the hold removed -> I1's remedies are called (the hold is what stops them)", len(calls) >= 1, calls)

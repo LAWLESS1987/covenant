@@ -44,6 +44,10 @@ HOLD_BELOW = -0.5
 OUTCOME_REAL, OUTCOME_PERSISTED, OUTCOME_SELF_CLEARED = 1.0, 0.5, -1.0
 ACTED = ("fixed", "started", "held")            # a remedy of its own ran (held = ran and the condition stayed)
 PRESENT, ABSENT = "PRESENT", "ABSENT"
+# A472 (2026-11-22, Codex's audit, verified here): detectors that guard security are never held, whatever their credit,
+# for the same reason the takeover guards are not: Defender, the integrity manifest and the core's pin.
+NEVER_HOLD = ("defense_lapse", "manifest_stale", "held_core_drift")
+MAX_STATE_BYTES = 1 << 20                       # a state file larger than this is not read (A472)
 
 
 def off():
@@ -54,25 +58,58 @@ def _path(path=None):
     return path or os.environ.get("COVENANT_ELIGIBILITY_STATE") or STATE
 
 
+def _clean(d):
+    """A472: keep only well-formed detector entries -- credit a finite number clipped to [-1, 1], counts non-negative
+    ints. A malformed or hand-edited entry is dropped (no credit = no hold), never trusted."""
+    out = {}
+    for name, e in (d.get("detectors") or {}).items():
+        if not isinstance(name, str) or not isinstance(e, dict):
+            continue
+        c = e.get("credit", 0.0)
+        if isinstance(c, bool) or not isinstance(c, (int, float)) or not math.isfinite(c):
+            continue
+        lp = e.get("last_present_at")
+        out[name] = {"credit": max(-1.0, min(1.0, float(c))),
+                     "last_present_at": float(lp) if isinstance(lp, (int, float)) and not isinstance(lp, bool) and math.isfinite(lp) else None}
+        for k in ("real", "persisted", "self_cleared"):
+            v = e.get(k, 0)
+            out[name][k] = v if isinstance(v, int) and not isinstance(v, bool) and v >= 0 else 0
+    return {"detectors": out}
+
+
 def load(path=None):
     try:
-        with open(_path(path), encoding="utf-8") as fh:
+        p = _path(path)
+        if os.path.getsize(p) > MAX_STATE_BYTES:
+            return {"detectors": {}}
+        with open(p, encoding="utf-8") as fh:
             d = json.load(fh)
-        return d if isinstance(d, dict) and isinstance(d.get("detectors"), dict) else {"detectors": {}}
+        return _clean(d) if isinstance(d, dict) and isinstance(d.get("detectors"), dict) else {"detectors": {}}
     except (OSError, ValueError):
         return {"detectors": {}}
 
 
 def save(state, path=None):
+    """A472: a uniquely named temp file per writer, then an atomic replace, so two processes saving at once cannot
+    truncate or rename each other's half-written file. (Last writer still wins: credit is advisory and self-correcting.)"""
+    import tempfile
     p = _path(path)
+    tmp = None
     try:
         os.makedirs(os.path.dirname(p), exist_ok=True)
-        tmp = p + ".tmp"
-        with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+        fd, tmp = tempfile.mkstemp(prefix=".elig-", suffix=".tmp", dir=os.path.dirname(p))
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
             json.dump(state, fh, indent=1, sort_keys=True)
         os.replace(tmp, p)
+        tmp = None
     except OSError:
         pass
+    finally:
+        if tmp and os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
 
 def recent_rows(path, tail_bytes=262144):
@@ -133,13 +170,19 @@ def observe(prev, conditions, ledger_rows, state, now=None, prev_at=None):
 
 
 def hold(name, prev, state, exempt=()):
-    """None, or the reason this detector's remedies wait one pass. Caution only; never raises."""
-    if off() or name in exempt:
+    """None, or the reason this detector's remedies wait one pass. Caution only; never raises.
+
+    A472 (Codex's audit, verified): with NO known previous pass (none recorded, or older than the window) there is
+    nothing to say "this is new", and the old form held on every such pass -- a hold that repeats instead of one
+    pass. Now an unknown previous pass means no hold: act as before."""
+    if off() or name in exempt or name in NEVER_HOLD:
         return None
+    if not isinstance(prev, dict):
+        return None                                  # A472: no known previous pass -> act as before
     d = state.get("detectors", {}).get(name)
     if not d or d.get("credit", 0.0) > HOLD_BELOW:
         return None
-    if prev and prev.get(name) == PRESENT:
+    if prev.get(name) == PRESENT:
         return None                                  # it persisted: act now, as before
     return ("its alarms have cleared by themselves %d times (credit %.2f, A471): remedies wait one pass and run "
             "if it is still present then" % (d.get("self_cleared", 0), d["credit"]))

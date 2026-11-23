@@ -4704,7 +4704,8 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
         import covenant_eligibility as _elig
         with open(os.environ.get("COVENANT_HIGHWAY_LAST_SENSE") or LAST_SENSE, encoding="utf-8") as _fh:
             _ls = json.load(_fh)
-        if time.time() - float(_ls.get("at", 0)) <= 1800 and isinstance(_ls.get("conditions"), dict):
+        _age = time.time() - float(_ls.get("at", 0))
+        if -5 <= _age <= 1800 and isinstance(_ls.get("conditions"), dict):      # A472: no future-dated previous pass
             prev, prev_at = _ls["conditions"], float(_ls["at"])
         # A pass given its own ledger (every test) keeps its credit BESIDE that ledger, never in the live file:
         # found 2026-11-22 when two H1 runs left the fixture detector "fixture_elsewhere" in logs/eligibility_state.json.
@@ -4770,12 +4771,17 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
         # A471: a detector whose alarms keep clearing by themselves waits ONE pass before its remedies run. The reading
         # is already reported above; only automatic action waits. Never a takeover guard; off with
         # COVENANT_ELIGIBILITY_OFF=1.
+        # A472 (Codex's audit, verified): only a detector that HAS automatic remedies can be held. An alarm-only
+        # detector was held too in A471's first form, and the hold's `continue` skipped its ALERT -- a real reading
+        # demoted to an info line. Now its alert path is never reached by a hold.
+        _has_remedy = any(name in rr["for"] and rn not in (exclude or ()) for rn, rr in REMEDIES.items())
         try:
-            _why = _elig.hold(name, prev, elig_state, exempt=ALWAYS_APPLIES) if elig_state is not None else None
+            _why = (_elig.hold(name, prev, elig_state, exempt=ALWAYS_APPLIES)
+                    if (elig_state is not None and _has_remedy) else None)
         except Exception:                                        # noqa: BLE001
             _why = None
         if _why:
-            infos.append("highway: %s is present; %s" % (name, _why))
+            infos.append("highway: %s is present; %s -- %s" % (name, _why, json.dumps(c.get("measured"))[:200]))
             continue
         acted = False
         for rname, r in REMEDIES.items():
