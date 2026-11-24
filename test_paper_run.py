@@ -877,20 +877,34 @@ check("  ...and says so rather than scoring what it can", "REFUSING TO SCORE" in
 
 section("A13. The append lock")
 
+# A486: the append lock is an OS lock (covenant_oslock) on a file never removed. A "held lock" is now a held OS lock,
+# not a file that exists. Before A486 the second check read "...and the lock is released after a normal append" and
+# asserted the lock FILE was gone afterwards.
+import covenant_oslock as _OL
 lp, pp = new_case("lock")
 seal(lp, pp, px=100.0, ts=T(1000.0))
-with open(lp + ".lock", "w") as fh:
-    fh.write("99999 held\n")
+_held = _OL.acquire(lp + ".lock")
 try:
     seal(lp, pp, px=101.0, ts=T(1001.0))
     check("a held lock blocks a concurrent append", False, "it appended anyway")
 except pr.LedgerUnavailable:
     check("a held lock blocks a concurrent append", True)
 finally:
-    os.unlink(lp + ".lock")
-check("  ...and the lock is released after a normal append",
+    _OL.release(_held)
+check("  ...and the lock is free again after a normal append (the file stays, A486)",
       seal(lp, pp, px=101.0, ts=T(1001.0)) is not None
-      and not os.path.exists(lp + ".lock"))
+      and os.path.exists(lp + ".lock") and not _OL.held_by_other(lp + ".lock")[0])
+with open(lp + ".lock", "w") as fh:
+    fh.write('{"pid": 99999}')                     # a writer that died mid-append: a note with no "released" mark
+import io as _io
+_err, _saved = _io.StringIO(), sys.stderr
+sys.stderr = _err
+try:
+    _ok = seal(lp, pp, px=102.0, ts=T(1002.0)) is not None
+finally:
+    sys.stderr = _saved
+check("  ...and a lock left by a writer that died mid-append is taken, with the --verify warning kept",
+      _ok and "did not release" in _err.getvalue() and "--verify" in _err.getvalue(), _err.getvalue())
 
 
 

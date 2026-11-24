@@ -829,6 +829,8 @@ SUITES = [
     # TCO1 (A485, 2026-11-24): Tetsu joins the collective through the brain -- his counts in the readout, and a read-only
     # COLLECTIVE line through the real /m/agent door; no ring, his reflex untouched.
     ("test_tco1_tetsu_collective.py", 240, "DAILY + GUARDS"),
+    # LF1 (A486, 2026-11-24): no function writes into logs/ without making the folder (A479 and A486 found two more).
+    ("test_lf1_log_folders.py", 120, "DAILY + GUARDS"),
     ("test_ly1_layers.py", 120, "DAILY + GUARDS"),
     ("test_cl1_cloud.py", 120, "DAILY + GUARDS"),
     # OS1 (2026-09-26, "protect operation security in all we do by default"): his

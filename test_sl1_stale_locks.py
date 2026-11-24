@@ -134,12 +134,52 @@ check("SL1.17 daily: a lock file nobody holds does not stop the launch, and is n
 check("SL1.18 daily: after the cycle's unlock the next cycle can take it", D._lock() is True)
 D._unlock()
 
+# ---- the site deploy's pass lock (A486)
+sys.path.insert(0, os.path.join(HERE, "tools"))
+import site_autodeploy as SA
+SA.LOCK = os.path.join(tmp, "site_autodeploy.lock")
+SA.LEDGER = os.path.join(tmp, "site_autodeploy.jsonl")
+passes = []
+real_pass = SA.one_pass
+SA.one_pass = lambda dry_run=False: passes.append(dry_run) or {"result": "dry_run_ok"}
+import io
+import json
+import contextlib
+try:
+    blocker = subprocess.Popen([sys.executable, "-c",
+                                "import sys,time; sys.path.insert(0, %r); import covenant_oslock as O; h=O.acquire(%r); "
+                                "print('held' if h else 'refused', flush=True); time.sleep(60)" % (HERE, SA.LOCK)],
+                               stdout=subprocess.PIPE, text=True)
+    bl = blocker.stdout.readline().strip()
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        rc = SA.main(["--dry-run"])
+    check("SL1.22 site deploy: while another pass holds the lock, a second does nothing and says so",
+          bl == "held" and rc == 0 and "another_pass_running" in out.getvalue() and not passes, (bl, out.getvalue()))
+    blocker.kill()
+    blocker.wait(timeout=15)
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        SA.main(["--dry-run"])
+    rec = json.loads(out.getvalue().strip().splitlines()[-1])
+    check("SL1.23 site deploy: a pass that died without releasing is recorded as taken over, and the next pass runs",
+          passes == [True] and rec.get("took_over_stale_lock") is True, rec)
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        SA.main(["--dry-run"])
+    rec2 = json.loads(out.getvalue().strip().splitlines()[-1])
+    check("SL1.24 site deploy: after a pass that finished, the next is not flagged, the lock file stays and is free",
+          len(passes) == 2 and "took_over_stale_lock" not in rec2 and os.path.exists(SA.LOCK)
+          and not OL.held_by_other(SA.LOCK)[0] and os.path.exists(SA.LOCK + ".last"), rec2)
+finally:
+    SA.one_pass = real_pass
+
 # ---- the guard: the old shape, anywhere in the tree
 SKIP = {".git", ".trash", "pending-v8.38", "node_modules", ".venv", "__pycache__", "logs"}
 # Known, named, not changed by A482 (each a decision, not an oversight):
 KNOWN = {
-    ("paper_run.py", "__enter__"): "A482 left it: same race (120 s), paper ledger appender; its own record entry next",
-    ("tools/site_autodeploy.py", "main"): "A482 left it: same race (1 h), the laptop's site deploy; its own entry next",
+    # A486 converted paper_run.AppendLock and tools/site_autodeploy.main to covenant_oslock; they left this list, so a
+    # return of the old shape in either now turns SL1.19 red.
     ("pairstore_excl.py", "prune"): "same window, but a double prune of expired pairs is harmless; shared with an "
                                     "outside project's adopted copy",
 }
@@ -173,10 +213,10 @@ def age_lock_shapes(root):
 
 found = age_lock_shapes(HERE)
 unknown = [f for f in found if f not in KNOWN]
-check("SL1.19 GUARD: no function in the tree reclaims an O_EXCL lock by its age except the three named",
+check("SL1.19 GUARD: no function in the tree reclaims an O_EXCL lock by its age except the one named (three until A486)",
       not unknown, unknown)
-check("SL1.20 the free-will round and the daily cycle are no longer of that shape",
-      not [f for f in found if f[0] in ("covenant_free_will.py", "covenant_daily.py")], found)
+check("SL1.20 the free-will round, the daily cycle, the paper ledger and the site deploy are no longer of that shape",
+      not [f for f in found if f[0] in ("covenant_free_will.py", "covenant_daily.py", "paper_run.py", "tools/site_autodeploy.py")], found)
 probe_dir = tempfile.mkdtemp(prefix="sl1probe-")
 with open(os.path.join(probe_dir, "new_lock.py"), "w", encoding="utf-8") as fh:
     fh.write("import os, time\ndef take(p):\n    try:\n        os.open(p, os.O_CREAT | os.O_EXCL)\n"

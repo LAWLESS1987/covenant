@@ -19410,3 +19410,51 @@ only thing they lack on TETSU).
 **Renamed before merge (2026-11-24).** The suite is called TC1 in the text above and was test_tc1_tetsu_collective.py at
 the first push (PR #118, 095ed3b); CI's log showed TC1 was already the prefix of two other suites (test_tc1_tetsu_client.py,
 test_tc1_tetsu_crawl.py), so it is now TCO1, test_tco1_tetsu_collective.py. Checks and results unchanged.
+
+### A486. [operations / a forgotten step, an A479 recurrence] Two more writes into logs/ without making the folder: the highway's restart remedy (HL1 red in a fresh checkout) and ops/hidden_task.py's "fail LOUDLY" message, silently lost -- FIXED IN SOURCE 2026-11-24; a guard (LF1) now finds the shape
+
+**His words, 2026-11-24:** "Run it through the quorom and use what helps the cause", of the collective's open list
+(mutual-benefit-collective docs/NOT_IMPLEMENTED_2026-11-24.md). Seven of seven outside seats named this a quick win
+(item 33 of their packet).
+
+**A recurrence.** A479 made `covenant_watchdog_guard.revive` create logs/ before opening its log (QW1 failed in a
+fresh checkout). It repaired that instance and left nothing to find the next. Found 2026-11-24: `covenant_highway.
+remedy_restart_nodes` opened logs/rolling_restart.log with no folder made (HL1 failed in every fresh worktree; green
+in the full sweep, which has the folder), and `ops/hidden_task.py` -- whose comment says a failing wrapper "must fail
+LOUDLY somewhere a person reads" -- opened logs/hidden_task.log inside a try, so with no folder the failure was lost
+in silence.
+
+**Fixed.** Both now `os.makedirs(..., exist_ok=True)` first. HL1+HL2 34/34 in a fresh worktree that had no logs/.
+**The guard:** LF1 walks the tree by AST and fails on any function that opens a path containing the literal "logs" for
+writing or appending with no makedirs/mkdir in the same function. Red on main's two files (names exactly these two),
+red on a probe, quiet on the same write after makedirs and on a read. It cannot see a log path built elsewhere and
+passed in as a variable; that is said in the suite.
+
+### A487. [operations / locks, the last two A459-shaped locks] paper_run's append lock and the website deploy's pass lock now hold an OS lock -- FIXED IN SOURCE 2026-11-24
+
+A482's SL1 guard named them and left them. `paper_run.AppendLock` broke a lock older than 120 s, so two waiters could
+both append (an interleaved chain, which --verify reports as tampering) and a live writer slower than 120 s was evicted;
+`tools/site_autodeploy.main` took a lock over after an hour, so two passes could both deploy, and a dead pass blocked
+the next one for that hour. Both now use `covenant_oslock` on a file never moved or removed. Kept on purpose: paper_run
+still warns "run --verify" when the last writer died mid-append (a holder note without a "released" mark), and the
+site deploy still records `took_over_stale_lock` for a pass that died, and still writes the last pass's note to
+`.lock.last`. Both left SL1's known list, so the old shape in either now turns SL1.19 red. **Checks:** SL1 26/26 (new:
+a held pass lock refuses a second pass; a died pass is recorded and the next runs; a finished pass leaves the lock
+free); red against main's two files (22/26). test_paper_run 271/271, its A13 restated for the OS lock with the old
+wording kept beside it ("...and the lock is released after a normal append" asserted the file was gone). SA1 18/18.
+
+### A488. [the record / review honesty] The gate's two judges count as one effective vote; the review panel as at most about 4.7 of 13 -- RECORDED 2026-11-24
+
+Measured 2026-11-23 (on TETSU, security/state/retained/hf-scan-20261123/effective_votes.py over this repository's own
+result files, numbers only), from the method of "Nine Judges, Two Effective Votes" (n_eff = k / (1 + (k-1) x mean
+pairwise correlation)):
+- **The gate's two seats** on the 2026-10-11 outside sets (XSTest + ETHICS, human labels; eval/outside/results):
+  2,559 items, 455 decided by both, **0 decided differently**; both wrong on the same 211 (independence expects 97.8);
+  phi 1.0, so **1.0 effective vote**. Where they abstain they differ more (phi 0.619, 1.23).
+- **The incumbent gate against the round-0 meaning head** (HateCheck, human labels; eval/loop/round0): 654 decided by
+  both, 104 differently; phi 0.69, **1.18 effective votes**.
+- **The review panel**: 13 seats, 12 questions over 2 runs, mean pairwise kappa 0.148, so **at most about 4.68
+  effective votes of 13** -- by agreement beyond chance with no ground truth, which counts seats that agree because
+  they are right as dependent, so this understates their independence.
+Use: two gate judges agreeing is one confirmation, not two; a panel's majority is read as a signal. Four of seven
+outside seats (2026-11-24) named recording this a quick win. Nothing changes in the gate by this entry.

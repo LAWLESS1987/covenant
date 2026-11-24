@@ -3078,6 +3078,7 @@ def remedy_restart_nodes(measured, dry_run=True):
     # watchdog's own process (no node module loaded) the old synchronous path is unchanged.
     if "covenant_unified_v8" in sys.modules:
         import covenant_quiet
+        os.makedirs(os.path.join(HERE, "logs"), exist_ok=True)   # A486: a fresh checkout has no logs/ (HL1 failed there)
         log = open(os.path.join(HERE, "logs", "rolling_restart.log"), "a", encoding="utf-8", errors="replace")
         covenant_quiet.popen_survivor([sys.executable, os.path.join(HERE, "rolling_restart.py")],
                                       cwd=HERE, stdout=log, stderr=log)
