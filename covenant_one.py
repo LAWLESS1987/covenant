@@ -826,9 +826,9 @@ SUITES = [
     # SNB2 (A484, 2026-11-24): the octopus respects TETSU's GPU lease (never takes it; never on the GPU under one;
     # moved to numpy, state and all, when one is taken mid-run). GPU and numpy lines NOT RUN where absent.
     ("test_snb2_gpu_lease.py", 240, "DAILY + GUARDS"),
-    # TC1 (A485, 2026-11-24): Tetsu joins the collective through the brain -- his counts in the readout, and a read-only
+    # TCO1 (A485, 2026-11-24): Tetsu joins the collective through the brain -- his counts in the readout, and a read-only
     # COLLECTIVE line through the real /m/agent door; no ring, his reflex untouched.
-    ("test_tc1_tetsu_collective.py", 240, "DAILY + GUARDS"),
+    ("test_tco1_tetsu_collective.py", 240, "DAILY + GUARDS"),
     ("test_ly1_layers.py", 120, "DAILY + GUARDS"),
     ("test_cl1_cloud.py", 120, "DAILY + GUARDS"),
     # OS1 (2026-09-26, "protect operation security in all we do by default"): his

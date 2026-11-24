@@ -19406,3 +19406,7 @@ reaches an older door that hands it back unhandled. COLLECTIVE is not an act wor
 **The core's pin** moved with it (	ools/pin_core.py --write: 925a21591f8f / 14,191 lines -> 8a5f3c2ea2fa / 14,203,
 after K1, K2, P19, A3s and the security audit passed on these bytes; K1 and K2 run with Git's sh on the PATH, the
 only thing they lack on TETSU).
+
+**Renamed before merge (2026-11-24).** The suite is called TC1 in the text above and was test_tc1_tetsu_collective.py at
+the first push (PR #118, 095ed3b); CI's log showed TC1 was already the prefix of two other suites (test_tc1_tetsu_client.py,
+test_tc1_tetsu_crawl.py), so it is now TCO1, test_tco1_tetsu_collective.py. Checks and results unchanged.
