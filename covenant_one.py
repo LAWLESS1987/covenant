@@ -811,6 +811,26 @@ SUITES = [
     # CH1 (A479, 2026-11-23): tools/child_python.py learns the pid of the process that runs a child's code (on a
     # Windows venv the launcher's child), and the guard fails on a test that names a holder by Popen's pid (RR1.7).
     ("test_ch1_child_python.py", 120, "DAILY + GUARDS"),
+    # CAP1 (A480, 2026-11-23): a load that fails for memory makes room through the highway's trim remedy, then
+    # retries; each ask's row carries the reused prompt tokens (cache_n), read/write ms, and whether it loaded cold.
+    ("test_cap1_tetsu_capability.py", 120, "DAILY + GUARDS"),
+    # GP1 (A481, 2026-11-23): the offline probe harness for the gate and the execution guard -- six outcomes never
+    # merged, floors, the run record, resume re-judged, speaking order; the guard's two findings pinned.
+    ("test_gp1_gate_probes.py", 180, "DAILY + GUARDS"),
+    # SL1 (A482, 2026-11-23): the free-will round and the daily cycle hold an OS lock (covenant_oslock), so no live
+    # holder is evicted and two cannot both win; its guard fails on any new age-reclaimed O_EXCL lock in the tree.
+    ("test_sl1_stale_locks.py", 180, "DAILY + GUARDS"),
+    # SNB1 (A483, 2026-11-23): the octopus's neurons on pure Python, numpy or the GPU by size, bit-identical; the default
+    # octopus stays on the pure-Python path and imports nothing heavy (numpy/GPU lines NOT RUN where absent).
+    ("test_snb1_snn_backends.py", 240, "DAILY + GUARDS"),
+    # SNB2 (A484, 2026-11-24): the octopus respects TETSU's GPU lease (never takes it; never on the GPU under one;
+    # moved to numpy, state and all, when one is taken mid-run). GPU and numpy lines NOT RUN where absent.
+    ("test_snb2_gpu_lease.py", 240, "DAILY + GUARDS"),
+    # TCO1 (A485, 2026-11-24): Tetsu joins the collective through the brain -- his counts in the readout, and a read-only
+    # COLLECTIVE line through the real /m/agent door; no ring, his reflex untouched.
+    ("test_tco1_tetsu_collective.py", 240, "DAILY + GUARDS"),
+    # LF1 (A486, 2026-11-24): no function writes into logs/ without making the folder (A479 and A486 found two more).
+    ("test_lf1_log_folders.py", 120, "DAILY + GUARDS"),
     ("test_ly1_layers.py", 120, "DAILY + GUARDS"),
     ("test_cl1_cloud.py", 120, "DAILY + GUARDS"),
     # OS1 (2026-09-26, "protect operation security in all we do by default"): his

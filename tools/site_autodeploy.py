@@ -209,24 +209,33 @@ def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     os.makedirs(os.path.dirname(LEDGER), exist_ok=True)
     # One pass at a time: a scheduled pass that finds another still running does nothing and says so.
-    # A lock older than an hour is from a pass that died; it is taken over, and that is recorded too.
-    took_over = False
-    try:
-        fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        import time
-        if time.time() - os.path.getmtime(LOCK) < LOCK_STALE_S:
-            print(json.dumps({"result": "another_pass_running"}))
-            return 0
-        os.replace(LOCK, LOCK + ".stale")
-        fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        took_over = True
-    os.write(fd, str(os.getpid()).encode())
-    os.close(fd)
+    # A486 (the A459 / A482 shape): this was an O_EXCL file taken over after an hour, so two passes could both judge
+    # it stale and both deploy, and the first one's closing move then moved the second one's lock aside. Now an OS
+    # lock (covenant_oslock) on a file never moved or removed: the OS drops it when a pass exits or dies. A pass that
+    # died is still recorded: a holder note without a "released" mark means the last pass did not finish.
+    if HERE not in sys.path:
+        sys.path.insert(0, HERE)            # this script runs from tools/; covenant_oslock lives in the root
+    import covenant_oslock as _OL
+    before = _OL.note(LOCK)
+    fh = _OL.acquire(LOCK)
+    if fh is None:
+        print(json.dumps({"result": "another_pass_running"}))
+        return 0
+    took_over = bool(before.get("pid")) and not before.get("released")
     try:
         rec = one_pass(dry_run="--dry-run" in argv)
     finally:
-        os.replace(LOCK, LOCK + ".last")
+        try:
+            note = {"pid": os.getpid(), "released": True}
+            fh.seek(0)
+            fh.truncate()
+            fh.write(json.dumps(note).encode("utf-8"))
+            fh.flush()
+            with open(LOCK + ".last", "w", encoding="utf-8") as last:   # the last pass's note, kept as before
+                last.write(json.dumps(note))
+        except OSError:
+            pass
+        _OL.release(fh)
     if took_over:
         rec["took_over_stale_lock"] = True
     with open(LEDGER, "a", encoding="utf-8") as fh:
