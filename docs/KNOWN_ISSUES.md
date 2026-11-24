@@ -19716,3 +19716,31 @@ pairwise correlation)):
   they are right as dependent, so this understates their independence.
 Use: two gate judges agreeing is one confirmation, not two; a panel's majority is read as a signal. Four of seven
 outside seats (2026-11-24) named recording this a quick win. Nothing changes in the gate by this entry.
+
+### A489. [the record / a NO-GO result kept off main] A406's grid SNN witness v2, measured NO-GO on 2026-11-02, lands on main alone -- RECORDED 2026-11-24
+
+**What was missing.** The 2026-11-02 work numbered A406 on its branch (covenant#14, `claude/unruffled-joliot-19015a`) sealed a second preregistration for the grid SNN temporal witness before any weights existed, trained it, and measured it NO-GO for both the control and Amendment A1 (the operator's "amplify the amount we're allowing" test). The witness stays UNKNOWN and alarm-only. That result was not on main anywhere, and A406 had no entry in this record. The branch had also collected unrelated work, and it was 277 commits behind and in conflict.
+
+**What lands, unchanged.** The four A406 commits, cherry-picked with `-x`:
+- `ops/GRID_SNN_PREREG_v2_2026-11-02.md`;
+- `tools/grid_snn_bench_v2.py` and `tools/grid_snn_train_v2.py`;
+- `test_gs2_grid_snn_v2.py`, registered SECURITY in `covenant_one.py`;
+- the opt-in `graded` path in `covenant_grid_snn.run_lif`. Its default is the control, and GS1 holds it.
+
+The four sealed files are byte-identical to the branch (same blob ids). No weights ship. The core pin is unchanged. Only `MANIFEST.sha256` was regenerated.
+
+**Why now, and why alone.** On 2026-11-24 the operator asked for the open pull requests to be handled with discernment toward mutual benefit of all intelligence, using the quorum. Seven of seven outside seats, asked independently, said to take only the sealed preregistration and its verdict onto main, so the result serves researchers, and to leave the rest of the branch. Five said REWORK and two said CLOSE.
+
+**What is left.** Covenant#14 is closed with a note, and its branch is kept. The unrelated changes there are not judged by this entry:
+- the public ledger;
+- the app host guard;
+- the head commitment;
+- the core edits;
+- the editor RAM-guard hook and its settings.
+
+Each needs its own pull request on today's main if it is still wanted.
+
+**Checks.**
+- GS1 4/4, GG1 86/86, pin unchanged.
+- GS2's boundary checks pass here, 4/4.
+- Its numpy apparatus checks run on CI's Linux lanes, which install numpy (A484).
