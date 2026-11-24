@@ -530,7 +530,9 @@ for state in ("held", "not_judged"):
           % state.upper().replace("_", " "),
           r["solved_round"] == 1 and not r.get("stop") and acts6c == [("write", state, True), ("run", state, True)]
           and len(given6c) == 2 and all("\n" not in t and "def flatten" not in t for t in given6c)
-          and given6c[0].startswith("hands: Tetsu writes ") and given6c[1].startswith("hands: Tetsu runs his own script practice/flatten_check.py "),
+          # RESTATED 2026-11-24 (covenant#74): the RUN sentence was "hands: Tetsu runs his own script <name> ..."
+          and given6c[0].startswith("hands: Tetsu writes ")
+          and given6c[1].startswith("hands: Tetsu requests a run of workshop script practice/flatten_check.py. "),
           (r, acts6c, [t[:120] for t in given6c]))
 # PP1.6d (A428; RESTATED by A429, 2026-11-15). As A428 wrote it: switched on, the gate is given his file and then the
 # check file's source through the loop, and the switch is off as shipped. A429 switched it on and moved the content
