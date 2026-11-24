@@ -85,7 +85,10 @@ def main():
               "and none of the content (it is the road to a runner and to the tracked verdicts file)",
               len(seen) == 3 and all("\n" not in t and MARK not in t for t in seen)
               and seen[0] == "hands: Tetsu writes %d characters to note.py in his own workshop on this PC" % len(src2)
-              and seen[2].startswith("hands: Tetsu runs his own script shown.py in his workshop, bounded to 60 seconds"),
+              # RESTATED 2026-11-24 (covenant#74): the RUN sentence no longer claims isolation the runner does not
+              # enforce; it was "hands: Tetsu runs his own script shown.py in his workshop, bounded to 60 seconds".
+              and seen[2].startswith("hands: Tetsu requests a run of workshop script shown.py. The runner screens its "
+                                     "source and applies a 60-second timeout"),
               seen)
 
         # HS1.3 the clearly bad script is refused, at its WRITE and at its RUN, under a quorum nobody judged and with the
