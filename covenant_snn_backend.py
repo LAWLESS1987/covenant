@@ -41,6 +41,50 @@ GPU_MIN = 131072             # measured: GPU 153 us vs numpy 514 us at 131,072 (
 GPU_HEADROOM_MIB = 1024      # free GPU memory that must remain after a pool is placed there
 ENV = "COVENANT_SNN_BACKEND"
 
+# THE GPU LEASE (A484, his "GPU respects the lease"). On TETSU the GPU is shared through a lease file: while a lease
+# is in force a training or lens job holds the GPU and the 27B is paused; with none, the 27B holds it. The spiking
+# network never TAKES the lease (that would stop the 27B for a few small arms); it uses the GPU only while NO lease is
+# in force, and a pool already on the GPU moves to numpy, state and all, when one is taken. The file is read the way
+# the lease's own writer and TETSU's start script read it: missing = free; unreadable, or an expiry that is missing,
+# not a number or not finite = in force; an expiry in the past = free. The path: COVENANT_GPU_LEASE, else
+# training/gpu-lease.json beside this covenant folder (where it sits on TETSU); elsewhere that path does not exist.
+LEASE_ENV = "COVENANT_GPU_LEASE"
+LEASE_CHECK_S = 1.0          # a pool on the GPU looks at the lease at most this often while it steps
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+class LeaseTaken(RuntimeError):
+    """Raised by a GPU pool's step when a lease came into force; nothing was committed for that step."""
+
+
+def lease_path():
+    return os.environ.get(LEASE_ENV) or os.path.join(os.path.dirname(HERE), "training", "gpu-lease.json")
+
+
+def lease_held(path=None):
+    """(True, why) while a GPU lease is in force."""
+    import json
+    import time
+    path = path or lease_path()
+    try:
+        with open(path, encoding="utf-8-sig") as fh:
+            d = json.load(fh)
+    except FileNotFoundError:
+        return False, "no GPU lease"
+    except (OSError, ValueError):
+        return True, "the GPU lease file cannot be read, so it counts as held"
+    if not isinstance(d, dict):
+        return True, "the GPU lease file is not a record, so it counts as held"
+    try:
+        exp = float(d.get("expires"))
+    except (TypeError, ValueError):
+        return True, "the GPU lease has no usable expiry, so it counts as held"
+    if exp != exp or exp in (float("inf"), float("-inf")):
+        return True, "the GPU lease's expiry is not finite, so it counts as held"
+    if exp > time.time():
+        return True, "a GPU lease is in force (%s)" % str(d.get("why", "no reason given"))[:80]
+    return False, "the GPU lease has expired"
+
 
 def _has_numpy():
     try:
@@ -51,7 +95,11 @@ def _has_numpy():
 
 
 def _gpu_room(n):
-    """(True, why) when torch sees a CUDA GPU with room for n neurons and GPU_HEADROOM_MIB left over."""
+    """(True, why) when no GPU lease is in force and torch sees a CUDA GPU with room for n neurons and
+    GPU_HEADROOM_MIB left over. The lease is read first, so a held lease never even loads torch."""
+    held, why = lease_held()
+    if held:
+        return False, why
     try:
         import torch
     except Exception as e:                                   # noqa: BLE001
@@ -143,6 +191,16 @@ class NeuronPool:
         cols = {k: (a.tolist() if self.backend == "numpy" else a.cpu().tolist()) for k, a in self.arr.items()}
         return [(cols["v"][i], cols["decay"][i], cols["thresh"][i], cols["reset"][i]) for i in range(self.n)]
 
+    def to_numpy(self):
+        """The same neurons, state and all, as a numpy pool (A484: off the GPU when a lease is taken). Bit-identical
+        afterwards, because the two backends compute the same step the same way."""
+        import numpy as np
+        other = NeuronPool.__new__(NeuronPool)
+        other.n, other.backend, other._np = self.n, "numpy", np
+        other.arr = {k: (np.array(a, dtype=np.float64) if self.backend == "numpy"
+                         else a.cpu().numpy().astype(np.float64, copy=True)) for k, a in self.arr.items()}
+        return other
+
     def min_thresh(self):
         return float(self.arr["thresh"].min()) if self.n else 1.0
 
@@ -157,6 +215,13 @@ class NeuronPool:
             v = np.where(fired, a["reset"], v)
             a["v"] = v                                  # committed only now
             return fired.astype(np.int8).tolist()
+        import time
+        now = time.monotonic()
+        if now - getattr(self, "_lease_seen", -1e9) >= LEASE_CHECK_S:
+            self._lease_seen = now
+            held, why = lease_held()
+            if held:
+                raise LeaseTaken(why)                   # before anything is computed: nothing committed
         t = self._t
         x = t.as_tensor(signal, dtype=t.float64, device="cuda")
         v = t.mul(a["v"], a["decay"])

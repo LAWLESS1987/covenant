@@ -823,6 +823,9 @@ SUITES = [
     # SNB1 (A483, 2026-11-23): the octopus's neurons on pure Python, numpy or the GPU by size, bit-identical; the default
     # octopus stays on the pure-Python path and imports nothing heavy (numpy/GPU lines NOT RUN where absent).
     ("test_snb1_snn_backends.py", 240, "DAILY + GUARDS"),
+    # SNB2 (A484, 2026-11-24): the octopus respects TETSU's GPU lease (never takes it; never on the GPU under one;
+    # moved to numpy, state and all, when one is taken mid-run). GPU and numpy lines NOT RUN where absent.
+    ("test_snb2_gpu_lease.py", 240, "DAILY + GUARDS"),
     ("test_ly1_layers.py", 120, "DAILY + GUARDS"),
     ("test_cl1_cloud.py", 120, "DAILY + GUARDS"),
     # OS1 (2026-09-26, "protect operation security in all we do by default"): his

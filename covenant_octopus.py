@@ -129,7 +129,20 @@ class Arm:
                 try:
                     self.last = self.pool.step(signal)
                 except Exception as e:                   # noqa: BLE001 -- the pool committed nothing; replay below
-                    self._to_python("the %s backend raised %s" % (self.backend, type(e).__name__))
+                    if type(e).__name__ == "LeaseTaken":
+                        # A484: a GPU lease came into force. Off the GPU to numpy, state and all, and this step
+                        # runs there; if numpy cannot take it, pure Python does (the line after).
+                        try:
+                            self.pool = self.pool.to_numpy()
+                            self.neurons = self.pool.views()
+                            self.backend, self.backend_why = "numpy", "moved off the GPU: " + str(e)
+                            self.last = self.pool.step(signal)
+                            signal = None
+                        except Exception as e2:          # noqa: BLE001
+                            if self.pool is not None:
+                                self._to_python("off the GPU, numpy raised %s" % type(e2).__name__)
+                    else:
+                        self._to_python("the %s backend raised %s" % (self.backend, type(e).__name__))
                 else:
                     signal = None
         if signal is not None:

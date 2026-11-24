@@ -97,6 +97,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # A484: numpy for the spiking network's equivalence checks (SNB1, SNB2) and GS1's mechanism checks, which
+      # were NOT RUN here. Not in requirements.txt on purpose: the octopus runs without it (the phone has none),
+      # and PP1 keeps treating numpy as a package CI does not install, so an unguarded import still turns it red.
+      - name: Install numpy for the spiking-network checks
+        run: pip install "numpy>=2,<3"
+
       - name: Declare what this run is
         run: |
           echo "This is the LINUX half of ONE.bat. It does not cover win32,"

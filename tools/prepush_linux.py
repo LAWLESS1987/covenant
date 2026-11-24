@@ -43,6 +43,10 @@ WHAT IT CANNOT SEE, said plainly (rule 9):
   - CI's PACKAGES. CI installs exactly requirements.txt; this Linux has what it has. A package this machine has and
     CI will not is caught only where the import is written in a file the run executes; one built at run time
     (importlib with a computed name) is not read. "Pulled in" is judged from the metadata installed HERE.
+    [A484, 2026-11-24: CI's Linux job now also installs numpy, in its own step, for the spiking network's
+    equivalence checks; the sentence above was exact until then. This guard still treats numpy as a package CI
+    does not install, on purpose: the octopus must run without it (the phone has none), so an unguarded numpy
+    import stays red here even though CI would now pass it.]
   - CI's TOOLS and INTERPRETERS. CI runs 3.11 and 3.12 on ubuntu-latest, which has pwsh; this runs the python3 it
     finds and, on this PC's WSL, has no pwsh -- so V1's PowerShell half (verify.ps1, check.ps1) is unmeasured here
     and a push touching a .ps1 file is told so.

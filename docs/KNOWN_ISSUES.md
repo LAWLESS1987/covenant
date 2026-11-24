@@ -19330,3 +19330,36 @@ with every arm forced onto numpy, and onto the GPU, OC1's behaviour checks all p
 running many arms at once, is worth building is a design question, not a measurement. The GPU's room is read from
 the GPU itself, not from TETSU's model lease; a GPU arm beside Cipher would need that lease. Not run by a quorum:
 it changes no output, and the thresholds are measured.
+### A484. [the spiking network / GPU sharing, and its checks in CI] The octopus respects TETSU's GPU lease, and CI now runs the numpy equivalence checks -- BUILT 2026-11-24
+
+**His words, 2026-11-24:** "GPU respects the lease", then "both" (with "numpy checks in CI"), after A483; and
+before it, "You can continue to improve and optimize afterwards".
+
+**The lease.** On TETSU the GPU is shared through `training/gpu-lease.json` (written by TETSU's `jlens/gpu_lease.py`;
+the start script and the watchdog honour it): while a lease is in force a training or lens job holds the GPU and the
+27B is paused; with none, the 27B holds it. A483 placed a big pool on the GPU whenever it had 1 GiB to spare, without
+reading the lease. Now `covenant_snn_backend.lease_held()` reads it as its writer does (missing = free; unreadable,
+not a record, or an expiry that is missing, not a number or not finite = in force; expired = free), and:
+- the network never takes or writes the lease (taking it would stop the 27B for a few small arms);
+- a pool goes to the GPU only while no lease is in force, whatever `COVENANT_SNN_BACKEND` asks; the lease is read
+  before torch is even loaded;
+- a pool already on the GPU looks at the lease at most once a second while it steps (`LEASE_CHECK_S`); when one comes
+  into force it raises `LeaseTaken` before computing anything, and the arm moves the pool to numpy (`to_numpy()`,
+  state and all) and runs that step there; if numpy cannot, pure Python does.
+The path is `COVENANT_GPU_LEASE`, else `training/gpu-lease.json` beside the covenant folder (TETSU's layout: covenant
+and training sit side by side); written relative, so no private path enters this public file.
+
+**CI.** The Linux job installs `numpy>=2,<3` in its own step, so SNB1's and SNB2's numpy lines and GS1's mechanism
+checks run there instead of NOT RUN. Not added to requirements.txt, on purpose: the octopus runs without numpy (the
+phone has none), and `tools/prepush_linux.py` keeps treating numpy as absent, so an unguarded import stays red
+(a dated note added beside its sentence that CI installs exactly requirements.txt). GS1 was run first with numpy and
+covenant's packages together (same Python, 3.12.10): 16 passed, 0 failed. The Windows lane is unchanged, so it still
+mirrors TETSU's covenant venv, which has no numpy.
+
+**Checks.** SNB2 (16 checks, on the runner list): 16/16 in the lens venv (numpy + CUDA), including a real GPU pool
+moved to numpy by a lease written mid-run with spikes and voltages identical to pure Python; 13/13 in the covenant
+venv (the GPU and numpy lines NOT RUN, named); red against main (no lease reader). Breaks seen red: the lease ignored
+(SNB2.16), the hand-over losing the voltages (SNB2.15). SNB1 25/25 and 10/10, OC1 34/34, unchanged.
+
+**Not done.** Whether TETSU's lease reader and this one stay in step is not tested across the two repositories (the
+cases mirror the writer's own tests, L5 and L6). No arm is on the GPU today.
