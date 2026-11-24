@@ -1,6 +1,6 @@
 {
  "_what": "Anchors for covenant_sentinels.py. TRACKED on purpose: they travel with the repository so a stranger who clones it can verify the record without trusting whoever handed it over. Rewriting them is an operator act (`python covenant_sentinels.py --anchor`), never automatic.",
- "anchored_at": "2026-09-09T19:07:40Z",
+ "anchored_at": "2026-11-23T16:28:58Z",
  "documents": {
   "MY_STRATEGY.md": {
    "lines": 168,
@@ -8,14 +8,14 @@
    "sha256": "2bd9a811b345e2bed5a8a6b9cfdd4835406255808cde03cdc059ebd79aec98eb"
   },
   "docs/CONSTITUTION.md": {
-   "lines": 407,
+   "lines": 409,
    "markers": 1,
-   "sha256": "40ea331f98420ddb5d5ca4c00893e78fabfad0d77910ea703b2e9d879bff4ece"
+   "sha256": "7380edad1fb9635533e3841d76266602d11ed02abcda62a72ba971dafe59a9d4"
   },
   "docs/KNOWN_ISSUES.md": {
-   "lines": 1911,
-   "markers": 1,
-   "sha256": "5636b275dfeaa9db40cdae459993c858532440d78ab7cdd4a76050cc81e34b07"
+   "lines": 19109,
+   "markers": 11,
+   "sha256": "cb78d17d76e277a2fe79ec42ec94d9edcac905a7dc38f46a8429bbe68eab9126"
   },
   "docs/WHAT_WE_FOUND.md": {
    "lines": 424,
@@ -25,24 +25,24 @@
  },
  "ledgers": {
   "docs/KNOWN_ISSUES.md": {
-   "lines_at_anchor": 1910,
-   "prefix_sha256": "a32845780a64e6d0d447060635a5fb0043ca64a044768dfc9475a1bcfbc4cc8a"
+   "lines_at_anchor": 19108,
+   "prefix_sha256": "8b9deb03792962fdaa320cd7cce0b741239bc26e8275301473b113eb4e9e087c"
   },
   "ops/DISTILL.md": {
-   "lines_at_anchor": 1578,
-   "prefix_sha256": "eb1cf5671daf4f52c3954d13eee8a4666c1204f80b6f43beba1f9ea8b97dc860"
+   "lines_at_anchor": 2922,
+   "prefix_sha256": "c9a9748a9d29ca97c4d078b973b4ffbc1e92b26c83fb3a73a3f3cb86799323ae"
   },
   "ops/NIGHTLY.md": {
-   "lines_at_anchor": 3789,
-   "prefix_sha256": "a12dd141837bda1b9c26cba7b6b9ad8723c7636e708aacc932debc5d75ce6357"
+   "lines_at_anchor": 21665,
+   "prefix_sha256": "b93584a9b4bbd8bddea46dbbbe6610bfd08549c5c5f93fbb6cbfac3a3833b772"
   },
   "ops/SELF_EVAL.md": {
-   "lines_at_anchor": 1525,
-   "prefix_sha256": "180b2e6749faa94ffc7d84288fbf7c05f0381fb2cace2973a10d99147556b5f8"
+   "lines_at_anchor": 4842,
+   "prefix_sha256": "d6a6e46b48526e598bf54f2758d01a42146b9d2faf772f06f57d1f806d4102ef"
   },
   "ops/verdicts.jsonl": {
-   "lines_at_anchor": 3517,
-   "prefix_sha256": "cab5af044235a554f50e9967c749c89147f2d3deb2b4c0f0e3def2f198a43157"
+   "lines_at_anchor": 5157,
+   "prefix_sha256": "defffb40f62442fe3e791506a3cd88f3452c5f0bfe1916212f2e5b21e33cde75"
   }
  },
  "prefix_lines": 200

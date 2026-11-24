@@ -2782,6 +2782,194 @@
    ],
    "note_on_branch": "Kept as written on branch a446-refusal-reason-as-written-2026-11-18 (at af31ea0). The pinned packet commit 9d85f6c also keeps it, by design.",
    "note_on_allow": "The three .trash/predeploy_* directories are whole pre-deploy copies of the tree kept by earlier deploys (rule 10); they hold the old wording as it was. Named one by one, as A392's are, so a new copy elsewhere is still caught."
+  },
+  {
+   "id": "A452-LOOKBACK-NEVER-INCOMING",
+   "claim": "That the adoption gate's look back searches this checkout's record and never the incoming one. Written at 08b2380 (2026-11-18) in the A452 comment of tools/covenant_adopt.py, in docs/KNOWN_ISSUES.md A452 and in the body of pull request #87.",
+   "verbatim": [
+    "It searches THIS checkout's record, never the incoming",
+    "It searches this checkout's record, not the incoming one, on purpose"
+   ],
+   "truth": "False after an apply that failed with HEAD already moved: apply() reports applied only when the updater returns 0, so a nonzero return after the merge was made leaves the working tree holding the INCOMING docs/KNOWN_ISSUES.md and docs/RETRACTED.json, and lookback() at 08b2380 read the working tree. A header planted in the incoming record, describing that failure as known, came back as its pointer. The lazy import of tools/lookback_index.py loaded the incoming copy of that file too. Restated: the record is read from the commit the run started at (git show <head>:docs/...), a missing commit is reported as unreadable and never replaced by the files on disk, and the readers are loaded when the gate starts. Whether the laptop's updater always rolls back before returning nonzero was not determined; the fix does not depend on it.",
+   "refuted_by": "The TETSU session's non-author read of covenant #87, 2026-11-18 (its probe87.py, 20 probes, on a temp root). Reproduced the same day in a throwaway git repository as CA1's TheRecordSearchedIsThePreRunOne, which is red on the tool as committed at 08b2380.",
+   "patterns": [
+    "searches THIS checkout's record, never the incoming",
+    "searches this checkout's record, not the incoming one"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a452-lookback-claim-as-written-2026-11-18 (at 08b2380)."
+  },
+  {
+   "id": "A452-NEW-NAME-EVERY-FILE",
+   "claim": "That in the adoption gate's look back a failing file's name counts as what tripped only if the file was tracked at the commit the run started at, so that a name arriving with the merge is always labelled new_name and capped. Written at 41b85a7 (2026-11-18) in tools/covenant_adopt.py (the docstring of _terms and the note lookback() returns), in docs/KNOWN_ISSUES.md A452, in that commit's message and, on 2026-11-19, in the body of pull request #87.",
+   "verbatim": [
+    "a file's name counts as what tripped only if that path is tracked at the commit the run started at",
+    "A failing file that was not there before the run is labelled new_name, not tripped."
+   ],
+   "truth": "False at 41b85a7 for a file whose name has no dot and no slash. Whether a key was a file was decided by its spelling (_is_file_name: a dot, a slash or a backslash), so a new file at the repository root with no extension, a12_a34_a56_a78_a441, carrying a scan hit, was taken for the gate's own word, was never asked about, and gave five pointers each labelled tripped at weight 3; the same through a conflict, whose path the sender names. Restated: each contradiction now says which of its keys are file paths (`paths`: a scan hit's file, a conflicted path, a failing suite), decided where the key is produced; every path is asked of the pre-run commit, and a contradiction that does not say has every key asked. Separately, the commit id these functions accepted could be an abbreviation (7 to 40 characters), which git resolves as a ref name first; only a whole id is read now.",
+   "refuted_by": "The TETSU session's third read of covenant #87 at 41b85a7, 2026-11-19 (its probe87c.py, 18 probes, scratch clone). Reproduced the same day in throwaway repositories (git 2.55, Windows) and pinned as CA1's test_a_new_file_with_no_dot_and_no_slash_is_still_a_file and test_a_conflicted_path_the_sender_named_is_a_file_too, both red on the tool as pushed at 41b85a7.",
+   "patterns": [
+    "counts as what tripped only if that path is tracked",
+    "before the run is labelled new_name, not tripped"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a452-new-name-claim-as-written-2026-11-19 (at 41b85a7)."
+  },
+  {
+   "id": "A459-STALE-TAKEOVER",
+   "claim": "That rolling_restart.py's lock stopped two rolling restarts running at once, including after a run died and left its lock behind, because a stale lock was moved aside and taken over. Written at 87190a2 (2026-11-19) in rolling_restart.py (take_lock's docstring), in docs/KNOWN_ISSUES.md A459, in that commit's subject and message, and in the title and body of pull request #94.",
+   "verbatim": [
+    "A459: two rolling restarts can no longer run at once",
+    "A lock whose holder is known to be gone, or that is older than 30 minutes, is moved to `logs/rolling_restart.lock.stale` (kept, not deleted) and taken over",
+    "A lock whose holder is known\n    to be gone, or that is older than LOCK_STALE_S, is moved aside to `<lock>.stale` (kept, not deleted) and\n    taken once more"
+   ],
+   "truth": "False at 87190a2 and 6a43d12 whenever a lock had been left behind. Two runs could both judge it stale; B moved it aside and made its own, then A's move-aside moved B's FRESH lock and A made another, and both returned (True, \"\"). That is the two-starts-within-seconds case the lock was written for, after any crash. Restated: the lock is a non-blocking exclusive OS lock (msvcrt on Windows, fcntl.flock elsewhere) on a file that is never moved or removed; the OS drops it when the holder exits or dies, so there is no stale lock and no takeover. The same shape had been found in covenant_leviathan.acquire_lock by an outside review and fixed the same way, recorded only in that function's docstring, so the lookback could not surface it.",
+   "refuted_by": "The hub (TETSU session)'s non-author read of covenant #94 at 6a43d12, 2026-11-19: its rr_race_probe.py runs B's whole take_lock inside A's liveness call and reads \"A: (True, '')  B: (True, '')\". Reproduced here the same day by a separate probe (rr_race_mine.py, same result, files rolling_restart.lock and rolling_restart.lock.stale) and pinned as RR1.6, which a mutation restoring the move-aside turns red.",
+   "patterns": [
+    "two rolling restarts can no longer run at once",
+    "is moved (aside )?to\\s+`[^`]*\\.stale`\\s+\\(kept, not deleted\\)\\s+and\\s+taken (over|once more)"
+   ],
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a459-stale-takeover-as-written-2026-11-19 (at 6a43d12, which carries 87190a2's lock unchanged)."
+  },
+  {
+   "id": "A427-FULL-ACT-LIST",
+   "claim": "That the act-word door guard (A427, 2026-11-14) covered the full list of acts the /m/agent door carries out. Written in covenant_unified_v8.py (the comment above ACT_WORDS) and in docs/KNOWN_ISSUES.md A427 (its Status line).",
+   "verbatim": [
+    "acts), so the full act list is covered.",
+    "**Status:** wired (full act list; capitals / whole-line / quoted rule; substitution, replayed history, and bare-URL FETCH remain uncovered -- a URL-provenance follow-up)"
+   ],
+   "truth": "False from the day it was written. The door had carried out a line beginning LIMB since A402 (2026-11-01), thirteen days before A427, and LIMB was not on the list: a caller's message that spelled the limb line out made Tetsu consult a limb on the second PC, and nothing held it. The same list in covenant_tetsu_hands.py's prose seat (A435) left it out too. Restated by A463 (2026-11-20): LIMB is on ACT_WORDS and among the prose seat's act lines. What the list still does not cover is what A427 named itself: an act the model substitutes, replayed history, a bare-URL FETCH.",
+   "refuted_by": "A read of the door on TETSU, 2026-11-20, while designing a trial whose asks spelled the limb line out: ACT_WORDS at covenant_unified_v8.py line 843 beside the LIMB branch at line 9609 (main 35a16ea). Pinned by test_a463_limb_guard.py (D2, M1) and test_a427_actword.py, run against 35a16ea first: LG1 6 of 34 passed, A427 6 of 8.",
+   "patterns": [
+    "full act list"
+   ],
+   "note_on_patterns": "Three plain words, so a later sentence that uses them about this guard must carry the id. The guard's test keeps its old name (test_the_full_act_list_is_covered, underscores, not matched) with the id in a comment beside it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a463-limb-claims-as-written-2026-11-20 (at 35a16ea)."
+  },
+  {
+   "id": "A263-NOTHING-LEAVES",
+   "claim": "That nothing of an ask marked private (A263, 2026-10-05) leaves the machine that answers it. Written in covenant_unified_v8.py (the note above PRIVATE_TEACHER_NOTE, and PRIVATE_ACT_HELD, which is said to Tetsu) and in tools/tetsu_work.py (its module docstring).",
+   "verbatim": [
+    "machine and nothing of the exchange leaves it: not queued (recorded as withheld, with the reason,",
+    "NOT done: this ask is marked private (A263), so nothing from it leaves this machine -- ",
+    "marked private. A private item is answered by the model on this machine and nothing of it leaves"
+   ],
+   "truth": "True when written. Not true from A402 (2026-11-01), which gave Tetsu limbs on the second PC: a LIMB line on a private ask sent his question to whatever address private/limbs.json named, and the private rule held FETCH, WEB and MOLTBOOK only. (The leg was the smaller case: covenant_leg already refused a host that is not loopback unless COVENANT_LEG_ALLOW_REMOTE was set.) Restated by A463 (2026-11-20) to what the marker does: the exchange is not queued for the teacher, not replayed into an ordinary ask, no FETCH, WEB or MOLTBOOK act is made for it, and a LEG or LIMB consult is made only when the host urllib will connect to is this machine or a tailnet address written as an IP with no proxy in the way (covenant_unified_v8.private_consult_leaves); otherwise it is held. So part of a private exchange can reach the operator's second PC. And, as A263's own entry says under Residual, the gate still sees a private question and answer: with a judge that is not on the machine they go to that judge. Not measured: whether any private text went anywhere but the second PC between 2026-11-01 and the fix; the laptop's limb list was not read from TETSU.",
+   "refuted_by": "The same read of the door on TETSU, 2026-11-20: the private branch at covenant_unified_v8.py line 9477 beside the LIMB branch at line 9609 (main 35a16ea). Pinned by test_a463_limb_guard.py (P1-P20, D3, D4, D6, D8, M2-M4), LG1 6 of 34 against 35a16ea.",
+   "patterns": [
+    "nothing of the exchange leaves it",
+    "nothing from it leaves this machine",
+    "answered by the model on this machine and nothing of it leaves"
+   ],
+   "note_on_patterns": "The three sentences as they stood, each narrow enough to be this claim. covenant_council.py line 376 says the same of the council door in other words; the council makes no consult, so it is left as it is and not matched.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a463-limb-claims-as-written-2026-11-20 (at 35a16ea)."
+  },
+  {
+   "id": "A466-VERIFIER-SALT",
+   "claim": "That an independent verifier checks the genesis signature, and by rule C9 every transaction's, with RSA-PSS salt length equal to the digest length (rule C3 of docs/SPEC_INDEPENDENT_VERIFIER.md, in the text whose invariants C1-C3 the spec says were re-verified on 2026-10-29).",
+   "verbatim": [
+    "Verify RSA-PSS (MGF1-SHA256, salt length = digest length, hash SHA-256) with any RSA library."
+   ],
+   "truth": "The node signs with PSS.MAX_LENGTH (covenant_unified_v8.py, every padding.PSS in it), which for RSA-2048 with SHA-256 is 222 bytes. Measured 2026-11-22 on the real genesis.json: its signature does NOT verify with salt length 32, and verifies with 222 and with automatic salt detection. A verifier built from the rule as written would have rejected the real chain; one that auto-detects the salt would have passed it without anyone noticing the text was wrong. Found while an outside model built a second verifier from a separate spec (tetsu security/second_verifier.py, 2026-11-21), which measured 222 on all 165 live signatures of node D's chain.",
+   "refuted_by": "test_vs1_verifier_salt.py, which runs the real genesis.json with salt 222, MAX_LENGTH and 32 and reads rule C3's text.",
+   "patterns": [
+    "salt length = digest length"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ],
+   "branch": "c3-salt-claim-as-written-2026-11-22"
+  },
+  {
+   "id": "A470-LIMBS-CAUSE",
+   "date": "2026-11-22",
+   "by": "Claude (an AI), HF reply chat; refuted by the TETSU session's measurement the same day, checked here",
+   "claim": "A470's record (f6872566) put both limbs' VOIDs down to the second PC's restart that day for a security flag, and pointed at --no-slots.",
+   "verbatim": [
+    "The second PC's servers were restarted that day \"to add a security flag\" (the TETSU session); the flags now carry `--no-slots`."
+   ],
+   "patterns": [
+    "restarted that day \\\"to add a security flag\\\""
+   ],
+   "refuted_by": "The TETSU session, 2026-11-22: the old pins are reproduced exactly by the manifests with --threads-batch 8 and --cache-ram 256 removed, both added by tetsu commit 29cba20 (2026-11-12) and picked up when the gateways restarted; the day's flag (--cors-origins localhost --no-cors-credentials) does not change a manifest on its own (two throwaway runners gave the same hash). Checked on the laptop: the re-read manifests equal that session's values and the flags it named are present.",
+   "truth": "Both limbs had VOIDed since the gateways restarted onto runner flags changed on 2026-11-12 (--threads-batch 8, --cache-ram 256); not since the 2026-11-22 restart, and not because of --no-slots. Re-pinned 2026-11-22 (private/limbs.json keeps the old pins under retired_pins).",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The record as written stays on branch a470-limbs-cause-as-written-2026-11-22 (at f6872566)."
+  },
+  {
+   "id": "A274-PROCESS-ENFORCED",
+   "date": "2026-11-23",
+   "by": "Claude (an AI), A274's author session's record; refuted by the TETSU session's measurement (A479), after the quorum asked",
+   "claim": "A274 (2026-10-06) recorded the Windows Job Object path's process limit as ENFORCED: ActiveProcessLimit 1 together with the desktop-app breakaway policy keeps every child the jailed code starts inside the job, so cmd.exe, os.system and a second Python are refused.",
+   "verbatim": [
+    "ENFORCED by the two together."
+   ],
+   "patterns": [
+    "ENFORCED by the two together"
+   ],
+   "refuted_by": "A479, measured 2026-11-23 on TETSU (python.org CPython 3.12, not packaged: GetCurrentPackageFullName 15700): an escaped snippet inside the job started winget.exe through its app execution alias and it ran (exit 0), with the breakaway policy set and with it dropped alike, while cmd.exe and Python were refused 1816 in the same job. Pinned as P4 in test_a274_win_job_sandbox.py. Asked first of the quorum, which could not say (7 seats UNSURE, 4 HOLE).",
+   "truth": "The process limit holds for cmd.exe, os.system and a second Python, as measured; it does NOT hold for a packaged app started through an app execution alias, which runs outside the job's count on a python.org build. Not measured on a packaged interpreter. The Windows path stays shut on file size either way (SANDBOX_WIN_UNENFORCEABLE), so nothing runs proposals through it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md",
+    "covenant_unified_v8.py",
+    "pending-v8.38/",
+    ".trash/a479-r1-probe/"
+   ],
+   "note_on_allow": "The core's comment at the _win_job_run limits (and its pending copy) still carries the A274 wording. Changing the core moves its deploy pin, which is the operator's act, so the core is allowed by name here until that change is made; the record and this entry carry the truth. .trash/a479-r1-probe/ holds the probe that drove .C red on 2026-11-23, retired there, not deleted.",
+   "note_on_branch": "The record as written stays on branch a274-process-enforced-claim-as-written-2026-11-23 (at a200592)."
   }
  ]
 }

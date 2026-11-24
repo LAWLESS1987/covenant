@@ -105,7 +105,7 @@ REPAIR  (dry run)
 ## Built the same day, on his "just do it"
 
 - **The wire.** `GET /hwy/state` — tailnet-gated like `/m`, returns what this node senses
-  and a narrow view of its ledger. `POST /hwy/report` — takes a peer's **signed** offer and
+  and a narrow view of its ledger. [A464, 2026-11-21: what it senses is read with this machine's profile (`ops/machine.json`) and the report names what does not apply there. Before that, on a machine with a profile, this page offered the first PC's conditions as its own.] `POST /hwy/report` — takes a peer's **signed** offer and
   runs `ingest()` with `dry_run` forced **true**, not as a parameter. An inbound request can
   make this node measure and answer; it cannot make it act. H1d already says a node repairs
   only what it measured itself, and this is the stronger form: "a packet arrived and the

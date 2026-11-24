@@ -141,6 +141,24 @@ def main():
           "left alone" in out, "")
     check("A117.5b ...and is unchanged", sha(loose) == keep3, "")
 
+    # ------------------------------------------------ a RETIRED copy under .trash/ (A454)
+    # The tombstone rule moves retired files to .trash/ and never deletes them. A
+    # pre-deploy backup there declares the live version with the bytes before the
+    # deploy; the tool must neither overwrite it nor count it as "left for a
+    # person", or the highway's resync remedy is held every round for a file
+    # nothing can run (2026-11-18/19, three such backups).
+    td7 = plant()
+    retired = os.path.join(td7, ".trash", "predeploy_x", CORE)
+    write(retired, core_text("v9.99", "\n# the bytes before the deploy\n"))
+    keep7 = sha(retired)
+    rc, out = run(td7, "--check")
+    check("A117.10a a copy under .trash/ declaring the live version is not a "
+          "held copy: --check reports in sync and exits 0",
+          rc == 0 and "in sync" in out and "left alone" not in out, "rc=%d %s" % (rc, out[-120:]))
+    rc, out = run(td7)
+    check("A117.10b ...and the fixer leaves it byte-for-byte", sha(retired) == keep7 and rc == 0,
+          "rc=%d" % rc)
+
     # ------------------------------------------------ no git at all: change nothing
     td4 = plant(with_git=False)
     nogit = os.path.join(td4, "held", CORE)

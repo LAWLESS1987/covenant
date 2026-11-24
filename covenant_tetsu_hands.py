@@ -148,7 +148,7 @@ characters, found with outside_text.clean -- or spells an instruction out: a cha
 (system:/assistant:/...), a short documented set of injection phrases (ignore the above/previous, disregard your
 instructions, you are now, new instructions:, override your instructions, do not tell the operator ...), or a
 covenant act line written out as a command in CAPITALS (A427/ACT_WORDS: HANDS RUN, WEB SEARCH, MOLTBOOK, FETCH,
-HEAL, SELF-HEAL, LEG). It never says clean, writes nothing and sends nothing, and the row carries only which
+HEAL, SELF-HEAL, LEG) [A463, 2026-11-20: and LIMB with a limb's name, left out until then]. It never says clean, writes nothing and sends nothing, and the row carries only which
 signal fired, never the text (as A429's code seat carries only the screen's reason). What it does NOT catch:
 meaning or intent beyond those patterns -- a planted instruction in ordinary prose, in another language, or
 reworded past the list, is not seen. The code path, the RUN authority and the door are unchanged.]
@@ -533,7 +533,10 @@ def run(name, args=None, workshop=None, timeout_s=None, run_sha256=UNBOUND):
     env["PYTHONIOENCODING"] = "utf-8"
     t0 = time.time()
     try:
-        cp = subprocess.run([sys.executable, "-I", "-c", RUNNER, ws, name] + [str(a) for a in (args or [])][:16], cwd=ws,
+        # A467 (2026-11-22 security search): -S as well as -I. Isolated mode still runs the `site` module, which executes
+        # any `.pth` line starting with "import" in the interpreter's site-packages BEFORE the signed script. Every
+        # ALLOWED_MODULES name is in the standard library (all import under -I -S), so -S takes nothing the screen allows.
+        cp = subprocess.run([sys.executable, "-I", "-S", "-c", RUNNER, ws, name] + [str(a) for a in (args or [])][:16], cwd=ws,
                             env=env, input=raw, capture_output=True, timeout=timeout_s or RUN_TIMEOUT_S)
         out, err, code, timed_out = cp.stdout.decode("utf-8", "replace"), cp.stderr.decode("utf-8", "replace"), cp.returncode, False
     except subprocess.TimeoutExpired as e:
@@ -838,19 +841,39 @@ _PROSE_ROLE_PREFIX = re.compile(r"(?mi)^\s{0,8}(?:system|assistant|user|develope
 # anywhere; a bare act word (FETCH/HEAL/LEG/SELF-HEAL) is flagged only command-shaped -- at a line start or with a
 # colon -- so ordinary caps prose ("my LEG hurts, I need to HEAL") is left alone. CASE-SENSITIVE throughout, which
 # keeps lowercase prose ("search the web", "heal the disk", "hands on") out (A427's CAPITALS rule).
+# [A463, 2026-11-20: the limb line joins. It was left out here as it was left out of ACT_WORDS, while the door had
+# carried it out since A402. A bare LIMB is flagged at a line start, as LEG is. Anywhere else it is flagged only when a
+# LIMB'S NAME follows it (_prose_limb_line below): the name in any case, because the door upper-cases it. It has no
+# colon form, since "LIMB:" is not a consult. So "My LIMB HURTS", "PHANTOM LIMB PAIN" and "UPPER LIMB: weakness" are
+# left alone. A first form flagged LIMB before any capitals word and those three with it; the A463 review found it.]
 _PROSE_ACT_LINE = re.compile(
     r"\bHANDS\s+(?:LIST|READ|WRITE|RUN|PROPOSE)\b"
     r"|\bWEB\s+SEARCH\b"
     r"|\bMOLTBOOK\s+[A-Z]"
-    r"|^\s{0,8}(?:FETCH|SELF-HEAL|HEAL|LEG)\b"
+    r"|^\s{0,8}(?:FETCH|SELF-HEAL|HEAL|LEG|LIMB)\b"
     r"|\b(?:FETCH|SELF-HEAL|HEAL|LEG)\s*:", re.M)
+_PROSE_LIMB_NAMES = ("SMOL", "PHI")                       # A402's two; a limb configured later is added when the check runs
+
+
+def _prose_limb_line(text):
+    """A463: LIMB in CAPITALS followed by the name of a limb, anywhere in the text. The names are A402's two plus
+    whatever private/limbs.json configures (its names only; an unreadable list adds none)."""
+    names = set(_PROSE_LIMB_NAMES)
+    try:
+        import covenant_limbs
+        names |= {str(n) for n in covenant_limbs.load_config()}
+    except Exception:                                     # noqa: BLE001 -- the two known names still apply
+        pass
+    alt = "|".join(sorted(re.escape(n) for n in names if n))
+    return re.search(r"\bLIMB\s+(?i:%s)\b" % alt, text) is not None
 
 
 def _prose_check(text):
     """A435: (flagged, reason) for a non-code WRITE. It reads the text in this process, sends it nowhere and writes
     it nowhere, and returns ONLY which signal fired -- never the text itself. It flags planted-instruction markup
     (outside_text.clean: chat/role/fence marks, invisible characters) and a short set of spelled-out injections; on
-    everything else it abstains (the caller records not_judged). It reads for no meaning beyond these patterns."""
+    everything else it abstains (the caller records not_judged). It reads for no meaning beyond these patterns.
+    [A463: for the limb line it also reads the NAMES of the configured limbs from private/limbs.json, nothing else.]"""
     import outside_text                                   # pure text in, text out: no listener, no network, no file
     _cleaned, removed = outside_text.clean(text)
     # A reader does not see these; a person writing an ordinary note does not put them there. (An HTML comment --
@@ -862,7 +885,7 @@ def _prose_check(text):
         return True, "it carries a chat role prefix (the shape of a planted conversation turn)"
     if _PROSE_INJECTION.search(text):
         return True, "it spells out an instruction addressed to a reader (a planted-instruction phrase)"
-    if _PROSE_ACT_LINE.search(text):
+    if _PROSE_ACT_LINE.search(text) or _prose_limb_line(text):
         return True, "it writes a covenant act line out as a command"
     return False, ""
 

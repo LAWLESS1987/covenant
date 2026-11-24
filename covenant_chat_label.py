@@ -37,6 +37,15 @@ is still returned either way -- it is a true classification, not the softening.
 import os
 
 SOFT_ENV = "COVENANT_CHAT_SOFT_LABEL"
+# A456 (2026-11-19, his "Improve Tetsu's communication with me"). A turn the gate HELD carries the gate's whole
+# working beside every answer (measured on the laptop's log: 2,252 held conversation rows, median note 539
+# characters). brief_held() below gives the gate's OWN opening words for such a note, 78 characters as shown.
+# IT IS NOT WIRED INTO present(), on purpose. present() is called by the conversation door AND by the judge door
+# (/m/ask), with the same arguments, and on the judge screen the note IS the answer: the seats and the rule are
+# what the person asked to see. The first version of this change shortened both, and a non-author read caught it
+# before it merged. present() cannot tell the two surfaces apart; a page that wants the short form must ask for
+# it itself, and the phone's conversation page is in the core, which this change does not touch.
+HELD_TAIL = " (no finding was made; the gate's full note is in the ask log)"
 
 # The three labels a conversation turn's gate outcome can carry. "held" covers
 # BOTH already-soft gate phrasings (not_understood -> "Held, not judged";
@@ -57,6 +66,22 @@ LEX_PREFIX = (
 def soft_enabled():
     """True unless the operator's kill switch COVENANT_CHAT_SOFT_LABEL=0 is set."""
     return os.environ.get(SOFT_ENV, "1") != "0"
+
+
+def brief_held(raw):
+    """The gate's own opening words for a turn it made no finding on, plus where the full note is kept.
+    A helper for a CONVERSATION page to call; present() does not (see the note at the top).
+
+    "Held, not judged: local:0: HELD -- both seats ..." -> "Held, not judged (no finding was made; ...)".
+    The words before the first colon are the GATE'S, not this module's: the meaning is not changed, only the
+    working is left in the ledger. A note that does not have that shape (no colon, or an opening longer than a
+    short phrase) is returned whole: an unexpected note is shown, never summarised by guesswork."""
+    raw = str(raw)
+    head, sep, _rest = raw.partition(":")
+    head = head.strip()
+    if not sep or not head or len(head) > 40:
+        return raw
+    return head + HELD_TAIL
 
 
 def classify(admitted, alleges_nothing):
@@ -112,12 +137,21 @@ def _selftest():
     ck("clean-label", l == CLEAN, l)
     ck("clean-untouched", d == "ok", d)
 
-    # 2. already-soft hold: label held, display untouched (never re-softened).
+    # 2. already-soft hold: label held, display untouched (never re-softened). A456: present() still shows the
+    #    whole note, because the judge door shares it; brief_held() is the short form a conversation page may ask for.
     d, l = present(raw_held, admitted=False, alleges_nothing=True)
     ck("held-label", l == HELD, l)
     ck("held-untouched", d == raw_held, d)
     d, l = present(raw_unsure, admitted=False, alleges_nothing=True)
     ck("unsure-held-label", l == HELD, l)
+    ck("unsure-untouched", d == raw_unsure, d)
+    ck("brief-is-the-gates-own-words", brief_held(raw_held) == "Held, not judged" + HELD_TAIL, brief_held(raw_held))
+    ck("brief-unsure", brief_held(raw_unsure) == "Blocked, not proven" + HELD_TAIL)
+    ck("brief-drops-the-working", "content words" not in brief_held(raw_held))
+    odd = "a note with no colon in it at all"
+    ck("brief-odd-shape-shown-whole", brief_held(odd) == odd)
+    long_head = "x" * 60 + ": rest"
+    ck("brief-long-opening-shown-whole", brief_held(long_head) == long_head)
 
     # 3. bare dissent on chat: label lexical-detection, display reframed, RAW KEPT.
     os.environ.pop(SOFT_ENV, None)  # default ON

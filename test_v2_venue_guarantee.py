@@ -218,6 +218,30 @@ def main():
           "trader_log.txt' as two separate lines -- on every platform (on "
           "non-Windows the attempt reads 'unknown', never a run)",
           "last attempt" in low and "last run per trader_log.txt" in low)
+    # A12b-f (A479, 2026-11-23): every branch of the scheduler section, on every platform, from made-up listings.
+    # Found on a Windows machine with no trader task: A12 failed there, because that branch printed neither line;
+    # and a failed listing printed "No scheduled task" (the quorum's point, 5 of 11 seats).
+    def _both(lines):
+        t = "\n".join(lines).lower()
+        return "last attempt" in t and "last run per trader_log.txt" in t
+    no_task = MP.scheduler_lines(True, True, "", None, None, True)
+    check("A12b Windows, the listing worked and no task invokes the trader: both lines, and it does not claim "
+          "only a person runs it", _both(no_task) and "no scheduled task invokes the trader" in "\n".join(no_task).lower()
+          and "it runs only when" not in "\n".join(no_task).lower(), no_task)
+    failed = MP.scheduler_lines(True, False, "Access is denied.", None, None, True)
+    check("A12c Windows, the listing FAILED: UNKNOWN with both lines, never 'no scheduled task'",
+          _both(failed) and "unknown" in "\n".join(failed).lower()
+          and "no scheduled task" not in "\n".join(failed).lower(), failed)
+    garbled = MP.scheduler_lines(True, True, "Get-ScheduledTaskInfo : The system cannot find the file", None, None, True)
+    check("A12d Windows, the listing ran but printed nothing readable: UNKNOWN, never 'no scheduled task'",
+          _both(garbled) and "no scheduled task" not in "\n".join(garbled).lower(), garbled)
+    one = MP.scheduler_lines(True, True, "TraderDaily|Ready|2026-09-02 09:00:39|0|2026-09-03 09:00:00|0|True|False|False",
+                             "Tue 09/02/2026  9:00:41.10", (2026, 9, 2), True)
+    check("A12e Windows, one task: its own lines, both lines, and the attempt read against the log",
+          _both(one) and "TASK TraderDaily" in "\n".join(one) and "agree" in "\n".join(one), one)
+    off = MP.scheduler_lines(False, False, "", None, None, False)
+    check("A12f off Windows both lines; a missing trader_log.txt is said as missing, not as 'none found'",
+          _both(off) and "there is no trader_log.txt" in "\n".join(off), off)
 
     # ---- T: the trader's armed gate ----------------------------------------
     tsrc = ""

@@ -199,9 +199,15 @@ def revive(cmd=None):
     py = os.path.join(HERE, ".venv", "Scripts", "python.exe")
     if not os.path.exists(py):
         py = sys.executable
+    # A479 (2026-11-23): this opened logs/watchdog-stdout.log without making logs/, so on a fresh clone revive()
+    # raised FileNotFoundError; in the sweep an earlier suite happened to make the folder first (C3 R5).
+    os.makedirs(LOGDIR, exist_ok=True)
     out = open(os.path.join(LOGDIR, "watchdog-stdout.log"), "a",
                encoding="utf-8", errors="replace")
-    p = covenant_quiet.popen_survivor(cmd or [py, WD_SRC], cwd=HERE, stdout=out, stderr=out)
+    try:
+        p = covenant_quiet.popen_survivor(cmd or [py, WD_SRC], cwd=HERE, stdout=out, stderr=out)
+    finally:
+        out.close()        # the child holds its own handle; the guard kept this one open for its whole life (A479)
     return p.pid
 
 

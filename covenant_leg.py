@@ -44,9 +44,26 @@ import threading
 import time
 import urllib.request
 
+# A470 (2026-11-22): where the leg is served may come from private/leg.json (gitignored, like private/limbs.json),
+# so every process that imports this module -- a node the watchdog revives as much as one a restart starts -- reads
+# the same place. {"host", "port", "manifest_sha256", "allow_remote": true}. An environment variable still wins.
+# Unreadable or absent -> {} -> the loopback default, as before.
+def _leg_file(path=None):
+    p = path or os.environ.get("COVENANT_LEG_FILE") or os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                                     "private", "leg.json")
+    try:
+        with open(p, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+_LEG_FILE = _leg_file()
+
 # The leg's own server (a second llama-server, separate from the 3B keeper on PORT 8081). On-demand by design.
-LEG_HOST = os.environ.get("COVENANT_LEG_HOST", "127.0.0.1")
-LEG_PORT = int(os.environ.get("COVENANT_LEG_PORT", "8099"))
+LEG_HOST = os.environ.get("COVENANT_LEG_HOST") or str(_LEG_FILE.get("host") or "127.0.0.1")
+LEG_PORT = int(os.environ.get("COVENANT_LEG_PORT") or _LEG_FILE.get("port") or 8099)
 LEG_MODEL = "Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf"
 MAX_LEG_CHARS = 6000                                       # over this, the leg's answer VOIDs (no runaway text into synthesis)
 
@@ -89,13 +106,25 @@ _no_redirect = urllib.request.build_opener(_NoRedirect)
 
 def _is_loopback(host):
     """Only loopback hosts may be reached unless the operator explicitly allows remote (COVENANT_LEG_ALLOW_REMOTE)."""
-    if os.environ.get("COVENANT_LEG_ALLOW_REMOTE"):
+    if os.environ.get("COVENANT_LEG_ALLOW_REMOTE") or _LEG_FILE.get("allow_remote") is True:
         return True
     return str(host) in ("127.0.0.1", "localhost", "::1", "[::1]")
 
 
 def _leg_live():
     return os.environ.get("COVENANT_LEG_LIVE", "1") != "0"
+
+
+# A470 (2026-11-22, his "Yes, use RTX leg"): the leg may live on the second PC, behind the same gateway the limbs
+# (A402) use. Off loopback the reply must carry X-Leg-Manifest naming the PINNED sha256 (the gateway's hash over
+# weights, runner, flags, sampler and chat template), exactly as covenant_limbs checks it; with no pin set, a remote
+# leg is never asked. Loopback is unchanged (the laptop's own llama-server has no gateway and no manifest).
+def _host_is_loopback(host):
+    return str(host) in ("127.0.0.1", "localhost", "::1", "[::1]")
+
+
+def _leg_pin():
+    return (os.environ.get("COVENANT_LEG_MANIFEST") or str(_LEG_FILE.get("manifest_sha256") or "")).strip().lower()
 
 
 def free_ram_gb():
@@ -489,6 +518,10 @@ def consult_leg(text, max_tokens=320, temperature=0.4, timeout=180, trigger=None
     Never raises -- None means the leg could not be reached and the caller proceeds without it."""
     if not _leg_live() or not _is_loopback(LEG_HOST):      # CXR-8: honour the kill switch and loopback IN the module
         return None
+    remote = not _host_is_loopback(LEG_HOST)
+    pin = _leg_pin()
+    if remote and len(pin) != 64:                          # A470: a remote leg is never asked unpinned
+        return None
     if not _leg_sema.acquire(timeout=1.0):                 # CXR-8: cap concurrent generations; a RAM snapshot can't
         return None                                        #        stop simultaneous callers all passing
     try:
@@ -501,11 +534,17 @@ def consult_leg(text, max_tokens=320, temperature=0.4, timeout=180, trigger=None
         try:
             with _no_redirect.open(req, timeout=timeout) as r:     # no redirects off loopback
                 raw = r.read(MAX_HTTP_BYTES + 1)                   # CXR-3: bound the response BEFORE parsing
+                served_manifest = str(r.headers.get("X-Leg-Manifest") or "")[:200]
             if len(raw) > MAX_HTTP_BYTES:
+                return None
+            if remote and pin not in served_manifest.lower():      # A470: not the model file he agreed to -> VOID
                 return None
             d = json.loads(raw.decode("utf-8", "replace"))
             ans = (d.get("choices") or [{}])[0].get("message", {}).get("content") or ""
-            return ans.strip(), attribution(text, body, params, served=d.get("model"), trigger=trigger)
+            att = attribution(text, body, params, served=d.get("model"), trigger=trigger)
+            if remote:
+                att["manifest"] = served_manifest                  # the pinned file's hash, as the gateway sent it
+            return ans.strip(), att
         except Exception:                                  # noqa: BLE001
             return None
     finally:
