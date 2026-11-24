@@ -9670,6 +9670,18 @@ class CovenantAPI:
                         msgs.append({"role": "assistant", "content": answer})
                         msgs.append({"role": "user", "content": _data + "\n\nNow tell the person, in your own words, what was repaired and what still needs a person. Do not write HEAL again."})
                         answer, meta = _ask_fitted()
+                elif first.upper() == "COLLECTIVE":
+                    # Tetsu reads the collective through the central brain (2026-11-24, A485). Lawrence's intent:
+                    # "the purpose of the SNN is for one neural network. It collective consciousness ... Tetsu is
+                    # Tetsu"; asked how Tetsu should join it, "Through the brain" -- the way Tetsu himself preferred
+                    # when he declined the ring for his arms (2026-11-07). A READ, not an act: every arm's rate, the
+                    # witness detectors and his own counts come back as data; nothing changes, nothing schedules it.
+                    _handled, _data, _rec = importlib.import_module("covenant_tetsu_collective").act(answer)
+                    if _handled:
+                        forum.append(_rec)
+                        msgs.append({"role": "assistant", "content": answer})
+                        msgs.append({"role": "user", "content": _data + "\n\nNow tell the person, in your own words, what the collective looks like right now. Do not write COLLECTIVE again."})
+                        answer, meta = _ask_fitted()
                 elif first.upper().startswith("WEB "):
                     # Tetsu's crawler (2026-09-27, A237, his words: "create a fire crawl like
                     # system for tetsu also"): a search, or a same-host crawl a few pages deep,

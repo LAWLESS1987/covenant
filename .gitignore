@@ -450,6 +450,8 @@ ops/tetsu_immunity.jsonl
 ops/tetsu_conv_reflex.json
 ops/tetsu_conv_reflex.jsonl
 ops/tetsu_conv_encoder.json
+# A485: each COLLECTIVE look he takes (counts only), his record on this node -- not shipped
+ops/tetsu_collective.jsonl
 # A416 fix: each caller/privacy partition keeps its own files (hashed scope in the name), and a save goes via .tmp
 ops/tetsu_conv_reflex.scope-*
 ops/tetsu_conv_encoder.scope-*

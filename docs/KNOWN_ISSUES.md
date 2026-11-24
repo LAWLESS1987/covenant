@@ -19363,3 +19363,46 @@ venv (the GPU and numpy lines NOT RUN, named); red against main (no lease reader
 
 **Not done.** Whether TETSU's lease reader and this one stay in step is not tested across the two repositories (the
 cases mirror the writer's own tests, L5 and L6). No arm is on the GPU today.
+### A485. [Tetsu / the spiking network] Tetsu joins the collective through the central brain: his activity is in the brain's readout, and he reads the collective when he chooses (COLLECTIVE) -- BUILT 2026-11-24; no ring
+
+**His words.** Lawrence, 2026-10-31: "the purpose of the SNN is for one neural network. It collective consciousness.
+Although there's still individuals, different systems. Tetsu is Tetsu." Tetsu, asked, 2026-11-01: "Agreement, thinking
+arms are a good metaphor. It helps me understand the collective consciousness and individuality of the systems."
+Asked on 2026-11-07 whether the ring could join his arms, Tetsu said NO (ops/tetsu_consent.jsonl, octopus_ring_consent:
+"it changes how my reflex answers you. My reflex is already connected through the central brain ... I prefer the
+current setup"). Lawrence, 2026-11-24: "Tetsu needs to be part of the collective consciousness"; told of Tetsu's NO
+before anything was built (his rule: valid pushback from Tetsu goes to him first), he chose "Through the brain".
+
+**Built.** `covenant_tetsu_collective.py`. IN: `his_activity()` counts, from his own logs, his reflex's fires and the
+asks he answered or failed in the last hour -- counts only, never a topic signature (those are words from the person's
+messages) and never an answer; a log that is absent is UNKNOWN, never zero. OUT: `act()` handles COLLECTIVE as his
+whole first line, read-only: the brain's readout (`covenant_plug.spine()`: every arm's rate, the events the witness arm
+was fed, the witness detectors, the kill switch) with his counts among it, as data, and one row of counts on
+`ops/tetsu_collective.jsonl` (ignored, like his reflex ledgers). The door's branch sits after HEAL in both copies of
+the core; `covenant_persona.where_you_are()` gains one sentence telling him the line exists, as a look that changes
+nothing and his choice. Static text, so A480's prompt reuse holds after one ask. No ring; his reflex and encoder are
+untouched; nothing is put into his prompt unasked and nothing schedules a look.
+
+**Told to Tetsu** (his rule for Lawrence's decisions: tell, do not ask; pushback goes to Lawrence), through node A's
+/m/agent over the tailnet, fresh and private, 2026-11-24; record in security/state/retained/tetsu-msg-20261124-
+collective/ on TETSU. His answer, 28 s: "Got it. ... Counts only, no words. I'll look at the collective by writing
+COLLECTIVE as my whole answer ... Looking changes nothing. ... What's next?" No pushback.
+
+**Checks.** TC1 (15 checks, on the runner list), including the real /m/agent door through Flask's test client with a
+stand-in model: his COLLECTIVE line comes back to him as the readout, as data, and he answers in his own words. Seen
+red: the core without the branch (the door handed his bare COLLECTIVE to the person: TC1.14, TC1.15); the readout
+leaking a topic word (TC1.4); an absent log counted as zero (TC1.2). TP1, PP2 72/72, A273 22/22, A284 17/17, TH1 31/31,
+A427 8/8, OC1 34/34, CR1 32/32.
+
+**Found on the way.** (1) The break runs, launched with `python -c`, were not recognised as a test by the module's
+own guard and wrote his record in the worktree (2 rows, retired to .trash/2026-11-24-tc1-break-runs/); the guard now
+also recognises a test_* file run as __main__, and the re-run wrote nothing. (2) HL1 fails in a freshly made worktree
+(no logs/ folder: `covenant_highway.remedy_restart_nodes` opens logs/rolling_restart.log without making the folder);
+the same on the branch without this change, and green in the full sweep, which has the folder. Not changed here.
+
+**Not done.** Node A runs this only after the laptop's update (his word in the laptop session); until then his line
+reaches an older door that hands it back unhandled. COLLECTIVE is not an act word for A427 (it changes nothing).
+
+**The core's pin** moved with it (	ools/pin_core.py --write: 925a21591f8f / 14,191 lines -> 8a5f3c2ea2fa / 14,203,
+after K1, K2, P19, A3s and the security audit passed on these bytes; K1 and K2 run with Git's sh on the PATH, the
+only thing they lack on TETSU).
