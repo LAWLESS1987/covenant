@@ -57,17 +57,55 @@ class LIF:
         return 0
 
 
+def _min_thresh(arm):
+    """An arm's lowest threshold as it is now: from its pool when it has one (A483), else neuron by neuron."""
+    f = getattr(arm, "min_thresh", None)
+    return f() if callable(f) else min((nu.thresh for nu in arm.neurons), default=1.0)
+
+
 class Arm:
     """A semi-autonomous ganglion: a pool of LIF neurons that senses local input and spikes on its own, without the
     central brain. Subclasses give it a job. rate() is the arm's current firing fraction."""
 
     name = "arm"
 
-    def __init__(self, n=8, tau=20.0, thresh=1.0):
-        self.neurons = [LIF(tau=tau, thresh=thresh) for _ in range(n)]
+    def __init__(self, n=8, tau=20.0, thresh=1.0, backend=None):
+        # A483 ("gpu and cpu should be intergrated in the snn"): where this arm's neurons compute is chosen by its
+        # size (covenant_snn_backend: pure Python below 256 neurons -- every default arm, Tetsu's among them --
+        # numpy on the CPU from 256, the GPU from 131,072 when it has room). Same spikes and voltages on every
+        # backend. The backend module is imported only for an arm that could leave pure Python, so the phone's
+        # stdlib-only path never imports it.
+        self.pool, self.backend, self.backend_why = None, "python", "default"
+        want = backend or os.environ.get("COVENANT_SNN_BACKEND")
+        if n >= 256 or (want and want.strip().lower() not in ("python", "auto")):
+            try:
+                import covenant_snn_backend as _B
+                self.backend, self.backend_why = _B.choose(n, want)
+                if self.backend != "python":
+                    self.pool = _B.NeuronPool(n, tau=tau, thresh=thresh, backend=self.backend)
+            except Exception as e:                       # noqa: BLE001 -- never a new failure: stay on Python
+                self.pool, self.backend, self.backend_why = None, "python", "backend unavailable (%s)" % type(e).__name__
+        self.neurons = self.pool.views() if self.pool is not None else [LIF(tau=tau, thresh=thresh) for _ in range(n)]
         self.last = [0] * n
         self.incoming = 0.0       # current arriving from neighbouring arms over the ring; added on the NEXT step
         self.ring = None          # the Commissure this arm sits on, set by Octopus.attach; None = a lone arm
+
+    def min_thresh(self):
+        """The arm's lowest threshold as it is NOW (the ring's bound reads it live, A414)."""
+        if self.pool is not None:
+            return self.pool.min_thresh()
+        return min((nu.thresh for nu in self.neurons), default=1.0)
+
+    def _to_python(self, why):
+        """Hand the pool's exact state to pure-Python LIF neurons and continue there (A483: never a new failure)."""
+        state = self.pool.state()
+        neurons = []
+        for v, decay, thresh, reset in state:
+            nu = LIF()
+            nu.v, nu.decay, nu.thresh, nu.reset = v, decay, thresh, reset
+            neurons.append(nu)
+        self.neurons, self.pool = neurons, None
+        self.backend, self.backend_why = "python", "fell back: " + why
 
     ring_receives = True          # False: the arm sends on the ring but never takes ring current (WitnessArm)
 
@@ -81,9 +119,21 @@ class Arm:
         if extra and not _disabled():          # with the kill switch on, queued ring current is DROPPED, so turning
             # it back off cannot release excitation stored meanwhile. Clamped again ON ARRIVAL against the thresholds
             # as they are now, in case one was lowered after the current was sent.
-            extra = min(extra, 2.0 * Commissure.SUBCRITICAL * min((nu.thresh for nu in self.neurons), default=1.0))
+            extra = min(extra, 2.0 * Commissure.SUBCRITICAL * self.min_thresh())
             signal = [s + extra for s in signal]
-        self.last = [nu.step(s) for nu, s in zip(self.neurons, signal)]
+        if self.pool is not None:
+            if len(signal) != self.pool.n:
+                # the pure-Python step zips and leaves the extra neurons unstepped; a pool cannot, so hand back
+                self._to_python("a signal of %d values for %d neurons" % (len(signal), self.pool.n))
+            else:
+                try:
+                    self.last = self.pool.step(signal)
+                except Exception as e:                   # noqa: BLE001 -- the pool committed nothing; replay below
+                    self._to_python("the %s backend raised %s" % (self.backend, type(e).__name__))
+                else:
+                    signal = None
+        if signal is not None:
+            self.last = [nu.step(s) for nu, s in zip(self.neurons, signal)]
         if self.ring is not None:
             self.ring.relax()
             if any(self.last):
@@ -235,7 +285,7 @@ class Commissure:
             self.order.append(arm.name)
         self.arms[arm.name] = arm
         arm.ring = self
-        arm.ring_thresh = min((nu.thresh for nu in arm.neurons), default=1.0)   # join-time value, for readers only;
+        arm.ring_thresh = _min_thresh(arm)   # join-time value, for readers only;
         #                                                                        carry() reads thresholds live
         self._nb = {}                                                          # the ring changed: neighbours afresh
         self._relax = self.decay ** (1.0 / len(self.order))
@@ -279,7 +329,7 @@ class Commissure:
                 tgt = self.arms[nb]
                 if not tgt.ring_receives:                # the witness attests real bursts only; it takes no current
                     continue
-                thresh = min((nu.thresh for nu in tgt.neurons), default=1.0)   # as it is NOW (ChatGPT's review:
+                thresh = _min_thresh(tgt)   # as it is NOW (ChatGPT's review:
                 # a join-time cache let a threshold lowered at runtime outrun the per-spike bound)
                 # SUBCRITICAL, structurally: weight x gain is held under SUBCRITICAL x the receiver's threshold, so
                 # one spike's total ring input over BOTH neighbours stays below what a spike costs (a reset from

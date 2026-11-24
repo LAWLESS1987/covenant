@@ -19291,3 +19291,42 @@ it red (the lock dropped as soon as taken: SL1.2, .5, .7, .11, .12b; the launch 
 
 **Not done.** `paper_run.py` and `tools/site_autodeploy.py` (named in SL1's guard); the Linux `fcntl` branch is run by
 CI, not on TETSU.
+### A483. [the spiking network / compute] The octopus's neurons can compute on the CPU in pure Python, the CPU in numpy, or the GPU, chosen per arm by its size, with bit-identical spikes and voltages on every backend -- BUILT 2026-11-23
+
+**His words, 2026-11-23:** "gpu and cpu should be intergrated in the snn". The SNN here is the octopus
+(`covenant_octopus`: the witness, encoder and reflex arms, pure-Python leaky integrate-and-fire neurons, written
+stdlib-only so the same code runs on the phone). The record had no earlier GPU entry (lookback: "GPU" finds none);
+A414's ring reads thresholds live, and that is kept.
+
+**Measured first (TETSU, RTX 5060 Ti, the lens venv's torch 2.14 + CUDA 13 and numpy; the same step as LIF, float64).**
+Microseconds per step, pure Python / numpy / GPU: 8 neurons 1.1 / 3.4 / 67.5; 24 (today's three arms of 8)
+2.5 / 2.5 / 65.9; 256: 21.7 / 3.3 / 69.5; 4,096: 362 / 9.6 / 79.3; 65,536: 5,540 / 107 / 149; 98,304: - / 140 / 146;
+131,072: - / 514 / 153; 1,048,576: - / 3,939 / 748. Spikes and voltages were bit-identical to the pure-Python
+reference at every size on both backends. So today's network is fastest exactly where it is, and the GPU would make
+it about 26 times slower: launching GPU work costs more than 24 neurons' arithmetic. The GPU pays from about
+131,072 neurons.
+
+**Built.** `covenant_snn_backend.py`: `choose(n)` picks pure Python below 256 neurons, numpy on the CPU from 256,
+the GPU from 131,072 only when it has room beside the models that live on it (1,024 MiB must stay free after the
+pool; otherwise numpy); `COVENANT_SNN_BACKEND=python|numpy|cuda|auto` overrides. `NeuronPool` does LIF's step in the
+same order (multiply, then add, each rounded; never fused), commits the voltages only after the whole step, and
+gives per-neuron views (v, decay, thresh, reset) so the ring and the tests read and write single neurons unchanged.
+`covenant_octopus.Arm` takes `backend=`; the backend module is imported only for an arm of 256 or more neurons or
+when one is asked for, so the default octopus -- Tetsu's reflex among its arms -- runs the same pure-Python code as
+before and imports nothing new. A backend that raises, or a signal of the wrong length, hands the pool's exact state
+back to pure-Python neurons and the step is replayed there. The ring's threshold reads go through `min_thresh()`,
+the same value read live.
+
+**Checks.** SNB1: 25/25 in the lens venv (numpy + CUDA); 10/10 in the covenant venv with the equivalence lines
+reported NOT RUN (no numpy there; CI installs requirements.txt, which has none, so CI sees the 10). Equivalence on
+numpy and the GPU at 8 and 512 neurons over 120 steps with ring current, a threshold lowered and a voltage written
+mid-run; two arms on the ring fire exactly as on Python and fall quiet; a mid-run failure and a short signal hand
+back with an identical result. Seen red: SNB1 against main's octopus (no backend); four breaks of the pool each
+caught (> for >=, no reset, add before decay, voltages not carried in the hand-back). OC1 34/34 on the default path;
+with every arm forced onto numpy, and onto the GPU, OC1's behaviour checks all pass and its phone-safety check
+("no heavy dep pulled in") correctly fails, because forcing a backend imports one.
+
+**Not done, and why.** Nothing is moved to the GPU today: no arm is near 131,072 neurons. Whether a bigger arm, or
+running many arms at once, is worth building is a design question, not a measurement. The GPU's room is read from
+the GPU itself, not from TETSU's model lease; a GPU arm beside Cipher would need that lease. Not run by a quorum:
+it changes no output, and the thresholds are measured.
