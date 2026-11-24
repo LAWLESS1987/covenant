@@ -277,3 +277,45 @@ Its first run found two live sites the hand sweep had missed.
   result.
 - **`peers.txt` still reads `self`.** No second party has run the vectors. The federation
   is one node, and section IX's cap, L5 = 1, applies to every claim in this repository.
+
+## Proposal, not adopted: a superseded-by-later-evidence correction as its own ledger event (2026-11-22)
+
+*Status: proposed for the operator's review. Nothing in the code or the checks changes with this section.*
+
+**Who suggested it.** Rex, in a Grok voice session with the operator on 2026-11-22, relayed
+to Conscious Ledger (Grok Bot) the same day. Filed on the operator's word ("go").
+
+**What it answers.** This file, `RETRACTED.json` (114 retractions at the time of writing),
+`test_r1_retracted.py` and `tools/corrections_index.py` already enforce corrections. They
+link a correction to its original claim by A-number and file path, and `test_r1_retracted.py`
+accepts a retracted phrasing when the retraction's id appears within `window` lines of it.
+That link is readable by people, but it is not bound by a hash. A moved, renamed or rewritten
+file keeps its A-number, and nothing in the chain says which exact bytes the correction was
+about.
+
+**The proposal.** When a claim is superseded by later evidence, the correction is written as
+a separate, tombstone-style row in the hash-chained ledger. That row names the SHA-256 of the
+original claim's row (or of the original file's bytes at the commit where the claim was made),
+and the ledger chain commits to the correction row like any other row. The original row is
+never edited. The chain then shows the claim and its correction as two separate, bound events,
+instead of relying on a citation window. The existing A-number and file-path links in this
+file and in `RETRACTED.json` stay as they are. The hash link is added next to them, and it
+does not replace them.
+
+**Wording as first relayed.** The first relay described the row as having "no chain
+commitment to the original claim's hash". The operator's direction to file it describes it
+as "binding a correction to the original claim's hash". This section follows the direction
+to file. The difference is recorded here instead of being resolved silently.
+
+**What it would cost, and who pays.** One more row type in the ledger writer and its checker.
+The person writing each correction must also find the original row's hash. A correction whose
+original predates the ledger (or sits only in a file) has no row hash to name, so it would
+name a file hash at a commit instead. Readers gain a correction they can check without trusting
+the A-number index.
+
+**Who it applies to.** Everyone who writes to the ledger, the operator included, as with every
+tombstone and amendment rule in this project.
+
+**Open, for the operator.** Whether the row names the original's row hash, its file hash at a
+commit, or both. Whether `test_r1_retracted.py` should come to require the hash link for new
+retractions, or only accept it. Neither is decided here.
