@@ -19246,3 +19246,48 @@ MEASURED.
 
 **Corrected before commit.** This entry's draft said 21 arms per act and 39 checks, written before counting; counted:
 23 per act (24 with an amount) and 49 checks.
+
+### A482. [operations / locks, an A459 recurrence named in A459 itself] Two locks were reclaimed by their age, so two holders could both win and a live one could be evicted: the free-will round and the daily cycle -- FIXED IN SOURCE 2026-11-23; a guard now finds the shape anywhere in the tree
+
+**His word, 2026-11-23:** "Yes, fix them", after the quorum's triage of the unpushed list put the two lock routines
+fourth (5 of 6 seats). The number was claimed through the hub (A482).
+
+**A recurrence: which instance, and why the earlier fix did not stop it.** A459-STALE-TAKEOVER (2026-11-19) is the
+shape: a lock file made with O_EXCL, and "older than N seconds means a dead holder: remove it and take over". A459
+fixed `rolling_restart.py` with an OS lock and ended by naming `covenant_daily.py` and `covenant_free_will.py` as not
+yet read. Nothing stopped the next copy: A459's guard (RR1) tests one file. The same shape had already been fixed once
+before, in `covenant_leviathan.acquire_lock`, and recorded only in that docstring.
+
+**Measured on the old code (SL1, red 16 of 23).** `covenant_free_will._take_lock` (7,200 s) and `covenant_daily._lock`
+(3 h): a LIVE holder whose lock file is older than the limit was evicted and a second holder took it (SL1.12b,
+SL1.15b). The round's `finally` removed the lock file by path, so a round that had lost the race removed the winner's
+lock; `covenant_daily.due()` read "a file younger than 3 h" as a running cycle and removed an older one.
+
+**Fixed.** `covenant_oslock.py` holds A459's method once: a non-blocking exclusive OS lock (msvcrt on Windows,
+fcntl.flock elsewhere) on a file never moved or removed; the OS drops it when the holder exits or dies; a process
+with no handle cannot release another's. `_take_lock` / `_release_lock` and `_lock` / `_unlock` use it; `due()` asks
+`held_by_other()` and removes nothing. Unchanged on purpose: a free-will round where no lock can be written is not
+stopped by that (as before); a daily cycle whose lock cannot be opened refuses (as before). `LOCK_STALE_S` stays in
+both files (it still bounds the daily launcher's own timing at lines that read it) but reclaims no lock.
+`rolling_restart.py` keeps its own copy of the method, unchanged (RR1 17/17).
+
+**The guard (the tombstone for a forgotten step).** SL1.19 walks the tree by AST and fails on any function that uses
+`os.O_EXCL`, reads an age (`getmtime` / `.st_mtime`) and calls `os.remove` / `unlink` / `replace` / `rename`: the
+next copy fails the build where it is written. Three are named and left, each a decision: `paper_run.AppendLock`
+(120 s) and `tools/site_autodeploy.main` (1 h) have the same race and are not changed here; `pairstore_excl.prune` has
+the same window but a double prune of expired pairs is harmless, and its code is shared with an outside project.
+SL1.21 shows the guard red on a probe file of the old shape.
+
+**Checks changed with the behaviour (the old wording kept).** FW1k's two checks read, before: "while another live
+round holds the lock, a second does nothing and says why" (an empty file as the holder) and "a stale lock (a dead
+round's) is taken over, and released when the round ends" (the file gone afterwards). TD1f's read: "a fresh lock (a
+cycle running) blocks the launch" (a young file) and "a dead cycle's lock (5 h old) is removed by the launch check, so
+the cycle is not stopped for good (review)". Each now holds a real OS lock as the running holder, and asserts the
+leftover file stays and does not stop the next one. FW1 130/130, TD1 104/104.
+
+**Checks.** SL1 (23 checks, on the runner list): red 16/23 before, green after; two breaks of the new code each turn
+it red (the lock dropped as soon as taken: SL1.2, .5, .7, .11, .12b; the launch check ignoring a held lock: SL1.3,
+.16). A real second process holds the lock, is killed without releasing, and the next taker gets it (SL1.8-10).
+
+**Not done.** `paper_run.py` and `tools/site_autodeploy.py` (named in SL1's guard); the Linux `fcntl` branch is run by
+CI, not on TETSU.

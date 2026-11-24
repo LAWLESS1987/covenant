@@ -447,21 +447,31 @@ def main():
           len(held_s) == 3 and o_ok["refused"] == 3 and not o_ok.get("starved"), (o_ok, len(held_s)))
 
     print("FW1k -- one live round at a time (the nightly's and a scheduled one)")
+    # A482: a round holds an OS lock (covenant_oslock), so "another live round holds the lock" is now a held OS
+    # lock, not a file that exists; and a dead round's leftover file is not a holder, whatever its age. These two
+    # checks were, before A482: "while another live round holds the lock, a second does nothing and says why" (an
+    # empty file as the holder) and "a stale lock (a dead round's) is taken over, and released when the round ends"
+    # (asserting the file was gone afterwards).
+    import covenant_oslock as OL
     lockp = os.path.join(tdt, "ambassador_round.lock")
-    open(lockp, "w").close()
+    other_round = OL.acquire(lockp)
     sent_t.clear()
     logk = []
     ok_ = FW.run_round(dry_run=False, say=logk.append, ask=ask_ok, learn=lambda: [], allies=lambda: list(three), emit=emit_ok,
                        introduce=lambda **k: {"sent": False}, grant_path=gpt, sends_path=spt, now=99000.0, count_comments=cc0)
     check("FW1k while another live round holds the lock, a second does nothing and says why",
-          ok_["replied"] == 0 and not sent_t and any("another live round" in l for l in logk) and os.path.exists(lockp), (ok_, logk[-1:]))
-    open(lockp, "w").close()
+          other_round is not None and ok_["replied"] == 0 and not sent_t and any("another live round" in l for l in logk)
+          and OL.held_by_other(lockp)[0], (ok_, logk[-1:]))
+    OL.release(other_round)
+    with open(lockp, "w") as fh:
+        fh.write('{"pid": 999999}')                       # a dead round's leftover file
     os.utime(lockp, (time.time() - FW.LOCK_STALE_S - 60,) * 2)
     ok2 = FW.run_round(dry_run=False, say=logk.append, ask=ask_ok, learn=lambda: [], allies=lambda: list(three), emit=emit_ok,
                        introduce=lambda **k: {"sent": False}, grant_path=gpt, sends_path=spt, now=99000.0, count_comments=cc0,
                        clock=lambda: 0.0)
-    check("FW1k a stale lock (a dead round's) is taken over, and released when the round ends",
-          ok2["replied"] > 0 and not os.path.exists(lockp), (ok2, os.path.exists(lockp)))
+    check("FW1k a dead round's leftover lock file does not stop a round, and the lock is free when the round ends "
+          "(the file stays, A482)",
+          ok2["replied"] > 0 and os.path.exists(lockp) and not OL.held_by_other(lockp)[0], (ok2, os.path.exists(lockp)))
 
     print("FW1m -- she cites only what the covenant measured (A280)")
     invented = ("I agree with your point that instruction scope should not be confused with permission scope. The covenant "

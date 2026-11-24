@@ -817,6 +817,9 @@ SUITES = [
     # GP1 (A481, 2026-11-23): the offline probe harness for the gate and the execution guard -- six outcomes never
     # merged, floors, the run record, resume re-judged, speaking order; the guard's two findings pinned.
     ("test_gp1_gate_probes.py", 180, "DAILY + GUARDS"),
+    # SL1 (A482, 2026-11-23): the free-will round and the daily cycle hold an OS lock (covenant_oslock), so no live
+    # holder is evicted and two cannot both win; its guard fails on any new age-reclaimed O_EXCL lock in the tree.
+    ("test_sl1_stale_locks.py", 180, "DAILY + GUARDS"),
     ("test_ly1_layers.py", 120, "DAILY + GUARDS"),
     ("test_cl1_cloud.py", 120, "DAILY + GUARDS"),
     # OS1 (2026-09-26, "protect operation security in all we do by default"): his
