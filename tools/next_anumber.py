@@ -46,6 +46,44 @@ def ungrandfathered_dups(text):
     return duplicates(primaries(text)) - GRANDFATHERED
 
 
+REGISTRY = os.path.join(HERE, "docs", "ANUMBER_GAPS.json")
+
+
+def gaps(text, through):
+    """A-numbers 1..THROUGH with no primary header (A477). Sub-entries (A84b) do not fill a gap."""
+    have = set(primaries(text))
+    return {n for n in range(1, int(through) + 1) if n not in have}
+
+
+def load_registry(path=None):
+    """docs/ANUMBER_GAPS.json, or None when it is absent or unreadable."""
+    import json
+    try:
+        with open(path or REGISTRY, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
+def registry_problems(text, reg):
+    """Every way the record disagrees with the gap registry (A477). Empty means they agree."""
+    if not isinstance(reg, dict) or "checked_through" not in reg:
+        return ["no gap registry (docs/ANUMBER_GAPS.json) to check the record against"]
+    out = []
+    listed = {int(k[1:]) for k in (reg.get("gaps") or {})}
+    real = gaps(text, reg["checked_through"])
+    for n in sorted(real - listed):
+        out.append("A%d has no entry and is not a listed gap (an entry lost, or a number skipped)" % n)
+    for n in sorted(listed - real):
+        out.append("A%d is listed as a gap but now has an entry (trim the registry)" % n)
+    heads = re.findall(r"^### A\d+\..*$", text, re.M)
+    for key, copies in sorted((reg.get("duplicates") or {}).items()):
+        for c in copies:
+            if not any(h.startswith(c.get("header_starts", "\0")) for h in heads):
+                out.append("%s: the copy headed %r is gone" % (key, c.get("header_starts", "")[:60]))
+    return out
+
+
 def _read(path=None):
     with open(path or RECORD, encoding="utf-8") as fh:
         return fh.read()

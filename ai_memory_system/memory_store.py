@@ -47,6 +47,10 @@ from typing import Any, Dict, List, Optional
 from index_db import MemoryIndex
 
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9-]{0,79}$")
+# An extension key a caller may add through put(): a lowercase ASCII word. Anything wider admits keys that READ
+# as a store-owned one without being it -- a zero-width space, a no-break space or a capital beside
+# `superseded_by` parses as a different key, but the line in the file looks the same to a person or a model.
+_EXT_KEY = re.compile(r"[a-z][a-z0-9_]{0,39}")
 GENESIS = "0" * 64
 
 # ---------------------------------------------------------------- BOUNDS --
@@ -103,7 +107,9 @@ _VOLATILE = ("uses", "last_used", "tier")
 # tombstone_unprovenanced (marks a pre-schema record's absence, never fills it).
 PROVENANCE_FIELDS = ("intent", "beneficiary", "divergence")
 
-_PWORD = re.compile(r"[a-z0-9]+")
+# \w+ not [a-z0-9]+ (2026-11-18): a CJK intent had NO tokens under the ASCII class, so an intent identical to
+# its payload was never caught and a wordless value counted as a word. Unicode words, as flinch 37d71be has it.
+_PWORD = re.compile(r"\w+")
 
 
 def _norm_tokens(s: str) -> List[str]:
@@ -125,12 +131,32 @@ def _intent_restates(intent: str, payload: str) -> bool:
     if not it:
         return False
     iset, pset = set(it), set(_norm_tokens(payload))
-    ni, npl = " ".join(it), " ".join(_norm_tokens(payload))
-    if ni and ni in npl:                       # intent is literally a span of the payload
+    # On TOKEN BOUNDARIES (2026-11-18, the consult of ops/CONSULT_INTENT_PROVENANCE_FLINCH_2026-11-18.md,
+    # reproduced here by probe before the change): the bare `ni in npl` matched INSIDE words, so an honest
+    # "cause review" was refused against "because reviewed", "stop drift" against "nonstop drifting", and a
+    # one-letter intent against almost anything. The padding spaces make the span test whole-word.
+    ni, npl = " " + " ".join(it) + " ", " " + " ".join(_norm_tokens(payload)) + " "
+    if ni in npl:                              # intent is literally a span of the payload, whole words
         return True
     if len(iset) < 3:                          # too short to judge by overlap; emptiness is caught elsewhere
         return False
     return len(iset & pset) / len(iset) >= 0.8  # ~all of intent's words are the payload's
+
+
+def _one_line_words(v: Any) -> Optional[str]:
+    """Why a provenance value is malformed, or None (2026-11-18, same consult, each shape reproduced by
+    probe first). It must be a str: beneficiary=7, intent=True and intent=["x"] passed through str(). It
+    must be ONE line where EVERY line separator counts: the old test looked for CR, LF and NUL only, so
+    U+2028, U+2029, U+0085, U+000B and U+000C passed; str.splitlines() knows all of them. And it must hold
+    at least one word under the Unicode tokenizer: "...", "???" and a zero-width space carried no intent
+    and passed an emptiness test that only stripped whitespace."""
+    if not isinstance(v, str):
+        return f"must be a string, not {type(v).__name__}"
+    if "\x00" in v or len(v.splitlines()) > 1:
+        return "must be a single line (no line separators or NULs)"
+    if not _norm_tokens(v):
+        return "must contain at least one word"
+    return None
 
 
 def screen_provenance(intent: str, beneficiary: str, divergence: str,
@@ -145,10 +171,13 @@ def screen_provenance(intent: str, beneficiary: str, divergence: str,
     """
     for k, v in (("intent", intent), ("beneficiary", beneficiary),
                  ("divergence", divergence)):
-        if not str(v or "").strip():
+        if v is None or (isinstance(v, str) and not v.strip()):
             return f"missing provenance field: {k} is required and may not be empty"
-        if any(c in str(v) for c in "\r\n\x00"):
-            return f"provenance field {k!r} must be a single line (no newlines or NULs)"
+        why = _one_line_words(v)
+        if why:
+            return f"provenance field {k!r} {why}"
+    if diverges_from is not None and not isinstance(diverges_from, str):
+        return f"diverges_from must be a string record name, not {type(diverges_from).__name__}"
     if _intent_restates(intent, body) or _intent_restates(intent, description):
         return ("intent restates the payload instead of stating its purpose; "
                 "say what this record is meant to CAUSE, not what it says")
@@ -203,6 +232,14 @@ def content_digest(rec: Dict[str, Any]) -> str:
 # use counter) or a per-node operational state, and none of it is part of what
 # the memory SAYS.
 _NODE_LOCAL = _VOLATILE + ("created", "review", "review_by")
+
+# Only the store and its admission checks may assign these fields. An
+# extension is not evidence of review, identity, or checked provenance.
+_STORE_FIELDS = frozenset(_NODE_LOCAL + (
+    "type", "agent", "intent", "beneficiary", "divergence", "diverges_from",
+    "superseded_by"))
+# parse_memory uses splitlines(), which also recognizes Unicode separators.
+_FRONTMATTER_BREAKS = "\r\n\x00\v\f\x1c\x1d\x1e\x85\u2028\u2029"
 
 
 def claim_digest(rec: Dict[str, Any]) -> str:
@@ -281,6 +318,13 @@ def parse_memory(text: str) -> Dict[str, Any]:
     return meta
 
 
+def _exact(v: Any) -> str:
+    """The built-in str for a value, converted once. A str subclass comes back
+    as a plain str, so nothing later can answer differently for the same text."""
+    s = str(v)
+    return s if type(s) is str else str.__str__(s)
+
+
 def render_memory(name: str, description: str, mtype: str, body: str,
                   agent: str, extra: Optional[Dict[str, Any]] = None) -> str:
     """The frontmatter other agents already parse, plus whatever recall
@@ -303,19 +347,33 @@ def render_memory(name: str, description: str, mtype: str, body: str,
     # `body` is exempt: it lives after the closing fence where newlines are
     # ordinary text, and a memory that cannot contain a paragraph is not a
     # memory. It cannot escape, because parse_memory stops at the fence.
+    # ONE CONVERSION, THEN CHECK AND WRITE THE SAME TEXT. The check used
+    # str(val) while the lines below are built by f-string, which calls
+    # __format__: a value whose two renderings differ passed the check and
+    # wrote a line break. Reproduced 2026-11-10 (challenge C14, C23).
+    name, description, mtype, agent = (
+        _exact(v) for v in (name, description, mtype, agent))
     for label, val in (("name", name), ("description", description),
                        ("type", mtype), ("agent", agent)):
-        if any(c in str(val) for c in "\r\n\x00"):
+        if any(c in val for c in _FRONTMATTER_BREAKS):
             raise ValueError(
                 f"{label} may not contain newlines or NULs: they would break "
                 f"out of the frontmatter and forge other fields")
     lines = [f"---", f"name: {name}", f"description: {description}",
              "metadata:", f"  type: {mtype}", f"  agent: {agent}"]
+    for k in extra or {}:
+        if type(k) is not str or not k or k != k.strip() or ":" in k:
+            raise ValueError("metadata keys must be nonempty, trimmed and contain no colon")
     for k in sorted(extra or {}):
+        if k in ("type", "agent"):
+            # Written once, above, from the arguments. The rewrite paths (supersede, touch, review) pass a
+            # record's whole metadata back as `extra`, which used to write both lines a second time.
+            continue
         v = (extra or {})[k]
-        if any(c in str(k) + str(v) for c in "\r\n\x00"):
+        v = "" if v is None else _exact(v)
+        if any(c in k + v for c in _FRONTMATTER_BREAKS):
             raise ValueError(f"metadata {k!r} may not contain newlines or NULs")
-        if v not in (None, ""):
+        if v != "":
             lines.append(f"  {k}: {v}")
     lines += ["---", ""]
     return "\n".join(lines) + f"\n{body.strip()}\n"
@@ -701,6 +759,15 @@ class MemoryStore:
             extra: Optional[Dict[str, Any]] = None,
             intent: str = "", beneficiary: str = "", divergence: str = "",
             diverges_from: str = "") -> Dict[str, Any]:
+        if extra is not None and not isinstance(extra, dict):
+            raise ValueError("metadata extensions must be an object")
+        if any(type(k) is not str for k in (extra or {})):
+            raise ValueError("metadata extension keys must be plain strings")
+        if any(k.strip() in _STORE_FIELDS for k in (extra or {})):
+            raise ValueError("metadata extensions cannot override store-owned fields")
+        if any(not _EXT_KEY.fullmatch(k) for k in (extra or {})):
+            raise ValueError("metadata extension keys must be lowercase ASCII words: a-z, 0-9 and _, "
+                             "starting with a letter, at most 40 characters")
         if mtype not in ("user", "feedback", "project", "reference"):
             raise ValueError(f"bad type {mtype!r}")
         if tier not in ("core", "archival"):
@@ -862,6 +929,8 @@ class MemoryStore:
     def supersede(self, old_name: str, new_name: str, agent: str) -> bool:
         """Mark old as superseded BY new, keeping both. The destructive
         update this store refuses to perform -- see recall.reconcile."""
+        if type(new_name) is not str or not _SLUG.fullmatch(new_name):
+            raise ValueError(f"bad memory name {new_name!r}: kebab-case, <=80")
         old = self.get(old_name)
         if old is None:
             return False

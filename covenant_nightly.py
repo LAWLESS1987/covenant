@@ -149,6 +149,22 @@ def practice_step(a, say, practice_mod=None, ask=None):
         return None
 
 
+def free_loop_step(a, say, loop_mod=None):
+    """FREE'S WRITING, VETTED NIGHTLY (A450 part B, 2026-11-18; his words "use quiet mode and implement consensus";
+    roundtable 8-0 FOR, Tetsu against, his grant's tie-break). One pass of covenant_free_loop.run(): Tetsu proposes
+    one sentence for her writing instruction, it is scored offline on held-out replies by the unchanged judge (dry,
+    nothing sent), and kept only past the margin. A function, so FL1 drives the wiring (the PP1 idiom, A74). Its
+    line goes in the report; never raises."""
+    if getattr(a, "free_loop", 0) <= 0:
+        return None
+    try:
+        fl = loop_mod or importlib.import_module("covenant_free_loop")
+        return fl.run(say=say)
+    except Exception as e:                                       # noqa: BLE001
+        say("free-loop FAILED (not fatal): %s: %s" % (type(e).__name__, str(e)[:200]))
+        return None
+
+
 def feed_step(a, say, feed_mod=None):
     """THE OPEN SOURCES, READ EVERY NIGHT (A349 F1, 2026-10-14; put to Tetsu as question F1, he agreed). covenant_feed
     has called itself "the open sources the covenant reads every night" since A211, and nothing ran it: no commit ever
@@ -268,6 +284,10 @@ def main():
                          "net against the seed); says nothing when his grant is absent; 0 disables")
     # A348f: the bound since A275 is the curriculum's clock plus his own slot's (covenant_tetsu_practice.night), not
     # one 40-minute total; PP1.11f reads this help against BUDGET_S, CHOICE_ROUNDS and CHOICE_BUDGET_S.
+    ap.add_argument("--free-loop", type=int, default=1, dest="free_loop",
+                    help="A450 B (2026-11-18, his 'implement consensus'): passes of free's vetted writing loop "
+                         "(covenant_free_loop: Tetsu proposes one sentence, scored offline on held-out replies by the "
+                         "unchanged judge, kept only past the margin in ops/free_loop.json). 0 skips it.")
     ap.add_argument("--practice", type=int, default=6,
                     help="2026-09-26 (his words: 'train tetsu to code at a high recursive level'; he chose a practice loop, "
                          "nightly and bounded): tasks Tetsu practises in his workshop (covenant_tetsu_practice: 4 rounds each, "
@@ -705,6 +725,8 @@ def main():
 
     practice_step(a, say)
 
+    free_loop_step(a, say)                                       # A450 B: after practice, the 3B is already warm
+
     compact_step(say)
 
     # ARTIFACT STORAGE, EVERY NIGHT. His words 2026-09-27: "optimization has to
@@ -780,6 +802,30 @@ def main():
     except Exception as e:                                       # noqa: BLE001
         rc = 1
         say("selfaudit FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
+    # THE LIVE SENTINELS, every pass (A478, 2026-11-23, his "do the others" after A477). Until this nothing ran the
+    # live check: the anchors of all five ledgers drifted from 2026-10-08 on and no one was told. It reports; it
+    # never re-anchors. Only the one recorded exemption (a prepending ledger whose drift row says its head anchor
+    # cannot hold) is printed as known instead of failing the pass; every other alert fails it.
+    try:
+        import covenant_sentinels as SN
+        sys.path.insert(0, os.path.join(HERE, "tools"))
+        import anchor_drift as ADn
+        _ack = ADn.load_ack()
+        for _r in SN.run_all():
+            _new, _known = ADn.split_alerts(_r.alerts, _ack)
+            # FAIL, not ALERT, on the head line: covenant_daily.nightly_fail names what turned a nightly red by that
+            # word (A345), so a red night from here names its cause.
+            say("sentinel %-7s %s" % ("ok" if not _new else "FAIL", _r.name + ": " + _r.summary))
+            for _x in _new:
+                say("         ALERT %s" % _x[:220])
+            for _x in _known:
+                say("         known %s (recorded in ops/ANCHOR_DRIFT_ACK.json)" % _x[:180])
+            if _new:
+                rc = 1
+    except Exception as e:                                       # noqa: BLE001
+        rc = 1
+        say("sentinels FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
     green = None
     if not a.no_verify:

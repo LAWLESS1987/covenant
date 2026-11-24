@@ -316,11 +316,16 @@ def harvest_comments(post_id, limit=35, timeout=20, key=None):
     return rows, "read %d comment(s), %d long enough to keep" % (len(tree), len(rows))
 
 
-def learn(limit=25, submolt=None, with_comments=True, pause=1.2, say=print):
+def learn(limit=25, submolt=None, with_comments=True, pause=1.2, say=print, tag=None):
     """Read the forum and quarantine what is worth judging. Writes no verdict.
 
     Rate limits are the forum's own: reads are 60 per 60 seconds, so `pause`
-    defaults above the floor and the comment pass respects it too."""
+    defaults above the floor and the comment pass respects it too.
+
+    `tag` (A433, 2026-11-16): when free is isolated the round still reads, and passes the isolation it read under.
+    Every row is stamped `isolation` BEFORE it reaches the quarantine, so covenant_own_account.held_by_isolation
+    keeps it from mining and ally ranking until the judge-gated release passes it. A row already in quarantine is
+    not appended again (sha256 dedup), so only what was first read during isolation carries the stamp."""
     rows = MB.harvest_api(limit=limit, submolt=submolt, pause=pause, say=say)
     if with_comments:
         ids = []
@@ -333,6 +338,9 @@ def learn(limit=25, submolt=None, with_comments=True, pause=1.2, say=print):
             crows, note = harvest_comments(pid)
             say("  %s  %s" % (pid, note))
             rows.extend(crows)
+    if tag:
+        for r in rows:
+            r["isolation"] = dict(tag)
     added = MB.append(rows)
     say("ambassador learned: %d candidate(s) seen, %d new in quarantine, "
         "0 labelled -- labels are the teacher's and live elsewhere"
@@ -525,8 +533,11 @@ def find_allies(limit=25, path=None, say=print, rows=None):
     path = path or ALLIES
     if rows is None:
         rows = MB._read()
+    import covenant_own_account as _OA
     by_author = {}
     for r in rows:
+        if _OA.held_by_isolation(r):      # A433: read while she was isolated, not yet released -- not her context
+            continue
         s = score_ally(r)
         if s["score"] <= 0:
             continue

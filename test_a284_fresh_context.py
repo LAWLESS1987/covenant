@@ -90,6 +90,8 @@ DECLARED = {
                                                   # own -- no history bleed between unrelated replies
     "ops/ECHO_AB_2026-11-04/ab_echo.py": "fresh",        # A409: the v1-vs-v2 side-by-side, one stand-alone
     "ops/ECHO_AB_2026-11-04/ab_echo_rerun.py": "fresh",  # extraction per reply (kept as the record of that run)
+    "covenant_free_loop.py": "fresh",             # A450 B: his one-sentence proposal must stand alone -- no
+                                                  # earlier proposal's tail may shape the next night's
 }
 PRUNE = {".git", ".claude", ".trash", "__pycache__", "node_modules", "private", "venv", ".venv"}
 

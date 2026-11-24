@@ -166,14 +166,20 @@ def main():
         check("TD1f not while a sweep runs", D.due(now=at(11, 0), rows=[], running=["123 covenant_one.py"], nightly_done=True)[0] is False)
         os.makedirs(D.SNAPS, exist_ok=True)
         ref = at(11, 0)                                   # outside the trader's window; lock ages set relative to it
-        open(D.LOCK, "w").write("1")
-        os.utime(D.LOCK, (ref - 60, ref - 60))
+        # A482: a running cycle holds an OS lock (covenant_oslock); the launch check asks whether it is HELD and
+        # removes nothing. Before A482 these read: "a fresh lock (a cycle running) blocks the launch" (a young file
+        # as the holder) and "a dead cycle's lock (5 h old) is removed by the launch check, so the cycle is not
+        # stopped for good (review)" (asserting the file was removed).
+        import covenant_oslock as OL
+        running_cycle = OL.acquire(D.LOCK)
         ok_l, why_l = D.due(now=ref, rows=[], running=[], nightly_done=True)
-        check("TD1f a fresh lock (a cycle running) blocks the launch", ok_l is False and "lock" in why_l and os.path.exists(D.LOCK), why_l)
+        check("TD1f a running cycle (holding the lock) blocks the launch",
+              running_cycle is not None and ok_l is False and "lock" in why_l and os.path.exists(D.LOCK), why_l)
+        OL.release(running_cycle)
         os.utime(D.LOCK, (ref - 5 * 3600, ref - 5 * 3600))
         ok_f, why_f = D.due(now=ref, rows=[], running=[], nightly_done=True)
-        check("TD1f a dead cycle's lock (5 h old) is removed by the launch check, so the cycle is not stopped for good (review)",
-              ok_f is True and not os.path.exists(D.LOCK), (ok_f, why_f))
+        check("TD1f a dead cycle's leftover lock file (5 h old) does not stop the launch, and nothing is removed (A482)",
+              ok_f is True and os.path.exists(D.LOCK), (ok_f, why_f))
 
         print("TD1g -- the judge rollback")
         fake = os.path.join(tmp, "repo")

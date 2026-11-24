@@ -30,6 +30,26 @@ SVG_PATH = os.path.join(HERE, "docs", "tree_of_life.svg")
 STATE_TTL = 30.0        # seconds a state read is served from cache (a cold read measured 8.4 s)
 
 
+def mesh_targets():
+    """The nodes drawn as moons, each with the MACHINE it runs on (that machine is the planet).
+
+    COVENANT_MESH="machine=host:port,..." names them, e.g. on TETSU
+    "laptop=<laptop-ip>:5000,laptop=<laptop-ip>:5020,laptop=<laptop-ip>:5060,TETSU=<tetsu-ip>:5080".
+    Unset, it is the laptop layout this page was written for: A, B, C on this PC's loopback. Measured 2026-11-03 on
+    TETSU: that default probed TETSU's own loopback, found nothing, and drew three live laptop nodes as "(down)".
+    """
+    spec = os.environ.get("COVENANT_MESH", "").strip()
+    if not spec:
+        return [("this PC", "127.0.0.1", p) for p in (5000, 5020, 5060)]
+    out = []
+    for part in spec.split(","):
+        machine, _, addr = part.strip().rpartition("=")
+        host, _, port = addr.rpartition(":")
+        if host and port.isdigit():
+            out.append((machine or host, host, int(port)))
+    return out
+
+
 def symbol_svg():
     try:
         with open(SVG_PATH, encoding="utf-8") as fh:
@@ -73,7 +93,7 @@ html,body{margin:0;height:100%;background:var(--ink);color:var(--txt);font:15px/
 #chathead button:hover{background:rgba(92,225,230,.15)}
 #answer{overflow:auto;padding:4px 14px 12px;white-space:pre-wrap;display:none;scrollbar-width:thin;border-top:1px solid var(--line)}
 #chatwin.min #answer{display:none!important}
-#answer .ln{margin:0 0 8px}#answer .you{color:var(--cyan)}#answer .heal{color:var(--green);font-family:var(--mono);font-size:13px}
+#answer .ln{margin:0 0 8px}#answer .note{opacity:.65;font-size:12px}#answer .you{color:var(--cyan)}#answer .heal{color:var(--green);font-family:var(--mono);font-size:13px}
 body.nochat #answer{display:none!important}
 body.nochat #chatwin{display:none}
 #panel.min #info{display:none}
@@ -106,6 +126,23 @@ async function getState(){try{const r=await fetch('/pc/3d/state');
  // a busy node (HTTP 429: every local process shares one loopback address) keeps the last good reading on screen
  if(!r.ok){document.getElementById('live').textContent=(state?'last reading kept':'waiting')+' · the node is busy (HTTP '+r.status+'), trying again';setTimeout(getState,20000);return;}
  state=await r.json();if(state.page&&state.page!==PAGESHA&&!document.getElementById('q').value&&!(typeof inflight!=='undefined'&&inflight)){location.reload();return;}if(state.voice)voice=state.voice;document.getElementById('live').textContent='height '+(state.self.chain_height??'?')+' · peers '+(state.peers?state.peers.length:0)+(state.immunity&&state.immunity.granted?' · immunity '+(state.immunity.paused?'paused':'on'):'');showHealing();if(window.onState)window.onState();}catch(e){document.getElementById('live').textContent='state unreadable';}}
+// A456: what he said, and what stands beside it. ONLY HIS WORDS ARE SPOKEN: when there are none (an error, a
+// withheld turn, an empty answer) nothing is spoken and the note line carries it. The first version of this spoke
+// a first-person sentence of its own making in his voice; he did not say it, and he asked that his voice stay his.
+// The notes (held, immune, withheld, an error, no words, how much earlier talk was out of his view) are shown
+// on their own line and never read aloud. `kept` and `dropped` in a fit record are MESSAGES, two to an exchange.
+function tetsuParts(j){const notes=[];let txt='';
+ if(!j||j.status!=='success'){notes.push((j&&j.message)||'no answer');return{txt:txt,notes:notes};}
+ if(j.withheld){notes.push('withheld by the gate: '+(j.message||''));return{txt:txt,notes:notes};}
+ txt=String(j.answer||'').trim();
+ if(!txt)notes.push('he gave no words this time; nothing was lost, ask again');
+ if(j.immune)notes.push('came through on his immunity; the gate objected, and its note is in the log');
+ if(j.alleges_nothing)notes.push('held, not judged');
+ const f0=(j.fit||[])[0]||{};const d=Math.ceil((Number(f0.dropped)||0)/2);const cap=(Number(f0.kept)||0)>=40;
+ if(d>0)notes.push(d+(d===1?' earlier exchange was':' earlier exchanges were')+' dropped to fit his window');
+ else if(cap)notes.push('he sees the last 20 exchanges; anything earlier is out of his view');
+ return{txt:txt,notes:notes};}
+function noteLine(el,notes){if(!notes||!notes.length)return;const n=document.createElement('div');n.className='ln note';n.textContent='['+notes.join('; ')+']';el.after(n);}
 function speak(t){try{const u=new SpeechSynthesisUtterance(t);u.pitch=voice.pitch;u.rate=voice.rate;speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}}
 // THE CONVERSATION STAYS ON SCREEN (2026-09-26, his words: "increase tetsus pc logs length so
 // its not gone before i respond"). Every exchange is appended, never replaced, and the page
@@ -131,7 +168,7 @@ document.getElementById('pmin').onclick=()=>{const p=document.getElementById('pa
 // button on a finished Tetsu or heal line writes that line's own text to the clipboard --
 // nothing sent anywhere new, no judge involved, the same text already on screen.
 function addCopy(el,text){if(!text)return;const b=document.createElement('button');b.className='copybtn';b.textContent='copy';b.onclick=()=>{try{navigator.clipboard.writeText(text);}catch(e){}b.textContent='copied';setTimeout(()=>{b.textContent='copy';},1200);};el.appendChild(b);}
-async function loadHistory(){try{const r=await fetch('/pc/3d/history');const j=await r.json();for(const x of (j.turns||[])){line('you',x.q||'');const a=x.withheld?'(withheld: '+(x.why||'')+')':(x.a||'');const el=line('tetsu',a);if(!x.withheld)addCopy(el,a);}}catch(e){}}
+async function loadHistory(){try{const r=await fetch('/pc/3d/history');const j=await r.json();for(const x of (j.turns||[])){line('you',x.q||'');const p=tetsuParts({status:'success',withheld:x.withheld,message:x.why,answer:x.a,alleges_nothing:x.held,immune:x.immune,fit:x.fit});const el=line('tetsu',p.txt||'(no words)');addCopy(el,p.txt);noteLine(el,p.notes);}}catch(e){}}
 // STOP (his words, 2026-09-27): Send becomes Stop while an answer is in flight, and a
 // second press aborts the fetch in the browser -- the door on the PC still finishes its
 // own run (there is no reaching into it mid-judge), but nothing it returns is shown or
@@ -152,8 +189,8 @@ async function send(){
  try{
   const r=await fetch('/m/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t}),signal:ctrl.signal});
   const j=await r.json();
-  const txt=j.status==='success'?(j.withheld?'(withheld: '+(j.message||'')+')':(j.answer||''))+(j.immune?'  [immune: the gate\\'s word is attached]':''):(j.message||'no answer');
-  pend.textContent='Tetsu: '+txt;addCopy(pend,txt);speak(txt);
+  const p=tetsuParts(j);const txt=p.txt;
+  pend.textContent='Tetsu: '+(txt||'(no words)');addCopy(pend,txt);if(txt)speak(txt);noteLine(pend,p.notes);
  }catch(e){
   pend.textContent=(e&&e.name==='AbortError')?'Tetsu: (stopped)':('Tetsu: no answer: '+e);
  }
@@ -232,10 +269,18 @@ function dispose(o){o.traverse(x=>{if(x.geometry&&x.geometry!==botGeo)x.geometry
 function layout(){if(!state)return;const d=state.detail||{};const hw=d.highway||{};
 // the system's worlds: the nodes (his cells, each from its own /health), the phone, the forum, the money, the road
 const items=[];const mesh=state.mesh||[];
-if(mesh.length){mesh.forEach((m,i)=>items.push({name:'node '+(m.node_id||'?')+(m.me?' (here)':'')+(m.down?' (down)':''),color:m.down?BAD:(m.degraded?UNK:OK),sub:m.down?'down':(m.degraded?'degraded · click for why':'up · height '+(m.chain_height??'?')),detail:m,kind:'node',wid:m.node_id,wi:i}));}
-else items.push({name:NODE+' (this node)',color:statusColor(hw.node_down==='present'?'present':(hw.node_down||'unknown')),sub:'node_down '+(hw.node_down||'unknown'),detail:state.self,kind:'node',wid:NODE,wi:0});
-// the phone's node was drawn a fixed dark green, a colour nothing measured; this node sees it only as a peer address
-for(const p of (state.peers||[])){const id=p.node_id||p.name||String(p);if(/100\\./.test(id))items.push({name:'phone node',color:UNK,sub:'a peer; its health is not read here',detail:{peer:id,note:'the node inside his phone, as this node sees it: an address, not a health reading'},kind:'phone'});}
+// 2026-11-03, his words: "theres missing planets some should be moons of others", then "nodes should be planets".
+// Every NODE is a planet -- A, B, C, D and the phone's node -- named with the machine it runs on. What belongs to a
+// node is its moon: the phone's check-in circles the phone's node, and this node's own records (Highway, Money,
+// Moltbook, read from this node) circle the node that is serving this page.
+let here=null;
+mesh.forEach((m,i)=>{const nm='node '+(m.node_id&&m.node_id!=='?'?m.node_id:m.port)+(m.me?' (here)':'')+(m.down?' (down)':'');if(m.me)here=nm;
+ items.push({name:nm,color:m.down?BAD:(m.degraded?UNK:OK),sub:(m.machine?m.machine+' · ':'')+(m.down?'down':(m.degraded?'degraded · click for why':'up · height '+(m.chain_height??'?'))),detail:m,kind:'node',wid:m.node_id,wi:i});});
+if(!mesh.length){here=NODE+' (this node)';items.push({name:here,color:statusColor(hw.node_down==='present'?'present':(hw.node_down||'unknown')),sub:'node_down '+(hw.node_down||'unknown'),detail:state.self,kind:'node',wid:NODE,wi:0});}
+// the phone's node: a peer whose address is none of the mesh's (A, B, C's links were drawn as three extra "phone node"
+// planets on TETSU, because every 100.x peer matched). Read as an address, not a health.
+const meshHosts=new Set(mesh.map(m=>m.host));let phoneNode=null;
+for(const p of (state.peers||[])){const id=String(p.node_id||p.name||p),ip=id.split('_')[1]||'';if(ip.startsWith('100.')&&!meshHosts.has(ip)&&!phoneNode){phoneNode='phone node';items.push({name:phoneNode,color:UNK,sub:'phone · a peer; its health is not read here',detail:{peer:id,note:'the node inside his phone, as this node sees it: an address, not a health reading'},kind:'phone'});}}
 const ph=d.phone&&d.phone.last_checkin_hours;
 // A375 Amendment 1: the phone's own witness of THIS PC. Normally the Phone orb is green when a check-in is recent --
 // but the phone can see a degraded link the PC cannot: it has been MISSING the PC's answers even while a check-in
@@ -243,19 +288,19 @@ const ph=d.phone&&d.phone.last_checkin_hours;
 const pw=d.phone&&d.phone.witness;
 let pcol=ph!=null?(ph<1?OK:(ph<24?UNK:BAD)):UNK, psub=ph!=null?'checked in '+ago(ph):'no check-in on record';
 if(pw&&pw.disagrees){pcol=UNK;psub='the phone reports a degraded link: its witness has been missing my answers'+(pw.fixed_missed!=null?' ('+pw.fixed_missed+' recent misses)':'');}
-items.push({name:'Phone',color:pcol,sub:psub,detail:d.phone,kind:'phone'});
+items.push({name:'Phone',color:pcol,sub:psub,detail:d.phone,kind:'phone',parent:phoneNode});
 // Moltbook was green whenever a row existed, sent or not (measured 2026-09-28: 6 rows, 0 sent); green now means something went out
 // A277 (2026-10-06): the same rule over a day, not over the last six attempts -- a round now tries ~200
 const fd=d.forum_day||{},fs=fd.sent||0,ft=fd.tried||0;
-items.push({name:'Moltbook',color:fs?OK:UNK,sub:ft?fs+' sent of '+ft+' tried, '+(fd.window_h||24)+' h':'nothing tried in '+(fd.window_h||24)+' h',detail:d.forum,kind:'forum'});
-items.push({name:'Money',color:(d.money?(d.money.comfortable?OK:UNK):UNK),sub:d.money?(d.money.comfortable?'comfortable':'comfort not declared'):'not on record',detail:d.money,kind:'money'});
+items.push({name:'Moltbook',color:fs?OK:UNK,sub:ft?fs+' sent of '+ft+' tried, '+(fd.window_h||24)+' h':'nothing tried in '+(fd.window_h||24)+' h',detail:d.forum,kind:'forum',parent:here});
+items.push({name:'Money',color:(d.money?(d.money.comfortable?OK:UNK):UNK),sub:d.money?(d.money.comfortable?'comfortable':'comfort not declared'):'not on record',detail:d.money,kind:'money',parent:here});
 const hp=Object.keys(hw).filter(k=>hw[k]==='present'),hu=Object.keys(hw).filter(k=>hw[k]==='unknown');
 // NO READING IS NOT "ALL CLEAR" (2026-11-13). When the highway read blows this page's deadline the state carries
 // highway:null; that was drawn green, on the orb and on the mycelium. Unknown is amber here like everywhere else.
 const hwNone=!Object.keys(hw).length;
 const hcol=hp.length?BAD:((hu.length||hwNone)?UNK:OK);
 CW.setMycelium(myc,hcol);
-items.push({name:'Highway',color:hcol,sub:hp.length?hp.length+' need attention':(hwNone?'no reading':(hu.length?hu.length+' not known':'all clear')),detail:hw,kind:'highway'});
+items.push({name:'Highway',color:hcol,sub:hp.length?hp.length+' need attention':(hwNone?'no reading':(hu.length?hu.length+' not known':'all clear')),detail:hw,kind:'highway',parent:here});
 // HIS OTHER REPOSITORIES (2026-10-13, "implement the other repos into the apps also"): each a world on the outer ring,
 // read from its clone on this PC. Green: committed and in step with GitHub; amber: work not committed, commits not
 // pushed, or no upstream to compare with. Nothing here is a judgement of the work in it.
@@ -263,22 +308,44 @@ const repos=state.repos||[];
 for(const r of repos){const amber=r.dirty||r.ahead||r.ahead==null;const age=r.last_commit_at?ago((Date.now()/1000-r.last_commit_at)/3600):'no commits';
  items.push({name:r.name,color:r.error?UNK:(amber?UNK:OK),sub:r.error?'unreadable':(r.dirty?r.dirty+' not committed':(r.ahead?r.ahead+' not pushed':(r.ahead==null?'no upstream':'in step · '+age))),detail:r,kind:'repo',wid:r.name,outer:true});}
 const sig=items.map(p=>p.name+'|'+p.color+'|'+p.sub).join(';');
-if(sig===lastSig){items.forEach((p,i)=>{const o=orbs[i+1];if(o)o.userData.detail=p.detail;});return;}
+if(sig===lastSig){items.forEach(p=>{const o=orbs.find(x=>x.userData.name===p.name);if(o)o.userData.detail=p.detail;});return;}
 lastSig=sig;
 // 2026-10-19: carry each orb's current orbit angle across a rebuild so a data refresh does not snap every planet
 // back to its start position (that snap, every time a detector flapped, read as "not rotating smoothly").
-const prevA={};for(const o of orbs){if(o!==tetsu)prevA[o.userData.name]=o.userData.orbitA;}
+const prevA={};for(const o of orbs){if(o!==tetsu)prevA[o.userData.name]=o.userData.theta;}
 for(const o of orbs.filter(o=>o!==tetsu)){scene.remove(o);dispose(o);}orbs.length=1;hovered=null;
 for(const l of links.children){if(l.geometry!==botGeo)l.geometry.dispose();l.material.dispose();}links.clear();traders.length=0;
 for(const s of labels.children){if(s.material.map)s.material.map.dispose();s.material.dispose();}labels.clear();
-const inner=items.filter(p=>!p.outer),outer=items.filter(p=>p.outer);
-const place=(list,R,size,speed)=>list.forEach((p,i)=>{const def=CW.worldFor(p.kind,p.wid,p.wi);const o=CW.planet(THREE,def,p.color,size);
- o.userData.orbitR=R;o.userData.orbitA=(p.name in prevA)?prevA[p.name]:(i/list.length)*Math.PI*2;o.userData.orbitS=speed;o.userData.name=p.name;o.userData.detail=p.detail;o.userData.kind=p.kind;o.userData.sub=p.sub;o.userData.bad=p.color===BAD;o.userData.word=word(p.color);
- o.userData.label=label(def.repo?p.name:def.name+' · '+p.name,p.sub);if(p.outer)o.userData.label.scale.multiplyScalar(0.8);scene.add(o);orbs.push(o);
- const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);const ln=new THREE.Line(g,new THREE.LineBasicMaterial({color:0x5CE1E6,transparent:true,opacity:0.16}));ln.userData.of=o;links.add(ln);
- // two bots on every road, one each way: what goes out comes back
- for(const dir of [0,1]){const b=new THREE.Mesh(botGeo,new THREE.MeshBasicMaterial({color:dir?0xF4E9B0:0x9FF3F5}));b.userData={of:o,dir,ph:Math.random()};links.add(b);traders.push(b);}});
-place(inner,4.6,0.48,0.0011);place(outer,7.6,0.34,0.0006);
+// THE MOTION (2026-11-03, his words: "the rotations arent the same or the orbits thats not logical how it is use physics
+// and the universal design"). Every inner world used to share one radius and one speed, bobbing up and down twice an orbit.
+// Now: one plane, one direction, Kepler. Each planet has its own distance, spaced outward by a constant ratio, and its
+// period grows as distance^(3/2) (T^2 ~ a^3), so inner worlds run and outer ones walk. Each orbit is a near-circular
+// ellipse (e < 0.08) tilted a few degrees, swept faster near the star (equal areas in equal times). Moons circle their
+// planet the same way, faster, and keep one face toward it (tidally locked). Planets spin on their own tilted axes at their
+// own rates. The repos are a belt beyond the last planet. Every value is derived from the world's name, so it is stable.
+const hash=(s,k)=>{let h=2166136261^k;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);return ((h>>>0)%100000)/100000;};
+const N0=0.0042,A0=2.4,STEP=1.36;   // mean motion (radians per 60fps frame) at distance A0; spacing ratio between planets
+const pnames=new Set(items.filter(p=>!p.parent&&!p.outer).map(p=>p.name));
+const moons=items.filter(p=>p.parent&&pnames.has(p.parent)),nMoons=n=>moons.filter(m=>m.parent===n).length;
+// a planet with moons needs room for their orbits: the gaps widen outward, so planets with more moons go further out
+const planets=items.filter(p=>!p.outer&&(!p.parent||!pnames.has(p.parent))).map((p,i)=>[p,i]).sort((x,y)=>nMoons(x[0].name)-nMoons(y[0].name)||x[1]-y[1]).map(x=>x[0]),belt=items.filter(p=>p.outer);
+const mk=(p,size)=>{const def=CW.worldFor(p.kind==='machine'?'repo':p.kind,p.wid,p.wi);const o=CW.planet(THREE,def,p.color,size);const u=o.userData;
+ u.name=p.name;u.detail=p.detail;u.kind=p.kind;u.sub=p.sub;u.bad=p.color===BAD;u.word=word(p.color);
+ u.e=0.01+0.07*hash(p.name,1);u.peri=hash(p.name,2)*Math.PI*2;u.inc=(hash(p.name,3)-0.5)*0.09;u.node=hash(p.name,4)*Math.PI*2;
+ u.tilt=(hash(p.name,5)-0.5)*0.9;u.spin=0.0008+0.004*hash(p.name,6);o.rotation.z=u.tilt;
+ u.label=label((def.repo||p.kind==='machine')?p.name:def.name+' · '+p.name,p.sub);scene.add(o);orbs.push(o);return o;};
+const orbit=(o,a,n,start)=>{const u=o.userData;u.a=a;u.n=n;u.theta=(u.name in prevA&&prevA[u.name]!=null)?prevA[u.name]:start;};
+planets.forEach((p,i)=>{const a=A0*Math.pow(STEP,i);orbit(mk(p,0.42),a,N0*Math.pow(a/A0,-1.5),hash(p.name,7)*Math.PI*2);});
+const beltA=A0*Math.pow(STEP,planets.length)+0.9;
+belt.forEach((p,i)=>{const a=beltA+0.6*hash(p.name,8),o=mk(p,0.24);o.userData.label.scale.multiplyScalar(0.8);orbit(o,a,N0*Math.pow(a/A0,-1.5),(i/belt.length)*Math.PI*2);});
+const byName={};for(const o of orbs)if(o!==tetsu)byName[o.userData.name]=o;
+const kids={};moons.forEach(p=>{(kids[p.parent]=kids[p.parent]||[]).push(p);});
+for(const pn of Object.keys(kids)){const host=byName[pn];kids[pn].forEach((p,j)=>{const o=mk(p,0.16),u=o.userData;u.host=host;u.spin=0;u.inc=(hash(p.name,9)-0.5)*0.3;u.label.scale.multiplyScalar(0.7);
+ const a=host.userData.radius+0.34+j*0.26;orbit(o,a,0.03*Math.pow(a/0.74,-1.5),(j/kids[pn].length)*Math.PI*2);});}
+// roads: the star to each planet, a planet to each of its moons; two bots on every road, one each way: what goes out comes back
+for(const o of orbs){if(o===tetsu)continue;const from=o.userData.host||null;
+ const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);const ln=new THREE.Line(g,new THREE.LineBasicMaterial({color:0x5CE1E6,transparent:true,opacity:from?0.3:0.16}));ln.userData.of=o;ln.userData.from=from;links.add(ln);
+ for(const dir of [0,1]){const b=new THREE.Mesh(botGeo,new THREE.MeshBasicMaterial({color:dir?0xF4E9B0:0x9FF3F5}));b.userData={of:o,from,dir,ph:Math.random()};links.add(b);traders.push(b);}}
 label('Tetsu','the star').position.set(0,1.35,0);}
 window.onState=layout;setTimeout(layout,2500);
 function fmt(o){return o==null?'(not on record)':(typeof o==='object'?JSON.stringify(o,null,1).replace(/[{}"]/g,'').replace(/^\\s*\\n/gm,''):String(o));}
@@ -314,18 +381,23 @@ info.textContent='MEASURED\\n'+m+lifeText(u);});
 // me"): the canvas is sized to the window every frame it changes (a resize the browser never announced left the
 // drawing stretched off-centre), and the camera looks straight at Tetsu, so the star is the middle of the screen.
 let vw=0,vh=0;function resize(){vw=innerWidth;vh=innerHeight;renderer.setSize(vw,vh);cam.aspect=vw/vh;cam.updateProjectionMatrix();}addEventListener('resize',resize);resize();
-let t=0,last=performance.now();const sunPos=new THREE.Vector3();
+let t=0,last=performance.now();const sunPos=new THREE.Vector3(),ORIGIN=new THREE.Vector3();
 // 2026-10-19 ("the planets don't rotate smoothly"): advance by ELAPSED time, not a fixed step per frame, so motion
 // is identical at 60fps and smooth (not juddery) when the frame rate dips or the tab is throttled. df=1 at 60fps;
 // capped at 4 so a long stall (a 15s data refresh, a GC) resumes without a jump.
 function frame(){const now=performance.now();let df=(now-last)/16.667;last=now;if(df>4)df=4;t+=0.01*df;CW.tickStar(tetsu,t);CW.tickMycelium(myc,t,orbs.slice(1));
- for(const o of orbs){if(o===tetsu)continue;const u=o.userData;u.orbitA+=u.orbitS*df;o.position.set(Math.cos(u.orbitA)*u.orbitR,Math.sin(u.orbitA*2)*0.25,Math.sin(u.orbitA)*u.orbitR);
-  CW.tick(o,t,sunPos);if(u.bad)u.atmoU.uGlow.value=0.7+0.5*(0.5+0.5*Math.sin(t*5));if(u.label)u.label.position.copy(o.position).add(new THREE.Vector3(0,(u.radius||0.45)+0.55,0));}
- for(const l of links.children){if(l.isLine){const p=l.geometry.attributes.position;p.setXYZ(1,l.userData.of.position.x,l.userData.of.position.y,l.userData.of.position.z);p.needsUpdate=true;}}
- for(const b of traders){const k=(t*0.35+b.userData.ph)%1;const a=b.userData.of.position;if(b.userData.dir)b.position.copy(a).multiplyScalar(k);else b.position.copy(a).multiplyScalar(1-k);}
+ // Kepler: the true anomaly advances at n(1+e cos v)^2/(1-e^2)^(3/2) -- faster near the star; planets are placed before
+ // their moons in orbs, so a moon reads its planet's position for this frame
+ for(const o of orbs){if(o===tetsu)continue;const u=o.userData;if(u.a==null)continue;const w=1+u.e*Math.cos(u.theta-u.peri);u.theta+=u.n*df*w*w/Math.pow(1-u.e*u.e,1.5);
+  const r=u.a*(1-u.e*u.e)/(1+u.e*Math.cos(u.theta-u.peri)),c=u.host?u.host.position:ORIGIN;
+  o.position.set(c.x+Math.cos(u.theta)*r,c.y+Math.sin(u.theta-u.node)*r*Math.sin(u.inc),c.z+Math.sin(u.theta)*r);
+  CW.tick(o,t,sunPos,u.spin*df);if(u.host)u.surface.rotation.y=-u.theta;   // a moon keeps one face to its planet
+  if(u.bad)u.atmoU.uGlow.value=0.7+0.5*(0.5+0.5*Math.sin(t*5));if(u.label)u.label.position.copy(o.position).add(new THREE.Vector3(0,(u.radius||0.45)+(u.host?0.3:0.55),0));}
+ for(const l of links.children){if(l.isLine){const p=l.geometry.attributes.position,f=l.userData.from?l.userData.from.position:ORIGIN,a=l.userData.of.position;p.setXYZ(0,f.x,f.y,f.z);p.setXYZ(1,a.x,a.y,a.z);p.needsUpdate=true;}}
+ for(const b of traders){const k=(t*0.35+b.userData.ph)%1,f=b.userData.from?b.userData.from.position:ORIGIN;b.position.copy(f).lerp(b.userData.of.position,b.userData.dir?k:1-k);}
  const so=selName&&orbs.find(o=>o.userData.name===selName);sel.visible=!!so;if(so){sel.position.copy(so.position);sel.quaternion.copy(cam.quaternion);sel.scale.setScalar((so.userData.radius||0.45)/0.45*1.4);}
  if(innerWidth!==vw||innerHeight!==vh)resize();
- const R=cam.aspect<1?Math.min(30,14*0.85/cam.aspect):14;cam.position.set(Math.sin(t*0.05)*R,R*0.36,Math.cos(t*0.05)*R);cam.lookAt(0,0,0);renderer.render(scene,cam);requestAnimationFrame(frame);}frame();
+ const R=cam.aspect<1?Math.min(40,21*0.85/cam.aspect):21;cam.position.set(Math.sin(t*0.05)*R,R*0.36,Math.cos(t*0.05)*R);cam.lookAt(0,0,0);renderer.render(scene,cam);requestAnimationFrame(frame);}frame();
 }
 </script>
 </body></html>
@@ -489,7 +561,10 @@ def repos_detail(home=None, now=None, run=None):
     if run is None:
         import covenant_quiet
         run = covenant_quiet.run
-    base = home or os.path.dirname(HERE)
+    # COVENANT_REPOS_HOME: where his repositories live on a PC laid out differently from the laptop. On TETSU they are
+    # the bare mirrors in mirror\src\own (2026-11-03: his words "there used to be more where are they?" -- node D found
+    # no folder beside its checkout and drew no outer ring at all).
+    base = home or os.environ.get("COVENANT_REPOS_HOME") or os.path.dirname(HERE)
     try:
         names = sorted(os.listdir(base))
     except OSError:
@@ -497,8 +572,10 @@ def repos_detail(home=None, now=None, run=None):
     best = {}
     for d in names:
         p = os.path.join(base, d)
+        # a bare mirror (<name>.git with HEAD and objects, no working tree) counts as that repository
+        bare = d.endswith(".git") and os.path.isfile(os.path.join(p, "HEAD")) and os.path.isdir(os.path.join(p, "objects"))
         # .git is a FILE in a linked worktree (Sentinel-Witness-trading is one); exists, not isdir
-        if not os.path.exists(os.path.join(p, ".git")) or os.path.normcase(os.path.abspath(p)) == os.path.normcase(HERE):
+        if (not bare and not os.path.exists(os.path.join(p, ".git"))) or os.path.normcase(os.path.abspath(p)) == os.path.normcase(HERE):
             continue
 
         def g(*a, p=p):
@@ -515,12 +592,14 @@ def repos_detail(home=None, now=None, run=None):
             except Exception:                                    # noqa: BLE001
                 return None
             return r.stdout.strip() if r.returncode == 0 else None
-        url = g("remote", "get-url", "origin") or ""
+        url = g("remote", "get-url", "origin") or (g("remote", "get-url", "github") if bare else "") or ""
         m = re.search(r"github\.com[:/]([^/]+)/([^/\s]+?)(?:\.git)?$", url)
         if m:
             if m.group(1).lower() != REPO_OWNER:
                 continue
             name = m.group(2)
+        elif bare:
+            name = d[:-4]
         elif url and os.path.isdir(url):
             name = d
         else:
@@ -534,9 +613,14 @@ def repos_detail(home=None, now=None, run=None):
         else:
             row["last_commit_at"] = int(ct) if ct.isdigit() else None
             row["branch"] = g("rev-parse", "--abbrev-ref", "HEAD")
-            st = g("status", "--porcelain")
-            row["dirty"] = len([x for x in (st or "").splitlines() if x.strip()]) if st is not None else None
-            ah = g("rev-list", "--count", "@{u}..HEAD")
+            if bare:
+                # no working tree, so nothing uncommitted; "ahead" is against the mirror's copy of GitHub's main
+                row["dirty"] = 0
+                ah = g("rev-list", "--count", "refs/remotes/github/main..HEAD")
+            else:
+                st = g("status", "--porcelain")
+                row["dirty"] = len([x for x in (st or "").splitlines() if x.strip()]) if st is not None else None
+                ah = g("rev-list", "--count", "@{u}..HEAD")
             row["ahead"] = int(ah) if ah and ah.isdigit() else None
         # a repository's own clone outranks a linked worktree of it (a PR branch has no upstream to read);
         # between two of the same kind, the newer commit wins
@@ -652,8 +736,14 @@ def register(api, caller, refused, cov):
                 except ValueError:
                     continue
                 if r.get("kind") in ("agent", "council") and r.get("from") == addr:
+                    # A456: what stood beside the answer comes back with it after a reload (held, immune, and how
+                    # much earlier talk was in his view), so a held turn does not turn into an ordinary one.
+                    f0 = next((f for f in (r.get("fit") or []) if isinstance(f, dict)), {})
                     turns.append({"t": r.get("t"), "q": str(r.get("text", ""))[:4000], "a": str(r.get("answer", ""))[:4000],
-                                  "withheld": bool(r.get("withheld")), "why": str(r.get("message", ""))[:300] if r.get("withheld") else ""})
+                                  "withheld": bool(r.get("withheld")), "why": str(r.get("message", ""))[:300] if r.get("withheld") else "",
+                                  "held": bool(r.get("alleges_nothing")) and not r.get("withheld"), "immune": bool(r.get("immune")),
+                                  "fit": [{"dropped": f0.get("dropped") if isinstance(f0.get("dropped"), int) else 0,
+                                           "kept": f0.get("kept") if isinstance(f0.get("kept"), int) else 0}]})
         except OSError:
             turns = []
         return jsonify({"turns": turns[-40:]})
@@ -689,9 +779,9 @@ def register(api, caller, refused, cov):
         try:
             import urllib.request as _ur
             import json as _json
-            for port in (5000, 5020, 5060):
+            for machine, host, port in mesh_targets():
                 try:
-                    with _ur.urlopen("http://127.0.0.1:%d/health" % port, timeout=3) as r:
+                    with _ur.urlopen("http://%s:%d/health" % (host, port), timeout=3) as r:
                         h = _json.loads(r.read().decode("utf-8", "replace"))
                     # /health reports `peers` as a COUNT (an int, since the first commit);
                     # len() of it threw, and the bare except below filed every live node
@@ -702,10 +792,17 @@ def register(api, caller, refused, cov):
                     out["mesh"].append({"node_id": h.get("node_id") or "?", "port": port, "version": h.get("version"),
                                         "chain_height": h.get("chain_height"), "peers": _np,
                                         "source": (h.get("source_sha256") or "")[:12], "degraded": bool(h.get("degraded")),
-                                        "me": port == 5000 and (h.get("node_id") == self_h["node_id"])})
+                                        "me": h.get("node_id") == self_h["node_id"], "machine": machine, "host": host})
                 except Exception as _e:                          # noqa: BLE001
+                    # A 429 is the node ANSWERING that it is rate-limiting this caller: up, not down (measured
+                    # 2026-11-03: A, B, C drawn "(down)" from TETSU while each answered /health in 0.03 s).
+                    if getattr(_e, "code", None) == 429:
+                        out["mesh"].append({"node_id": "?", "port": port, "degraded": True, "machine": machine, "host": host,
+                                            "why": "answered 429: up, rate-limiting this reader"})
+                        continue
                     # the reason rides with the orb, so "down" is never a guess again
-                    out["mesh"].append({"node_id": "?", "port": port, "down": True, "why": "%s: %s" % (type(_e).__name__, str(_e)[:120])})
+                    out["mesh"].append({"node_id": "?", "port": port, "down": True, "machine": machine, "host": host,
+                                        "why": "%s: %s" % (type(_e).__name__, str(_e)[:120])})
         except Exception:                                        # noqa: BLE001
             pass
         try:

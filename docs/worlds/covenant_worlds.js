@@ -220,11 +220,14 @@ load three.js their own way). No network, no storage, no state of its own. Publi
     u.surfU.uStrain.value = strain || 0;
   }
 
-  function tick(group, t, sunWorld) {
+  // spin (optional): this world's own rotation this frame, in radians. Without it every world turns at the one shared
+  // rate, as before (the phone app); the PC passes each world its own rate, scaled by elapsed time (2026-11-03).
+  function tick(group, t, sunWorld, spin) {
     const u = group.userData;
     u.surfU.uTime.value = t; u.cloudU.uTime.value = t;
     if (sunWorld) { u.surfU.uSun.value.copy(sunWorld); u.cloudU.uSun.value.copy(sunWorld); }
-    u.surface.rotation.y += 0.0016; u.clouds.rotation.y += 0.0022;
+    if (spin == null) { u.surface.rotation.y += 0.0016; u.clouds.rotation.y += 0.0022; }
+    else { u.surface.rotation.y += spin; u.clouds.rotation.y += spin * 1.35; }
     for (const s of u.swarms) s.rotation.y += s.userData.speed;
   }
 

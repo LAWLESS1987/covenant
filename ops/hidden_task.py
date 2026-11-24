@@ -62,6 +62,7 @@ def main():
         # A wrapper that fails must fail LOUDLY somewhere a person reads,
         # and it has no console to fail into.
         try:
+            os.makedirs(os.path.join(HERE, "logs"), exist_ok=True)   # A486: else the loud failure is silently lost
             with open(os.path.join(HERE, "logs", "hidden_task.log"), "a", encoding="utf-8") as fh:
                 fh.write("could not run %r: %s\n" % (cmd, e))
         except OSError:

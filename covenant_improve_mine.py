@@ -147,14 +147,24 @@ def harvest(candidates=None, seen_path=None, min_chars=MIN_CHARS, update=True, r
     seen = _load_seen(seen_path)
     send_rows = OA.load_sends(sends_path)                      # None when the ledger is missing
     ours = OA.our_texts(send_rows)
-    own = OA.own_authors(_rows(candidates), ours) if ours else set()
+    # A held row is not evidence of anything yet, including of who is us (Codex's read of #67, 2026-11-18): the
+    # prepass ran over every row, so a held row matching one of our texts made its author "us" and that author's
+    # ordinary rows were skipped -- a row read during isolation steering the miner before release. HI1h pins it.
+    own = (OA.own_authors((r for r in _rows(candidates) if not OA.held_by_isolation(r)), ours)
+           if ours else set())
     n_own = 0
+    n_held = 0
     pend = set(pending_requeue()) if requeue_first else set()
     back = {}                                                  # re-queued replies, offered ahead of new ones
     new, new_ids = [], set()
     for row in _rows(candidates):
         if row.get("author") in own:
             n_own += 1
+            continue
+        # A433 (2026-11-16, the consult's S3): a row read while free was isolated is held until the judge-gated
+        # release passes it. Skipped, NOT marked seen -- once released it is new here and is mined then.
+        if OA.held_by_isolation(row):
+            n_held += 1
             continue
         if pend and (row.get("eligible") is not False):
             rid0 = _row_id(row)
@@ -178,17 +188,22 @@ def harvest(candidates=None, seen_path=None, min_chars=MIN_CHARS, update=True, r
         _save_seen(seen_path, seen | new_ids)
     if isinstance(stats, dict):
         stats.update({"sends_ledger": "missing" if send_rows is None else "read",
-                      "own_authors": sorted(own), "own_rows_skipped": n_own})
+                      "own_authors": sorted(own), "own_rows_skipped": n_own,
+                      "isolation_rows_held": n_held})
     order = [i for i in pending_requeue() if i in back] if back else []
     return [back[i] for i in order] + [x for x in new if x["id"] not in back]
 
 
 def own_line(st):
     """One line saying what the own-account rule did -- including when it could not run (A418)."""
+    held = st.get("isolation_rows_held") or 0
+    tail = ("; isolation hold (A433): %d row(s) read while free was isolated wait for the judge-gated release"
+            % held) if held else ""
     if st.get("sends_ledger") == "missing":
-        return "own-account rule NOT applied: the sends ledger is missing, so our own replies cannot be recognised"
+        return ("own-account rule NOT applied: the sends ledger is missing, so our own replies cannot be recognised"
+                + tail)
     return "own-account rule: %d row(s) by %s skipped" % (st.get("own_rows_skipped", 0),
-                                                        ", ".join("u/" + a for a in st.get("own_authors") or []) or "no one")
+                                                        ", ".join("u/" + a for a in st.get("own_authors") or []) or "no one") + tail
 
 
 def main(argv=None):

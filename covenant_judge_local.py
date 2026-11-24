@@ -120,6 +120,11 @@ class _NullCache:
 _VC_CACHES = {}
 
 
+def _exact_text(text):
+    """A468: the cache key's text, unchanged (None reads as empty, as the default normalization did)."""
+    return text or ""
+
+
 def _verdict_cache(model):
     try:
         import covenant_verdict_cache as _vc
@@ -140,7 +145,12 @@ def _verdict_cache(model):
     k = (model, basis, artifact)
     c = _VC_CACHES.get(k)
     if c is None:
-        c = _vc.VerdictCache("llm-judge::" + str(model) + "::basis=" + basis + "::" + artifact)
+        # A468 (2026-11-22 security search): the key is the EXACT text. The default normalization lower-cases and
+        # collapses white space, so a text that differs only in case (base64 is case-sensitive) or in white space
+        # (indentation in code) was served the verdict of its normalized twin without being judged. "::key=exact" in the
+        # policy version puts these entries in a new store, so no verdict made under the old key is ever served.
+        c = _vc.VerdictCache("llm-judge::" + str(model) + "::basis=" + basis + "::" + artifact + "::key=exact",
+                             normalize_fn=_exact_text)
         _VC_CACHES[k] = c
     return c
 

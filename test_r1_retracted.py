@@ -95,6 +95,44 @@ def allowed(relpath, allow):
     return any(relpath == a or relpath.startswith(a) for a in allow)
 
 
+def retired_copy_allowed(relpath, allow):
+    """A460 (2026-11-19): a RETIRED COPY of a file the allow-list permits, kept at its original path under one
+    folder of .trash/ (`.trash/<folder>/<original path>`), is that allowed file, not a restatement.
+
+    R1 walks .trash/ on purpose -- the ledger allow-lists five .trash paths, and a retired probe takes a suffix
+    outside SCAN_EXT because R1 reads it -- so .trash/ is NOT skipped. But the tombstone rule keeps whole copies
+    there: on the laptop's running tree a retired docs/KNOWN_ISSUES.md under .trash/2026-11-18-a450-adopt/ and a
+    kept worktree's .trash/ under .trash/kept-worktree-.../ held 48 lines that are allowed at their real paths,
+    and R1 read 463/492 for the record itself -- the A236 shape, a copy whose path no longer matches its allow.
+
+    Narrow on purpose, each limit a check below: only the TOP-LEVEL .trash/; exactly one folder is stripped, so a
+    copy retired without its own folder, or one whose original path is NOT allowed, still counts. A copy of an
+    allowed .trash path kept inside another retired folder (.trash/kept-worktree-x/.trash/<allowed>/...) resolves
+    because the stripped remainder is itself the allowed path. Used at the violation step only, never for L1/L2 --
+    a retired copy must not keep a dead pattern looking alive, nor stand in for a record that was emptied."""
+    segs = relpath.split("/")
+    if len(segs) < 3 or segs[0] != ".trash":
+        return False
+    return allowed("/".join(segs[2:]), allow)
+
+
+def file_violations(rp, text, rx, rid, window, allow, src):
+    """The .C guard for one file: each match of `rx` in `text` not citing `rid` within `window` lines, unless the
+    file is allowed at its own path or is a retired copy of an allowed one (A460). Lifted out of main() so the
+    A460 checks below drive the same code the guard runs, not a copy of it."""
+    if allowed(rp, allow) or retired_copy_allowed(rp, allow):
+        return []
+    out = []
+    lines = text.splitlines()
+    for m in rx.finditer(text):
+        ln = text[:m.start()].count("\n")
+        lo, hi = max(0, ln - window), min(len(lines), ln + window + 1)
+        if rid in "\n".join(lines[lo:hi]):
+            continue
+        out.append((rp, ln + 1, lines[ln].strip()[:110], src))
+    return out
+
+
 _SPECIAL = set(".^$*+?{}[]\\|()")
 
 
@@ -284,16 +322,9 @@ def main():
                     for a in records:
                         if rp == a or rp.startswith(a):
                             held[a] = True
-                if not hit or allowed(rp, allow):
+                if not hit:
                     continue
-                lines = text.splitlines()
-                for m in rx.finditer(text):
-                    ln = text[:m.start()].count("\n")
-                    lo, hi = max(0, ln - window), min(len(lines), ln + window + 1)
-                    if rid in "\n".join(lines[lo:hi]):
-                        continue
-                    violations.append((rp, ln + 1,
-                                       lines[ln].strip()[:110], src))
+                violations += file_violations(rp, text, rx, rid, window, allow, src)
             if in_record == 0 and not any(rx.search(v) for v in verbatim):
                 dead.append(src)
             unrecorded += ["%s (not in %s)" % (src, a) for a, ok in held.items() if not ok]
@@ -321,6 +352,29 @@ def main():
         check("R1.%s.C no live file restates this retracted claim without "
               "citing %s within %d lines" % (rid, rid, window),
               not violations, "%d violation(s)" % len(violations))
+
+    # T* -- A460, driven both ways through file_violations(), the function the .C guard above calls.
+    t_rx, t_id, t_allow = re.compile(r"the moon is cheese", re.I), "T-PROBE", ["docs/KNOWN_ISSUES.md", ".trash/kept_x/"]
+    t_text = "intro\nthe moon is cheese\nend\n"
+
+    def t_hits(path, text=t_text):
+        return len(file_violations(path, text, t_rx, t_id, 2, t_allow, "t"))
+    check("R1.T1 a claim restated in a live file not on the allow-list is a violation (the guard can fail)",
+          t_hits("README.md") == 1, t_hits("README.md"))
+    check("R1.T2 a retired copy of an allowed record at its original path (.trash/<folder>/docs/KNOWN_ISSUES.md) "
+          "is not a violation", t_hits(".trash/2026-11-18-x/docs/KNOWN_ISSUES.md") == 0,
+          t_hits(".trash/2026-11-18-x/docs/KNOWN_ISSUES.md"))
+    check("R1.T3 ...a retired copy of an allowed .trash path, kept inside another retired folder, resolves too",
+          t_hits(".trash/kept-worktree-y/.trash/kept_x/bench.py") == 0,
+          t_hits(".trash/kept-worktree-y/.trash/kept_x/bench.py"))
+    check("R1.T4 a retired file whose original path is NOT allowed still counts -- .trash is read, not skipped",
+          t_hits(".trash/2026-11-18-x/README.md") == 1, t_hits(".trash/2026-11-18-x/README.md"))
+    check("R1.T5 exactly one folder is stripped: a copy retired without its own folder (.trash/docs/KNOWN_ISSUES.md) "
+          "still counts", t_hits(".trash/docs/KNOWN_ISSUES.md") == 1, t_hits(".trash/docs/KNOWN_ISSUES.md"))
+    check("R1.T6 a citation of the id within the window still clears a live file, as before",
+          t_hits("README.md", "intro\nthe moon is cheese\nsee T-PROBE\n") == 0)
+    check("R1.T7 only the top-level .trash/ is read this way: tools/.trash/x/docs/KNOWN_ISSUES.md still counts",
+          t_hits("tools/.trash/x/docs/KNOWN_ISSUES.md") == 1, t_hits("tools/.trash/x/docs/KNOWN_ISSUES.md"))
 
     no_record = [r["id"] for r in retractions if not r.get("records")]
     print("\n      %d of %d retractions name a record file other than the ledger (L2); %d keep their wording in the"

@@ -1,6 +1,8 @@
 {
   "_about": "Copy to ops/machine.json on a machine that is NOT the PC the highway was written for. No file means: that PC; everything applies and the highway repairs. See covenant_highway.machine_profile.",
   "acts_here": false,
+  "_own_nodes": "Optional (A465). The node(s) THIS machine hosts, as id: a port on 127.0.0.1 where that node's /health answers. Only a port: the highway asks this machine and nowhere else. Leave the key out and the mesh checks read not known here.",
+  "own_nodes": {"D": 15080},
   "why": "this PC hosts node D only; its services are kept running by its own watchdog",
   "not_applicable": {
     "node_down": "asks this machine for nodes A, B and C, which run on the other PC",

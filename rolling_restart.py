@@ -65,6 +65,101 @@ ORDER = ["C", "B", "A"]          # the hub in the middle; the phone's node last
 UP_TIMEOUT_S = 120               # a cold node adopts genesis and builds its judges
 PORT_FREE_TIMEOUT_S = 30
 
+# ONE RESTART AT A TIME (A459, 2026-11-19). Nothing stopped two of these running at once. That day a run
+# started by hand and the highway's own remedy_restart_nodes (which starts this script detached when it sees
+# source drift) began within two seconds of each other. Both restarted node A, and node A ran as TWO processes
+# on one database for an hour and three quarters: one held the API, peer and bridge ports, the other only a
+# shared API port, its peer listener deaf. A second run now refuses while the first holds this lock, and says
+# who holds it. --status takes no lock: it changes nothing.
+#
+# THE LOCK IS HELD BY THE OS, NOT BY A FILE'S EXISTENCE (A459 corrected, 2026-11-19). The first version made the
+# lock file with O_EXCL and took over a lock whose holder was gone or which was old, by moving it to .stale. That
+# takeover let two runs both hold the lock: after a crash left a lock behind, run A judged it stale, run B judged
+# it stale too, moved it aside and made its own, and then A's move-aside moved B's FRESH lock and A made another
+# (found by the hub's non-author read of PR #94; tombstone A459-STALE-TAKEOVER). The same shape had been found
+# in covenant_leviathan.acquire_lock by an outside review and fixed there the same way, and that finding was
+# recorded only in that docstring. Now: a non-blocking exclusive OS lock on a file that is never moved or
+# removed (msvcrt on Windows, fcntl.flock elsewhere). The OS releases it when the holder exits or dies, so there
+# is no stale lock and nothing to take over. The file's text says who holds it, for the refusal message only.
+LOCK = os.environ.get("COVENANT_RESTART_LOCK", os.path.join(HERE, "logs", "rolling_restart.lock"))
+LOCKED_EXIT = 3
+_LOCK_BYTE = 1 << 20             # Windows locks a byte range; this one is past the holder note, so the note stays readable
+_HELD = {}                       # lock path -> the open handle this process holds it by
+
+
+def _os_lock(fh):
+    """Take a non-blocking exclusive OS lock on the open file, or raise OSError if another handle holds it."""
+    if os.name == "nt":
+        import msvcrt
+        fh.seek(_LOCK_BYTE)
+        msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _os_unlock(fh):
+    try:
+        if os.name == "nt":
+            import msvcrt
+            fh.seek(_LOCK_BYTE)
+            msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+    except OSError:
+        pass
+
+
+def _holder_note(path):
+    try:
+        with open(path, "rb") as fh:
+            note = json.loads(fh.read(4096).decode("utf-8", "replace") or "{}")
+        return note if isinstance(note, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def take_lock(path=None):
+    """(True, "") when this process now holds the restart lock; (False, who holds it) when another run does.
+
+    The OS holds the lock for as long as the returned-to process keeps the handle (in _HELD), and drops it when
+    the process exits or dies. The handle is not inheritable, so a node this run starts never holds it."""
+    path = path or LOCK
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    try:
+        fh = os.fdopen(os.open(path, os.O_RDWR | os.O_CREAT, 0o644), "r+b")
+    except OSError as exc:
+        return False, "the lock file could not be opened (%s)" % (exc,)
+    try:
+        _os_lock(fh)
+    except OSError:
+        fh.close()
+        note = _holder_note(path)
+        return False, "pid %s since %s%s" % (note.get("pid", "?"), note.get("t", "?"),
+                                             "" if note else "; who holds it could not be read")
+    fh.seek(0)
+    fh.truncate()
+    fh.write(json.dumps({"pid": os.getpid(), "t": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                         "argv": sys.argv[1:]}).encode("utf-8"))
+    fh.flush()
+    _HELD[path] = fh
+    return True, ""
+
+
+def release_lock(path=None):
+    """Drop the OS lock if this process holds it; a run cannot release another's, because it has no handle to
+    it. The file stays: it is never moved or removed, so no run can mistake its absence for a free lock."""
+    fh = _HELD.pop(path or LOCK, None)
+    if fh is None:
+        return False
+    _os_unlock(fh)
+    try:
+        fh.close()
+    except OSError:
+        pass
+    return True
+
 
 def disk_sha():
     with open(os.path.join(HERE, "covenant_unified_v8.py"), "rb") as fh:
@@ -303,6 +398,18 @@ def main(argv=None):
     if a.status:
         return status()
 
+    ok, who = take_lock()
+    if not ok:
+        print("another rolling restart is running (%s): not starting a second one (A459)" % who)
+        print("Nothing was touched. Run again when it has finished, or look at %s." % LOCK)
+        return LOCKED_EXIT
+    try:
+        return _restart(a)
+    finally:
+        release_lock()
+
+
+def _restart(a):
     import covenant_watchdog as W
     want = disk_sha()
     by_id = {n["id"]: n for n in W.NODES}
