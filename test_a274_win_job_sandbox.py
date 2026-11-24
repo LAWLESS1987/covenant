@@ -193,6 +193,32 @@ except OSError as e:
     out.append("popen_python=REFUSED:%s" % getattr(e, "winerror", None))
 raise RuntimeError(" ".join(out))
 '''
+def interpreter_packaged():
+    """True for an MSIX-packaged interpreter, False for one that is not, None when it cannot be read (A479).
+    GetCurrentPackageFullName: 15700 APPMODEL_ERROR_NO_PACKAGE, 122 ERROR_INSUFFICIENT_BUFFER (it has a name)."""
+    if not WIN:
+        return None
+    try:
+        import ctypes
+        n = ctypes.c_uint(0)
+        rc = ctypes.windll.kernel32.GetCurrentPackageFullName(ctypes.byref(n), None)
+        return {15700: False, 122: True}.get(rc)
+    except Exception:                                           # noqa: BLE001
+        return None
+
+
+PACKAGED = interpreter_packaged()
+ALIAS = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WindowsApps", "winget.exe")
+ALIAS_SPAWN = r'''
+import subprocess
+try:
+    p = subprocess.Popen([%r, "--version"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=0x08000000)
+    p.communicate(timeout=50)
+    raise RuntimeError("alias=RAN:%%s" %% p.returncode)
+except OSError as e:
+    raise RuntimeError("alias=REFUSED:%%s" %% getattr(e, "winerror", None))
+''' % ALIAS
+
 if WIN and group("P", "the process limit: the child starts nothing"):
     wrapper = "try:\n    exec(%r)\nexcept RuntimeError as e:\n    print(e)\n" % SPAWN
     ctl = subprocess.run([cov._wj_interpreter(), "-I", "-S", "-c", wrapper], capture_output=True, text=True,
@@ -207,6 +233,22 @@ if WIN and group("P", "the process limit: the child starts nothing"):
           r.get("ran") is True and "cmd_exists=True" in seen and "popen_cmd=REFUSED:1816" in seen, seen)
     check("P2 inside the job, os.system fails to start cmd.exe (-1, not 7)", "system_cmd=-1" in seen, seen)
     check("P3 inside the job, a Python child is refused (1816)", "popen_python=REFUSED:1816" in seen, seen)
+    # P4 (A479, 2026-11-23), the process limit NOT enforced for a packaged app started through an app execution
+    # alias. Asked of the quorum (7 seats UNSURE, 4 HOLE) and then measured on a python.org build: the escaped
+    # snippet started winget.exe through its alias INSIDE the job and it ran (exit 0), with the breakaway policy set
+    # and with it dropped alike, while cmd.exe and Python were refused 1816 in the same job. Pinned like F: the day
+    # something bounds it this goes red, and the record and the gate's reason change with it. The Windows path stays
+    # shut on file size either way. Measured on a python.org build only: on a packaged interpreter NOT RUN.
+    if PACKAGED is False and os.path.isfile(ALIAS):
+        r4 = cov._win_job_run(ALIAS_SPAWN, timeout=60, builtin_names=WIDE)
+        seen4 = str(r4.get("error"))
+        check("P4 NOT ENFORCED, pinned: inside the job a packaged app started through an app execution alias runs "
+              "(the process limit does not reach it)", r4.get("ran") is True and "alias=RAN:0" in seen4, seen4)
+    elif PACKAGED is not False:
+        not_run("P4 the alias escape", "this interpreter is packaged (or could not be read: %r); the escape was "
+                "measured on a python.org build only" % PACKAGED)
+    else:
+        not_run("P4 the alias escape", "no app execution alias at %s to start" % ALIAS)
 
 # --------------------------------------------------------------- W wall time
 if WIN and group("W", "the wall-time limit"):
@@ -342,6 +384,16 @@ if MUTATE and not ONLY:
     with open(os.path.join(CORE_DIR, "covenant_unified_v8.py"), "rb") as fh:
         pristine = fh.read()
     for mid, what, g, edits in MUTATIONS:
+        if mid == "M-breakaway" and PACKAGED is not True:
+            # A479 (2026-11-23): this mutation can only bite on a packaged interpreter. Measured on a python.org build
+            # (GetCurrentPackageFullName 15700): with the policy dropped, cmd.exe and Python are still refused 1816
+            # by the process quota, and an app-alias launch runs with or without it (P4), so P stays green and the
+            # check failed for a reason that is not the policy. The A274 record had predicted "should be a no-op"
+            # here and not measured it. The policy stays set in the core on every machine.
+            not_run("%s: dropping %s turns %s red" % (mid, what, g),
+                    "the interpreter is not packaged (%r); on a python.org build the policy changes nothing this "
+                    "suite can see (measured 2026-11-23, A479)" % PACKAGED)
+            continue
         src = pristine
         stale = [a for a, _ in edits if src.count(a.encode()) != 1]
         if stale:

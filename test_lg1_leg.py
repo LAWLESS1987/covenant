@@ -12,6 +12,9 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# A470 (2026-11-22): covenant_leg may read private/leg.json, and a machine whose leg is on the second PC has one that
+# allows remote. These checks are of the module's rules, not of this machine's wiring, so they read no file.
+os.environ["COVENANT_LEG_FILE"] = os.path.join(tempfile.gettempdir(), "no-such-dir-lg1", "leg.json")
 import covenant_leg as L
 
 fails = []

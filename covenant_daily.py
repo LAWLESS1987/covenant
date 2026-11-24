@@ -80,7 +80,7 @@ VENV_PYW = os.path.join(HERE, ".venv", "Scripts", "pythonw.exe")
 STALE_H = 30.0            # hours since the last cycle ENDED: a day plus the launch rules' own slack
                           # (nightly finish ~05:00 vs the 10:00 fallback, the trader window)
 FALLBACK_HOUR = 10        # start by 10:00 even if the nightly never finished
-LOCK_STALE_S = 3 * 3600   # a cycle takes well under an hour; a lock this old is a dead cycle's
+LOCK_STALE_S = 3 * 3600   # a cycle takes well under an hour; the launcher's timing reads this (A482: no lock is reclaimed by it)
 TRADER_WINDOW = ((7, 45), (9, 15))   # the armed trader runs at 09:00; a ~30-minute cycle must not straddle it
 PHONE_FRESH_MIN = 30      # the phone checks in every 10 min
 PHONE_DEAD_H = 24.0
@@ -887,31 +887,23 @@ def directive_exam(which=None, ask=None, system=None, path=None):
 
 # ------------------------------------------------------------ the cycle
 def _lock():
+    """One daily cycle at a time. A482 (the A459 shape): this used to remove a lock older than LOCK_STALE_S as a
+    crashed cycle's and take it over, so two cycles could both hold it and a live cycle slower than that was
+    evicted (SL1.15b, red on the old code). Now an OS lock through covenant_oslock: dropped by the OS when the
+    cycle's process exits or dies, so a crashed cycle leaves nothing to take over. A lock that cannot be opened
+    at all refuses (False), as a lock that could not be removed did before."""
+    import covenant_oslock as _OL
     os.makedirs(SNAPS, exist_ok=True)
     try:
-        fd = os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.write(fd, str(os.getpid()).encode())
-        os.close(fd)
-        return True
-    except FileExistsError:
-        try:
-            age = _now() - os.path.getmtime(LOCK)
-        except OSError:
-            age = 0
-        if age > LOCK_STALE_S:                                   # a crashed cycle's lock
-            try:
-                os.remove(LOCK)
-            except OSError:
-                return False
-            return _lock()
+        return _OL.acquire(LOCK) is not None
+    except OSError:
         return False
 
 
 def _unlock():
-    try:
-        os.remove(LOCK)
-    except OSError:
-        pass
+    """Drop this cycle's own lock; the file stays, and another cycle's lock is never touched."""
+    import covenant_oslock as _OL
+    _OL.release_path(LOCK)
 
 
 def status_line(row):
@@ -1340,20 +1332,14 @@ def due(now=None, rows=None, running=None, nightly_done=None):
     lt = time.localtime(now)
     if in_trader_window(now):
         return False, "inside the trader's window (07:45-09:15)"
-    if os.path.exists(LOCK):
-        # A cycle killed mid-run (a reboot, a power cut) cannot remove its lock. One older than
-        # LOCK_STALE_S is a dead cycle's, removed here -- otherwise no cycle would ever start again
-        # (review, 2026-09-28: the removal lived only in _lock(), which this refusal never reached).
-        try:
-            age = now - os.path.getmtime(LOCK)
-        except OSError:
-            age = 0
-        if age <= LOCK_STALE_S:
-            return False, "a cycle holds the lock (%.0f min old)" % (age / 60.0)
-        try:
-            os.remove(LOCK)
-        except OSError:
-            return False, "a stale lock (%.1f h) could not be removed" % (age / 3600.0)
+    # A482: whether a cycle is running is asked of the OS lock, never of the file's age. A cycle killed mid-run
+    # (a reboot, a power cut) holds nothing, so its leftover file does not stop the next one, and nothing is
+    # removed here. (Before: a file younger than LOCK_STALE_S refused and an older one was removed -- the
+    # 2026-09-28 review's fix for a cycle stopped for good, which the OS lock makes unnecessary.)
+    import covenant_oslock as _OL
+    held, who = _OL.held_by_other(LOCK)
+    if held:
+        return False, "a cycle holds the lock (pid %s since %s)" % (who.get("pid", "?"), who.get("t", "?"))
     done = nightly_finished_today(now) if nightly_done is None else nightly_done
     if not done and lt.tm_hour < FALLBACK_HOUR:
         return False, "waiting for the nightly to finish (or 10:00)"

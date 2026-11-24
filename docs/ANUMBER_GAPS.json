@@ -1,0 +1,231 @@
+{
+ "_what": "A477 (2026-11-23). The A-numbers 1..checked_through that have no primary header ('### A<n>.') in docs/KNOWN_ISSUES.md, with what was found for each, and the duplicate primaries with each copy's header and first commit. test_an1_anumbers.py fails when the gaps in that range differ from this list either way (a new gap: an entry lost or a number skipped; a listed gap now filled: trim it) and when a listed duplicate copy is gone. Numbers above checked_through are in flight on branches and are not checked; raising checked_through is a deliberate edit of this file. A gap is a fact about the record, not proof that work was lost: 'work exists, no entry' means commits or files name the number but no entry was written.",
+ "measured": "2026-11-23 on TETSU (main 2c1d9a6, every local clone and bundle) and on the laptop (its session's search)",
+ "checked_through": 470,
+ "gaps": {
+  "A84": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": "a619f99 2026-09-10",
+   "files_on_main_naming_it": 2
+  },
+  "A88": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": "3c08cb7 2026-09-11",
+   "files_on_main_naming_it": 4
+  },
+  "A90": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 4
+  },
+  "A91": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 7
+  },
+  "A92": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 4
+  },
+  "A94": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": "4120c40 2026-09-12",
+   "files_on_main_naming_it": 1
+  },
+  "A208": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 3
+  },
+  "A209": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 3
+  },
+  "A210": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 9
+  },
+  "A217": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": "fc551b5 2026-09-21",
+   "files_on_main_naming_it": 5
+  },
+  "A241": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": "bc63a1e 2026-10-12",
+   "files_on_main_naming_it": 3
+  },
+  "A318": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": "0172ddc 2026-10-08",
+   "files_on_main_naming_it": 1
+  },
+  "A319": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": "8caa6c4 2026-10-08",
+   "files_on_main_naming_it": 2
+  },
+  "A320": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": "616ee22 2026-10-08",
+   "files_on_main_naming_it": 2
+  },
+  "A384": {
+   "kind": "no use found",
+   "header_elsewhere": null,
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 0
+  },
+  "A385": {
+   "kind": "no use found",
+   "header_elsewhere": null,
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 0
+  },
+  "A386": {
+   "kind": "no use found",
+   "header_elsewhere": null,
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 0
+  },
+  "A387": {
+   "kind": "no use found",
+   "header_elsewhere": null,
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 0
+  },
+  "A388": {
+   "kind": "no use found",
+   "header_elsewhere": null,
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 0
+  },
+  "A389": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": "e0fa974 2026-10-25",
+   "files_on_main_naming_it": 3
+  },
+  "A390": {
+   "kind": "no use found",
+   "header_elsewhere": null,
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 0
+  },
+  "A391": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 4
+  },
+  "A404": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": "9783378 2026-11-02",
+   "files_on_main_naming_it": 1
+  },
+  "A405": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": "c92a59c 2026-11-02",
+   "files_on_main_naming_it": 7
+  },
+  "A406": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": "49e9163 2026-11-02",
+   "files_on_main_naming_it": 0
+  },
+  "A407": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": "7a31550 2026-11-02",
+   "files_on_main_naming_it": 10
+  },
+  "A408": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": "9acb7ce 2026-11-03",
+   "files_on_main_naming_it": 0
+  },
+  "A426": {
+   "kind": "entry on another branch",
+   "header_elsewhere": "header only on unmerged origin/consensus/hands-held-2026-11-14 (first 94f8e83 2026-11-14)",
+   "first_commit_naming_it": "94f8e83 2026-11-14",
+   "files_on_main_naming_it": 1
+  },
+  "A449": {
+   "kind": "work exists, no entry",
+   "header_elsewhere": null,
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 1
+  },
+  "A457": {
+   "kind": "entry on another branch",
+   "header_elsewhere": "header only on the laptop live line claude/improve-miner-circle-back, 2db7943f (2026-11-19), on no remote",
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 0
+  },
+  "A458": {
+   "kind": "entry on another branch",
+   "header_elsewhere": "header only on the laptop live line claude/improve-miner-circle-back, 1ee4c105 (2026-11-19), on no remote",
+   "first_commit_naming_it": null,
+   "files_on_main_naming_it": 0
+  },
+  "A461": {
+   "kind": "entry on another branch",
+   "header_elsewhere": "header only on unmerged origin/claude/a461-hg1-self-report-split (first f759f98 2026-11-20)",
+   "first_commit_naming_it": "f759f98 2026-11-20",
+   "files_on_main_naming_it": 2
+  }
+ },
+ "duplicates": {
+  "A222": [
+   {
+    "header_starts": "### A222. [his own cloud storage: built, hardened and checked; the one step that starts it",
+    "first_commit": "52463b3 2026-09-25"
+   },
+   {
+    "header_starts": "### A222. [money / a way to earn] 2026-09-25. His words, in order: \"Create a unique revenu",
+    "first_commit": "bce8fe3 2026-09-25"
+   }
+  ],
+  "A223": [
+   {
+    "header_starts": "### A223. [the gate / four helpers] 2026-09-25. His words: \"fix it aslong as it doesn't pu",
+    "first_commit": "b03d2ab 2026-09-25"
+   },
+   {
+    "header_starts": "### A223. [Tetsu remembers the PC conversation, and it stays on screen -- asked first, he ",
+    "first_commit": "06accd7 2026-09-26"
+   }
+  ],
+  "A224": [
+   {
+    "header_starts": "### A224. [Tetsu / the business, his wallet, his share] 2026-09-25. His words: \"refine thi",
+    "first_commit": "94f6e53 2026-09-25"
+   },
+   {
+    "header_starts": "### A224. [the phone had been skipping every core-only rebuild; the phone app measured bef",
+    "first_commit": "b7b204e 2026-09-26"
+   }
+  ]
+ }
+}

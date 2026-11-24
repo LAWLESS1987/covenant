@@ -533,7 +533,10 @@ def run(name, args=None, workshop=None, timeout_s=None, run_sha256=UNBOUND):
     env["PYTHONIOENCODING"] = "utf-8"
     t0 = time.time()
     try:
-        cp = subprocess.run([sys.executable, "-I", "-c", RUNNER, ws, name] + [str(a) for a in (args or [])][:16], cwd=ws,
+        # A467 (2026-11-22 security search): -S as well as -I. Isolated mode still runs the `site` module, which executes
+        # any `.pth` line starting with "import" in the interpreter's site-packages BEFORE the signed script. Every
+        # ALLOWED_MODULES name is in the standard library (all import under -I -S), so -S takes nothing the screen allows.
+        cp = subprocess.run([sys.executable, "-I", "-S", "-c", RUNNER, ws, name] + [str(a) for a in (args or [])][:16], cwd=ws,
                             env=env, input=raw, capture_output=True, timeout=timeout_s or RUN_TIMEOUT_S)
         out, err, code, timed_out = cp.stdout.decode("utf-8", "replace"), cp.stderr.decode("utf-8", "replace"), cp.returncode, False
     except subprocess.TimeoutExpired as e:

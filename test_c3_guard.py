@@ -232,6 +232,31 @@ def main():
     check("R4 the revive spawns the WATCHDOG and nothing else",
           "WD_SRC" in inspect.getsource(g.revive), "")
 
+    # R5 (A479, 2026-11-23): revive() writes into a logs/ folder it never created, so on a fresh clone it raised
+    # FileNotFoundError (QW1 failed alone; in the sweep an earlier suite had made logs/). Driven against a folder
+    # that does NOT exist yet (an empty temp folder would already exist and could not go red -- Codex, 2026-11-23),
+    # with the started process stubbed and the module's path restored in a finally.
+    real_logdir = g.LOGDIR
+    with tempfile.TemporaryDirectory() as td:
+        fresh = os.path.join(td, "not_yet", "logs")
+        g.LOGDIR = fresh
+        try:
+            try:
+                pid, err = g.revive(cmd=[sys.executable, "-c", "pass"]), None
+            except Exception as e:                                  # noqa: BLE001
+                pid, err = None, e
+            made = os.path.isfile(os.path.join(fresh, "watchdog-stdout.log"))
+            # the stub child holds the log open until it exits; wait for it so the temp folder can go
+            sys.path.insert(0, os.path.join(HERE, "tools"))
+            import child_python as _cp
+            t_end = time.time() + 20
+            while pid and _cp.alive(pid) and time.time() < t_end:
+                time.sleep(0.1)
+        finally:
+            g.LOGDIR = real_logdir
+    check("R5 revive() creates its log folder when it is missing (a fresh clone) and starts what it was given",
+          err is None and isinstance(pid, int) and made, repr(err) if err else (pid, made))
+
     p = sum(results)
     print(f"\nC3: {p}/{len(results)} passed")
     return 0 if p == len(results) else 1

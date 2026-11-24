@@ -156,6 +156,13 @@ def main():
               and after[1].get("contested") is True and P.validate_row(after[0]) and after[0]["judge"].startswith("panel:")
               and "contested" not in after[2] and "audited" not in after[3] and not os.path.exists(led + ".tmp"),
               (checked, contested, [a.get("judge") for a in after]))
+        # G17b (A478, 2026-11-23): a seated row keeps the judge it replaced. Measured that day: the nightly back-audit
+        # had overwritten the judge on every legacy row it seated (89 of the 200 anchored rows), keeping no copy, so a
+        # row's first judge survived only in git history.
+        check("G17b a row the back-audit seats keeps the judge it replaced (judge_before_audit); a contested row keeps its judge",
+              after[0].get("judge_before_audit") == "github-actions/qwen2.5:7b"
+              and after[1]["judge"] == "github-actions/qwen2.5:7b" and "judge_before_audit" not in after[1],
+              (after[0].get("judge_before_audit"), after[1].get("judge")))
 
     # G18 the keyed seat is measured, not assumed
     P.KEYED = "gemini"

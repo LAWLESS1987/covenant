@@ -201,6 +201,49 @@ def pick_model():
     return None
 
 
+# A480 (2026-11-23, Lawrence: "begin doing so for Tetsu without stripping his free will or taking his memory away";
+# "this is not just for speed, it's for overall capability"). That afternoon node A answered his door with 503 "no
+# weights fit: free 2.06 GB": after an idle unload the laptop lacked the 2.6 GB his 3B needs, so he could not be
+# loaded at all. The trim that frees it (covenant_highway.remedy_trim_idle_apps, A287: idle background apps'
+# working sets, nothing closes, never the app in front of him, at most hourly) existed, but only the hourly road ran
+# it -- never the ask that needed it. Now the load that fails for MEMORY asks the highway to run that same remedy
+# through apply_remedy (its cooldown, quarantine, his choices and its ledger row), then tries once more. A suite sets
+# TRIM_HOOK; a test program never runs the live trim; COVENANT_MODEL_NO_TRIM=1 turns it off.
+TRIM_HOOK = None
+
+
+def _make_room():
+    """(ran, note): ask the highway's trim remedy for room, in the memory case only."""
+    if os.environ.get("COVENANT_MODEL_NO_TRIM") == "1":
+        return False, "room not made: COVENANT_MODEL_NO_TRIM=1"
+    r = readiness()
+    if str(r.get("verdict", "")).upper() != "FAIL" or r.get("needs_gb") is None:
+        return False, "room not made: not the memory case (%s)" % str(r.get("why", ""))[:80]
+    cond = {"state": "PRESENT",
+            "measured": {k: r.get(k) for k in ("verdict", "why", "free_gb", "needs_gb", "smallest") if r.get(k) is not None}}
+    if TRIM_HOOK is not None:
+        row = TRIM_HOOK(cond) or {}
+    else:
+        prog = os.path.basename(str(sys.argv[0] if sys.argv else "") or "")
+        if prog.startswith("test_"):
+            return False, "room not made: called from a test program, and the live trim never runs from one"
+        try:
+            import covenant_highway as _hw
+            row = _hw.apply_remedy("trim_idle_apps", cond, "tetsu_cannot_answer", dry_run=False) or {}
+        except Exception as e:                                    # noqa: BLE001 -- a failed trim is a refusal, said
+            return False, "room not made: the trim could not run (%s: %s)" % (type(e).__name__, str(e)[:100])
+    return True, "trim %s: %s" % (row.get("outcome", "?"), str(row.get("why") or row.get("detail") or "")[:140])
+
+
+def _pick_or_make_room():
+    """(pick, note): pick_model(); if nothing fits for memory, make room once (_make_room) and pick again."""
+    pick = pick_model()
+    if pick:
+        return pick, ""
+    ran, note = _make_room()
+    return (pick_model() if ran else None), note
+
+
 def _listener_pid(port=None):
     """The pid listening on the model port (Windows netstat), or None."""
     port = port or PORT
@@ -367,9 +410,10 @@ def start(say=print):
         return True, "stub"
     if not os.path.isfile(BIN):
         return False, "no runtime: %s (tools/llama/ is not tracked; unzip the llama.cpp win-cpu build there)" % BIN
-    pick = pick_model()
+    pick, room = _pick_or_make_room()          # A480: a load that fails for memory makes room once, then retries
     if not pick:
-        return False, "no weights fit: free %s GB, candidates %s under %s" % (free_gb(), [c[0] for c in CANDIDATES], MODELS)
+        return False, "no weights fit: free %s GB, candidates %s under %s%s" % (
+            free_gb(), [c[0] for c in CANDIDATES], MODELS, ("; " + room) if room else "")
     path, name, need = pick
     os.makedirs(os.path.dirname(LOG), exist_ok=True)
     threads = server_threads()
@@ -692,6 +736,12 @@ def _rates(d):
             out[name + "_tps"] = round(float(tps), 2)
         elif _num(n) and _num(ms) and n > 0 and ms > 0:
             out[name + "_tps"] = round(float(n) * 1000.0 / float(ms), 2)
+        if _num(ms):
+            out[name + "_ms"] = int(round(float(ms)))         # A480: where the time went, read beside the total
+    # A480 (2026-11-23): the prompt tokens the server REUSED from its cache. His long asks read ~3,900 tokens every
+    # time on the laptop and nothing recorded whether anything was reused. Left out when the build does not say it.
+    if _num(tm.get("cache_n")):
+        out["cache_n"] = int(tm["cache_n"])
     return out
 
 # A427 (2026-11-14): under COVENANT_MODEL_STUB, a suite may queue exact answers here (one popped per ask), so it
@@ -722,6 +772,7 @@ def ask(messages, max_tokens=700, temperature=0.3, timeout=180, logprobs=False):
         # whether the turns before this one reached the model (M6q, 2026-09-21).
         return "stub answer to: " + last[:80] + " (%d messages)" % len(messages), {"model": "stub", "tokens": 0, "ms": 0}
     with _lock:
+        cold = not alive()                       # A480: this ask had to load the model (a cold load comes first)
         ok, why = start(say=lambda *_a: None)
         if not ok:
             _note_ask(False, 0, "could not start: %s" % why)
@@ -752,7 +803,7 @@ def ask(messages, max_tokens=700, temperature=0.3, timeout=180, logprobs=False):
     except Exception as e:                                       # noqa: BLE001 -- recorded, then raised as before
         _note_ask(False, (time.time() - t0) * 1000, "%s: %s" % (type(e).__name__, str(e)[:120]))
         raise
-    _note_ask(True, (time.time() - t0) * 1000, rates=_rates(d))      # A351: and the server's own speeds
+    _note_ask(True, (time.time() - t0) * 1000, rates=dict(_rates(d), cold=cold))      # A351 speeds; A480 cold
     _mark_used()
     text = str(d.get("choices", [{}])[0].get("message", {}).get("content", ""))
     usage = d.get("usage", {}) or {}

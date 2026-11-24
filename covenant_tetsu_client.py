@@ -6,6 +6,9 @@ network plane: one on the hosted tailnet (dialed directly) and the headscale pla
 (dialed through the laptop's own userspace SOCKS proxies on loopback). This client tries
 the configured doors IN ORDER and falls through on connection error or timeout, so a
 consult survives any one plane dropping, and it records which door answered.
+(A469, 2026-11-22: a consult POST that reached a door and then timed out no longer falls through; it raises
+SentNoAnswer, because the question may still be running on the same panel behind every door. A door the request
+never reached, an HTTP error reply, and every GET still fall through as above.)
 
 Door ADDRESSES are NOT in this file. The node IPs are the operator's private tailnet
 identifiers and must never be committed (the opsec push guard enforces this). They live in
@@ -56,6 +59,12 @@ class AllDoorsDown(Exception):
         )
 
 
+class SentNoAnswer(AllDoorsDown):
+    """A469: a POST reached a door and no answer came before the timeout. It is NOT sent to another door: every
+    door leads to the same panel, so the question may still be running there, and a second copy would run beside it.
+    A subclass of AllDoorsDown, so every caller that handles AllDoorsDown handles this too."""
+
+
 def _default_config_path():
     return os.environ.get("COVENANT_TETSU_DOORS") or \
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "tetsu_doors.json")
@@ -80,10 +89,18 @@ def load_doors(path=None):
 def _curl(method, url, socks, timeout, payload=None):
     """One curl request. Returns (http_code, body). http_code 0 means the request did not
     complete (connection refused / timeout / resolve failure) -- the signal to fall through."""
+    code, body, _sent = _curl_sent(method, url, socks, timeout, payload)
+    return code, body
+
+
+def _curl_sent(method, url, socks, timeout, payload=None):
+    """_curl, plus whether the request's body left for the door: (http_code, body, sent). sent is True when curl
+    uploaded bytes (curl's size_upload; measured 2026-11-22: 16 after a send that then timed out, 0 after a refused
+    connection), False when it uploaded none, None when that cannot be told (curl itself was killed)."""
     cmd = [CURL, "-s", "-S",
            "--connect-timeout", str(max(1, min(int(timeout), 10))),
            "--max-time", str(int(timeout)),
-           "-o", "-", "-w", _CODE_SENTINEL + "%{http_code}"]
+           "-o", "-", "-w", _CODE_SENTINEL + "%{http_code}|%{size_upload}"]
     if socks:
         cmd += ["--socks5-hostname", socks]
     if method == "POST":
@@ -97,24 +114,28 @@ def _curl(method, url, socks, timeout, payload=None):
         p = subprocess.run(cmd, input=(payload or "").encode("utf-8"), capture_output=True,
                            timeout=int(timeout) + 5)
     except subprocess.TimeoutExpired:
-        return 0, "timeout"
+        return 0, "timeout", None
     except OSError as e:
-        return 0, "curl error: %s" % e
-    try:
-        out = (p.stdout or b"").decode("utf-8")
-    except UnicodeDecodeError as e:
-        return 0, "decode error: the door answered, but not in UTF-8 (%s)" % e
+        return 0, "curl error: %s" % e, False
+    raw = p.stdout or b""
     p_stderr = (p.stderr or b"").decode("utf-8", errors="replace")
-    p = type("P", (), {"stdout": out, "stderr": p_stderr})()
-    idx = out.rfind(_CODE_SENTINEL)
+    sentinel = _CODE_SENTINEL.encode("ascii")
+    idx = raw.rfind(sentinel)
     if idx < 0:
-        return 0, (p.stderr or "no response").strip()[:200]
-    body = out[:idx]
-    code = out[idx + len(_CODE_SENTINEL):].strip()
+        return 0, (p_stderr or "no response").strip()[:200], None
+    code_s, _, up_s = raw[idx + len(sentinel):].decode("ascii", errors="replace").strip().partition("|")
     try:
-        return int(code), body
+        sent = int(up_s) > 0
     except ValueError:
-        return 0, (p.stderr or "no response").strip()[:200]
+        sent = None
+    try:
+        body = raw[:idx].decode("utf-8")
+    except UnicodeDecodeError as e:
+        return 0, "decode error: the door answered, but not in UTF-8 (%s)" % e, sent
+    try:
+        return int(code_s), body, sent
+    except ValueError:
+        return 0, (p_stderr or "no response").strip()[:200], sent
 
 
 def _resolve(doors):
@@ -131,7 +152,7 @@ def _try_doors(path, method, timeout, payload=None, doors=None):
     doors = _resolve(doors)
     attempts = []
     for d in doors:
-        code, body = _curl(method, d["base"] + path, d.get("socks"), timeout, payload)
+        code, body, sent = _curl_sent(method, d["base"] + path, d.get("socks"), timeout, payload)
         if code == 200:
             try:
                 parsed = json.loads(body)
@@ -139,6 +160,14 @@ def _try_doors(path, method, timeout, payload=None, doors=None):
                 parsed = body
             return d["name"], parsed, attempts
         attempts.append({"door": d["name"], "error": ("http %d" % code) if code else body})
+        # A469 (2026-11-22): a POST that LEFT for a door and got no reply is not sent to the next door. Every door
+        # leads to the same panel on TETSU, so it may still be running there; the old fall-through ran a slow
+        # model's question twice at once (seen: 802 s = 2 x 400, and 0.56 tok/s on a model that does 2.5-5).
+        # An HTTP reply (code != 0) or a door the request never reached (sent False) still falls through. A GET
+        # (panel, reachable) asks for nothing to be run, so it still falls through on a timeout.
+        if method == "POST" and not code and sent is not False:
+            attempts[-1]["error"] += " (sent, no answer: not re-sent to another door; it may still be running there)"
+            raise SentNoAnswer(attempts)
     raise AllDoorsDown(attempts)
 
 

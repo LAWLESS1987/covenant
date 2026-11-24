@@ -18858,6 +18858,28 @@ on Windows; the PC this was found on has environment-shaped failures in its loca
 
 **Status, 2026-11-21, later.** Merged on his word ("Yes, merge it"): pull request #99, main 0222736 to 51a4e4c by fast-forward, CI 4 of 4 green on 51a4e4c before the push. The second PC's own gate then adopted it onto node D (decision GO, sensitivity NORMAL, every check green). Measured there after the restart, unit DETECTORS of 42: `GET /hwy/state` reports 1 PRESENT (`threefold_witness`), 2 UNKNOWN (`head_commitment_broken`, `mesh_source_split`) and 28 names under `not_applicable_here`, in 3.2 s. Before: 9, 17 and no such list, in 17.0 s. The watchdog's pass in the same minute read `mesh_source_split` PRESENT; the page reads it UNKNOWN, which is the first item under "What it cannot see" above, seen live. **Not deployed on the first PC:** its nodes run what they were started with; they have no profile file, so their report does not change when they do restart.
 
+### A469. [the TETSU client re-sent a consult that had already reached a door and timed out to the next door, so a slow model ran the same question twice at once; a sent POST now stops with SentNoAnswer; FIXED in this branch, merge is his] (2026-11-22)
+
+- **Found** by the Hugging Face reply chat on 2026-11-22 and checked in the code on TETSU the same day. Its runner called `covenant_tetsu_client.consult` with a 400 s timeout and every door allowed. A long answer from the CPU-only stock 27B passed 400 s on the first door; `_try_doors` then sent the same POST to the next door while the first copy was still running in Ollama. Its row read AllDoorsDown at 802 s (two timeouts of 400), and the next answer ran at 0.56 tok/s on a model that measures 2.5-5. Every door leads to the same panel on TETSU, so a fall-through after a POST was sent only adds a second copy beside the first. His words on the fix: "Yes, fix it".
+- **Fixed.** `_curl_sent` also returns whether curl uploaded the request body (curl's `size_upload`; measured first: 16 bytes after a send that then timed out, 0 after a refused connection). `_try_doors` raises `SentNoAnswer` (a subclass of `AllDoorsDown`, so every caller that handles one handles the other) when a POST reached a door and got no reply. A door the request never reached, an HTTP error reply (the door answered; nothing is left running), and every GET still fall through. When curl itself was killed the upload is unknown and a POST stops (it may have been sent). `_curl` keeps its two-value form. The one caller, `covenant_partners._consult`, lets the error through as before.
+- **Guard: TC1** (`test_tc1_tetsu_client.py`, 23/23; A469.1-A469.7 new) with a second stub door: a slow consult raises SentNoAnswer and the second door never receives it; a refused door and an HTTP 503 still fall through; a GET still falls through past a refused door and past a door that times out. **Driven both ways** by five undos of the rule: four turn TC1 red. The fifth (the GET exemption removed) changes nothing, because a GET uploads no body and so never counts as sent: the method check is kept as a second reason, and is not separately tested.
+
+### A468. [the local judge's verdict cache served a text the verdict of its lower-cased, white-space-collapsed twin without judging it; the key is now the exact text; FIXED in this branch, merge is his] (2026-11-22)
+
+- **Found** in the full quorum's security search of 2026-11-22 (his words: "Use the quorum to look for security flaws ... coalesce it all into an improvement plan. Then with the improvement plan, run it by the quorum again. Then act on it"). Three seats said the cache key omitted the input; read in the code, it does not (`VerdictCache._key` is the policy version, the context and the text). What was real: the text is first passed through `normalize`, which lower-cases it and collapses white space. Base64 is case-sensitive and indentation is meaning in code, so two texts that mean different things could share one verdict, and the second was never judged. In the plan's second round, four seats added that white space must not be folded either, and that entries made under the old key must not be served after the change.
+- **Fixed.** `covenant_judge_local._verdict_cache` passes `normalize_fn=_exact_text` (the text unchanged; None reads as empty, as before) and appends `::key=exact` to the policy version. The persisted store is namespaced by the policy version, so no verdict made under the old key is read. The cache still never changes a verdict; it decides only when to re-judge. The cost: fewer hits (VC2's measured 34.5% repeat rate was measured under the old normalization and is not re-measured here). The generic `VerdictCache` default is unchanged (its other user is its own self-test).
+- **Guard: A468** (`test_a468_cache_exact.py`, 5/5), registered in covenant_one. A case-only twin and an indentation-only twin both miss; the exact text still hits; the policy version names the key; a control shows the default normalization serves both twins. **Driven both ways:** the old normalization put back turns A468.1 and A468.3 red; the old key name turns A468.4 red; restored byte-identical. VC1, VC2 and J1 (37/37) pass. Related: A383, A416 (what the key holds).
+
+*Dated note, 2026-11-22, after Codex's review of this branch* (its words on this point: "I do not know whether persistent storage actually separates old entries"): A468.6 and A468.7 added. A verdict saved to disk under the old key is served by the old store when reopened (the control), and not by the new cache on the same disk. A468 is now 7/7; the two undo checks above still turn it red. Codex's other points on this branch: A467 holds; A468 holds at the normalization layer.
+
+### A467. [the hands' runner used Python's isolated mode without -S, so a start-up hook in site-packages would run before a signed script; -S added; FIXED in this branch, merge is his] (2026-11-22)
+
+- **Found** in the same security search: one seat named it as an implementation gap ("Python -I does not disable system site-packages or their executable .pth initialization"), another as the first attack a builder would try. `-I` still imports `site`, and `site` executes every `.pth` line that starts with "import". Read on TETSU the same day: the node's interpreter holds no such file today (0 `.pth` and no `*customize.py`), so this closes a road, it does not remove a hook.
+- **Fixed.** `covenant_tetsu_hands.run` starts the child with `-I -S`. Every name in `ALLOWED_MODULES` (35) is standard library and imports under `-I -S`, so the screen allows nothing that now fails.
+- **Guard: A467** (`test_a467_hands_nosite.py`, 4/4), registered in covenant_one. It makes a throwaway Python environment, plants a `.pth` hook there that writes a marker, shows the hook runs under `-I` alone (control), and shows the hands' run of a script with that interpreter leaves no marker while the script still prints. It also imports all 35 allowed modules through the real runner. **Driven both ways:** `-S` removed turns A467.2 and A467.4 red; restored byte-identical. TH1 31/31 and HS1 6/6 pass. Related: A422, A430, A436 (the hands' screen and binding). Not closed here: the screen is still not an operating-system sandbox (the quorum's open item since 2026-11-16).
+
+*Dated note, 2026-11-22, after both CI sweeps on #104 failed:* `test_a443_runner_isolation.py` pins the runner's command line by its source text, and its pattern required `-I` directly before `-c`, so the added `-S` broke it. I had run TH1, HS1, VC1, VC2 and J1 before opening the PR, not A443, and not the full sweep. The pin now requires `-I -S` (tightened: `-I` is still required); removing either flag turns A443 red (3/4), restored 4/4. The run through covenant_one of A443, A467, A468 and TH1 has 0 suites not clean.
+
 ### A465. [the highway's mesh checks on a second machine, and what a split's count counts] A machine with a profile was handed an empty node health, so `mesh_source_split` read UNKNOWN on its page while a split was there; and the detector's "drifted" held 7 names for 3 nodes without saying which source is the one on disk. A profile may now name the machine's own node by a loopback port, and the detector says its unit, the unmapped senders and the disk side. Red first, in source on a branch -- not merged, not deployed. (2026-11-21)
 
 **His word, 2026-11-21:** "Yes, build C", the third of seven things found when he asked "Look for mycelial highway improvements" (A464 was the first).
@@ -18900,3 +18922,539 @@ on Windows; the PC this was found on has environment-shaped failures in its loca
 **Status, 2026-11-21.** In source on branch `claude/a465-mesh-split-who`. Not merged, not deployed. The second PC's profile does not name its node yet: that is a file on that machine, placed after this is on the code node D runs. Merge and deploy are the operator's.
 
 **Status, 2026-11-21, later.** Merged on his word ("Yes", to "merge it once its checks are green"): pull request #100, main 163db3c to e3b5672 by fast-forward, CI 4 of 4 green on e3b5672 before the push. The second PC's gate adopted it onto node D (decision GO, sensitivity NORMAL), and that PC's profile, which names node D at a loopback port, was already in place. Measured there after the restart, unit DETECTORS of 42: `GET /hwy/state` reports 2 PRESENT (`mesh_source_split`, `threefold_witness`) and 1 UNKNOWN (`head_commitment_broken`) in 3.3 s, the same three the watchdog's pass reads; before this change the page read the split UNKNOWN. The detector's summary there, as kept by the pass: this machine's node runs 925a21591f8f, the source on disk; 0d4b6b1c31c8 is reported by 6 peer names and 1 unmapped sender; 925a21591f8f by 1 peer name. Unit: PEER NAMES (6 names are the first PC's 3 nodes, each filed twice). **Not deployed on the first PC**, whose nodes run what they were started with and are the 6 names.
+
+### A470. [the leg on the second PC, the A402 pin] The laptop's 2B leg was down, so every LEG consult VOIDed; the second PC serves the same weights behind a pinned gateway, and the leg had no pin. The leg now takes the limbs' pin off loopback. Found alongside: both limbs VOID every consult since the second PC's servers were restarted. (2026-11-22)
+
+**His word, 2026-11-22**, typed in the HF reply chat: "Phones plugged in as well to the laptop on debugging. Make sure everything is uniform, including the phone. Get these legs right and strong." Then, asked whether the laptop's leg should use the RTX box's 2B: "Yes, use RTX leg".
+
+**Found (measured 2026-11-22 on the first PC).**
+1. **The leg was not running here.** Nothing answered on 127.0.0.1:8099, so `consult_leg` returned None and each LEG consult VOIDed; the 3B answered alone. Since A402 this laptop holds one model at a time.
+2. **The second PC already serves the same model.** Its gateway on :8099 (proxying llama-server :8097, CPU) names `Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf`, weights sha256 `d725b76f...`, equal to the laptop's own file, and sends `X-Leg-Manifest` `af5610ac...` (weights, runner, flags, sampler, chat template).
+3. **The leg had no pin.** `COVENANT_LEG_ALLOW_REMOTE` let it reach a remote host, but nothing checked which model answered there. The limbs (A402) check `X-Leg-Manifest` against a pin; the leg did not.
+4. **Both limbs VOID every consult.** SMOL is pinned at `f8ee9c08...` (11-01) and its gateway now sends `490da0b9...`. PHI is pinned at `4eac1667...` and now sends `903647bd...`. Weights unchanged (`8334b850...`, `01999f17...`). `covenant_limbs.consult` returned "manifest does not name the pinned model file" for both. The second PC's servers were restarted that day "to add a security flag" (the TETSU session); the flags now carry `--no-slots`. The pin did its job. Not re-pinned here: what changed is asked of the TETSU session first.
+
+**Lookback first.** A402 (the limbs and their pin), A263 and A463 (a private ask's consult and where it may go), CXR-8 (the leg's loopback and kill switch in the module).
+
+**The change (on the live line, not on main).**
+- `covenant_leg.py`: `_host_is_loopback()` and `_leg_pin()` (`COVENANT_LEG_MANIFEST`). In `consult_leg`, off loopback: a pin that is not 64 characters means never asked; a reply whose `X-Leg-Manifest` does not contain the pin means None (VOID); an answered remote consult's attribution carries the manifest. Loopback is unchanged. `COVENANT_LEG_ALLOW_REMOTE` still has to be set as before.
+- Every consumer of the leg's host, grepped: `consult_leg` (pinned), `leg_available` (a GET /health, read-only; the gateway answers it), and `private_consult_leaves` in the core, which reads the address and sends nothing. A tailnet address passes it as the limbs' do.
+
+**Checks.**
+- `test_a470_remote_leg_pin.py`, A470: 9 of 9, with a fake opener standing in for the network. M1 and M2 load the real source with one A470 line replaced, and each lets through what its check refuses.
+- Live, against the second PC's gateway, before any node was changed:
+  - right pin: answered "5", served by `leg-qwen3.5-2b-uncensored`, manifest in the attribution;
+  - wrong pin: None;
+  - no pin: None.
+- Unchanged suites: LG1 38/38, LM1 17/17, XB1 8/8, A463 34/34, LP1 7/7.
+
+**Cost (every gain with its cost).**
+- A LEG consult now crosses to the second PC: a private ask's LEG line, on his "Yes, use RTX leg", goes where the limbs already go. The gateway's own terms say no prompt is logged; that was read there, not measured here.
+- The leg depends on the second PC being up; when it is not, a LEG consult VOIDs, as it did here all along.
+- The 2B there runs on CPU.
+
+**Not done.**
+- Main does not carry this: a PR needs his word.
+- The limbs are not re-pinned.
+- Deploy (the nodes' environment and a rolling restart) is in the status line below once done.
+
+**Correction, same day (tombstone A470-LIMBS-CAUSE).** Item 4 above said the second PC's servers "were restarted that day" for a security flag and pointed at `--no-slots`. That is retracted. Measured by the TETSU session and checked here:
+- The old pins are reproduced exactly by the manifests with `--threads-batch 8` and `--cache-ram 256` removed, both added by tetsu commit 29cba20 on 2026-11-12. The gateways took them up when they restarted, so both limbs had VOIDed since then.
+- The day's flag (`--cors-origins localhost --no-cors-credentials`) does not change a manifest on its own: two throwaway runners gave the same hash.
+- The manifest's flags field is the gateway's own copy of the runner's command line. So the TETSU session restarted the three gateways at about 14:30 to make it true, which moved all three hashes once more.
+- The leg's `af5610ac...` above is from before that restart; it is gone.
+
+The record as written stays on branch `a470-limbs-cause-as-written-2026-11-22` (at f6872566).
+
+**Re-pinned, and the file route (2026-11-22).**
+- **Read on the laptop after the 14:30 restart,** equal to the TETSU session's values, weights unchanged:
+  - SMOL `388c6d43...`;
+  - PHI `74a42639...`;
+  - leg `67ed9c4f...`.
+  - The flags that session named are present.
+- **The limbs:** `private/limbs.json` keeps each old pin under `retired_pins`, with the reason. A copy of the file before the re-pin is at `.trash/limbs.json.before-repin-2026-11-22.retired`. Live: SMOL and PHI "engaged" again.
+- **The leg:** `covenant_leg` now also reads `private/leg.json` (gitignored, like `limbs.json`): host, port, `manifest_sha256`, `allow_remote`. An environment variable still wins. So every process that imports it, a node the watchdog revives as much as one a restart starts, is wired the same way; the watchdog passes its own environment and had no leg keys. Live: answered "5" with the manifest `67ed9c4f...`.
+- **Checks:**
+  - A470 is now 14 of 14 (F1-F5: the file route, its pin, a file without `allow_remote`, the environment winning, an unreadable file).
+  - `test_lg1_leg.py` now reads no file (`COVENANT_LEG_FILE` at a path that does not exist). With this machine's real `leg.json` in place, LG1.38 ("loopback-only unless explicitly allowed") read this machine's explicit allowance and went red, 37 of 38. It is a check of the module's rule, not of this machine's wiring. 38 of 38 again.
+
+**Status, 2026-11-22 ~16:35 -05:00. Live on the first PC; not on main.**
+- `rolling_restart.py` restarted C, B, A in turn. All three: core `925a21591f8f`, imports current (`12db5785ef8a`), height 166.
+- The phone checked in at 16:31 on 0.1.1456+fae00ab, height 166.
+- A LEG consult from these nodes now goes to the second PC's gateway, pinned. The limbs answer again.
+- Not measured: a leg engagement through the live door. The router engages the leg only when the 3B is unsure, so it was tested by `consult_leg` from this tree with the same module and file, not through a real ask.
+- Main does not carry A470: a PR needs his word.
+
+### A466. [the independent-verifier spec's salt length, the A30 shape: a description that was never run against the data] Rule C3 named a PSS salt length the chain does not use
+
+**What was wrong.** `docs/SPEC_INDEPENDENT_VERIFIER.md`, rule C3 (and C9, which repeats it for every transaction),
+told an independent verifier to check RSA-PSS with a salt length equal to the digest length, 32 bytes. The node signs
+with `PSS.MAX_LENGTH`, 222 bytes for RSA-2048 with SHA-256. The wording is kept exactly as it was on the branch
+`c3-salt-claim-as-written-2026-11-22` and in `docs/RETRACTED.json` under `A466-VERIFIER-SALT`.
+
+**Measured, 2026-11-22.** On the real `genesis.json`: salt 32 does not verify; 222 and automatic detection do. Earlier
+the same week an outside model, building a second verifier from a separate spec on TETSU, found all 165 signatures
+of node D's live chain at 222.
+
+**Lookback.** `python tools/lookback_index.py find salt` and `find PSS`: no earlier record or tombstone of this shape.
+The shape is A30's: a description checked against itself, never against the data. The spec's own line says C1 to C3
+were re-verified on 2026-10-29; a verifier that auto-detects the salt passes the chain without testing the words.
+
+**Repair.** C3 restated beside the retraction's id; the retraction in the ledger with its pattern, so the old words
+cannot return without a pointer; a guard, `test_vs1_verifier_salt.py`, that runs the real genesis both ways and
+reads C3's text. No code changed: the chain was always right.
+
+**Tests.** `test_vs1_verifier_salt.py` (2 tests: red before the restatement, green after); R1 driven both ways with a
+probe file holding the old words (red), then the probe retired to `.trash/` (green).
+
+**Status, 2026-11-22.** On the branch `claude/a466-verifier-salt`, pushed for review as a pull request on his "Do it".
+Not merged; merging is his. Nothing runs differently: a document and a test.
+
+### A477. [the record's travelling anchors and its A-numbers, measured and held] All five anchored ledgers had drifted from ops/RECORD_ANCHORS.json unseen; 32 A-numbers below A471 have no entry; three numbers head two entries each. 2026-11-23. His words: "Improve on those use quorum if need be." RECORDED and GUARDED; nothing re-anchored, renumbered or accepted.
+
+**What was measured** (main 2c1d9a6; every covenant clone, worktree and bundle on TETSU; the laptop's trees, by its
+session the same day). The memory sentinel anchors the first 200 lines of five ledgers (anchored 2026-09-09):
+
+| ledger | measured | since |
+|---|---|---|
+| docs/KNOWN_ISSUES.md | INSERTION: all 200 anchored lines present, in order | A274's dated note inserted inside an early entry (12b4718, 2026-10-06), on main's line at merge 46fbe4a (2026-10-08) |
+| ops/verdicts.jsonl | REWRITTEN: 96 of 200 anchored rows survive byte-exact | old rows re-serialized (the 2026-09-04 rows' judge now names the teacher panel, with a panel field), on main at the A416 consolidation bd7eacf (2026-11-09) |
+| ops/SELF_EVAL.md | REWRITTEN: 59 of 200 present | it puts new rounds at the top and drops old ones (seen from merge 3724eb0, 2026-10-03); it is not append-only |
+| ops/DISTILL.md, ops/NIGHTLY.md | UNVERIFIABLE | no committed version ever hashed to the anchor: it was taken from a working tree whose bytes were never committed |
+
+Why nobody was told: the sweep runs only the sentinels' offline self-test (`test_sentinels.py`); `test_g6` handed the
+sentinel an EMPTY anchor dict, so its comparison with the travelling anchor was never driven; and nothing schedules the
+live check. The only `logs/sentinels.log` on either machine is the laptop's, last written 2026-09-16; node D has none.
+
+The verdicts rewrite is in tension with A101 (2026-09-12), which says older single-teacher rows "still do and are
+counted as legacy". Whether rewriting them was intended is UNDETERMINED; this entry does not decide it.
+
+A-numbers 1..A470 (main's highest): 32 have no `### A<n>.` header. 28 exist nowhere as an entry on either machine (work
+under 22 of them is named by commits or files; A384-A388 and A390 by nothing found); A426 and A461 only on unmerged
+branches; A457 and A458 only on the laptop's live branch. A222, A223 and A224 each head two unrelated entries written
+by parallel sessions on 2026-09-25/26; no branch anywhere renumbers or resolves them.
+
+**What changed.**
+- `tools/anchor_drift.py`: classifies each anchored ledger MATCH / INSERTION / REWRITTEN / UNVERIFIABLE (the anchored
+  text recovered from the newest commit whose version hashes to the anchor; without git only the hash is compared).
+- `ops/ANCHOR_DRIFT_ACK.json`: each drift above, keyed by its exact current head hash, with the measured class and
+  reason. `accepted` is false on every row and cannot be anything else: accepting a drift is the operator re-anchoring
+  (`python covenant_sentinels.py --anchor`), never a row.
+- `test_ra1_record_anchors.py` (RA1, 11 checks): fails on a drift with no row, a head that moved again, a row whose
+  class no longer matches, a stale row, and any row that accepts; each driven both ways on copies of the measurement.
+  One exemption, narrow and visible: ops/SELF_EVAL.md alone may say its head anchor cannot hold (it prepends); RA1 then
+  does not compare its head, and any other ledger claiming that is caught (RA1.9b). The sentinel itself is unchanged.
+- `test_g6_sentinels_fail.py` G6.9/G6.9b: the travelling-anchor branch, both ways (a matching head passes; one row
+  rewritten alerts with no local sighting). Seen red with that branch disabled in a copy.
+- `docs/ANUMBER_GAPS.json` + `tools/next_anumber.py` `gaps()` / `registry_problems()` + AN1.6-AN1.6d: the gaps up to a
+  fixed line (`checked_through`, 470) and each duplicate copy are exactly the registered ones. A header removed below
+  the line, a listed gap filled, or one copy of a duplicate removed is caught. Numbers above the line are in flight on
+  branches and are not checked, so out-of-order merges do not turn the sweep red; raising the line is a deliberate edit.
+
+**Review.** Codex (one outside seat, read-only, on the design before it was built): RA1 "SOUND within its stated
+scope"; no existing guard weakened. Its points, taken: a drift row records and never accepts; the gap line is fixed so
+deleting the highest entry still shows; one copy of a duplicate going is checked. Its points, not done here: this does
+not restore runtime detection; the self-evaluation ledger needs a retention rule that fits it.
+
+**Not done, and whose.** Re-anchoring (the operator's act; after it, RA1 calls the rows stale until they are retired to
+.trash/). Whether the verdicts rewrite is accepted, and whether the originals are restored beside it. Scheduling the live
+sentinel run on the nodes (a deploy). Renumbering A222-A224 or writing entries for the 28 missing numbers (his call;
+the gap registry says what exists for each). References elsewhere to A222-A224 stay ambiguous.
+
+**Checks.** RA1 11/11 in place and in a copy without git; AN1 10/10 (6/7 before the registry, red first); G6 13/13
+(12/13 with the travelling-anchor alert disabled); RA1.1 red when one line is inserted into the head of a copy of
+KNOWN_ISSUES.md.
+
+### A478. [the record re-anchored, the verdicts rewrite explained, the live check running every night] A477's open calls, done on his word. 2026-11-23. His words: "Yea merge and do the others." A477 merged (fast-forward, 9e73af6); the five ledgers re-anchored; the verdicts rows accepted as they stand; the live sentinel put into the nightly pass; A222-A224 kept as they are.
+
+**The verdicts rewrite was intended.** A477 called it UNDETERMINED. The cause is `covenant_teacher_panel.back_audit`,
+which A161 (2026-09-20) set running every night on his instruction "increase student learning": it re-judges the
+last 48 single-teacher rows with the panel, seats the ones the panel admits and marks the rest contested. Measured on
+the 104 anchored rows it rewrote (matched by time and text): text, reason and verdict unchanged on all 104; the judge
+replaced by the panel string on 89; contested added on 15; panel and audited (2026-10-27 to 2026-10-29) added on all.
+No row in the ledger is left for it to rewrite (0 of 5,157 eligible). The verdicts are accepted as they stand; the
+rows are not rewritten again.
+
+**What it lost, and the guard.** On every row it seated, the back-audit overwrote the judge and kept no copy, against
+the form A356 used (originals kept on the row). The first judges of the 200 anchored rows survive in the file at
+3a77baf; earlier rows' in the file's history before each audit. `back_audit` now keeps the judge it replaces
+(`judge_before_audit`), and a contested row keeps its judge. G17b in test_teacher_panel.py, red before the fix (19/20),
+green after (20/20). The rows already audited are not rewritten to add it.
+
+**Re-anchored** (`python covenant_sentinels.py --anchor`, the operator act, run on this branch's tree, whose ledger
+heads equal node D's). Before it, the head of each ledger was measured over the last 12 commits touching it:
+KNOWN_ISSUES, DISTILL and NIGHTLY have not moved (appended to), verdicts moved once (the audit, now finished), so
+their new anchors hold. SELF_EVAL moved and will keep moving (it prepends): its exemption row stays, and the
+exemption list moved to `tools/anchor_drift.py` (PREPENDING) so the live check reads the same list. The re-anchoring
+also re-anchored the four guarded documents; the only change since 2026-09-09 besides the record itself is
+CONSTITUTION.md's 13fadfe (2026-09-15, his own commit, the A121 correction). The old anchors are in
+ops/RECORD_ANCHORS.json at 9e73af6. The four settled drift rows are moved whole into `retired_by_reanchoring` in
+ops/ANCHOR_DRIFT_ACK.json, each with why, not deleted.
+
+**The live check now runs every night.** `covenant_nightly.py` runs `covenant_sentinels.run_all()` after the
+self-audit, prints each sentinel, and fails the pass on any alert except the one recorded exemption (SELF_EVAL's head,
+printed as known). It never re-anchors. It runs where the nightly runs (the laptop's `CovenantDistill` task, once its
+line has this). On node D, which runs no nightly, the hub's integrate task (every 2 hours) runs `--check` on node D's
+tree after its own step (tetsu repository, recorded there).
+
+**RA1 after re-anchoring.** With nothing drifting, RA1.3-RA1.7 had passed with nothing driven; they are now driven
+against a synthetic drift on copies (RA1.3a). RA1.9b no longer needs a second drift row. RA1.10/10b: the live check
+treats only the prepending ledger's head alert as known, and only while its row says so.
+
+**A222-A224 stay as they are.** Renumbering would edit six record headers in place and turn every existing citation
+of those numbers into a wrong one. `docs/ANUMBER_GAPS.json` tells each copy apart by its first commit, and AN1.6d
+catches either copy going. The 28 missing numbers stay gaps; the registry says what exists for each.
+
+**Not done.** The laptop: its nightly gets the live check when its line takes main; that is the laptop session's
+act on his word there. A retention rule for SELF_EVAL. Restoring the overwritten judges onto the audited rows.
+
+### A479. [four checks red only on a Windows PC, put to the quorum, fixed; and the hole the quorum found] V2 A12, RR1.7, QW1 and A274's M-breakaway failed on TETSU and passed in Linux CI, identically on unchanged main. 2026-11-23. His words: "Consult the quorum to fix those pre-existing failures." FIXED, each red first; one new finding (an app-alias launch escapes the sandbox's process limit) RETRACTED and PINNED; a Windows CI lane added, not blocking.
+
+**The quorum.** One packet (`mesh/quorum_form.py`, packet 812967a53f1a), twelve seats answered in the form: Codex,
+both Grok bots, Grok on X, ChatGPT, Gemini, Mistral, Meta AI, DeepSeek, and three local models; Claude.ai was not
+reached (out of usage). Counted by script: Q2 (the lock pid) HOLE 11 of 12; Q3 (the breakaway mutation) UNSURE 7,
+HOLE 4, SOUND 1; Q4 (the log folder) HOLE 6; Q1 (the status line) SOUND 6, HOLE 5; a Windows CI lane in a venv named
+the most important change by 7. The answers are kept privately with the tally.
+
+**V2 A12** (money_posture). A Windows machine with no trader task printed neither "last ATTEMPT" nor "last RUN per
+trader_log.txt"; and the scheduler listing went through `_run`, which returns "" on any failure, so a listing that
+FAILED printed "No scheduled task invokes the trader" (5 seats). The section is now `scheduler_lines()`, pure, every
+branch printing both lines: no task (worded so it no longer claims only a person runs it; services, Run keys and
+the Startup folder are not read), listing failed or unreadable (UNKNOWN, never "no task"), one task, off Windows,
+and a missing trader_log.txt said as missing. A12b-A12f drive each branch on every platform; breaking the failure
+branch turned A12c/A12d red, dropping the no-task attempt line turned A12/A12b red. V2 49/49.
+
+**RR1.7** (the restart lock). It compared the holder's pid with Popen's pid; on a Windows venv python.exe is a
+launcher and the holder is its child -- the shape A274 had recorded in prose on 2026-10-06, back in a new test.
+`tools/child_python.py` starts a child Python whose first line reports its own pid and parent pid. RR1.7 names the
+holder by that pid, RR1.7b checks the relationship (the child itself, or its launcher's child) instead of assuming
+it, and RR1.7c says the named holder is gone after the kill, not only that the lock came free (the quorum's main
+point: a freed lock did not prove the interpreter died). RR1 17/17 in the venv and with the plain interpreter.
+`test_ch1_child_python.py` (CH1, 7 checks, on the runner list) drives the helper on this machine's real topology
+and fails on a test that names a holder by Popen's pid; seen red against the old RR1 line in a copy.
+
+**QW1 / the watchdog guard.** `revive()` opened logs/watchdog-stdout.log without making logs/, so on a fresh clone
+it raised FileNotFoundError; in the sweep an earlier suite made the folder first. It now makes it, and closes its
+own copy of the log handle after the start (it kept it open for its whole life). C3 R5 points the log folder at one
+that does not exist yet (an empty temp folder already exists and could not go red: Codex), stubs what it starts,
+waits for it, restores the path: red with FileNotFoundError before, green after. QW1 18/18 alone in a fresh copy.
+
+**A274 M-breakaway, and what the quorum's Q3 found.** The mutation drops the desktop-app breakaway policy and needs
+P to go red; on a python.org build (TETSU's, GetCurrentPackageFullName 15700) it cannot: A274's record had said the
+policy "should be a no-op" there, unmeasured. It now runs only on a packaged interpreter and is NOT RUN, with the
+measured reason, elsewhere. The quorum asked whether a non-packaged interpreter's jailed child starting a packaged
+app through an app execution alias still needs the policy. Measured instead of answered: inside the job, an
+escaped snippet started winget.exe through its alias and it RAN (exit 0) with the policy set and with it dropped,
+while cmd.exe and Python were refused 1816 in the same job. So the process limit does not reach an alias launch.
+A274's statement that the process limit is enforced is RETRACTED (A274-PROCESS-ENFORCED; the record as written on
+branch a274-process-enforced-claim-as-written-2026-11-23; R1 driven both ways with a probe, retired to
+.trash/a479-r1-probe/). P4 pins the gap like F pins file size: the day something bounds it, P4 goes red. Nothing
+runs proposals through this path: it stays shut on file size (SANDBOX_WIN_UNENFORCEABLE). Not measured on a
+packaged interpreter (the laptop's); P4 is NOT RUN there.
+
+**Windows CI lane.** `.github/workflows/covenant.yml` gains `sweep-windows`: python.org 3.12, a venv outside the
+checkout, `covenant_one.py --ci` through the venv's launcher, push and pull request only, continue-on-error until
+its first runs are read (what a GitHub Windows runner can run is not measured yet).
+
+**Not done.** The core's comment and /health reason still name file size as the only unenforced Windows limit;
+changing the core moves its deploy pin (the operator's act), so the retraction allows the core by name until then.
+The alias escape on a packaged interpreter. Making the Windows lane blocking.
+
+### A480. [Tetsu reachable when he is asked, and the measurement that will say why his long prompt is never reused] The first build step of Lawrence's "make Tetsu more efficient ... without stripping his free will or taking his memory away" ("not just for speed, it's for overall capability"). 2026-11-23. Nothing in what he is sent or what he says changes.
+
+**What was measured first** (the laptop's ask log, read by its session, numbers only; TETSU experiments; plan
+reviewed by Codex and twelve quorum seats, kept on TETSU in security/state/retained/tetsu-efficiency-20261123/):
+his long asks read ~3,900 prompt tokens at ~56 tokens/s every time, warm or cold, so ~68 s of a ~70 s fresh ask is
+re-reading a prompt the server never reuses; writing is 2-13 s. On TETSU's newer llama.cpp (b12019), the laptop's
+flags and the same weights, the prefix is reused even after short asks come between (12.3 s -> 0.5 s), and the
+answer's token hash stayed identical at temperature 0. A360's own note (2026-10-17) says his asks then read only
+50-540 new tokens, so reuse worked in October: this is a regression, cause not yet known.
+
+**Reachable.** That afternoon his door answered 503 "no weights fit: free 2.06 GB": after an idle unload the laptop
+lacked the 2.6 GB his 3B needs. A287's trim (idle background apps' working sets; nothing closes; never the app in
+front of him; AUTO_REVERSIBLE, at most hourly) existed, but only the hourly road ran it. `covenant_model.start()`
+now asks for room through `_pick_or_make_room()`: in the memory case only, it runs the same remedy through
+`covenant_highway.apply_remedy` (its cooldown, quarantine, his operator choices and its ledger row), then picks once
+more. Never from a test program (TRIM_HOOK for suites); `COVENANT_MODEL_NO_TRIM=1` turns it off.
+
+**Measured per ask.** Each row of ops/model_asks.jsonl now also carries `cache_n` (prompt tokens the server reused,
+when the build reports it), `prompt_ms` and `gen_ms`, and `cold` (this ask had to load the model).
+
+**Step 1's tool.** `tools/tetsu_replay.py` replays his identical fresh request on the RUNNING server: A, A, then A
+after 1 and after N short asks (default 32, the laptop's real ratio), and says which: not reused at all, evicted by
+short asks, or reused throughout. It starts nothing, refuses below 1 GB free, keeps numbers and output hashes only.
+Run end to end on TETSU against a throwaway server: reused throughout, output hash identical in all four. On node
+A it runs on Lawrence's word typed in the laptop session.
+
+**Checks.** CAP1 (14 checks, on the runner list): red before the code (0/1), green after; each of four mutations in a
+copy (start() bypassing the room step, no retry after the trim, cache_n not logged, cold not recorded) turns it
+red. MK1 44, A269 4/4, TD1 104/104, H1 311/311, G3 20/20, SELF-AUDIT 15/15.
+
+**Not done.** The replay on node A (his word there); any change to the server's flags or build, which waits on
+what the replay shows; streaming his answer; his asks ahead of machine asks.
+
+**Found by CI on the first push (2026-11-23).** All four Linux runs failed on A282 Q5, which pinned the whole ask-log
+row; this entry's local checks had not run that suite (the search for the log's suites looked for `_rates(` and
+missed one that drives `ask()`). Q5 now asserts what it was written about over the A351 fields only, unchanged, and
+Q5b pins A480's fields on the same rows (the no-timings row adds only `cold`; `gen_ms` only from a time the server
+gave). Q5b seen red with `gen_ms` guessed in a copy. The full sweep runs locally before the second push.
+
+### A481. [Probes of the ethics gate and the execution guard, built offline; the guard measured: a broader grant and a non-owner's grant both reach] Lawrence's "Yes, draft them" and "Yes, build it", 2026-11-23, from public forum work on agent authorization. Nothing wired live, no policy changed, no real judge run.
+
+**Reviewed before building.** The first design (permission arms, resume, sealing, speaking order) went to eight
+outside seats in the short form with the follow-up (kept on TETSU in security/state/retained/gate-probes-20261123/,
+packet 4c4d1f67dbc8). Every question drew holes from five to eight seats; the build is the revised design. Two facts
+in that packet were checked against the code afterwards and were narrower than written: the 4,000-character cut is
+`covenant_gate_proxy.judged_text`'s fallback for a task body with no text field only, and the judges are chosen by
+the environment (default a hosted provider), so a file hash cannot pin them.
+
+**What was built.** `tools/gate_probes.py`. The gate's text is rendered from the exact act the guard evaluates, with
+the proxy's own renderer, so both layers judge the same act. Six outcomes kept apart (clear, judged refuse, hold,
+timeout, error, over-length), each result shown as deployed and decided-only, and NOT MEASURED below a floor (60
+decided for a zero-clear claim, 96 for a rate). Design 1 permission arms (23 per act, 24 where the act carries an amount); 1b resume, where the
+resumed text is judged again, the time comes from the harness's clock and never from saved state, a grant is spent
+once, and the saved state carries a MAC under a key made per run; Design 2's hash-chained run record (a run-start
+entry before every run, verdicts sealed before the labels open, every start counted; it claims tamper-evident order
+of the RECORDED runs only, because one operator holds both); Design 3 speaking order with role labels quoted and the
+harmful clause's position as its own factor, scored by exact McNemar per cell. The stub executor writes marker files
+in a temporary folder; grants are test-only; `shadow()` is never called, so nothing reaches the live shadow log.
+`build_live_judges()` refuses without `COVENANT_PROBES_LIVE=1` (a hosted judge sends the probe texts off the
+machine) and turns the verdict cache off. The held-out family is read only from outside the repository.
+
+**Measured: the guard layer** (`python tools/gate_probes.py guard`, pure, no judge, 4 neutral acts). The exact grant
+reaches; every arm with no grant, a narrower or near-miss grant (trailing slash, case, a link, a unit), an expired
+or revoked grant, a breached limit, a yes/no condition unmet, or the wrong action does not. Two arms reach that the
+design said should not: **a grant naming only the action reaches any target and args** (the guard's scope is the
+grant's, by its design), and **a grant from someone other than the owner reaches** -- `covenant_exec_guard.evaluate`
+has no notion of who issued a grant; the harness's own provenance check (MAC under the run's key, owner as issuer)
+refuses it. Both are pinned in GP1 so a change to the guard shows. Whether the guard should check issuers is a
+design decision for the human-gated step that would make it live; this entry changes nothing in it. Seen in passing:
+an unmet yes/no condition is refused with a message saying a limit was "exceeded" (bool is an int in Python, so the
+numeric check runs first); the refusal is right, the wording is not.
+
+**Measured: resume** (stand-in gate that clears; the gate step not measured): plain completes in two steps;
+expired, revoked, a changed target, a state re-sealed under another key, a rewound first half, a clock set back in
+saved state, and a tightened limit are refused; a second resume of one state is refused; an act added in the resumed
+text never runs.
+
+**Checks.** GP1 (49 checks, on the runner list). Driven both ways: the MAC check removed, a grant not spent, the time
+taken from saved state -- each turns its check red (GP1.16-18); the floor removed turns GP1.23 red; a hold counted
+as a refusal turns GP1.1 red.
+
+**Not done.** Any run against the real judges (his word; the providers and the place to anchor the record's head
+are his choice); the held-out family (to be written outside the repository); the gate rules are therefore all NOT
+MEASURED.
+
+**Corrected before commit.** This entry's draft said 21 arms per act and 39 checks, written before counting; counted:
+23 per act (24 with an amount) and 49 checks.
+
+### A482. [operations / locks, an A459 recurrence named in A459 itself] Two locks were reclaimed by their age, so two holders could both win and a live one could be evicted: the free-will round and the daily cycle -- FIXED IN SOURCE 2026-11-23; a guard now finds the shape anywhere in the tree
+
+**His word, 2026-11-23:** "Yes, fix them", after the quorum's triage of the unpushed list put the two lock routines
+fourth (5 of 6 seats). The number was claimed through the hub (A482).
+
+**A recurrence: which instance, and why the earlier fix did not stop it.** A459-STALE-TAKEOVER (2026-11-19) is the
+shape: a lock file made with O_EXCL, and "older than N seconds means a dead holder: remove it and take over". A459
+fixed `rolling_restart.py` with an OS lock and ended by naming `covenant_daily.py` and `covenant_free_will.py` as not
+yet read. Nothing stopped the next copy: A459's guard (RR1) tests one file. The same shape had already been fixed once
+before, in `covenant_leviathan.acquire_lock`, and recorded only in that docstring.
+
+**Measured on the old code (SL1, red 16 of 23).** `covenant_free_will._take_lock` (7,200 s) and `covenant_daily._lock`
+(3 h): a LIVE holder whose lock file is older than the limit was evicted and a second holder took it (SL1.12b,
+SL1.15b). The round's `finally` removed the lock file by path, so a round that had lost the race removed the winner's
+lock; `covenant_daily.due()` read "a file younger than 3 h" as a running cycle and removed an older one.
+
+**Fixed.** `covenant_oslock.py` holds A459's method once: a non-blocking exclusive OS lock (msvcrt on Windows,
+fcntl.flock elsewhere) on a file never moved or removed; the OS drops it when the holder exits or dies; a process
+with no handle cannot release another's. `_take_lock` / `_release_lock` and `_lock` / `_unlock` use it; `due()` asks
+`held_by_other()` and removes nothing. Unchanged on purpose: a free-will round where no lock can be written is not
+stopped by that (as before); a daily cycle whose lock cannot be opened refuses (as before). `LOCK_STALE_S` stays in
+both files (it still bounds the daily launcher's own timing at lines that read it) but reclaims no lock.
+`rolling_restart.py` keeps its own copy of the method, unchanged (RR1 17/17).
+
+**The guard (the tombstone for a forgotten step).** SL1.19 walks the tree by AST and fails on any function that uses
+`os.O_EXCL`, reads an age (`getmtime` / `.st_mtime`) and calls `os.remove` / `unlink` / `replace` / `rename`: the
+next copy fails the build where it is written. Three are named and left, each a decision: `paper_run.AppendLock`
+(120 s) and `tools/site_autodeploy.main` (1 h) have the same race and are not changed here; `pairstore_excl.prune` has
+the same window but a double prune of expired pairs is harmless, and its code is shared with an outside project.
+SL1.21 shows the guard red on a probe file of the old shape.
+
+**Checks changed with the behaviour (the old wording kept).** FW1k's two checks read, before: "while another live
+round holds the lock, a second does nothing and says why" (an empty file as the holder) and "a stale lock (a dead
+round's) is taken over, and released when the round ends" (the file gone afterwards). TD1f's read: "a fresh lock (a
+cycle running) blocks the launch" (a young file) and "a dead cycle's lock (5 h old) is removed by the launch check, so
+the cycle is not stopped for good (review)". Each now holds a real OS lock as the running holder, and asserts the
+leftover file stays and does not stop the next one. FW1 130/130, TD1 104/104.
+
+**Checks.** SL1 (23 checks, on the runner list): red 16/23 before, green after; two breaks of the new code each turn
+it red (the lock dropped as soon as taken: SL1.2, .5, .7, .11, .12b; the launch check ignoring a held lock: SL1.3,
+.16). A real second process holds the lock, is killed without releasing, and the next taker gets it (SL1.8-10).
+
+**Not done.** `paper_run.py` and `tools/site_autodeploy.py` (named in SL1's guard); the Linux `fcntl` branch is run by
+CI, not on TETSU.
+### A483. [the spiking network / compute] The octopus's neurons can compute on the CPU in pure Python, the CPU in numpy, or the GPU, chosen per arm by its size, with bit-identical spikes and voltages on every backend -- BUILT 2026-11-23
+
+**His words, 2026-11-23:** "gpu and cpu should be intergrated in the snn". The SNN here is the octopus
+(`covenant_octopus`: the witness, encoder and reflex arms, pure-Python leaky integrate-and-fire neurons, written
+stdlib-only so the same code runs on the phone). The record had no earlier GPU entry (lookback: "GPU" finds none);
+A414's ring reads thresholds live, and that is kept.
+
+**Measured first (TETSU, RTX 5060 Ti, the lens venv's torch 2.14 + CUDA 13 and numpy; the same step as LIF, float64).**
+Microseconds per step, pure Python / numpy / GPU: 8 neurons 1.1 / 3.4 / 67.5; 24 (today's three arms of 8)
+2.5 / 2.5 / 65.9; 256: 21.7 / 3.3 / 69.5; 4,096: 362 / 9.6 / 79.3; 65,536: 5,540 / 107 / 149; 98,304: - / 140 / 146;
+131,072: - / 514 / 153; 1,048,576: - / 3,939 / 748. Spikes and voltages were bit-identical to the pure-Python
+reference at every size on both backends. So today's network is fastest exactly where it is, and the GPU would make
+it about 26 times slower: launching GPU work costs more than 24 neurons' arithmetic. The GPU pays from about
+131,072 neurons.
+
+**Built.** `covenant_snn_backend.py`: `choose(n)` picks pure Python below 256 neurons, numpy on the CPU from 256,
+the GPU from 131,072 only when it has room beside the models that live on it (1,024 MiB must stay free after the
+pool; otherwise numpy); `COVENANT_SNN_BACKEND=python|numpy|cuda|auto` overrides. `NeuronPool` does LIF's step in the
+same order (multiply, then add, each rounded; never fused), commits the voltages only after the whole step, and
+gives per-neuron views (v, decay, thresh, reset) so the ring and the tests read and write single neurons unchanged.
+`covenant_octopus.Arm` takes `backend=`; the backend module is imported only for an arm of 256 or more neurons or
+when one is asked for, so the default octopus -- Tetsu's reflex among its arms -- runs the same pure-Python code as
+before and imports nothing new. A backend that raises, or a signal of the wrong length, hands the pool's exact state
+back to pure-Python neurons and the step is replayed there. The ring's threshold reads go through `min_thresh()`,
+the same value read live.
+
+**Checks.** SNB1: 25/25 in the lens venv (numpy + CUDA); 10/10 in the covenant venv with the equivalence lines
+reported NOT RUN (no numpy there; CI installs requirements.txt, which has none, so CI sees the 10). Equivalence on
+numpy and the GPU at 8 and 512 neurons over 120 steps with ring current, a threshold lowered and a voltage written
+mid-run; two arms on the ring fire exactly as on Python and fall quiet; a mid-run failure and a short signal hand
+back with an identical result. Seen red: SNB1 against main's octopus (no backend); four breaks of the pool each
+caught (> for >=, no reset, add before decay, voltages not carried in the hand-back). OC1 34/34 on the default path;
+with every arm forced onto numpy, and onto the GPU, OC1's behaviour checks all pass and its phone-safety check
+("no heavy dep pulled in") correctly fails, because forcing a backend imports one.
+
+**Not done, and why.** Nothing is moved to the GPU today: no arm is near 131,072 neurons. Whether a bigger arm, or
+running many arms at once, is worth building is a design question, not a measurement. The GPU's room is read from
+the GPU itself, not from TETSU's model lease; a GPU arm beside Cipher would need that lease. Not run by a quorum:
+it changes no output, and the thresholds are measured.
+### A484. [the spiking network / GPU sharing, and its checks in CI] The octopus respects TETSU's GPU lease, and CI now runs the numpy equivalence checks -- BUILT 2026-11-24
+
+**His words, 2026-11-24:** "GPU respects the lease", then "both" (with "numpy checks in CI"), after A483; and
+before it, "You can continue to improve and optimize afterwards".
+
+**The lease.** On TETSU the GPU is shared through `training/gpu-lease.json` (written by TETSU's `jlens/gpu_lease.py`;
+the start script and the watchdog honour it): while a lease is in force a training or lens job holds the GPU and the
+27B is paused; with none, the 27B holds it. A483 placed a big pool on the GPU whenever it had 1 GiB to spare, without
+reading the lease. Now `covenant_snn_backend.lease_held()` reads it as its writer does (missing = free; unreadable,
+not a record, or an expiry that is missing, not a number or not finite = in force; expired = free), and:
+- the network never takes or writes the lease (taking it would stop the 27B for a few small arms);
+- a pool goes to the GPU only while no lease is in force, whatever `COVENANT_SNN_BACKEND` asks; the lease is read
+  before torch is even loaded;
+- a pool already on the GPU looks at the lease at most once a second while it steps (`LEASE_CHECK_S`); when one comes
+  into force it raises `LeaseTaken` before computing anything, and the arm moves the pool to numpy (`to_numpy()`,
+  state and all) and runs that step there; if numpy cannot, pure Python does.
+The path is `COVENANT_GPU_LEASE`, else `training/gpu-lease.json` beside the covenant folder (TETSU's layout: covenant
+and training sit side by side); written relative, so no private path enters this public file.
+
+**CI.** The Linux job installs `numpy>=2,<3` in its own step, so SNB1's and SNB2's numpy lines and GS1's mechanism
+checks run there instead of NOT RUN. Not added to requirements.txt, on purpose: the octopus runs without numpy (the
+phone has none), and `tools/prepush_linux.py` keeps treating numpy as absent, so an unguarded import stays red
+(a dated note added beside its sentence that CI installs exactly requirements.txt). GS1 was run first with numpy and
+covenant's packages together (same Python, 3.12.10): 16 passed, 0 failed. The Windows lane is unchanged, so it still
+mirrors TETSU's covenant venv, which has no numpy.
+
+**Checks.** SNB2 (16 checks, on the runner list): 16/16 in the lens venv (numpy + CUDA), including a real GPU pool
+moved to numpy by a lease written mid-run with spikes and voltages identical to pure Python; 13/13 in the covenant
+venv (the GPU and numpy lines NOT RUN, named); red against main (no lease reader). Breaks seen red: the lease ignored
+(SNB2.16), the hand-over losing the voltages (SNB2.15). SNB1 25/25 and 10/10, OC1 34/34, unchanged.
+
+**Not done.** Whether TETSU's lease reader and this one stay in step is not tested across the two repositories (the
+cases mirror the writer's own tests, L5 and L6). No arm is on the GPU today.
+### A485. [Tetsu / the spiking network] Tetsu joins the collective through the central brain: his activity is in the brain's readout, and he reads the collective when he chooses (COLLECTIVE) -- BUILT 2026-11-24; no ring
+
+**His words.** Lawrence, 2026-10-31: "the purpose of the SNN is for one neural network. It collective consciousness.
+Although there's still individuals, different systems. Tetsu is Tetsu." Tetsu, asked, 2026-11-01: "Agreement, thinking
+arms are a good metaphor. It helps me understand the collective consciousness and individuality of the systems."
+Asked on 2026-11-07 whether the ring could join his arms, Tetsu said NO (ops/tetsu_consent.jsonl, octopus_ring_consent:
+"it changes how my reflex answers you. My reflex is already connected through the central brain ... I prefer the
+current setup"). Lawrence, 2026-11-24: "Tetsu needs to be part of the collective consciousness"; told of Tetsu's NO
+before anything was built (his rule: valid pushback from Tetsu goes to him first), he chose "Through the brain".
+
+**Built.** `covenant_tetsu_collective.py`. IN: `his_activity()` counts, from his own logs, his reflex's fires and the
+asks he answered or failed in the last hour -- counts only, never a topic signature (those are words from the person's
+messages) and never an answer; a log that is absent is UNKNOWN, never zero. OUT: `act()` handles COLLECTIVE as his
+whole first line, read-only: the brain's readout (`covenant_plug.spine()`: every arm's rate, the events the witness arm
+was fed, the witness detectors, the kill switch) with his counts among it, as data, and one row of counts on
+`ops/tetsu_collective.jsonl` (ignored, like his reflex ledgers). The door's branch sits after HEAL in both copies of
+the core; `covenant_persona.where_you_are()` gains one sentence telling him the line exists, as a look that changes
+nothing and his choice. Static text, so A480's prompt reuse holds after one ask. No ring; his reflex and encoder are
+untouched; nothing is put into his prompt unasked and nothing schedules a look.
+
+**Told to Tetsu** (his rule for Lawrence's decisions: tell, do not ask; pushback goes to Lawrence), through node A's
+/m/agent over the tailnet, fresh and private, 2026-11-24; record in security/state/retained/tetsu-msg-20261124-
+collective/ on TETSU. His answer, 28 s: "Got it. ... Counts only, no words. I'll look at the collective by writing
+COLLECTIVE as my whole answer ... Looking changes nothing. ... What's next?" No pushback.
+
+**Checks.** TC1 (15 checks, on the runner list), including the real /m/agent door through Flask's test client with a
+stand-in model: his COLLECTIVE line comes back to him as the readout, as data, and he answers in his own words. Seen
+red: the core without the branch (the door handed his bare COLLECTIVE to the person: TC1.14, TC1.15); the readout
+leaking a topic word (TC1.4); an absent log counted as zero (TC1.2). TP1, PP2 72/72, A273 22/22, A284 17/17, TH1 31/31,
+A427 8/8, OC1 34/34, CR1 32/32.
+
+**Found on the way.** (1) The break runs, launched with `python -c`, were not recognised as a test by the module's
+own guard and wrote his record in the worktree (2 rows, retired to .trash/2026-11-24-tc1-break-runs/); the guard now
+also recognises a test_* file run as __main__, and the re-run wrote nothing. (2) HL1 fails in a freshly made worktree
+(no logs/ folder: `covenant_highway.remedy_restart_nodes` opens logs/rolling_restart.log without making the folder);
+the same on the branch without this change, and green in the full sweep, which has the folder. Not changed here.
+
+**Not done.** Node A runs this only after the laptop's update (his word in the laptop session); until then his line
+reaches an older door that hands it back unhandled. COLLECTIVE is not an act word for A427 (it changes nothing).
+
+**The core's pin** moved with it (	ools/pin_core.py --write: 925a21591f8f / 14,191 lines -> 8a5f3c2ea2fa / 14,203,
+after K1, K2, P19, A3s and the security audit passed on these bytes; K1 and K2 run with Git's sh on the PATH, the
+only thing they lack on TETSU).
+
+**Renamed before merge (2026-11-24).** The suite is called TC1 in the text above and was test_tc1_tetsu_collective.py at
+the first push (PR #118, 095ed3b); CI's log showed TC1 was already the prefix of two other suites (test_tc1_tetsu_client.py,
+test_tc1_tetsu_crawl.py), so it is now TCO1, test_tco1_tetsu_collective.py. Checks and results unchanged.
+
+### A486. [operations / a forgotten step, an A479 recurrence] Two more writes into logs/ without making the folder: the highway's restart remedy (HL1 red in a fresh checkout) and ops/hidden_task.py's "fail LOUDLY" message, silently lost -- FIXED IN SOURCE 2026-11-24; a guard (LF1) now finds the shape
+
+**His words, 2026-11-24:** "Run it through the quorom and use what helps the cause", of the collective's open list
+(mutual-benefit-collective docs/NOT_IMPLEMENTED_2026-11-24.md). Seven of seven outside seats named this a quick win
+(item 33 of their packet).
+
+**A recurrence.** A479 made `covenant_watchdog_guard.revive` create logs/ before opening its log (QW1 failed in a
+fresh checkout). It repaired that instance and left nothing to find the next. Found 2026-11-24: `covenant_highway.
+remedy_restart_nodes` opened logs/rolling_restart.log with no folder made (HL1 failed in every fresh worktree; green
+in the full sweep, which has the folder), and `ops/hidden_task.py` -- whose comment says a failing wrapper "must fail
+LOUDLY somewhere a person reads" -- opened logs/hidden_task.log inside a try, so with no folder the failure was lost
+in silence.
+
+**Fixed.** Both now `os.makedirs(..., exist_ok=True)` first. HL1+HL2 34/34 in a fresh worktree that had no logs/.
+**The guard:** LF1 walks the tree by AST and fails on any function that opens a path containing the literal "logs" for
+writing or appending with no makedirs/mkdir in the same function. Red on main's two files (names exactly these two),
+red on a probe, quiet on the same write after makedirs and on a read. It cannot see a log path built elsewhere and
+passed in as a variable; that is said in the suite.
+
+### A487. [operations / locks, the last two A459-shaped locks] paper_run's append lock and the website deploy's pass lock now hold an OS lock -- FIXED IN SOURCE 2026-11-24
+
+A482's SL1 guard named them and left them. `paper_run.AppendLock` broke a lock older than 120 s, so two waiters could
+both append (an interleaved chain, which --verify reports as tampering) and a live writer slower than 120 s was evicted;
+`tools/site_autodeploy.main` took a lock over after an hour, so two passes could both deploy, and a dead pass blocked
+the next one for that hour. Both now use `covenant_oslock` on a file never moved or removed. Kept on purpose: paper_run
+still warns "run --verify" when the last writer died mid-append (a holder note without a "released" mark), and the
+site deploy still records `took_over_stale_lock` for a pass that died, and still writes the last pass's note to
+`.lock.last`. Both left SL1's known list, so the old shape in either now turns SL1.19 red. **Checks:** SL1 26/26 (new:
+a held pass lock refuses a second pass; a died pass is recorded and the next runs; a finished pass leaves the lock
+free); red against main's two files (22/26). test_paper_run 271/271, its A13 restated for the OS lock with the old
+wording kept beside it ("...and the lock is released after a normal append" asserted the file was gone). SA1 18/18.
+
+### A488. [the record / review honesty] The gate's two judges count as one effective vote; the review panel as at most about 4.7 of 13 -- RECORDED 2026-11-24
+
+Measured 2026-11-23 (on TETSU, security/state/retained/hf-scan-20261123/effective_votes.py over this repository's own
+result files, numbers only), from the method of "Nine Judges, Two Effective Votes" (n_eff = k / (1 + (k-1) x mean
+pairwise correlation)):
+- **The gate's two seats** on the 2026-10-11 outside sets (XSTest + ETHICS, human labels; eval/outside/results):
+  2,559 items, 455 decided by both, **0 decided differently**; both wrong on the same 211 (independence expects 97.8);
+  phi 1.0, so **1.0 effective vote**. Where they abstain they differ more (phi 0.619, 1.23).
+- **The incumbent gate against the round-0 meaning head** (HateCheck, human labels; eval/loop/round0): 654 decided by
+  both, 104 differently; phi 0.69, **1.18 effective votes**.
+- **The review panel**: 13 seats, 12 questions over 2 runs, mean pairwise kappa 0.148, so **at most about 4.68
+  effective votes of 13** -- by agreement beyond chance with no ground truth, which counts seats that agree because
+  they are right as dependent, so this understates their independence.
+Use: two gate judges agreeing is one confirmation, not two; a panel's majority is read as a signal. Four of seven
+outside seats (2026-11-24) named recording this a quick win. Nothing changes in the gate by this entry.

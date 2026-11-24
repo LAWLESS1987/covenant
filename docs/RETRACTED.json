@@ -2900,6 +2900,76 @@
     "docs/LOOKBACK_INDEX.md"
    ],
    "note_on_branch": "The claim as written, with the code that did not keep it, stays runnable on branch a463-limb-claims-as-written-2026-11-20 (at 35a16ea)."
+  },
+  {
+   "id": "A466-VERIFIER-SALT",
+   "claim": "That an independent verifier checks the genesis signature, and by rule C9 every transaction's, with RSA-PSS salt length equal to the digest length (rule C3 of docs/SPEC_INDEPENDENT_VERIFIER.md, in the text whose invariants C1-C3 the spec says were re-verified on 2026-10-29).",
+   "verbatim": [
+    "Verify RSA-PSS (MGF1-SHA256, salt length = digest length, hash SHA-256) with any RSA library."
+   ],
+   "truth": "The node signs with PSS.MAX_LENGTH (covenant_unified_v8.py, every padding.PSS in it), which for RSA-2048 with SHA-256 is 222 bytes. Measured 2026-11-22 on the real genesis.json: its signature does NOT verify with salt length 32, and verifies with 222 and with automatic salt detection. A verifier built from the rule as written would have rejected the real chain; one that auto-detects the salt would have passed it without anyone noticing the text was wrong. Found while an outside model built a second verifier from a separate spec (tetsu security/second_verifier.py, 2026-11-21), which measured 222 on all 165 live signatures of node D's chain.",
+   "refuted_by": "test_vs1_verifier_salt.py, which runs the real genesis.json with salt 222, MAX_LENGTH and 32 and reads rule C3's text.",
+   "patterns": [
+    "salt length = digest length"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md"
+   ],
+   "branch": "c3-salt-claim-as-written-2026-11-22"
+  },
+  {
+   "id": "A470-LIMBS-CAUSE",
+   "date": "2026-11-22",
+   "by": "Claude (an AI), HF reply chat; refuted by the TETSU session's measurement the same day, checked here",
+   "claim": "A470's record (f6872566) put both limbs' VOIDs down to the second PC's restart that day for a security flag, and pointed at --no-slots.",
+   "verbatim": [
+    "The second PC's servers were restarted that day \"to add a security flag\" (the TETSU session); the flags now carry `--no-slots`."
+   ],
+   "patterns": [
+    "restarted that day \\\"to add a security flag\\\""
+   ],
+   "refuted_by": "The TETSU session, 2026-11-22: the old pins are reproduced exactly by the manifests with --threads-batch 8 and --cache-ram 256 removed, both added by tetsu commit 29cba20 (2026-11-12) and picked up when the gateways restarted; the day's flag (--cors-origins localhost --no-cors-credentials) does not change a manifest on its own (two throwaway runners gave the same hash). Checked on the laptop: the re-read manifests equal that session's values and the flags it named are present.",
+   "truth": "Both limbs had VOIDed since the gateways restarted onto runner flags changed on 2026-11-12 (--threads-batch 8, --cache-ram 256); not since the 2026-11-22 restart, and not because of --no-slots. Re-pinned 2026-11-22 (private/limbs.json keeps the old pins under retired_pins).",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md"
+   ],
+   "note_on_branch": "The record as written stays on branch a470-limbs-cause-as-written-2026-11-22 (at f6872566)."
+  },
+  {
+   "id": "A274-PROCESS-ENFORCED",
+   "date": "2026-11-23",
+   "by": "Claude (an AI), A274's author session's record; refuted by the TETSU session's measurement (A479), after the quorum asked",
+   "claim": "A274 (2026-10-06) recorded the Windows Job Object path's process limit as ENFORCED: ActiveProcessLimit 1 together with the desktop-app breakaway policy keeps every child the jailed code starts inside the job, so cmd.exe, os.system and a second Python are refused.",
+   "verbatim": [
+    "ENFORCED by the two together."
+   ],
+   "patterns": [
+    "ENFORCED by the two together"
+   ],
+   "refuted_by": "A479, measured 2026-11-23 on TETSU (python.org CPython 3.12, not packaged: GetCurrentPackageFullName 15700): an escaped snippet inside the job started winget.exe through its app execution alias and it ran (exit 0), with the breakaway policy set and with it dropped alike, while cmd.exe and Python were refused 1816 in the same job. Pinned as P4 in test_a274_win_job_sandbox.py. Asked first of the quorum, which could not say (7 seats UNSURE, 4 HOLE).",
+   "truth": "The process limit holds for cmd.exe, os.system and a second Python, as measured; it does NOT hold for a packaged app started through an app execution alias, which runs outside the job's count on a python.org build. Not measured on a packaged interpreter. The Windows path stays shut on file size either way (SANDBOX_WIN_UNENFORCEABLE), so nothing runs proposals through it.",
+   "records": [
+    "docs/KNOWN_ISSUES.md"
+   ],
+   "allow": [
+    "docs/RETRACTED.json",
+    "docs/KNOWN_ISSUES.md",
+    "docs/CORRECTIONS.md",
+    "docs/LOOKBACK_INDEX.md",
+    "covenant_unified_v8.py",
+    "pending-v8.38/",
+    ".trash/a479-r1-probe/"
+   ],
+   "note_on_allow": "The core's comment at the _win_job_run limits (and its pending copy) still carries the A274 wording. Changing the core moves its deploy pin, which is the operator's act, so the core is allowed by name here until that change is made; the record and this entry carry the truth. .trash/a479-r1-probe/ holds the probe that drove .C red on 2026-11-23, retired there, not deleted.",
+   "note_on_branch": "The record as written stays on branch a274-process-enforced-claim-as-written-2026-11-23 (at a200592)."
   }
  ]
 }

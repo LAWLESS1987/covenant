@@ -1129,27 +1129,29 @@ def _ver(res):
     return out
 
 
-LOCK_STALE_S = 7200
+LOCK_STALE_S = 7200      # A482: no longer reclaims anything; kept because it was the old limit and FW1k names it
 
 
 def _take_lock(path, stale_s=LOCK_STALE_S):
     """One live round at a time: the nightly's round and a scheduled one must not both reply to the same
-    people before either has recorded it. A lock older than stale_s is a dead round's and is taken over."""
+    people before either has recorded it.
+
+    A482 (the A459 shape): this used to treat a lock older than stale_s as a dead round's, remove it and take it
+    over. Two rounds could both judge it stale and both hold it, and a live round slower than stale_s was evicted
+    (SL1.12b, red on the old code). Now an OS lock through covenant_oslock: the OS drops it when the round's
+    process exits or dies, so there is nothing stale to take over. stale_s is accepted and unused. Unchanged: when
+    no lock can be written here at all, the round is not stopped by that (True)."""
+    import covenant_oslock as _OL
     try:
-        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        try:
-            if time.time() - os.path.getmtime(path) > stale_s:
-                os.remove(path)
-                return _take_lock(path, stale_s)
-        except OSError:
-            pass
-        return False
+        return _OL.acquire(path) is not None
     except OSError:
-        return True                      # no lock can be written here: the round is not stopped by that
-    os.write(fd, ("%d %s" % (os.getpid(), time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))).encode())
-    os.close(fd)
-    return True
+        return True
+
+
+def _release_lock(path):
+    """Release this round's lock. False when this process does not hold it: a round cannot release another's."""
+    import covenant_oslock as _OL
+    return _OL.release_path(path)
 
 
 def run_round(dry_run=True, say=print, sends_path=None, tetsu_updates=False, tetsu_ask=None, tetsu_tell=None, **kw):
@@ -1191,10 +1193,7 @@ def run_round(dry_run=True, say=print, sends_path=None, tetsu_updates=False, tet
                 say("free: Tetsu's update could not run (%s)" % type(e).__name__)
         return out
     finally:
-        try:
-            os.remove(lock)
-        except OSError:
-            pass
+        _release_lock(lock)              # A482: drops only this round's own lock; the file stays
 
 
 def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=None, introduce=None,
