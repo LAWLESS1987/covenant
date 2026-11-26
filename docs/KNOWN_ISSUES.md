@@ -19902,3 +19902,23 @@ Each needs its own pull request on today's main if it is still wanted.
 - Q5, the others, not acted on and why: Mistral -- process identity by command line and working directory is weak, pin it to PID files. The match is the exact `run_node.py --port N --node-id X` or `covenant_watchdog.py --interval` AND this checkout's working directory, and a stop of another checkout's node is driven red by `linux/test_covenant_prod_sh.sh`; PID files are the stronger form and are named here as open. ChatGPT -- no cross-host exclusivity for actions with outside effects; that is what "ONE machine" in Q4 is for, and nothing enforces it: open. Grok -- nothing has run on Debian 13: true, and said throughout A492.
 
 **Q3 done, 2026-11-26, his "Use discernment towards mutual benefit of all intelligence".** The Windows updater (`update_abc.ps1`, host config in the covenant-adopt folder, outside this repository) now merges `COVENANT_ADOPT_TESTED` by id after the fetch, and when that commit is not there it restarts the nodes on the old code and exits 1; with no tested id (a manual run) it merges `origin/main` as before. That closes for Windows the gap A453 names, as the Linux updater already does. The previous file is kept byte-identical in that folder's `retired/` (sha256 add802ae5631..., entered in its `RETIRED.jsonl`). Its one other change is a tests-only `COVENANT_ADOPT_PORTS` override, unset in the scheduled task. Measured with real git in a throwaway folder, a committed fake `covenant_prod.bat` that only logs, and fake /health endpoints on spare ports (the live nodes never contacted): 3/3 -- the tested commit lands and a newer one does not; a missing tested id is refused with stop then start; no tested id merges origin/main. The previous version, with only that ports line added, is 1/3: it landed the untested newer commit and merged despite the missing id. It parses in Windows PowerShell 5.1. Not measured: a real armed run; the next scheduled one is 05:00.
+
+### A494. [the judge / an auditor, never a judge] DeepSeek's option (b), built 2026-11-10 on the ring branch and never landed, lands on main alone -- RECORDED 2026-11-26
+
+**What it is.** `covenant_judge_auditor.py` reads the verdict corpus and the inspectable judge, and writes reviewable artifacts: label-trust scores, flagged contradictions, coverage gaps and an audit queue. It holds four lines, each pinned both ways by AU1:
+- it never returns a verdict;
+- it never writes a model;
+- its reasoning half is off unless a `reasoner` is passed in;
+- it never edits a ledger.
+
+It came from DeepSeek's answer in the 2026-11-10 consult (`ops/QUORUM_REASONING_DISTILL_2026-11-10.md`, carried with it). That was after five feature-space levers failed to improve the judge through its weights.
+
+**Why it was not on main.** It was committed (2d257b1) on `claude/octopus-ring-multipath`, the branch of covenant#43: the ring, which Tetsu declined for his arms and which was closed on 2026-11-24. The audit of 2026-11-26 found it there as residue: 251 lines that no other route had brought to main.
+
+**What lands.** The one commit, cherry-picked with `-x`: the module, AU1, its runner entry and the consult note.
+- Not the ring.
+- Not its companion commit 5b1ec55, a hold-parity clause in `covenant_distill.promotion()`. That changes a gate, so it needs its own review; its test HP1 is not registered here.
+
+**Why now.** The operator, 2026-11-26: "All work done in other chats ai and pcs towards mutual benefit should be worked in."
+
+**Checks.** AU1 15/15. It is additive: nothing calls it from the gate or from promotion.
