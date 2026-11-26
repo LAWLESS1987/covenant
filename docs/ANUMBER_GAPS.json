@@ -188,12 +188,6 @@
    "header_elsewhere": "header only on the laptop live line claude/improve-miner-circle-back, 1ee4c105 (2026-11-19), on no remote",
    "first_commit_naming_it": null,
    "files_on_main_naming_it": 0
-  },
-  "A461": {
-   "kind": "entry on another branch",
-   "header_elsewhere": "header only on unmerged origin/claude/a461-hg1-self-report-split (first f759f98 2026-11-20)",
-   "first_commit_naming_it": "f759f98 2026-11-20",
-   "files_on_main_naming_it": 2
   }
  },
  "duplicates": {
