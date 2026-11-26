@@ -749,7 +749,12 @@ SUITES = [
     # demands, the peer it will not obey, and the quarantine counter. Every one
     # mutation-tested. Hermetic: fixture conditions, temp ledgers, no node and
     # no network, so it measures the rules rather than the machine.
-    ("test_h1_highway.py", 180, "DAILY + GUARDS"),
+    # A493 (2026-11-26): 180 -> 360. H1's detectors probe the services this machine runs (nodes 5000/5020/5060,
+    # 8080, 8088, 8771/8772). Where none listens -- the public Windows CI runner -- each refused connect costs
+    # ~2.04 s on Windows (measured), ~61 of them: H1 took 205 s with those ports refused here, and CI killed it at
+    # 180 s on main (f0228b8f) and on PR #121 alike, 0 checks failed. Not the check moved: the kill time, with the
+    # cause named. That H1 reads the machine's live services at all is the open part (A493).
+    ("test_h1_highway.py", 360, "DAILY + GUARDS"),
     # SF1 (2026-11-02, A405): the highway's sync-fabric detectors and remedies, each driven both ways. The
     # unison feed's staleness, a sync task that fails or stops firing (re-run, AUTO_REVERSIBLE), a task gone
     # entirely (config, PROPOSE_ONLY), and HF/website vs github mirror lag -- github never auto-pushed. Hermetic:

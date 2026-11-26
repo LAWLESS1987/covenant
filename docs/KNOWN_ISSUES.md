@@ -19799,3 +19799,17 @@ Each needs its own pull request on today's main if it is still wanted.
 **Not measured.** None of the three has run for real: hf-mirror pushes, site-autodeploy publishes, adopt merges and restarts. Nothing has run on Debian 13.
 
 **The first push was refused, 2026-11-26.** The Linux pre-push sweep (Python 3.14.4, the whole sweep because public CI was already red on f0228b8f) went red on `test_a298_stage_covers_tree.py` S1: the new top-level `linux/` was in neither `covenant_one.STAGE_DIRS` nor `NOT_STAGED`, the decision A298 exists to force. `linux/` is now staged, because the doc suites that read `linux/README.md` in place must find it in the staged copy too. A298 is 6/6 on Windows with it, and 4/6 with it taken out again (S1 and S2 red). Under WSL in this worktree S1 cannot list folders (`git` cannot follow a worktree `.git` file that names a Windows path); that is this checkout's shape, not the code, and the pre-push sweep runs in its own Linux copy.
+
+### A493. [ci / windows] test_h1_highway.py timed out on the public Windows runner (TIMEOUT 180.1 s, no tally line) on main and on PR #121 alike: its detectors probe the services this machine runs, and on Windows each refused connect costs ~2 s -- RECORDED 2026-11-26
+
+**His words, 2026-11-26:** "Is it fixed", then "Yes" (find the failing Windows test and compare it with main), then "Figure it out".
+
+**Measured, in order.**
+- The public Windows sweep is red on main's f0228b8f and on PR #121's ee2c405 for the same single reason: `suites not clean 1 -> test_h1_highway.py`, `checks failed 0` (324 suites on main, 325 on the PR). The job log's H1 line: `TIMEOUT 180.1s (no tally line)`. The Ubuntu lanes are green on both.
+- On the operator's PC H1 is 314/314 in 79 s directly and 93.8 s through `covenant_one.py --ci --only`, on main and on the PR alike. The runner is not slow in general: four suites timed here and on CI ran 0.64x to 2.13x, mixed.
+- Every socket connect H1 made, traced: it reaches the live nodes on 127.0.0.1:5000/5020/5060 (15 each) and 8080, 8088, 8771, 8772 (4 each), which answer at once on this PC. 127.0.0.1:8081, where nothing listens, cost 16.3 s over 8 refused connects: 2.04 s each, the Windows cost README.md already names.
+- Simulated here (the seven ports refused after 2.04 s, H1's own throwaway servers untouched): H1 is 314/314 in 205 s with 61 refused connects. Through the runner with the same simulation injected by a `sitecustomize.py` on PYTHONPATH: `TIMEOUT 180.2s (no tally line)` at the 180 s budget -- the CI line, reproduced -- and `ok 212.6s H1: 314/314 passed`, RESULT PASS, at 360 s.
+
+**Changed.** H1's budget in `covenant_one.py` is 360 s, with the cause written beside it. No check moved: H1's 314 checks and what they assert are untouched; only the time the runner waits before killing it.
+
+**Open, named, not fixed here.** H1 reads whatever services the machine it runs on happens to serve, so its duration and some of what it measures depend on the machine (the live production nodes on the operator's PC; nothing on CI). Making its detectors' probes hermetic in the suite is the real fix, and it touches a 314-check guard, so it is left for its own change.
