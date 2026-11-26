@@ -39,6 +39,23 @@ import sys
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CREATE_NO_WINDOW = 0x08000000
+# A492 (2026-11-25, the Debian towers): POSIX Popen refuses creationflags with
+# ValueError, which the except below did not catch -- under Linux the child
+# never ran and nothing was logged. There is no console window to hide off
+# Windows, so the flag is passed only where it means something.
+_HIDE = {"creationflags": CREATE_NO_WINDOW} if os.name == "nt" else {}
+
+
+def _fail_loudly(cmd, e):
+    """A wrapper that fails must fail LOUDLY somewhere a person reads, and it
+    has no console to fail into."""
+    try:
+        os.makedirs(os.path.join(HERE, "logs"), exist_ok=True)   # A486: else the loud failure is silently lost
+        with open(os.path.join(HERE, "logs", "hidden_task.log"), "a", encoding="utf-8") as fh:
+            fh.write("could not run %r: %s\n" % (cmd, e))
+    except OSError:
+        pass
+    return 3
 
 
 def main():
@@ -53,21 +70,17 @@ def main():
         # re-open a window, so the windowless one runs the child as well.
         cmd = [sys.executable, path] + argv[1:]
     elif target.lower().endswith((".bat", ".cmd")):
+        if os.name != "nt":
+            # A492: a .bat is Windows-only; running it through a shell that
+            # is not cmd.exe would be a different program. Refuse, loudly.
+            return _fail_loudly([path] + argv[1:], "a .bat/.cmd needs Windows; use its Linux port (linux/)")
         cmd = [os.environ.get("COMSPEC", "cmd.exe"), "/c", path] + argv[1:]
     else:
         cmd = [path] + argv[1:]
     try:
-        return subprocess.run(cmd, cwd=HERE, creationflags=CREATE_NO_WINDOW).returncode
-    except OSError as e:
-        # A wrapper that fails must fail LOUDLY somewhere a person reads,
-        # and it has no console to fail into.
-        try:
-            os.makedirs(os.path.join(HERE, "logs"), exist_ok=True)   # A486: else the loud failure is silently lost
-            with open(os.path.join(HERE, "logs", "hidden_task.log"), "a", encoding="utf-8") as fh:
-                fh.write("could not run %r: %s\n" % (cmd, e))
-        except OSError:
-            pass
-        return 3
+        return subprocess.run(cmd, cwd=HERE, **_HIDE).returncode
+    except (OSError, ValueError) as e:   # A492: ValueError is what an unusable Popen argument raises
+        return _fail_loudly(cmd, e)
 
 
 if __name__ == "__main__":
