@@ -1503,7 +1503,11 @@ def _stage_ignore(d):
 # Each time the fix was one more name. test_a298_stage_covers_tree.py (in place, it needs git) now fails when
 # a TRACKED top-level folder is in neither list below -- a new folder is a decision, not a silent absence.
 STAGE_DIRS = ("realdata", "quant", "ops", "semantic", "pending-v8.38", "docs", "tools", "sentinel_witness",
-              "ai_memory_system", "eval")
+              "ai_memory_system", "eval",
+              # A492 (2026-11-26): the Linux launchers and their README. Staged, not excused: the doc suites that
+              # read linux/README.md in place (G1, G2, CA1 and others at commit time) must find it in the copy too.
+              # The prepush sweep refused the first push of this folder on A298 S1, as this test intends.
+              "linux")
 
 
 def _eval_ignore(src, names):
