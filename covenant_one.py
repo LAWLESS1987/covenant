@@ -363,6 +363,12 @@ SUITES = [
     # tiebreak (lower pid stops the higher, one-sided) plus a per-round re-cull.
     # Drives both ways: each new case fails on the pre-A437 code.
     ("test_a437_twin_tiebreak.py", 60, "IDENTITY"),
+    # A492 (2026-11-25, the Debian towers): three Windows-only paths broke under
+    # Linux -- hidden_task's creationflags (ValueError, child never ran), the
+    # guard's tasklist (a live watchdog read as dead), and the twin check's
+    # PowerShell (a twin never stopped). /proc parsing is driven on every
+    # platform with a fake tree; the live cases run where /proc exists.
+    ("test_a492_linux_paths.py", 60, "IDENTITY"),
     # P23 (2026-09-16): the three second-operator security findings -- A31
     # (/propose_code RCE), A21 (implicit credential grab), A44 (key ACL).
     # Added because a back-door audit pointed out that all three fixes existed

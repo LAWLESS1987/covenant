@@ -174,6 +174,27 @@ def pid_alive_windows(pid):
         return False
 
 
+def pid_alive_posix(pid, proc="/proc"):
+    """Is PID alive AND a python process? /proc, stdlib only (A492).
+
+    Under Linux pid_alive_windows answered False for a live python -- tasklist
+    does not exist, and the OSError reads as "not alive" -- so a guard
+    scheduled there would revive a watchdog that is running: the duplicate it
+    exists to prevent. Same question, asked of /proc/PID/cmdline: alive, and
+    argv[0] names a python. `proc` is for the tests."""
+    try:
+        with open(os.path.join(proc, str(int(pid)), "cmdline"), "rb") as fh:
+            argv = fh.read().split(b"\0")
+    except (OSError, ValueError):
+        return False
+    return bool(argv) and b"python" in os.path.basename(argv[0]).lower()
+
+
+def pid_alive(pid):
+    """The platform's answer; the guard calls only this."""
+    return pid_alive_windows(pid) if os.name == "nt" else pid_alive_posix(pid)
+
+
 def read_state():
     try:
         with open(STATE, encoding="utf-8") as fh:
@@ -233,7 +254,7 @@ def main(argv=None):
     try:
         with open(WD_PID, encoding="utf-8") as fh:
             pid = int(fh.read().strip())
-        alive = pid_alive_windows(pid)
+        alive = pid_alive(pid)
     except (OSError, ValueError):
         pass
 

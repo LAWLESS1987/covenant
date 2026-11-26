@@ -19744,3 +19744,47 @@ Each needs its own pull request on today's main if it is still wanted.
 - GS1 4/4, GG1 86/86, pin unchanged.
 - GS2's boundary checks pass here, 4/4.
 - Its numpy apparatus checks run on CI's Linux lanes, which install numpy (A484).
+
+### A492. [linux / the Debian towers] covenant_prod.bat gets a Linux port, and three Windows-only paths are found by running them under Linux -- RECORDED 2026-11-25
+
+**Why.** On 2026-11-25 the operator chose Debian 13 for the three office towers (Dell OptiPlex 7050, HP ProDesk 9th gen, HP EliteDesk mini 8th gen) because no single company controls it. His words: "This is all about running Covenant and the corresponding repos." Asked to start the Linux launchers, with "Use your discernment" on the branch.
+
+**Counted first (units).** Tracked `.bat` FILES: 53 (52 at the root, 1 in `ops/`). Windows scheduled TASKS registered on the operator's PC with Covenant in the name: 8, of which 5 run from this repository (CovenantAmbassador, CovenantDistill, CovenantGuard, CovenantRefineCheck, CovenantTrader) and 3 from other folders. Task NAMES mentioned in tracked non-doc files: 12. The two task counts disagree, and which tasks belong on the towers is the operator's call (rule 5), not measured here.
+
+**What lands.**
+- `linux/covenant_prod.sh`: start, stop and status, with the same nodes, ports, peers, environment and key handling as `covenant_prod.bat`. It never deletes a database. Where it differs, it says so in its header: stop matches processes by command line AND working directory (the .bat's window-title match cannot see a node the watchdog restarted), stops the watchdog before the nodes, and sends TERM before KILL.
+- `linux/test_covenant_prod_sh.sh`: 23 checks in a throwaway copy with fake nodes. 23/23 pass under WSL Ubuntu 26.04 (Python 3.14.4).
+- `linux/mutate_covenant_prod_sh.sh`: drives it the other way. Three deliberate breaks, each CAUGHT: no working-directory check (another checkout's node killed), nodes stopped before the watchdog, wrong peers for B.
+- `linux/README.md`: first run, a Stop / remove section, and what is not ported (A14's lesson: nothing starts at boot unless the operator adds it).
+
+**Found by running the code under Linux, not by reading it.**
+1. `ops/hidden_task.py` passes `creationflags=0x08000000` unconditionally. Under Linux Python, `subprocess.run` raises `ValueError: creationflags is only supported on Windows platforms`, which the wrapper's `except OSError` does not catch, so the child never runs and nothing is logged. Three scheduled tasks launch through it, and so does the watchdog's seal-service revival.
+2. `covenant_watchdog_guard.pid_alive_windows` uses `tasklist`. Under Linux it returned False for the calling process's own live PID. Scheduled as it is, the guard would revive a watchdog that is alive: the duplicate it exists to prevent.
+3. The watchdog's twin check runs PowerShell. Under Linux it logs "twin check unavailable" and skips. Read from the code, not driven.
+
+**Not measured.** No real node has been started on Debian 13 (Python 3.13). The WSL distro on the operator's laptop is Ubuntu 26.04, not Debian: an earlier statement in the session that Covenant "already ran under Debian" read A476's "Debian Python" as the distribution, and is corrected here. The live start is UNDETERMINED until the first tower.
+
+**Repro.** `bash linux/test_covenant_prod_sh.sh "$PWD"`, then `bash linux/mutate_covenant_prod_sh.sh "$PWD" "$PWD/linux/test_covenant_prod_sh.sh"`. For finding 1: `python3 ops/hidden_task.py /tmp/any.py` under Linux.
+
+**Status:** the launcher is done and tested with fakes. Findings 1-3 are open, and the scheduled tasks wait on them and on the operator's choice of which run on the towers.
+
+**Status, later the same day:** findings 1-3 are FIXED (below). The scheduled tasks now wait only on the operator's choice of which run on the towers.
+
+**Fixed 2026-11-25, his "Yes, fix them".**
+1. `ops/hidden_task.py` passes `creationflags` only when `os.name == "nt"`, catches `ValueError` beside `OSError` so a failed launch is logged, and refuses a `.bat`/`.cmd` off Windows with a logged reason.
+2. `covenant_watchdog_guard.py` gains `pid_alive_posix` (reads `/proc/PID/cmdline`: alive, and argv[0] names a python) and `pid_alive`, which picks the platform's check. The guard's one caller now calls `pid_alive`. `pid_alive_windows` is unchanged.
+3. `covenant_watchdog._evict_twins` takes a Linux branch before the PowerShell one: `_twin_rows_posix` reads `/proc` for pythons whose argv names this tree's watchdog by absolute path, with the start time from `/proc/PID/stat` field 22 plus `btime`, in a fixed-width UTC format so string order is time order, and an older twin gets SIGTERM (the watchdog installs no handler). The Windows branch is byte-for-byte the code it was. `_twins_to_evict` is untouched.
+
+**Checks.** `test_a492_linux_paths.py`, registered IDENTITY in `covenant_one.py`: 10/10 under WSL Ubuntu 26.04 (Python 3.14.4); 6/6 on Windows, with the 4 live-/proc cases skipped there by design. Driven the other way: the same suite against `origin/main`'s three files, under Linux, is 0/10. Three of those are behavioural failures (the hidden_task child never runs; the `ValueError` traceback is in the output); seven are AttributeErrors, because the functions they test do not exist before this change, which shows the suite depends on the fix but is not a behavioural red. The guard's old wrong answer was shown behaviourally before the fix (False for its own live pid). The 25 existing suites that name the changed files were re-run on Windows: 24 exit 0 as run. `test_g7_pause.py` exited 1 because its stdout was redirected to a cp1252 file and it printed a character cp1252 cannot encode (a UnicodeEncodeError in `check`'s print, not a failed check); re-run with `PYTHONIOENCODING=utf-8` it is 26/26.
+
+**Not measured.** None of this has run on Debian 13 or its Python 3.13. `MANIFEST.sha256` is not regenerated: nothing is committed yet.
+
+**The five scheduled tasks, 2026-11-25, his "do them all".** Read from Task Scheduler as XML, not from memory (unit: triggers): CovenantGuard every 2 min from 14:12, limit 10 min; CovenantRefineCheck every 15 min from 06:03:38, limit 10 min; CovenantAmbassador every 3 h from 11:00, limit 2 h 50 min; CovenantDistill daily 02:30, limit 6 h; CovenantTrader daily 09:00, no limit set (Task Scheduler's default is 72 h). All five use IgnoreNew.
+- `linux/install_timers.sh` writes them as systemd user timers with those schedules, a oneshot service each, `TimeoutStartSec` as the limit (a timer never starts a service that is still running, which is IgnoreNew). `install` enables nothing; `enable NAMES|all` does, by name; `remove` disables all five and moves the unit files to `logs/retired-units/` (rule 10). It refuses a checkout path with a space, which ExecStart would split. It does not turn on lingering.
+- `linux/trader_task.sh` is TRADER_TASK.bat's port: a dated header into `trader_log.txt`, then `covenant_trader.py --once` into it. Its timer runs it through `bash`, because a file committed from Windows carries no executable bit.
+- Ambassador and Trader run the Windows command lines without `ops/hidden_task.py`: on Linux there is no console window to hide.
+- The other three Covenant tasks on the operator's PC (CovenantHFMirror and CovenantSiteAutoDeploy from `site`, covenant-adopt from its own folder) are outside this repository and are not ported here.
+
+**Checks.** `linux/test_install_timers_sh.sh`: 23/23 under WSL Ubuntu 26.04, with systemctl replaced by a logger and the scripts copied without an executable bit. `systemd-analyze --user verify` on all 10 units, run unfiltered as well, printed nothing and exited 0. `systemd-analyze calendar` confirmed the firing times: Ambassador at 02, 05, 08, 11, 14, 17, 20, 23 (the Windows 11:00 + 3 h series), RefineCheck at :03 :18 :33 :48, Guard on even minutes. One check was wrong as first written, not the script: it expected Guard's first run at 00:00:00 from a 00:00:00 base, and systemd's next elapse is strictly after the base, so it is 00:02:00. `linux/mutate_install_timers_sh.sh` drives it the other way: an install that enables everything, Ambassador moved to 00:00, and a remove that deletes, each CAUGHT. The harness first looked for the wrong failure label on the third (it was caught, 22/23, under a different message) and was corrected. The five task scripts compile under Python 3.14 on Linux.
+
+**Not measured.** No timer has run a real script: Ambassador sends messages and Trader trades, so neither was run to test it. Nothing has run on Debian 13 or its Python 3.13.

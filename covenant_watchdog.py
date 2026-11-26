@@ -63,6 +63,7 @@ import json
 import os
 import re
 import shutil
+import signal                  # A492: stopping a twin watchdog off Windows
 import subprocess
 import sys
 import time
@@ -2475,6 +2476,39 @@ def _twins_to_evict(rows, my_pid, my_ppid):
                   and (t < my_t or (t == my_t and p > my_pid)))
 
 
+def _twin_rows_posix(me, proc="/proc"):
+    """A492: the Linux measurement for _twins_to_evict -- (pid, started_iso) for
+    every python process whose command line names `me`, read from /proc.
+
+    Start time is /proc/PID/stat field 22 (clock ticks after boot) plus btime
+    from /proc/stat, written with a fixed-width UTC format so the string order
+    _twins_to_evict compares is the time order (an isoformat() that drops a
+    zero microsecond would not be fixed-width). Ticks are 1/100 s on Linux,
+    coarser than Windows' CreationDate, so a same-tick pair is likelier here;
+    A437's pid tiebreak is what settles it. `proc` is for the tests."""
+    with open(os.path.join(proc, "stat"), encoding="ascii") as fh:
+        btime = next(int(l.split()[1]) for l in fh if l.startswith("btime "))
+    hz = os.sysconf("SC_CLK_TCK") if hasattr(os, "sysconf") else 100
+    target = me.encode()
+    rows = []
+    for name in os.listdir(proc):
+        if not name.isdigit():
+            continue
+        try:
+            with open(os.path.join(proc, name, "cmdline"), "rb") as fh:
+                argv = fh.read().split(b"\0")
+            if not argv or b"python" not in os.path.basename(argv[0]).lower() or target not in argv:
+                continue
+            with open(os.path.join(proc, name, "stat"), encoding="ascii", errors="replace") as fh:
+                after_comm = fh.read().rsplit(")", 1)[1].split()   # comm may hold spaces or ')'
+            ticks = int(after_comm[19])                             # field 22 overall
+        except (OSError, ValueError, IndexError):
+            continue                                                # gone, or not ours to read
+        t = datetime.fromtimestamp(btime + ticks / hz, tz=timezone.utc)
+        rows.append((int(name), t.strftime("%Y-%m-%dT%H:%M:%S.%fZ")))
+    return rows
+
+
 def _evict_twins():
     """Daemon only: at startup AND once per round (A437). Measures, decides with
     _twins_to_evict, stops. Never raises: a failed check costs one possible
@@ -2484,6 +2518,29 @@ def _evict_twins():
     pid tiebreak alone cannot reach, since the sparing happened at start."""
     import subprocess
     me = os.path.join(HERE, "covenant_watchdog.py")
+    if os.name != "nt":
+        # A492: the PowerShell below does not exist off Windows; until then the
+        # check logged "unavailable" and a twin on Linux was never stopped.
+        try:
+            rows = _twin_rows_posix(me)
+        except Exception as e:                                   # noqa: BLE001
+            log("INFO", "twin check unavailable: %s: %s" % (type(e).__name__, str(e)[:120]))
+            return
+        victims = _twins_to_evict(rows, os.getpid(), os.getppid())
+        if not victims:
+            return
+        stopped = []
+        for v in victims:
+            try:
+                os.kill(v, signal.SIGTERM)    # no handler in the watchdog: TERM ends it
+                stopped.append(v)
+            except OSError as e:
+                log("INFO", "could not stop twin watchdog %s: %s: %s" % (v, type(e).__name__, str(e)[:120]))
+        if stopped:
+            log("WARN", "another watchdog of this tree was running (pid %s) -- "
+                        "stopped it: one tree, one watchdog (A160/A437)"
+                        % ", ".join(str(v) for v in stopped))
+        return
     if any(ch in me for ch in "*?[]'`"):
         log("INFO", "twin check skipped: %r cannot be a PowerShell -like pattern" % me)
         return
