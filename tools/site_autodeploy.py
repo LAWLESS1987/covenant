@@ -26,6 +26,7 @@ Each pass appends one line to ops/site_autodeploy.jsonl (gitignored) with what i
 import datetime
 import json
 import os
+import shutil
 import subprocess
 import sys
 import urllib.request
@@ -46,8 +47,40 @@ def feed_url():
             return fh.readline().strip() or None
     except OSError:
         return None
-SITE = r"C:\Users\Lawre\site\lawless1987-website-backup\website"
-NODE_DIR = r"C:\Users\Lawre\site\nodejs\node-v24.22.1-win-x64"
+if os.name == "nt":
+    SITE = r"C:\Users\Lawre\site\lawless1987-website-backup\website"
+    NODE_DIR = r"C:\Users\Lawre\site\nodejs\node-v24.22.1-win-x64"
+else:
+    # A492 (the Debian towers): the Windows paths above do not exist off Windows. The website checkout sits at the
+    # same place under the home folder, and node comes from the system (apt install nodejs) unless a folder is named.
+    SITE = os.environ.get("COVENANT_SITE_DIR") or os.path.expanduser("~/site/lawless1987-website-backup/website")
+    NODE_DIR = os.environ.get("COVENANT_NODE_DIR", "")
+
+
+def _node():
+    """The node binary: the pinned Windows build there; off Windows, NODE_DIR/bin/node when a folder is named,
+    else whatever `node` is on PATH."""
+    if os.name == "nt":
+        return os.path.join(NODE_DIR, "node.exe")
+    if NODE_DIR:
+        return os.path.join(NODE_DIR, "bin", "node")
+    return shutil.which("node") or "node"
+
+
+def _node_path():
+    return (NODE_DIR if os.name == "nt" else (os.path.join(NODE_DIR, "bin") if NODE_DIR else "")) or None
+
+
+def _venv_python():
+    """This checkout's venv python (Scripts\\python.exe on Windows, bin/python elsewhere), else this interpreter."""
+    p = (os.path.join(HERE, ".venv", "Scripts", "python.exe") if os.name == "nt"
+         else os.path.join(HERE, ".venv", "bin", "python"))
+    return p if os.path.exists(p) else sys.executable
+
+
+def _site_env():
+    np = _node_path()
+    return dict(os.environ, PATH=(np + os.pathsep if np else "") + os.environ.get("PATH", ""))
 LEDGER = os.path.join(HERE, "ops", "site_autodeploy.jsonl")
 OWNER = "LAWLESS1987"
 SITE_ORIGIN = "https://lawless1987.com/repos"
@@ -114,17 +147,16 @@ def opsec_full_history(git_dir, remote=None):
 
 
 def run_site(args, timeout=1500):
-    env = dict(os.environ, PATH=NODE_DIR + os.pathsep + os.environ.get("PATH", ""))
-    p = subprocess.run(args, cwd=SITE, capture_output=True, text=True, timeout=timeout, env=env)
+    p = subprocess.run(args, cwd=SITE, capture_output=True, text=True, timeout=timeout, env=_site_env())
     return p.returncode == 0, ((p.stdout or "") + (p.stderr or ""))[-600:]
 
 
 def regenerate():
-    return run_site([os.path.join(HERE, ".venv", "Scripts", "python.exe"), "scripts/mirror-repos.py"])
+    return run_site([_venv_python(), "scripts/mirror-repos.py"])
 
 
 def site_tests():
-    node = os.path.join(NODE_DIR, "node.exe")
+    node = _node()
     ok, out = run_site([node, "scripts/build.mjs"])
     if not ok:
         return False, "build failed: " + out
@@ -138,10 +170,8 @@ def site_tests():
 def deploy():
     """(ok, text) -- text starts with wrangler's "Current Version ID" line, read from the WHOLE output (run_site
     keeps only the tail, and the version line can fall before it)."""
-    node = os.path.join(NODE_DIR, "node.exe")
-    env = dict(os.environ, PATH=NODE_DIR + os.pathsep + os.environ.get("PATH", ""))
-    p = subprocess.run([node, "node_modules/wrangler/bin/wrangler.js", "deploy", "--config", "wrangler.json"],
-                       cwd=SITE, capture_output=True, text=True, timeout=1500, env=env)
+    p = subprocess.run([_node(), "node_modules/wrangler/bin/wrangler.js", "deploy", "--config", "wrangler.json"],
+                       cwd=SITE, capture_output=True, text=True, timeout=1500, env=_site_env())
     out = (p.stdout or "") + (p.stderr or "")
     version = [ln.strip() for ln in out.splitlines() if "Version ID" in ln][-1:]
     return p.returncode == 0, "\n".join(version + [out[-600:]])

@@ -2,10 +2,11 @@
 
 Started 2026-11-25 (A492), for running Covenant on the Debian towers. This
 folder holds the Linux launchers. Ported so far: **2 of the 53 tracked `.bat`
-files** (`covenant_prod.bat`, `TRADER_TASK.bat`), and **all 5 of the scheduled
-tasks** that this repository registers on Windows. The other 3 Covenant tasks on
-the operator's PC run from other folders (`site`, `covenant-adopt`) and are
-not part of this repository.
+files** (`covenant_prod.bat`, `TRADER_TASK.bat`), and **all 8 Covenant scheduled
+tasks** on the operator's PC: the 5 this repository registers, and the 3 that
+start from other folders (`site\hf_mirror.vbs` and `site\site_autodeploy.vbs`,
+which run this repository's `tools/`, and `covenant-adopt`, whose Linux updater
+lives in that folder as its README says host config should).
 
 ## What works today
 
@@ -55,7 +56,7 @@ there, and each is now fixed and tested by `test_a492_linux_paths.py`:
 
 ## Scheduled tasks (systemd user timers)
 
-`linux/install_timers.sh` writes the five Windows tasks as systemd user
+`linux/install_timers.sh` writes the eight Windows tasks as systemd user
 timers, on the Windows tasks' own schedules:
 
 | Timer | Windows task | Runs | Time limit |
@@ -65,6 +66,16 @@ timers, on the Windows tasks' own schedules:
 | `ambassador` | CovenantAmbassador | every 3 h: 02, 05, 08 ... 23 | 2 h 50 min |
 | `distill` | CovenantDistill | daily 02:30 | 6 h |
 | `trader` | CovenantTrader | daily 09:00 (`linux/trader_task.sh`) | 72 h |
+| `hf-mirror` | CovenantHFMirror | every 2 h, :05 on odd hours | 72 h |
+| `site-autodeploy` | CovenantSiteAutoDeploy | every 15 min, at :07 | 72 h |
+| `adopt` | covenant-adopt | daily 05:00 (`~/covenant-adopt/linux/run_adopt.sh`) | 72 h |
+
+**Enable `hf-mirror` and `site-autodeploy` on one machine only.** The laptop
+runs them today; a second machine would push and deploy the same things. On
+Linux, `site-autodeploy` needs the website checkout at
+`~/site/lawless1987-website-backup/website` (or `COVENANT_SITE_DIR`) and `node`
+(`sudo apt install nodejs`, or `COVENANT_NODE_DIR`). `adopt` merges into this
+checkout and restarts the nodes: see the covenant-adopt folder's README.
 
 ```sh
 linux/install_timers.sh install            # writes the units; enables NOTHING
@@ -79,7 +90,7 @@ Set the tower's time zone to the office's first (`sudo timedatectl set-timezone
 America/Chicago`): the schedules are local time.
 
 **Stop / remove timers:** `linux/install_timers.sh disable NAME` stops one.
-`linux/install_timers.sh remove` disables all five and moves the unit files to
+`linux/install_timers.sh remove` disables all eight and moves the unit files to
 `logs/retired-units/`, never deleting them. `loginctl disable-linger "$USER"`
 undoes lingering.
 

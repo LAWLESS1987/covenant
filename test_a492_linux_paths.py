@@ -190,6 +190,49 @@ class EvictTwinsLinux(unittest.TestCase):
         self.assertEqual(self.logged, [])
 
 
+class SiteAutodeployPaths(unittest.TestCase):
+    """4. tools/site_autodeploy.py named the site, node and python by Windows paths only (node.exe in a win-x64
+    folder, .venv\\Scripts\\python.exe). Each platform now gets its own; Windows keeps the paths it had."""
+    def load(self, **env):
+        import importlib
+        sys.path.insert(0, os.path.join(HERE, "tools"))
+        old = {k: os.environ.get(k) for k in env}
+        os.environ.update({k: v for k, v in env.items() if v is not None})
+        for k, v in env.items():
+            if v is None:
+                os.environ.pop(k, None)
+        try:
+            import site_autodeploy
+            return importlib.reload(site_autodeploy)
+        finally:
+            for k, v in old.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+            sys.path.remove(os.path.join(HERE, "tools"))
+
+    @unittest.skipUnless(os.name == "nt", "the Windows paths")
+    def test_windows_keeps_its_paths(self):
+        SA = self.load(COVENANT_SITE_DIR="/ignored/on/windows", COVENANT_NODE_DIR=None)
+        self.assertEqual(SA.SITE, r"C:\Users\Lawre\site\lawless1987-website-backup\website")
+        self.assertTrue(SA._node().endswith(r"node-v24.22.1-win-x64\node.exe"))
+        self.assertTrue(SA._site_env()["PATH"].startswith(SA.NODE_DIR + os.pathsep))
+
+    @unittest.skipIf(os.name == "nt", "the Linux paths")
+    def test_linux_defaults_and_overrides(self):
+        SA = self.load(COVENANT_SITE_DIR=None, COVENANT_NODE_DIR=None)
+        self.assertEqual(SA.SITE, os.path.expanduser("~/site/lawless1987-website-backup/website"))
+        self.assertNotIn("\\", SA.SITE)
+        self.assertEqual(SA._node(), shutil.which("node") or "node")
+        self.assertFalse(SA._node().endswith(".exe"))
+        SA = self.load(COVENANT_SITE_DIR="/srv/website", COVENANT_NODE_DIR="/opt/node-v24")
+        self.assertEqual(SA.SITE, "/srv/website")
+        self.assertEqual(SA._node(), "/opt/node-v24/bin/node")
+        self.assertTrue(SA._site_env()["PATH"].startswith("/opt/node-v24/bin" + os.pathsep))
+        self.assertTrue(os.path.exists(SA._venv_python()), "falls back to this interpreter when no venv")
+
+
 if __name__ == "__main__":
     res = unittest.main(exit=False, verbosity=2).result
     run, bad = res.testsRun, len(res.failures) + len(res.errors)

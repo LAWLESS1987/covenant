@@ -1,30 +1,39 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  linux/install_timers.sh -- the five Windows scheduled tasks as systemd user
-#  timers (A492). Installing writes the unit files; it ENABLES NOTHING unless
-#  you name the timers to enable (A14: nothing starts by itself).
+#  linux/install_timers.sh -- the eight Windows scheduled tasks Covenant runs,
+#  as systemd user timers (A492). Installing writes the unit files; it ENABLES
+#  NOTHING unless you name the timers to enable (A14: nothing starts by itself).
 #
 #  USAGE
 #    linux/install_timers.sh install                 write units, enable none
-#    linux/install_timers.sh install --enable all    write units, enable all five
+#    linux/install_timers.sh install --enable all    write units, enable all eight
 #    linux/install_timers.sh enable guard,distill    enable named timers
 #    linux/install_timers.sh disable trader          stop and disable named timers
 #    linux/install_timers.sh status                  what is installed and when it runs next
 #    linux/install_timers.sh remove                  disable all, move the unit files aside
 #
 #  NAMES   guard  refine-check  ambassador  distill  trader
+#          hf-mirror  site-autodeploy  adopt
 #
 #  The schedules are the Windows tasks' own, read from Task Scheduler on
-#  2026-11-25 (local time; set the tower's time zone to match):
-#    guard         every 2 min           limit 10 min    (CovenantGuard)
-#    refine-check  every 15 min, at :03  limit 10 min    (CovenantRefineCheck)
-#    ambassador    every 3 h, from 02:00 limit 2 h 50 min (CovenantAmbassador: 11:00 + 3 h steps)
-#    distill       daily 02:30           limit 6 h       (CovenantDistill)
-#    trader        daily 09:00           limit 72 h      (CovenantTrader; Windows' default limit)
-#  All five ran with "do not start a new instance": a systemd timer never
-#  starts a service that is still running, which is the same rule.
+#  2026-11-25/26 (local time; set the tower's time zone to match):
+#    guard           every 2 min            limit 10 min     (CovenantGuard)
+#    refine-check    every 15 min, at :03   limit 10 min     (CovenantRefineCheck)
+#    ambassador      every 3 h, from 02:00  limit 2 h 50 min (CovenantAmbassador: 11:00 + 3 h steps)
+#    distill         daily 02:30            limit 6 h        (CovenantDistill)
+#    trader          daily 09:00            limit 72 h       (CovenantTrader)
+#    hf-mirror       every 2 h, at :05 on odd hours  72 h    (CovenantHFMirror: 11:05 + 2 h steps)
+#    site-autodeploy every 15 min, at :07   limit 72 h       (CovenantSiteAutoDeploy: 22:52 + 15 min steps)
+#    adopt           daily 05:00            limit 72 h       (covenant-adopt; runs ~/covenant-adopt/linux/run_adopt.sh)
+#  72 h is Task Scheduler's default where the task set no limit. All eight ran
+#  with "do not start a new instance": a systemd timer never starts a service
+#  that is still running, which is the same rule.
 #
-#  ambassador SENDS messages and trader TRADES. Enable them knowingly.
+#  ambassador SENDS messages, trader TRADES, site-autodeploy PUBLISHES the
+#  website, hf-mirror PUSHES to Hugging Face, and adopt MERGES origin/main into
+#  this checkout and restarts the nodes. Enable them knowingly. hf-mirror and
+#  site-autodeploy run on the operator's laptop today: enable them on ONE
+#  machine, or two machines will deploy and push the same thing.
 #
 #  User timers run only while you are logged in, unless lingering is on:
 #    loginctl enable-linger "$USER"
@@ -43,17 +52,25 @@ case "$HERE$PY" in
     *[[:space:]]*) echo "the repository path or python path contains a space; systemd's ExecStart would split it. Move the checkout (e.g. ~/covenant)." >&2; exit 2 ;;
 esac
 
-ALL="guard refine-check ambassador distill trader"
+ALL="guard refine-check ambassador distill trader hf-mirror site-autodeploy adopt"
+BASH_BIN="$(command -v bash)"
+# covenant-adopt is this host's config, kept outside the repository by design (its README); the timer runs its
+# Linux wrapper from there.
+ADOPT_HOME="${COVENANT_ADOPT_HOME:-$HOME/covenant-adopt}"
 
-# name | OnCalendar | time limit | windows task | command (run from the repository root)
+# name | OnCalendar | time limit | windows task | Environment= (or empty) | command
 spec() {
     case "$1" in
-        guard)        echo "*-*-* *:00/2:00|10min|CovenantGuard|$PY $HERE/covenant_watchdog_guard.py" ;;
-        refine-check) echo "*-*-* *:03/15:00|10min|CovenantRefineCheck|$PY $HERE/covenant_refine_check.py" ;;
-        ambassador)   echo "*-*-* 02/3:00:00|2h 50min|CovenantAmbassador|$PY $HERE/covenant_free_will.py --round --send --log $HERE/logs/ambassador.log" ;;
-        distill)      echo "*-*-* 02:30:00|6h|CovenantDistill|$PY $HERE/covenant_nightly.py --study 24 --cycle 8 --audit 48" ;;
+        guard)        echo "*-*-* *:00/2:00|10min|CovenantGuard||$PY $HERE/covenant_watchdog_guard.py" ;;
+        refine-check) echo "*-*-* *:03/15:00|10min|CovenantRefineCheck||$PY $HERE/covenant_refine_check.py" ;;
+        ambassador)   echo "*-*-* 02/3:00:00|2h 50min|CovenantAmbassador||$PY $HERE/covenant_free_will.py --round --send --log $HERE/logs/ambassador.log" ;;
+        distill)      echo "*-*-* 02:30:00|6h|CovenantDistill||$PY $HERE/covenant_nightly.py --study 24 --cycle 8 --audit 48" ;;
         # through bash: a file committed from Windows has no executable bit, and ExecStart would refuse it
-        trader)       echo "*-*-* 09:00:00|72h|CovenantTrader|$(command -v bash) $HERE/linux/trader_task.sh" ;;
+        trader)       echo "*-*-* 09:00:00|72h|CovenantTrader||$BASH_BIN $HERE/linux/trader_task.sh" ;;
+        # site\hf_mirror.vbs: COVENANT_GH_READ=1 lets it clone through git's stored credential
+        hf-mirror)    echo "*-*-* 01/2:05:00|72h|CovenantHFMirror|COVENANT_GH_READ=1|$PY -B $HERE/tools/hf_mirror.py" ;;
+        site-autodeploy) echo "*-*-* *:07/15:00|72h|CovenantSiteAutoDeploy||$PY -B $HERE/tools/site_autodeploy.py" ;;
+        adopt)        echo "*-*-* 05:00:00|72h|covenant-adopt|COVENANT_ADOPT_REPO=$HERE|$BASH_BIN $ADOPT_HOME/linux/run_adopt.sh" ;;
         *)            return 1 ;;
     esac
 }
@@ -70,10 +87,11 @@ names_from() {   # names_from "a,b" | "all" -> validated, space separated
 }
 
 write_units() {
-    local n s cal limit task cmd
+    local n s cal limit task envv cmd extra
     mkdir -p "$UNIT_DIR" "$HERE/logs"
     for n in $ALL; do
-        IFS='|' read -r cal limit task cmd <<< "$(spec "$n")"
+        IFS='|' read -r cal limit task envv cmd <<< "$(spec "$n")"
+        extra=""; [ -n "$envv" ] && extra="Environment=$envv"
         cat > "$UNIT_DIR/covenant-$n.service" <<EOF
 # Written by linux/install_timers.sh (A492). Port of the Windows task $task.
 [Unit]
@@ -83,6 +101,7 @@ Description=Covenant $n (port of Windows task $task)
 Type=oneshot
 WorkingDirectory=$HERE
 Environment=PYTHONUNBUFFERED=1
+$extra
 ExecStart=$cmd
 TimeoutStartSec=$limit
 EOF
@@ -99,7 +118,7 @@ AccuracySec=1s
 WantedBy=timers.target
 EOF
     done
-    echo "wrote 5 services and 5 timers to $UNIT_DIR (none enabled by this step)"
+    echo "wrote $(echo $ALL | wc -w) services and timers to $UNIT_DIR (none enabled by this step)"
 }
 
 enable_names() {
@@ -141,7 +160,7 @@ case "${1:-}" in
         if [ "$moved" -gt 0 ]; then echo "disabled all; moved $moved unit files to $aside"; else echo "nothing installed"; fi
         ;;
     *)
-        sed -n '2,40p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+        awk 'NR > 2 && /^# ====/ { exit } NR > 2' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
         exit 2
         ;;
 esac
