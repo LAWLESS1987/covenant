@@ -363,6 +363,12 @@ SUITES = [
     # tiebreak (lower pid stops the higher, one-sided) plus a per-round re-cull.
     # Drives both ways: each new case fails on the pre-A437 code.
     ("test_a437_twin_tiebreak.py", 60, "IDENTITY"),
+    # A492 (2026-11-25, the Debian towers): three Windows-only paths broke under
+    # Linux -- hidden_task's creationflags (ValueError, child never ran), the
+    # guard's tasklist (a live watchdog read as dead), and the twin check's
+    # PowerShell (a twin never stopped). /proc parsing is driven on every
+    # platform with a fake tree; the live cases run where /proc exists.
+    ("test_a492_linux_paths.py", 60, "IDENTITY"),
     # P23 (2026-09-16): the three second-operator security findings -- A31
     # (/propose_code RCE), A21 (implicit credential grab), A44 (key ACL).
     # Added because a back-door audit pointed out that all three fixes existed
@@ -747,7 +753,12 @@ SUITES = [
     # demands, the peer it will not obey, and the quarantine counter. Every one
     # mutation-tested. Hermetic: fixture conditions, temp ledgers, no node and
     # no network, so it measures the rules rather than the machine.
-    ("test_h1_highway.py", 180, "DAILY + GUARDS"),
+    # A493 (2026-11-26): 180 -> 360. H1's detectors probe the services this machine runs (nodes 5000/5020/5060,
+    # 8080, 8088, 8771/8772). Where none listens -- the public Windows CI runner -- each refused connect costs
+    # ~2.04 s on Windows (measured), ~61 of them: H1 took 205 s with those ports refused here, and CI killed it at
+    # 180 s on main (f0228b8f) and on PR #121 alike, 0 checks failed. Not the check moved: the kill time, with the
+    # cause named. That H1 reads the machine's live services at all is the open part (A493).
+    ("test_h1_highway.py", 360, "DAILY + GUARDS"),
     # SF1 (2026-11-02, A405): the highway's sync-fabric detectors and remedies, each driven both ways. The
     # unison feed's staleness, a sync task that fails or stops firing (re-run, AUTO_REVERSIBLE), a task gone
     # entirely (config, PROPOSE_ONLY), and HF/website vs github mirror lag -- github never auto-pushed. Hermetic:
@@ -1501,7 +1512,11 @@ def _stage_ignore(d):
 # Each time the fix was one more name. test_a298_stage_covers_tree.py (in place, it needs git) now fails when
 # a TRACKED top-level folder is in neither list below -- a new folder is a decision, not a silent absence.
 STAGE_DIRS = ("realdata", "quant", "ops", "semantic", "pending-v8.38", "docs", "tools", "sentinel_witness",
-              "ai_memory_system", "eval")
+              "ai_memory_system", "eval",
+              # A492 (2026-11-26): the Linux launchers and their README. Staged, not excused: the doc suites that
+              # read linux/README.md in place (G1, G2, CA1 and others at commit time) must find it in the copy too.
+              # The prepush sweep refused the first push of this folder on A298 S1, as this test intends.
+              "linux")
 
 
 def _eval_ignore(src, names):
