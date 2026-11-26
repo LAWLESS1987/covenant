@@ -70,6 +70,24 @@ timers, on the Windows tasks' own schedules:
 | `site-autodeploy` | CovenantSiteAutoDeploy | every 15 min, at :07 | 72 h |
 | `adopt` | covenant-adopt | daily 05:00 (`~/covenant-adopt/linux/run_adopt.sh`) | 72 h |
 
+**Which to enable where -- the quorum's answer (2026-11-26, five seats, A492):**
+
+| Timer | Towers | Seats |
+|---|---|---|
+| `guard` | all three | 5 of 5 |
+| `refine-check` | all three | 4 of 5 |
+| `distill` | one | 3 of 5 (2 said all) |
+| `ambassador` | none | 4 of 5 |
+| `trader` | none | 5 of 5 |
+| `hf-mirror` | one machine in all (2 said none) | 3 of 5 |
+| `site-autodeploy` | one machine in all (2 said none) | 3 of 5 |
+| `adopt` | none | 3 of 5 |
+
+"One" counts the laptop: it runs `hf-mirror` and `site-autodeploy` today, so
+while it does, the towers enable neither. `install`, `enable` and `status`
+warn when lingering is off, because without it every timer stops at logout and
+none starts after a reboot (the risk two seats named first).
+
 **Enable `hf-mirror` and `site-autodeploy` on one machine only.** The laptop
 runs them today; a second machine would push and deploy the same things. On
 Linux, `site-autodeploy` needs the website checkout at

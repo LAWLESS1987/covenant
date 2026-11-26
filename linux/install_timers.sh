@@ -40,7 +40,7 @@
 #  This script does not turn that on for you.
 #
 #  For the tests: COVENANT_UNIT_DIR overrides the unit folder, and
-#  COVENANT_SYSTEMCTL replaces the systemctl command.
+#  COVENANT_SYSTEMCTL replaces the systemctl command, COVENANT_LOGINCTL the loginctl one.
 # ============================================================================
 set -u
 
@@ -124,6 +124,22 @@ EOF
 enable_names() {
     local n
     for n in $1; do "$SYSTEMCTL" --user enable --now "covenant-$n.timer" && echo "enabled covenant-$n.timer"; done
+    linger_check
+}
+
+# The quorum's Q5 (2026-11-26, A492): a user timer stops when its user logs out and does not start after a reboot
+# unless lingering is on, and nothing said so -- on a headless tower every timer would be silently dead. This says
+# so, loudly, wherever timers are installed, enabled or listed. It does not turn lingering on.
+LOGINCTL="${COVENANT_LOGINCTL:-loginctl}"
+linger_check() {
+    local v
+    v="$("$LOGINCTL" show-user "${USER:-$(id -un)}" -p Linger --value 2>/dev/null)"
+    if [ "$v" = "yes" ]; then
+        echo "lingering: on (timers run with nobody logged in, and after a reboot)"
+    else
+        echo "WARNING: lingering is OFF for ${USER:-$(id -un)} (loginctl said: ${v:-nothing})." >&2
+        echo "WARNING: these timers stop at logout and do NOT start after a reboot. To fix: loginctl enable-linger \"\$USER\"" >&2
+    fi
 }
 
 case "${1:-}" in
@@ -135,6 +151,7 @@ case "${1:-}" in
             enable_names "$names"
         else
             echo "Nothing is enabled. To enable:  linux/install_timers.sh enable guard,refine-check   (or: all)"
+            linger_check
         fi
         ;;
     enable)
@@ -147,6 +164,7 @@ case "${1:-}" in
         ;;
     status)
         "$SYSTEMCTL" --user list-timers --all 'covenant-*'
+        linger_check
         ;;
     remove)
         for n in $ALL; do "$SYSTEMCTL" --user disable --now "covenant-$n.timer" >/dev/null 2>&1; done

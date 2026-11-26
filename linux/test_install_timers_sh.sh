@@ -19,7 +19,10 @@ FAKE="$T/fake_systemctl"; CALLS="$T/systemctl_calls.log"
 printf '#!/usr/bin/env bash\necho "$*" >> %q\n' "$CALLS" > "$FAKE"; chmod +x "$FAKE"
 U="$T/units"
 I="$T/linux/install_timers.sh"
-export COVENANT_UNIT_DIR="$U" COVENANT_SYSTEMCTL="$FAKE" COVENANT_ADOPT_HOME="$T/adopt_home"
+LINGER="$T/linger_answer"; echo no > "$LINGER"
+FAKEL="$T/fake_loginctl"
+printf '#!/usr/bin/env bash\ncat %q\n' "$LINGER" > "$FAKEL"; chmod +x "$FAKEL"
+export COVENANT_UNIT_DIR="$U" COVENANT_SYSTEMCTL="$FAKE" COVENANT_ADOPT_HOME="$T/adopt_home" COVENANT_LOGINCTL="$FAKEL"
 
 bash -n "$I" && bash -n "$T/linux/trader_task.sh" && ok "syntax" || bad "syntax"
 
@@ -31,6 +34,18 @@ grep -q -- "--user daemon-reload" "$CALLS" && ok "install reloaded the user mana
 : > "$CALLS"
 bash "$I" install --enable all >/dev/null 2>&1
 [ "$(grep -c -- '--user enable --now covenant-' "$CALLS")" -eq 8 ] && ok "install --enable all enabled 8" || bad "enable all: $(grep -c enable "$CALLS")"
+
+# 1b. lingering is said aloud (the quorum's Q5): OFF warns on install, enable and status; ON does not
+echo no > "$LINGER"
+for cmd in "install" "enable guard" "status"; do
+    err="$(bash "$I" $cmd 2>&1 >/dev/null)"
+    grep -q "WARNING: lingering is OFF" <<<"$err" && ok "lingering off -> warning on '$cmd'" || bad "no linger warning on '$cmd'"
+done
+echo yes > "$LINGER"
+out="$(bash "$I" status 2>&1)"
+grep -q "lingering: on" <<<"$out" && ! grep -q "WARNING" <<<"$out" && ok "lingering on -> said, no warning" || bad "linger on: $out"
+echo no > "$LINGER"
+: > "$CALLS"
 
 # 2. names are validated, both ways
 : > "$CALLS"
