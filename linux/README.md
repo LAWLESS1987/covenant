@@ -25,10 +25,38 @@ first tower, and until then the live start is **UNDETERMINED**.
 sudo apt install git python3 python3-venv curl
 git clone https://github.com/LAWLESS1987/covenant.git && cd covenant
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/pip install "numpy>=2,<3"   # the spiking network's fast CPU path (CI's pin); without it, pure Python
 # copy genesis.json and covenant_A.db.key from the existing install (never commit them)
+bash linux/test_chain_join.sh <copy-of-a-node-db> genesis.json   # proves this machine joins the chain first
 linux/covenant_prod.sh            # start
 linux/covenant_prod.sh status
 ```
+
+**Start nodes only through `linux/covenant_prod.sh`** (or `run_node.py` with
+its judge settings). A bare `python3 covenant_unified_v8.py` falls back to the
+Claude judge, which fails closed without an API key, so it refuses to sync from
+block 2 on; and it does not know the `deferring` judge production uses (A494).
+
+## Interoperability, measured (A494)
+
+- **The Windows-built chain joins on Linux.** A fresh Linux node, started with the
+  Windows `genesis.json`, synced all 174 blocks of a copy of node A's chain from
+  a second Linux node: same length, same tip hash, in about 12 s
+  (`linux/test_chain_join.sh`; with a changed genesis it refuses, exit 1).
+- **The gate scores the chain the same on both.** All 175 judged payloads, scored
+  by the committed model on Windows and on Linux: identical scores and verdicts,
+  and A124 (can a new node join) 3/3 on both, margin 0.2680.
+- **The spiking network needs no link between machines.** Its neurons compute
+  where they are (pure Python, numpy, or a CUDA GPU); TETSU's GPU lease is a file
+  on TETSU, absent on a tower, which reads as free. Every spiking and
+  node-to-node suite passed in the full Linux sweep of the merged code (octopus
+  34/34, SNN backends 10/10, GPU lease 13/13, grid guard 86/86, spore roads
+  32/32, peer version 14/14, mesh split 49/49, listener bind 20/20, chain
+  serialisation 15/15).
+- **Not measured here:** a Windows node and a Linux node talking over a real
+  network. Starting a listener on the Windows PC for it was refused, and
+  covenant_unified_v8 has no loopback-only option, so that waits for the first
+  tower on the LAN or tailnet.
 
 ## Stop / remove
 
