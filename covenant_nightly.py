@@ -803,6 +803,30 @@ def main():
         rc = 1
         say("selfaudit FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
 
+    # THE LIVE SENTINELS, every pass (A478, 2026-11-23, his "do the others" after A477). Until this nothing ran the
+    # live check: the anchors of all five ledgers drifted from 2026-10-08 on and no one was told. It reports; it
+    # never re-anchors. Only the one recorded exemption (a prepending ledger whose drift row says its head anchor
+    # cannot hold) is printed as known instead of failing the pass; every other alert fails it.
+    try:
+        import covenant_sentinels as SN
+        sys.path.insert(0, os.path.join(HERE, "tools"))
+        import anchor_drift as ADn
+        _ack = ADn.load_ack()
+        for _r in SN.run_all():
+            _new, _known = ADn.split_alerts(_r.alerts, _ack)
+            # FAIL, not ALERT, on the head line: covenant_daily.nightly_fail names what turned a nightly red by that
+            # word (A345), so a red night from here names its cause.
+            say("sentinel %-7s %s" % ("ok" if not _new else "FAIL", _r.name + ": " + _r.summary))
+            for _x in _new:
+                say("         ALERT %s" % _x[:220])
+            for _x in _known:
+                say("         known %s (recorded in ops/ANCHOR_DRIFT_ACK.json)" % _x[:180])
+            if _new:
+                rc = 1
+    except Exception as e:                                       # noqa: BLE001
+        rc = 1
+        say("sentinels FAILED: %s: %s" % (type(e).__name__, str(e)[:200]))
+
     green = None
     if not a.no_verify:
         try:

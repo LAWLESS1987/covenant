@@ -150,7 +150,11 @@ def machine_profile(path=None):
 
     The profile is APPLIED ONLY WHERE A CALLER PASSES IT (the heal button, the watchdog's round, --repair).
     sense() and run_once() called without it behave as they always have, so a test suite gives the same answer
-    on every machine."""
+    on every machine.
+    [A464, 2026-11-21: two callers were missed by that sentence. report() and ingest() are what a node says to and
+    takes from the mesh, their only callers are the two /hwy routes, and neither passed a profile; on the second
+    PC the report named 9 conditions PRESENT where 2 were. Those two now read this function themselves when no
+    profile is handed in. sense() and run_once() are unchanged: they still apply one only when given it.]"""
     path = path or os.environ.get("COVENANT_MACHINE_PROFILE") or MACHINE
     home = {"acts_here": True, "not_applicable": {}, "why": "", "source": "none", "refused": [], "sha": ""}
     sha = ""
@@ -161,7 +165,7 @@ def machine_profile(path=None):
         data = json.loads(raw.decode("utf-8"))
     except FileNotFoundError:
         return home
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):      # RecursionError: JSON nested thousands deep (A465's outside read)
         return {"acts_here": False, "not_applicable": {}, "source": "unreadable", "refused": [], "sha": sha,
                 "why": "ops/machine.json could not be read, so nothing is repaired here until it can"}
     na = data.get("not_applicable") if isinstance(data, dict) else None
@@ -176,9 +180,41 @@ def machine_profile(path=None):
     refused = sorted(n for n in na if n in ALWAYS_APPLIES)      # a takeover guard applies on every machine
     for n in refused:
         del na[n]
-    return {"acts_here": data.get("acts_here") is True, "not_applicable": na, "source": "file", "refused": refused,
-            "sha": sha,
-            "why": str(data.get("why") or "this machine's profile says the highway does not repair here")[:300]}
+    out = {"acts_here": data.get("acts_here") is True, "not_applicable": na, "source": "file", "refused": refused,
+           "sha": sha,
+           "why": str(data.get("why") or "this machine's profile says the highway does not repair here")[:300]}
+    # A465 (2026-11-21): the node(s) THIS machine hosts, as {id: loopback port}. A machine whose profile marks
+    # node_down as not applying is given an empty health by sense(), so the mesh checks read UNKNOWN there for every
+    # reader but the one caller that handed the health in by hand. A port on this machine and nothing else: a
+    # profile is a file anyone who can write the tree can write, and it must not be able to send the highway's GET
+    # anywhere. A wrong shape is the whole file's wrong shape -- nothing hidden, nothing repaired -- like any other.
+    # The key is returned only when the file gives it, so the home profile and every older file read as before.
+    own = data.get("own_nodes")
+    if own is not None:
+        if not _own_nodes_ok(own):
+            return {"acts_here": False, "not_applicable": {}, "source": "unreadable", "refused": [], "sha": sha,
+                    "why": "ops/machine.json names own_nodes in a shape that is not {id: loopback port}, so nothing "
+                           "is repaired here until it is"}
+        if own:
+            out["own_nodes"] = dict(own)
+    return out
+
+
+OWN_NODES_MAX = 8
+
+
+def _own_nodes_ok(own):
+    """{id: port}: at most OWN_NODES_MAX entries, an id of 1 to 16 letters, digits, - or _, a port that is an int
+    (not a bool, not text) from 1 to 65535."""
+    import re
+    if not isinstance(own, dict) or len(own) > OWN_NODES_MAX:
+        return False
+    for node, port in own.items():
+        if not isinstance(node, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,16}", node):
+            return False
+        if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
+            return False
+    return True
 
 
 # ----------------------------------------------------------------- sensing
@@ -227,6 +263,67 @@ def _health():
             out[n["id"]] = None                      # no answer at all
     return out
 
+
+
+OWN_HEALTH_TIMEOUT_S = 3.0        # per socket operation
+OWN_HEALTH_BUDGET_S = 10.0        # for every own node together, in one sensing
+OWN_HEALTH_MAX = 1 << 20          # bytes of one answer
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A 3xx from this machine's own port is an answer with an error. It is never followed."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _get_own(url, timeout=OWN_HEALTH_TIMEOUT_S, deadline=None):
+    """The JSON at one of this machine's own ports, for _own_health and nothing else.
+
+    NOT the shared _get, on purpose (an outside read of A465's first form, 2026-11-21). The port comes from a
+    file, and whatever listens there is not proven to be the node. Read through _get, a process on that port could
+    answer `302 Location: http://elsewhere/` and the highway would follow it off this machine; a proxy set in the
+    environment would be obeyed; the answer was read to its end whatever its size; and one that trickled a byte
+    at a time never timed out. So: no proxy, no redirect followed (it raises HTTPError, "it answered"), at most
+    OWN_HEALTH_MAX bytes, and done by `deadline` however slowly the bytes come. No retry on 429: that is an
+    answer too, and the next sensing asks again."""
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
+    chunks, size = [], 0
+    with opener.open(url, timeout=timeout) as r:
+        while True:
+            if deadline is not None and time.time() > deadline:
+                raise TimeoutError("own node health: not finished inside this sensing's budget")
+            part = r.read1(65536)
+            if not part:
+                break
+            size += len(part)
+            if size > OWN_HEALTH_MAX:
+                raise ValueError("own node health: larger than %d bytes" % OWN_HEALTH_MAX)
+            chunks.append(part)
+    return json.loads(b"".join(chunks).decode("utf-8") or "{}")
+
+
+def _own_health(machine):
+    """{id: health} for the node(s) a machine's profile names as its own (A465), with _health()'s three answers:
+    a dict, {"http": code} for one that answered with an error, None for no answer. {} when none is named.
+    Only ever asks 127.0.0.1 -- machine_profile() admits a port and nothing else. Whatever answers there must be
+    an object, and if it names a node it must name THIS one: another node's health, or anything that is not a
+    health, is no answer from the node the file names (a port is a number in a file; it can be the wrong one)."""
+    out = {}
+    deadline = time.time() + OWN_HEALTH_BUDGET_S          # for all own nodes together: a stalled port costs the rest
+    for node, port in sorted(((machine or {}).get("own_nodes") or {}).items()):
+        if time.time() >= deadline:
+            out[node] = None                              # not asked: the budget of this sensing is spent
+            continue
+        try:
+            got = _get_own("http://127.0.0.1:%d/health" % port, deadline=deadline)
+            named = got.get("node_id") if isinstance(got, dict) else None
+            out[node] = got if isinstance(got, dict) and named in (None, node) else None
+        except urllib.error.HTTPError as e:
+            out[node] = {"http": e.code}
+        except (urllib.error.URLError, OSError, ValueError, TimeoutError):
+            out[node] = None
+    return out
 
 
 def detect_node_down(health=None):
@@ -359,11 +456,15 @@ def detect_mesh_source_split(health=None):
             continue
         if v.get("source_sha256"):
             running[k] = str(v["source_sha256"])[:12]
-        mesh = v.get("mesh") or {}
-        for src, whos in (mesh.get("by_source") or {}).items():
+        # A465: a health is another process's words. A mesh, a by_source or a heard_s_ago that is not a mapping is
+        # read as empty instead of raising (sense() would have turned the raise into UNKNOWN; this says why instead).
+        mesh = v.get("mesh") if isinstance(v.get("mesh"), dict) else {}
+        by = mesh.get("by_source") if isinstance(mesh.get("by_source"), dict) else {}
+        heard = mesh.get("heard_s_ago") if isinstance(mesh.get("heard_s_ago"), dict) else {}
+        for src, whos in by.items():
             for who in (whos if isinstance(whos, list) else [whos]):
                 peers[str(who)[:64]] = str(src)[:12]
-        for who, age in (mesh.get("heard_s_ago") or {}).items():
+        for who, age in heard.items():
             if isinstance(age, (int, float)):
                 who = str(who)[:64]
                 ages[who] = min(ages.get(who, age), age)
@@ -377,10 +478,42 @@ def detect_mesh_source_split(health=None):
                 "measured": {"running": running, "peers": peers,
                              "why": "no peer has reported a source to any local node"}}
     off = sorted([w for w, s in peers.items() if s and s not in ours])
-    return {"state": PRESENT if off else ABSENT,
-            "measured": {"running": ours, "peers": peers, "drifted": off,
-                         "heard_s_ago": {w: ages[w] for w in off if w in ages},
-                         "note": "no remedy: a peer's bytes are changed on the peer, by its owner"}}
+    measured = {"running": ours, "peers": peers, "drifted": off,
+                "heard_s_ago": {w: ages[w] for w in off if w in ages},
+                "note": "no remedy: a peer's bytes are changed on the peer, by its owner"}
+    # A465 (2026-11-21): WHO, WHICH SIDE, AND WHAT THE COUNT COUNTS. Added beside the keys above, which keep their
+    # exact values. Measured on the second PC that day: "drifted" held 7 names for 3 nodes, because a node reached
+    # by two roads is filed under two names and traffic through a relay is filed under the relay's own address
+    # with no port; and nothing said which of the two sources is the one on this disk, which is the first thing a
+    # person asks. This node keeps no identity per peer, only the name it files it under, so names cannot be
+    # folded into nodes here: the unit is SAID instead (rule 4), and the names with no port are listed apart.
+    by_source = {}
+    for who, src in peers.items():
+        if src:
+            by_source.setdefault(src, []).append(who)
+    by_source = {s: sorted(v) for s, v in sorted(by_source.items())}
+    unmapped = sorted(w for w in peers if w.endswith(":?"))
+    try:
+        import covenant_watchdog as W
+        disk = W.disk_source_sha12()
+    except Exception:                                            # noqa: BLE001
+        disk = None
+    ours_is_disk = None if not disk else (len(ours) == 1 and ours[0] == disk)
+    said = {None: "the source on disk could not be read", True: "the source on disk",
+            False: "not the source on disk (%s)" % disk}[ours_is_disk]
+    parts = []
+    for src, names in by_source.items():
+        n_un = sum(1 for w in names if w in unmapped)
+        bit = "%s by %d peer name(s)" % (src, len(names) - n_un)
+        if n_un:
+            bit += " and %d unmapped sender(s)" % n_un
+        parts.append(bit)
+    measured.update({
+        "by_source": by_source, "unmapped": unmapped, "disk": disk, "ours_is_disk": ours_is_disk,
+        "unit": "peer names as this node files them, not nodes: a node reached by two roads is two names",
+        "summary": "this machine's node(s) run %s, %s; %s reported: %s. Peer names, not nodes."
+                   % (", ".join(ours), said, "two or more sources" if off else "one source", "; ".join(parts))})
+    return {"state": PRESENT if off else ABSENT, "measured": measured}
 
 
 def detect_height_lag(health=None):
@@ -2368,6 +2501,35 @@ def detect_model_drift(health=None, pin=None, repo=None, **kwargs):
     return {"state": ABSENT, "measured": {"pinned": len(pinned)}}
 
 
+def detect_gateway_impostor(health=None, check=None, **kwargs):
+    """A475 (2026-11-23, Lawrence: "find a solution to protect the RTX gateway"): a model behind the TETSU gateway
+    answers its private canaries unlike the fingerprint recorded at pin time -- the gateway names the approved file but
+    serves something else. covenant_gateway_attest.check() measures (rate-limited to once per 15 min) and puts a
+    mismatching pin on hold, so covenant_leg.approved() refuses it. ALARM-only, no remedy: a model swap is a person's
+    call (re-pin and re-record, or investigate), and auto-healing would erase the evidence. PRESENT on any mismatch;
+    ABSENT when every remote target matched; UNKNOWN when nothing could be measured (no remote target, no fingerprint,
+    unreachable) -- never a hold."""
+    try:
+        if check is None:
+            import covenant_gateway_attest as _ga
+            check = _ga.check
+        st = check()
+    except Exception as e:                                   # noqa: BLE001
+        return {"state": UNKNOWN, "measured": {"error": "%s: %s" % (type(e).__name__, str(e)[:160])}}
+    res = (st or {}).get("results") or {}
+    bad = {n: r.get("why") for n, r in res.items() if r.get("status") == "mismatch"}
+    if bad:
+        return {"state": PRESENT, "measured": {
+            "mismatch": bad, "held": sorted((st.get("holds") or {}).keys()),
+            "kind": "a model behind the TETSU gateway does not answer like the one pinned -- its consults are held; "
+                    "re-pin and re-record if the change was agreed, otherwise investigate the gateway"}}
+    ok = [n for n, r in res.items() if r.get("status") == "ok"]
+    if res and len(ok) == len(res):
+        return {"state": ABSENT, "measured": {"matched": ok, "at": st.get("at")}}
+    return {"state": UNKNOWN, "measured": {"results": {n: r.get("status") for n, r in res.items()},
+                                           "why": "nothing measured" if not res else "not every target measured"}}
+
+
 HEADSCALE_HEALTH = "http://127.0.0.1:8080/health"
 
 
@@ -2843,6 +3005,8 @@ DETECTORS = {
     "head_commitment_broken": detect_head_commitment_broken,
     "consent_chain_broken": detect_consent_chain_broken,
     "model_drift": detect_model_drift,
+    # A475: the model BEHIND the TETSU gateway, measured by its answers to private canaries -- alarm-only too.
+    "gateway_impostor": detect_gateway_impostor,
     # Our own Tailscale control plane (headscale) -- AUTO-repairable: restarting our own
     # daemon is safe and reversible (restart_headscale), unlike the takeover guards above.
     "headscale_down": detect_headscale_down,
@@ -2897,7 +3061,10 @@ def sense(only=None, health=None, machine=None):
         # A machine whose profile says node_down does not apply does not host the nodes _health() asks 127.0.0.1
         # for. Asking anyway costs about two seconds a node on Windows (three refused connections, 6.1 s measured
         # 2026-11-13), which alone blew the orbs page's 3-second deadline and left it with no reading at all.
-        health = {} if "node_down" in skip else _health()
+        # A465: ...and the node it DOES host, when its profile names one, is asked instead, so the mesh checks are
+        # measured for every profiled reader (the page, the orb, the heal button) and not only for the one caller
+        # that handed the health in. No own node named -> the empty health, as before.
+        health = _own_health(machine) if "node_down" in skip else _health()
     out = {}
     for name, fn in DETECTORS.items():
         if only and name not in only:
@@ -2942,6 +3109,7 @@ def remedy_restart_nodes(measured, dry_run=True):
     # watchdog's own process (no node module loaded) the old synchronous path is unchanged.
     if "covenant_unified_v8" in sys.modules:
         import covenant_quiet
+        os.makedirs(os.path.join(HERE, "logs"), exist_ok=True)   # A486: a fresh checkout has no logs/ (HL1 failed there)
         log = open(os.path.join(HERE, "logs", "rolling_restart.log"), "a", encoding="utf-8", errors="replace")
         covenant_quiet.popen_survivor([sys.executable, os.path.join(HERE, "rolling_restart.py")],
                                       cwd=HERE, stdout=log, stderr=log)
@@ -4561,6 +4729,28 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
     """
     alerts, infos = [], []
     conditions = sense(health=health, machine=machine)
+    # A471 (2026-11-22): credit each detector from what happened to the condition it raised since the last pass,
+    # read BEFORE save_last_sense overwrites that pass. Sight only; the one act it can cause is a one-pass hold below.
+    prev, prev_at, elig_state = None, None, None
+    try:
+        import covenant_eligibility as _elig
+        with open(os.environ.get("COVENANT_HIGHWAY_LAST_SENSE") or LAST_SENSE, encoding="utf-8") as _fh:
+            _ls = json.load(_fh)
+        _age = time.time() - float(_ls.get("at", 0))
+        if -5 <= _age <= 1800 and isinstance(_ls.get("conditions"), dict):      # A472: no future-dated previous pass
+            prev, prev_at = _ls["conditions"], float(_ls["at"])
+        # A pass given its own ledger (every test) keeps its credit BESIDE that ledger, never in the live file:
+        # found 2026-11-22 when two H1 runs left the fixture detector "fixture_elsewhere" in logs/eligibility_state.json.
+        # (A second route found the same night: H1 swaps the module's LEDGER instead of passing one. So the test is
+        # the ledger actually in use against the real one, not whether an argument was given.)
+        _eff = os.path.abspath(ledger or LEDGER)
+        _elig_path = None if _eff == os.path.abspath(os.path.join(HERE, "ops", "highway.jsonl")) else _eff + ".eligibility.json"
+        elig_state = _elig.load(_elig_path)
+        if prev is not None:
+            _elig.observe(prev, conditions, _elig.recent_rows(ledger or LEDGER), elig_state, prev_at=prev_at)
+            _elig.save(elig_state, _elig_path)
+    except Exception:                                            # noqa: BLE001 -- credit never blocks a pass
+        pass
     save_last_sense(conditions)
     # A profile in force is SAID on every pass, so a detector switched off by a file is never switched off quietly;
     # and one that tried to switch off a takeover guard is an alert, pause or no pause.
@@ -4609,6 +4799,21 @@ def run_once(dry_run=False, exclude=("restart_watchdog",), ledger=None, health=N
                          % (name, json.dumps(c["measured"])[:120]))
             continue
         if c["state"] != PRESENT:
+            continue
+        # A471: a detector whose alarms keep clearing by themselves waits ONE pass before its remedies run. The reading
+        # is already reported above; only automatic action waits. Never a takeover guard; off with
+        # COVENANT_ELIGIBILITY_OFF=1.
+        # A472 (Codex's audit, verified): only a detector that HAS automatic remedies can be held. An alarm-only
+        # detector was held too in A471's first form, and the hold's `continue` skipped its ALERT -- a real reading
+        # demoted to an info line. Now its alert path is never reached by a hold.
+        _has_remedy = any(name in rr["for"] and rn not in (exclude or ()) for rn, rr in REMEDIES.items())
+        try:
+            _why = (_elig.hold(name, prev, elig_state, exempt=ALWAYS_APPLIES)
+                    if (elig_state is not None and _has_remedy) else None)
+        except Exception:                                        # noqa: BLE001
+            _why = None
+        if _why:
+            infos.append("highway: %s is present; %s -- %s" % (name, _why, json.dumps(c.get("measured"))[:200]))
             continue
         acted = False
         for rname, r in REMEDIES.items():
@@ -4759,16 +4964,29 @@ def standing(ledger=None):
     return out
 
 
-def report(node_id=None, health=None, ledger=None):
+def report(node_id=None, health=None, ledger=None, machine=None):
     """What this node offers the mesh: what it senses, and what has worked here.
 
     Deliberately narrow. Detector names and states, remedy outcomes, nothing
     read out of a file and nothing about money, holdings, keys or people. A
     report is an OFFER; the receiving node re-measures before it believes a word
     of it.
+
+    READ WITH THIS MACHINE'S PROFILE (A464, 2026-11-21). A report is this machine's statement about itself, so
+    with no `machine` argument it reads machine_profile(), which is how GET /hwy/state calls it. Measured that day
+    on the second PC: this function reported 9 conditions PRESENT and 17 UNKNOWN in 17.0 s, where the watchdog's
+    pass, which hands its profile to run_once(), read 2 and 1 in 3.7 s. node_down, sweep_red and
+    sync_task_missing were offered to the tailnet as that machine's own, and none of them describes it. A detector
+    the profile marks as not applying is not entered and reads ABSENT, as in sense(); because a peer cannot tell
+    that ABSENT from "measured and clear", the names are listed under "not_applicable_here" (names only: the
+    profile's reasons are prose about a machine and stay on it). No profile file, or the home profile handed in,
+    changes nothing. WHAT THIS DOES NOT DO: it does not hand the node's own health to the mesh checks, so on a
+    machine whose profile marks node_down as not applying, mesh_source_split reads UNKNOWN here though the
+    watchdog's pass, which is given that health, can read it.
     """
     import covenant_unified_v8 as cov
-    conditions = sense(health=health)
+    profile = machine_profile() if machine is None else machine
+    conditions = sense(health=health, machine=profile)
     worked = {}
     for row in read_ledger(ledger):
         if row.get("dry_run") or row.get("outcome") not in ("fixed", "did not fix"):
@@ -4780,30 +4998,47 @@ def report(node_id=None, health=None, ledger=None):
         "at": round(time.time(), 1),
         "source": cov.CORE_SOURCE_SHA12,
         "conditions": {k: v["state"] for k, v in conditions.items()},
+        "not_applicable_here": sorted(n for n in (profile.get("not_applicable") or {}) if n in conditions),
         "remedies_that_worked_here": worked,
         "offer": "data, not an instruction -- measure it yourself before acting",
     }
 
 
-def ingest(peer_report, dry_run=True, ledger=None, cooldown_s=None):
+def ingest(peer_report, dry_run=True, ledger=None, cooldown_s=None, machine=None):
     """Take a peer's offer and decide LOCALLY. Returns what this node did.
 
     INVARIANT 4: nothing here runs because a peer said so. For every condition
     the peer reports, this node runs its OWN detector; only a condition present
     HERE is even a candidate, and then only an AUTO_REVERSIBLE remedy runs.
+
+    WITH THIS MACHINE'S PROFILE (A464, 2026-11-21), read when no `machine` is handed in, which is how
+    POST /hwy/report calls it. A condition the profile marks as not applying here is declined and its detector is
+    not entered: a peer naming it cannot make this machine run a check written for another. And where the profile
+    says the highway does not repair on this machine, a condition present here too is raised and NO remedy is
+    entered, dry or not -- the same rule run_once() keeps ("NOT THIS MACHINE'S TO REPAIR").
     """
     acted = []
     out = {"from": (peer_report or {}).get("node", "?"), "did": acted}
+    profile = machine_profile() if machine is None else machine
+    skip = profile.get("not_applicable") or {}
     for name, state in ((peer_report or {}).get("conditions") or {}).items():
         if name not in DETECTORS:
             acted.append({"condition": name, "action": "ignored", "why": "no such detector here"})
             continue
         if state != PRESENT:
             continue
+        if name in skip:
+            acted.append({"condition": name, "action": "declined",
+                          "why": "does not apply on this machine (its profile says so); not measured"})
+            continue
         local = DETECTORS[name]()
         if local["state"] != PRESENT:
             acted.append({"condition": name, "action": "declined",
                           "why": "the peer has it; this node measured %s" % local["state"]})
+            continue
+        if profile.get("acts_here") is not True:    # exactly True: "no", 1 or "True" from a caller's dict is not a yes
+            acted.append({"condition": name, "action": "raised",
+                          "why": "present here too; this machine's profile says the highway does not repair here"})
             continue
         for rname, r in REMEDIES.items():
             if name in r["for"] and r["klass"] == AUTO_REVERSIBLE:

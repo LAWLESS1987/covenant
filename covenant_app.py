@@ -483,12 +483,30 @@ class Handler(BaseHTTPRequestHandler):
                    f"http://[::1]:{PORT}"}
         origin = self.headers.get("Origin")
         if origin and origin not in allowed:
-            self._send(403, json.dumps({"error": "cross-site request refused"}))
+            self._refuse_cross_site()
             return False
         if (self.headers.get("Sec-Fetch-Site") or "").lower() == "cross-site":
-            self._send(403, json.dumps({"error": "cross-site request refused"}))
+            self._refuse_cross_site()
             return False
         return True
+
+    DRAIN_MAX = 64 * 1024
+
+    def _refuse_cross_site(self):
+        """A490 (2026-11-26): read the request's body (up to DRAIN_MAX) before answering 403. Answering and closing
+        with the body unread makes Windows reset the connection, so the caller saw ConnectionAbortedError instead of
+        the refusal: CX1.2 went red once in a full sweep on TETSU, then passed 9 of 9 alone. The request was refused
+        either way; this makes the refusal arrive. Nothing in the body is parsed or used."""
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+        if 0 < n <= self.DRAIN_MAX:
+            try:
+                self.rfile.read(n)
+            except OSError:
+                pass
+        self._send(403, json.dumps({"error": "cross-site request refused"}))
 
     def do_GET(self):
         if not self._guard():

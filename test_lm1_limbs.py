@@ -32,6 +32,12 @@ def check(label, ok, detail=""):
 PIN = "ab" * 32
 CFG = {"SMOL": {"url": "http://127.0.0.1:1/v1/chat/completions", "model": "smollm3", "label": "SmolLM3-3B",
                 "manifest_sha256": PIN}}
+# A474: a limb's pin must also be approved in ops/leg_policy.json; this suite's stand-in pin is approved in a TEST policy
+# (never the real file). test_a474_leg_policy.py drives the refusal itself.
+_POL = os.path.join(tempfile.mkdtemp(prefix="lm1pol_"), "leg_policy.json")
+with open(_POL, "w", encoding="utf-8") as _fh:
+    json.dump({"leg": {}, "limbs": {"SMOL": [PIN]}}, _fh)
+LEG.POLICY_PATH = _POL
 GOOD = json.dumps({"answer": "Two plus two is four.", "evidence": "arithmetic", "confidence": "high"})
 
 

@@ -83,6 +83,25 @@ def main():
         none = post()
         check("CX1.4 a non-browser caller with no Origin is unaffected -- headless tools / curl still work",
               none != 403, "status=%r (must not be 403)" % none)
+        # CX1.5 (A490, 2026-11-26): the refusal must ARRIVE, every time. The console used to answer 403 with the
+        # body unread; Windows then reset the connection and the caller saw ConnectionAbortedError (CX1.2 red once
+        # in a full sweep). A body larger than one socket write makes the unread case show reliably.
+        big = b'{"pad": "' + b"x" * 32768 + b'"}'
+        seen = {}
+        for i in range(120):
+            req = urllib.request.Request("http://127.0.0.1:%d/api/action/gates" % port, data=big, method="POST",
+                                         headers={"Content-Type": "application/json"})
+            req.add_header(*(("Origin", "http://evil.example") if i % 2 else ("Sec-Fetch-Site", "cross-site")))
+            try:
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    got = r.status
+            except urllib.error.HTTPError as e:
+                got = e.code
+            except Exception as e:                                   # noqa: BLE001
+                got = "ERR:%s" % type(e).__name__
+            seen[got] = seen.get(got, 0) + 1
+        check("CX1.5 120 cross-site POSTs with a 32 KiB body all get the 403 (none reset or aborted)",
+              seen == {403: 120}, "outcomes=%r" % seen)
         # GET must stay open to the same-origin page regardless (read-only); a cross-site GET is harmless
         # and not gated, so we only assert the POST gate above.
     finally:

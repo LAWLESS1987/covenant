@@ -30,10 +30,16 @@ file (nothing is removed); the new one is appended after it, so the LAST row for
 WHERE THE TEACHER IS (A263, 2026-10-05). The teacher queue is carried by the nightly to the
 teacher PANEL, which runs on the PUBLIC repository's GitHub Actions runner, and the runner's job
 summary is rendered publicly -- the A128 route. So an item handed here is published unless it is
-marked private. A private item is answered by the model on this machine and nothing of it leaves
-it: the door records it as withheld from the teacher (ops/teacher_queue.withheld.jsonl, with the
-reason), does not replay it into ordinary asks, and makes no fetch, web search or forum act for it.
+marked private. A private item is answered by the model on this machine. The door records it as
+withheld from the teacher (ops/teacher_queue.withheld.jsonl, with the reason), does not replay it
+into ordinary asks, and makes no fetch, web search or forum act for it.
 It does not teach him; that is the cost, and it is said rather than hidden.
+[A263-NOTHING-LEAVES, restated by A463 (2026-11-20). As written this said a private item never left
+this one machine. Since A402 (2026-11-01) Tetsu can consult a limb on the second PC, and he may do
+so on a private item: the door makes that consult only to this machine or a tailnet address, and
+holds it to anywhere else. So part of a private item can reach the operator's second PC. And the
+gate still judges a private answer (A263, "Residual"): with a judge that is not on this machine,
+the question and the answer go to that judge.]
 
 An item is private when any of these holds:
   * --private (the whole batch), or {"private": true} on its line;

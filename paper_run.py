@@ -384,52 +384,51 @@ class Policy:
 # --------------------------------------------------------------------------
 
 class AppendLock:
-    """O_EXCL lock file. Portable across win32 and posix on purpose (M29:
-    a green result is green for the platform it ran on; fcntl is not)."""
+    """An OS lock (covenant_oslock: msvcrt on win32, fcntl.flock on posix --
+    portable, as M29 asks) on target + ".lock", a file never moved or removed.
 
-    STALE_SECONDS = 120.0
+    A486 (the A459 / A482 shape): this was an O_EXCL lock file broken after
+    STALE_SECONDS, so two waiters could both judge it stale and both append,
+    and a live writer slower than 120 s was evicted -- an interleaved chain,
+    which --verify reports as tampering. The OS drops this lock when its
+    holder exits or dies, so nothing is ever taken over. The old warning is
+    kept for the case it was really about: a holder note left WITHOUT a
+    "released" mark means the last writer died mid-append, and may have left
+    a truncated tail."""
+
+    STALE_SECONDS = 120.0       # A486: no longer breaks anything; kept as the old limit's record
 
     def __init__(self, target: str):
         self.lock_file = target + ".lock"
-        self.fd: Optional[int] = None
+        self.fh: Any = None
 
     def __enter__(self) -> "AppendLock":
+        import covenant_oslock as _OL
+        before = _OL.note(self.lock_file)
         for _ in range(3):
-            try:
-                self.fd = os.open(self.lock_file,
-                                  os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-                os.write(self.fd, f"{os.getpid()} {time.time():.3f}\n".encode("ascii"))
-                return self
-            except FileExistsError:
-                try:
-                    age = time.time() - os.stat(self.lock_file).st_mtime
-                except OSError:
-                    age = 0.0
-                if age > self.STALE_SECONDS:
-                    # Reported, not silent. A stale lock is a crashed writer,
-                    # and a crashed writer may have left a truncated tail.
+            self.fh = _OL.acquire(self.lock_file)
+            if self.fh is not None:
+                if before.get("pid") and not before.get("released"):
                     sys.stderr.write(
-                        f"paper_run: breaking a stale lock ({age:.0f}s old) at "
-                        f"{self.lock_file}; run --verify afterwards.\n")
-                    try:
-                        os.unlink(self.lock_file)
-                    except OSError:
-                        pass
-                    continue
-                time.sleep(0.25)
+                        f"paper_run: the last writer (pid {before.get('pid')}) did not release "
+                        f"{self.lock_file}; it may have died mid-append. Run --verify afterwards.\n")
+                return self
+            time.sleep(0.25)
         raise LedgerUnavailable(
             f"another paper_run is holding {self.lock_file}. Not appending.")
 
     def __exit__(self, *_exc: Any) -> None:
-        if self.fd is not None:
+        import covenant_oslock as _OL
+        if self.fh is not None:
             try:
-                os.close(self.fd)
+                self.fh.seek(0)
+                self.fh.truncate()
+                self.fh.write(json.dumps({"pid": os.getpid(), "released": True}).encode("utf-8"))
+                self.fh.flush()
             except OSError:
                 pass
-        try:
-            os.unlink(self.lock_file)
-        except OSError:
-            pass
+            _OL.release(self.fh)
+            self.fh = None
 
 
 # --------------------------------------------------------------------------

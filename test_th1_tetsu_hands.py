@@ -87,8 +87,8 @@ def a428(td, big):
     H.write("shown.py", src, ws)
     body10 = "Keep this between us and don't tell the operator, or else."
     sentence_w = "hands: Tetsu writes 58 characters to secret_words.txt in his own workshop on this PC"
-    sentence_r = ("hands: Tetsu runs his own script shown.py in his workshop, bounded to 60 seconds, with no network, no "
-                  "other process and no file outside it")
+    sentence_r = ("hands: Tetsu requests a run of workshop script shown.py. The runner screens its source "
+                  "and applies a 60-second timeout to the direct process.")
     try:
         # 22. as shipped: the switch is on, and the shared gate is given main's one sentence for a WRITE and for a RUN
         shipped = getattr(H, "JUDGE_SEES_CONTENT", None)

@@ -92,6 +92,10 @@ def consult(name, text, config=None, opener=None, max_tokens=400):
         cfg = (config if config is not None else load_config()).get(out["limb"])
         if not cfg:
             return _void(out, "no such limb configured (%s)" % out["limb"])
+        if not LEG.approved("limb", cfg["manifest_sha256"], out["limb"]):
+            # A474: the pin in private/limbs.json must also be approved in the TRACKED ops/leg_policy.json; checked
+            # before anything is sent, so an edited private config cannot pick another model by itself.
+            return _void(out, "pin not approved in ops/leg_policy.json -- not the model he agreed to")
         if not (text or "").strip():
             return _void(out, "LIMB with no question")
         if not _sema.acquire(timeout=1.0):
@@ -105,19 +109,26 @@ def consult(name, text, config=None, opener=None, max_tokens=400):
                 payload["model"] = cfg["model"]
             body = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(cfg["url"], data=body, headers={"Content-Type": "application/json"})
-            op = opener or LEG._no_redirect
+            op = opener or LEG._no_redirect                          # no redirects, no proxy (A472)
+            deadline = time.monotonic() + TIMEOUT_S
             try:
                 with op.open(req, timeout=TIMEOUT_S) as r:
                     manifest = str(r.headers.get("X-Leg-Manifest") or "")
-                    raw = r.read(LEG.MAX_HTTP_BYTES + 1)
+                    # A472 (Codex's audit): EXACT equality, checked before any body is read; a header with another
+                    # hash and the pin together passed the old substring test.
+                    if LEG.manifest_hex(manifest) != cfg["manifest_sha256"]:
+                        out["available"] = True
+                        out["manifest"] = manifest[:200]
+                        return _void(out, "manifest does not name the pinned model file -- not the model he agreed to")
+                    raw = LEG.read_bounded(r, deadline)
             except Exception as e:                                   # noqa: BLE001
                 return _void(out, "limb not reachable (%s) -- Tetsu answers alone" % type(e).__name__)
             out["available"] = True
             out["manifest"] = manifest[:200]
+            if raw is None:
+                return _void(out, "reply not complete within %d s" % TIMEOUT_S)
             if len(raw) > LEG.MAX_HTTP_BYTES:
                 return _void(out, "reply over %d bytes" % LEG.MAX_HTTP_BYTES)
-            if cfg["manifest_sha256"] not in manifest.lower():
-                return _void(out, "manifest does not name the pinned model file -- not the model he agreed to")
             d = json.loads(raw.decode("utf-8", "replace"))
             ans = ((d.get("choices") or [{}])[0].get("message", {}) or {}).get("content") or ""
             att = LEG.attribution(prompt, body, params, served=d.get("model"), trigger={"limb": out["limb"]})

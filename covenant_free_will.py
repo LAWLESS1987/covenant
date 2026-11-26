@@ -564,6 +564,49 @@ def untrusted(author, text):
     return '<untrusted_post author="%s">\n%s\n</untrusted_post>' % (name, _TAG.sub("[tag]", str(text or "")))
 
 
+# A451 (2026-11-18, his "Yes, fix titles"). The 3B often writes the instruction back before the post: of her 113
+# own-post rows, 86 took "a title under 80 characters:" (or a near copy) as the title, 4 of them sent live, and 25
+# carried "a post:" inside the body. The title was simply the first line. The echo set is DERIVED from POST_SYSTEM's
+# own format sentence, so a change of wording moves it too; a line is an echo when, normalised, it is a piece of that
+# sentence (or of the user turn's "Read today on Moltbook" lead-in), alone or as a "label:" before real text.
+def _norm(s):
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", str(s or "").lower())).strip()
+
+
+_POST_FORMAT = _norm(POST_SYSTEM[POST_SYSTEM.rfind("First line:"):])   # "first line a title under 80 ... the post"
+_LEAD_IN = _norm("Read today on Moltbook")
+
+
+def _echo(line):
+    """True when the line, normalised, is a piece of the format instruction or the user turn's lead-in (A451)."""
+    n = _norm(line)
+    core = re.sub(r"^(?:(?:a|an|the|then|first line)\s+)+", "", n)   # "a post" is a piece of "...then the post"
+    return bool(n) and ((len(core) >= 4 and core in _POST_FORMAT) or n.startswith(_LEAD_IN))
+
+
+def split_post(text):
+    """(title, body) from the model's post with instruction echoes removed (A451). A whole line that is an echo is
+    dropped; a "label:" prefix that is an echo is cut from its line. The title is the first line left; it is None
+    when nothing is left, or when what is left still reads as the instruction (then there is no post)."""
+    kept = []
+    for line in str(text or "").splitlines():
+        head, colon, rest = line.partition(":")
+        if _echo(line):
+            continue
+        if colon and _echo(head) and rest.strip():
+            line = rest
+        kept.append(line)
+    while kept and not kept[0].strip():
+        kept.pop(0)
+    if not kept:
+        return None, ""
+    title = kept[0].strip().strip("#*_").strip()[:80]
+    body = "\n".join(kept[1:]).strip()
+    if not title or "under 80 characters" in title.lower():
+        return None, body
+    return title, body
+
+
 def write_post(rows, ask):
     """(title, body, source_row) from the model, or (None, None, None) when nothing usable came back."""
     if ask is None:
@@ -582,8 +625,8 @@ def write_post(rows, ask):
         text, _meta = ask([{"role": "system", "content": POST_SYSTEM + UNTRUSTED_RULE},
                            {"role": "user", "content": "Read today on Moltbook:\n%s\n\nWrite the post." % untrusted(pick.get("author"), quote)}], max_tokens=320)
         text = str(text or "").strip()
-        title, _sep, body = text.partition("\n")
-        title, body = title.strip().strip("#").strip()[:80], body.strip()
+        title, body = split_post(text)                    # A451: was text.partition("\n"), which kept echoes
+        title = title or ""
         words = len(body.split())
         grounded, why_not = cites_only_facts(title + " " + body)
         if grounded:                                      # A409 honesty organ: and no fabricated first-person experience
@@ -1183,27 +1226,29 @@ def _ver(res):
     return out
 
 
-LOCK_STALE_S = 7200
+LOCK_STALE_S = 7200      # A482: no longer reclaims anything; kept because it was the old limit and FW1k names it
 
 
 def _take_lock(path, stale_s=LOCK_STALE_S):
     """One live round at a time: the nightly's round and a scheduled one must not both reply to the same
-    people before either has recorded it. A lock older than stale_s is a dead round's and is taken over."""
+    people before either has recorded it.
+
+    A482 (the A459 shape): this used to treat a lock older than stale_s as a dead round's, remove it and take it
+    over. Two rounds could both judge it stale and both hold it, and a live round slower than stale_s was evicted
+    (SL1.12b, red on the old code). Now an OS lock through covenant_oslock: the OS drops it when the round's
+    process exits or dies, so there is nothing stale to take over. stale_s is accepted and unused. Unchanged: when
+    no lock can be written here at all, the round is not stopped by that (True)."""
+    import covenant_oslock as _OL
     try:
-        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        try:
-            if time.time() - os.path.getmtime(path) > stale_s:
-                os.remove(path)
-                return _take_lock(path, stale_s)
-        except OSError:
-            pass
-        return False
+        return _OL.acquire(path) is not None
     except OSError:
-        return True                      # no lock can be written here: the round is not stopped by that
-    os.write(fd, ("%d %s" % (os.getpid(), time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))).encode())
-    os.close(fd)
-    return True
+        return True
+
+
+def _release_lock(path):
+    """Release this round's lock. False when this process does not hold it: a round cannot release another's."""
+    import covenant_oslock as _OL
+    return _OL.release_path(path)
 
 
 def run_round(dry_run=True, say=print, sends_path=None, tetsu_updates=False, tetsu_ask=None, tetsu_tell=None, **kw):
@@ -1245,10 +1290,7 @@ def run_round(dry_run=True, say=print, sends_path=None, tetsu_updates=False, tet
                 say("free: Tetsu's update could not run (%s)" % type(e).__name__)
         return out
     finally:
-        try:
-            os.remove(lock)
-        except OSError:
-            pass
+        _release_lock(lock)              # A482: drops only this round's own lock; the file stays
 
 
 def _run_round(dry_run=True, say=print, ask=None, learn=None, allies=None, emit=None, introduce=None,

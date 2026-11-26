@@ -233,6 +233,19 @@ hash`, or narrow this amendment back to match it. No run may do either — that
 block is inside `docs/IMPROVEMENT_LOG.md` §0's reach, and §0 binds runs
 absolutely whatever the operator has approved for the trader.
 
+### Candidate amendments (proposed, not adopted)
+
+Recorded 2026-11-18 for human review, at the operator's direction. Each is a
+row in `docs/PROPOSED_AMENDMENTS.json` with intent, beneficiary and divergence.
+They change nothing: no rule, gate, code path, anchor or protected block. None
+is in the record of amendments above until a human adopts it.
+
+- **PA-20261118-1 — SNN output feedback loop.** Proposed; awaits human review.
+- **PA-20261118-2 — Flinch-as-bridge protocol.** Proposed; awaits human review.
+- **PA-20261118-3 — Competing-neurons to multi-agent legs prior.** Proposed;
+  awaits human review. Conditional on the preregistered eight-seed selectivity
+  trial; it has no effect unless that result is measured and reviewed.
+
 ## IV. What anyone governed by this is owed
 
 1. **Exit.** Anyone may stop participating, take their data, and go. No

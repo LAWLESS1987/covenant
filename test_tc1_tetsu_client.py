@@ -41,7 +41,12 @@ class Stub(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b)
 
+    slow_get_port = None    # A469: the one stub door whose panel read is slower than the client's timeout
+
     def do_GET(self):
+        if self.path == "/panel" and self.server.server_address[1] == Stub.slow_get_port:
+            import time as _t
+            _t.sleep(4)
         if self.path == "/panel":
             self._send({"panel": {"leg-qwen3.5-2b": True, "qwen3.8-27b-uncensored": True}})
         else:
@@ -55,10 +60,22 @@ class Stub(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b)
 
+    posts = []              # A469: (port, question) of every POST each stub door received
+    fail503_port = None     # A469: the one stub door that answers HTTP 503
+
     def do_POST(self):
         n = int(self.headers.get("Content-Length", "0"))
         Stub.last_post = json.loads(self.rfile.read(n) or b"{}")
         q = Stub.last_post.get("question")
+        Stub.posts.append((self.server.server_address[1], q))
+        if q == "slow":
+            import time as _t
+            _t.sleep(4)                                            # longer than the client's timeout
+        if q == "err503" and self.server.server_address[1] == Stub.fail503_port:
+            self.send_response(503)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if q == "unicode":
             # what the real door sends: raw UTF-8, NOT \u-escaped (ensure_ascii=False). The 27B's answer on
             # 2026-11-05 carried a right double quote (bytes E2 80 9D); 0x9D has no cp1252 mapping.
@@ -157,6 +174,45 @@ try:
     except tc.NoDoorsConfigured as e:
         nd = e
     check("empty door list raises NoDoorsConfigured", nd is not None)
+
+    # --- A469 (2026-11-22), both ways: a consult that LEFT for a door and timed out is not re-sent ---
+    from http.server import ThreadingHTTPServer
+    port2 = free_port()
+    srv2 = ThreadingHTTPServer(("127.0.0.1", port2), Stub)
+    threading.Thread(target=srv2.serve_forever, daemon=True).start()
+    GOOD2 = {"name": "good2", "base": "http://127.0.0.1:%d" % port2, "socks": None}
+    try:
+        Stub.posts = []
+        slow = None
+        try:
+            tc.consult("slow", timeout=2, doors=[GOOD, GOOD2])
+        except tc.AllDoorsDown as e:
+            slow = e
+        check("A469.1 a consult sent to a door that then times out raises SentNoAnswer (an AllDoorsDown)",
+              isinstance(slow, tc.SentNoAnswer))
+        check("A469.2 ... and the second door never receives the question (no copy running beside it)",
+              [p for p, q in Stub.posts if q == "slow"] == [good_port])
+        check("A469.3 ... and the error says it was sent and not re-sent",
+              slow is not None and "not re-sent" in str(slow))
+        Stub.posts = []
+        c3 = tc.consult("say READY", timeout=4, doors=[BAD, GOOD2])
+        check("A469.4 a door the request never reached still falls through (refused, nothing sent)",
+              c3["door"] == "good2" and [p for p, q in Stub.posts] == [port2])
+        Stub.fail503_port = good_port
+        c4 = tc.consult("err503", timeout=4, doors=[GOOD, GOOD2])
+        check("A469.5 an HTTP error reply still falls through (the door answered; nothing is left running)",
+              c4["door"] == "good2")
+        Stub.fail503_port = None
+        Stub.posts = []
+        pr = tc.panel(timeout=4, doors=[BAD, GOOD2])
+        check("A469.6 a GET still falls through past a refused door", pr["door"] == "good2")
+        Stub.slow_get_port = good_port
+        pr2 = tc.panel(timeout=2, doors=[GOOD, GOOD2])
+        Stub.slow_get_port = None
+        check("A469.7 a GET still falls through past a door that TIMES OUT (asking for a panel runs nothing)",
+              pr2["door"] == "good2")
+    finally:
+        srv2.shutdown()
 finally:
     srv.shutdown()
 

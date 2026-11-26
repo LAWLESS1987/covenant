@@ -76,6 +76,81 @@ def _run(cmd):
         return ""
 
 
+def _run_rc(cmd):
+    """(ok, text). ok is False when the command could not start or exited non-zero. A479 (2026-11-23): the scheduler
+    listing went through _run, which returns "" on any failure, and "" printed as "No scheduled task invokes the
+    trader" -- a listing that failed read as a confident none."""
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
+        return p.returncode == 0, (p.stdout or "") + (p.stderr or "")
+    except Exception as e:                                   # noqa: BLE001
+        return False, "%s: %s" % (type(e).__name__, str(e)[:120])
+
+
+def scheduler_lines(is_win, listed_ok, listing, last_run_hdr, log_ymd, log_found):
+    """The lines of WILL ANYTHING RUN IT WITHOUT A HUMAN, from the scheduler listing. Pure, so every branch is tested
+    on every platform (A479). Every branch prints 'last ATTEMPT' and 'last RUN per trader_log.txt' (V2 A12): before
+    A479 a Windows machine with no trader task printed neither, and a failed listing printed 'no task'."""
+    run_line = "           last RUN per trader_log.txt: %s" % (
+        last_run_hdr or ("none found" if log_found else "none (there is no trader_log.txt)"))
+    if not is_win:
+        return ["      Not Windows -- cannot read the task scheduler here. UNKNOWN,",
+                "      which is not the same as 'nothing is scheduled'.",
+                "           last ATTEMPT unknown (no scheduler read on this platform)",
+                run_line]
+    rows, unread = [], []
+    for line in (listing or "").splitlines():
+        if not line.strip():
+            continue
+        parts = [x.strip() for x in line.strip().split("|")]
+        (rows if len(parts) >= 5 else unread).append(parts if len(parts) >= 5 else line.strip())
+    if not listed_ok or (unread and not rows):
+        why = (unread[0] if unread else (listing or "no output").strip())[:90]
+        return ["      The task scheduler could not be read (%s). UNKNOWN," % why,
+                "      which is not the same as 'nothing is scheduled'.",
+                "           last ATTEMPT unknown (the scheduler was not read)",
+                run_line]
+    out = []
+    if not rows:
+        out += ["      No scheduled task invokes the trader. Services, Run keys and the",
+                "      Startup folder are not read here, so this does not show that only",
+                "      a person runs it.",
+                "           last ATTEMPT none on record (no scheduled task invokes it now; an",
+                "           earlier, since-deleted task would not show here)",
+                run_line]
+    for parts in rows:
+        name, state, last, code, nxt = parts[:5]
+        missed = parts[5] if len(parts) > 5 else "?"
+        no_batt = parts[6] if len(parts) > 6 else "?"
+        catch_up = parts[7] if len(parts) > 7 else "?"
+        wake = parts[8] if len(parts) > 8 else "?"
+        kind, why = decode_task_result(code)
+        try:
+            code_hex = "0x%08X" % (int(code, 0) & 0xFFFFFFFF)
+        except (TypeError, ValueError):
+            code_hex = repr(code)
+        attempt_ymd = None
+        m = re.match(r"(\d{4})-(\d{2})-(\d{2})", last)
+        if m:
+            attempt_ymd = tuple(int(g) for g in m.groups())
+        out += ["      TASK %s  state=%s" % (name, state),
+                "           last ATTEMPT %s -> %s (%s)" % (last or "none", kind.upper(), code_hex),
+                "           %s" % why,
+                run_line,
+                "           %s" % attempt_vs_log(attempt_ymd, kind, log_ymd),
+                "           next %s; scheduler's missed-run counter %s" % (nxt or "none", missed),
+                "           conditions: no start on battery=%s, catch up a "
+                "missed start=%s, wake to run=%s" % (no_batt, catch_up, wake),
+                "           SO: it runs WITHOUT a human -- on a day this machine",
+                "           is awake, logged on and on mains at the trigger time.",
+                "           A day it is not is skipped, and the counter above",
+                "           stays 0. What it does when it runs is decided",
+                "           entirely by 'armed' above."]
+    if unread and rows:
+        out.append("      %d line(s) of the scheduler listing could not be read; UNKNOWN for them." % len(unread))
+    return out
+
+
 # Task Scheduler's LastTaskResult is an HRESULT, and the one this file first
 # printed raw -- 2147946720 -- reads as "last run today" to anyone who does not
 # happen to know it is 0x800710E0, "the operator or administrator has refused
@@ -250,6 +325,7 @@ def main() -> int:
             log_text = ""
     last_run_hdr = last_log_run(log_text)
     log_ymd = log_run_date(last_run_hdr)
+    listed_ok, out = False, ""
     if sys.platform.startswith("win"):
         ps = ("Get-ScheduledTask -ErrorAction SilentlyContinue | ForEach-Object "
               "{ $a = ($_.Actions | ForEach-Object { $_.Execute + ' ' + "
@@ -261,50 +337,10 @@ def main() -> int:
               "$i.LastTaskResult + '|' + $nr + '|' + $i.NumberOfMissedRuns + '|' + "
               "$st.DisallowStartIfOnBatteries + '|' + $st.StartWhenAvailable + '|' + "
               "$st.WakeToRun } }")
-        out = _run(["powershell", "-NoProfile", "-Command", ps]).strip()
-        if not out:
-            print("      No scheduled task invokes the trader. It runs only when")
-            print("      a person runs it.")
-        for line in out.splitlines():
-            parts = [x.strip() for x in line.strip().split("|")]
-            if len(parts) < 5:
-                continue
-            name, state, last, code, nxt = parts[:5]
-            missed = parts[5] if len(parts) > 5 else "?"
-            no_batt = parts[6] if len(parts) > 6 else "?"
-            catch_up = parts[7] if len(parts) > 7 else "?"
-            wake = parts[8] if len(parts) > 8 else "?"
-            kind, why = decode_task_result(code)
-            try:
-                n = int(code, 0) & 0xFFFFFFFF
-                code_hex = "0x%08X" % n
-            except (TypeError, ValueError):
-                code_hex = repr(code)
-            attempt_ymd = None
-            m = re.match(r"(\d{4})-(\d{2})-(\d{2})", last)
-            if m:
-                attempt_ymd = tuple(int(g) for g in m.groups())
-            print("      TASK %s  state=%s" % (name, state))
-            print("           last ATTEMPT %s -> %s (%s)"
-                  % (last or "none", kind.upper(), code_hex))
-            print("           %s" % why)
-            print("           last RUN per trader_log.txt: %s"
-                  % (last_run_hdr or "none found"))
-            print("           %s" % attempt_vs_log(attempt_ymd, kind, log_ymd))
-            print("           next %s; scheduler's missed-run counter %s"
-                  % (nxt or "none", missed))
-            print("           conditions: no start on battery=%s, catch up a "
-                  "missed start=%s, wake to run=%s" % (no_batt, catch_up, wake))
-            print("           SO: it runs WITHOUT a human -- on a day this machine")
-            print("           is awake, logged on and on mains at the trigger time.")
-            print("           A day it is not is skipped, and the counter above")
-            print("           stays 0. What it does when it runs is decided")
-            print("           entirely by 'armed' above.")
-    else:
-        print("      Not Windows -- cannot read the task scheduler here. UNKNOWN,")
-        print("      which is not the same as 'nothing is scheduled'.")
-        print("           last ATTEMPT unknown (no scheduler read on this platform)")
-        print("           last RUN per trader_log.txt: %s" % (last_run_hdr or "none found"))
+        listed_ok, out = _run_rc(["powershell", "-NoProfile", "-Command", ps])
+    for line in scheduler_lines(sys.platform.startswith("win"), listed_ok, out, last_run_hdr, log_ymd,
+                                os.path.isfile(log_path)):
+        print(line)
 
     print()
     print("  VENUES -- every order adapter, and what its dry run reaches")

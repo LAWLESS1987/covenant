@@ -44,9 +44,49 @@ import threading
 import time
 import urllib.request
 
+# A470 (2026-11-22): where the leg is served may come from private/leg.json (gitignored, like private/limbs.json),
+# so every process that imports this module -- a node the watchdog revives as much as one a restart starts -- reads
+# the same place. {"host", "port", "manifest_sha256", "allow_remote": true}. An environment variable still wins.
+# Unreadable or absent -> {} -> the loopback default, as before.
+def _leg_file(path=None):
+    p = path or os.environ.get("COVENANT_LEG_FILE") or os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                                     "private", "leg.json")
+    try:
+        if os.path.getsize(p) > 65536:                     # A472: a config file this large is not read
+            return {}
+        with open(p, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _port(v, default=8099):
+    """A472 (Codex's audit, verified: a text port in private/leg.json crashed this module's IMPORT, and covenant_limbs'
+    with it): a port that is not an integer 1-65535 is the default, never an exception at import."""
+    try:
+        if isinstance(v, bool):
+            return default
+        n = int(v)
+        return n if 1 <= n <= 65535 else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _flag(name):
+    """A472: an environment switch that is SET decides, strictly: 1/true/yes/on is on, anything else (including "0"
+    and "") is off. Unset -> None, so the file may decide. (Before, any non-empty value -- "0" too -- meant on.)"""
+    if name not in os.environ:
+        return None
+    return os.environ[name].strip().lower() in ("1", "true", "yes", "on")
+
+
+_LEG_FILE = _leg_file()
+
 # The leg's own server (a second llama-server, separate from the 3B keeper on PORT 8081). On-demand by design.
-LEG_HOST = os.environ.get("COVENANT_LEG_HOST", "127.0.0.1")
-LEG_PORT = int(os.environ.get("COVENANT_LEG_PORT", "8099"))
+_fh = _LEG_FILE.get("host")
+LEG_HOST = os.environ.get("COVENANT_LEG_HOST") or (_fh if isinstance(_fh, str) and _fh else "127.0.0.1")
+LEG_PORT = _port(os.environ.get("COVENANT_LEG_PORT") or _LEG_FILE.get("port"))
 LEG_MODEL = "Qwen3.5-2B-Qwensploit-UNCENSORED-Q4_K_M.gguf"
 MAX_LEG_CHARS = 6000                                       # over this, the leg's answer VOIDs (no runaway text into synthesis)
 
@@ -84,18 +124,106 @@ _leg_sema = threading.BoundedSemaphore(max(1, LEG_MAX_CONCURRENT))
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *a, **k):                   # noqa: D401
         return None
-_no_redirect = urllib.request.build_opener(_NoRedirect)
+# A472 (Codex's audit): ProxyHandler({}) -- no proxy, ever. Without it an http_proxy in the environment at import would
+# carry a private consult, loopback or not, through whatever proxy it names (the door's private_consult_leaves already
+# treats a proxy as leaving; the module itself did not).
+_no_redirect = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect)
 
 
 def _is_loopback(host):
-    """Only loopback hosts may be reached unless the operator explicitly allows remote (COVENANT_LEG_ALLOW_REMOTE)."""
-    if os.environ.get("COVENANT_LEG_ALLOW_REMOTE"):
+    """Only loopback hosts may be reached unless remote is explicitly allowed. A472: a SET environment switch decides
+    (COVENANT_LEG_ALLOW_REMOTE=0 now really turns it off); unset, the file's allow_remote: true may allow it."""
+    env = _flag("COVENANT_LEG_ALLOW_REMOTE")
+    if env is True or (env is None and _LEG_FILE.get("allow_remote") is True):
         return True
     return str(host) in ("127.0.0.1", "localhost", "::1", "[::1]")
 
 
 def _leg_live():
     return os.environ.get("COVENANT_LEG_LIVE", "1") != "0"
+
+
+# A470 (2026-11-22, his "Yes, use RTX leg"): the leg may live on the second PC, behind the same gateway the limbs
+# (A402) use. Off loopback the reply must carry X-Leg-Manifest naming the PINNED sha256 (the gateway's hash over
+# weights, runner, flags, sampler and chat template), exactly as covenant_limbs checks it; with no pin set, a remote
+# leg is never asked. Loopback is unchanged (the laptop's own llama-server has no gateway and no manifest).
+def _host_is_loopback(host):
+    return str(host) in ("127.0.0.1", "localhost", "::1", "[::1]")
+
+
+def _leg_pin():
+    """A472: a SET COVENANT_LEG_MANIFEST decides even when empty (an empty pin means a remote leg is never asked);
+    unset, the file's pin."""
+    if "COVENANT_LEG_MANIFEST" in os.environ:
+        return os.environ["COVENANT_LEG_MANIFEST"].strip().lower()
+    v = _LEG_FILE.get("manifest_sha256")
+    return (v if isinstance(v, str) else "").strip().lower()
+
+
+# A474 (2026-11-23, Codex's audit #6, on Lawrence's "fix"): private/leg.json and private/limbs.json are untracked, so
+# an edit to one could change the endpoint AND the pin together and pick another model, with nothing in git or the head
+# commitment to show it. The APPROVED manifests now live in a TRACKED file, ops/leg_policy.json (public hashes only, no
+# address), which git and the head commitment's tree bind. A remote consult runs only when its pin is listed there and,
+# for the leg, remote_allowed is true. The private files and the environment can only narrow within that list, never
+# widen it: there is deliberately no environment override of the policy's path. Missing or malformed policy -> no remote
+# consult (fail closed); loopback is unchanged. Read at call time, so a policy change needs no restart.
+POLICY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "leg_policy.json")
+
+
+def _policy():
+    try:
+        if os.path.getsize(POLICY_PATH) > 65536:
+            return {}
+        with open(POLICY_PATH, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _hexset(v):
+    if not isinstance(v, list):
+        return set()
+    return {x.strip().lower() for x in v if isinstance(x, str) and len(x.strip()) == 64}
+
+
+# A475 (2026-11-23, Lawrence: "find a solution to protect the RTX gateway"): the gateway NAMES the pinned file in
+# X-Leg-Manifest, but a compromised gateway can name it and serve another model. covenant_gateway_attest.py asks each
+# remote model fixed private canary prompts at temperature 0 with logprobs and compares the answer with the fingerprint
+# recorded at pin time; a mismatch puts the pin on hold here, and a held pin is not approved until a later check passes
+# or it is re-pinned. Read straight from the state file (no import of the attest module, so no cycle); unreadable
+# state holds nothing -- a hold comes only from a measured mismatch (a signal is investigated, never invented).
+ATTEST_STATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ops", "gateway_attest_state.json")
+
+
+def attest_held(pin):
+    try:
+        if os.path.getsize(ATTEST_STATE) > 262144:
+            return False
+        with open(ATTEST_STATE, encoding="utf-8") as fh:
+            holds = (json.load(fh) or {}).get("holds") or {}
+        return isinstance(holds, dict) and (pin or "").strip().lower() in holds
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def approved(kind, pin, name=None):
+    """A474: is PIN an approved manifest in ops/leg_policy.json? kind "leg" (also needs remote_allowed: true) or
+    "limb" with NAME. A475: and not on a fingerprint hold. Never raises; anything unreadable is False."""
+    try:
+        pin = (pin or "").strip().lower()
+        if attest_held(pin):                               # A475: a measured fingerprint mismatch holds the pin
+            return False
+        pol = _policy()
+        if kind == "leg":
+            sec = pol.get("leg")
+            return isinstance(sec, dict) and sec.get("remote_allowed") is True and pin in _hexset(sec.get("approved_manifests"))
+        if kind == "limb":
+            sec = pol.get("limbs")
+            return isinstance(sec, dict) and pin in _hexset(sec.get(str(name or "").upper()))
+    except Exception:                                      # noqa: BLE001
+        pass
+    return False
 
 
 def free_ram_gb():
@@ -413,10 +541,37 @@ def reverse_learning_write(tag, target_path=None, ledger_path=None):
     return len(removed)
 
 
+def read_bounded(r, deadline):
+    """A472: a response body bounded in bytes (MAX_HTTP_BYTES + 1 at most) AND by one overall monotonic deadline.
+    -> bytes, or None when the deadline passes first. read1() returns what has arrived (at most one underlying read);
+    read(n) would block until n bytes or EOF, so a server dripping a byte just inside each socket timeout could hold the
+    caller -- found when this check's first form passed against the old code too. Used by the leg and the limbs."""
+    _read = getattr(r, "read1", None)
+    if _read is None:                                     # not a real HTTP response (a stand-in): one bounded read
+        return r.read(MAX_HTTP_BYTES + 1)
+    chunks, got = [], 0
+    while got <= MAX_HTTP_BYTES:
+        if time.monotonic() > deadline:
+            return None
+        b = _read(min(65536, MAX_HTTP_BYTES + 1 - got))
+        if not b:
+            break
+        chunks.append(b); got += len(b)
+    return b"".join(chunks)
+
+
+def manifest_hex(header):
+    """A472: the hash a manifest header names, in one canonical form: lowercase, surrounding space stripped, and an
+    optional "sha256=" prefix removed (the gateway sends the bare hash; older stand-ins send the prefixed form).
+    Anything else in the header stays in, so it can only fail an exact comparison."""
+    s = str(header or "").strip().lower()
+    return s[len("sha256="):] if s.startswith("sha256=") else s
+
+
 def leg_available(timeout=3):
     """Is the leg's server up? Read-only; never raises."""
     try:
-        with urllib.request.urlopen("http://%s:%d/health" % (LEG_HOST, LEG_PORT), timeout=timeout) as r:
+        with _no_redirect.open("http://%s:%d/health" % (LEG_HOST, LEG_PORT), timeout=timeout) as r:   # A472: no proxy
             return r.status == 200
     except Exception:                                      # noqa: BLE001
         return False
@@ -489,6 +644,12 @@ def consult_leg(text, max_tokens=320, temperature=0.4, timeout=180, trigger=None
     Never raises -- None means the leg could not be reached and the caller proceeds without it."""
     if not _leg_live() or not _is_loopback(LEG_HOST):      # CXR-8: honour the kill switch and loopback IN the module
         return None
+    remote = not _host_is_loopback(LEG_HOST)
+    pin = _leg_pin()
+    if remote and len(pin) != 64:                          # A470: a remote leg is never asked unpinned
+        return None
+    if remote and not approved("leg", pin):                # A474: and never with a pin ops/leg_policy.json lacks
+        return None
     if not _leg_sema.acquire(timeout=1.0):                 # CXR-8: cap concurrent generations; a RAM snapshot can't
         return None                                        #        stop simultaneous callers all passing
     try:
@@ -499,13 +660,27 @@ def consult_leg(text, max_tokens=320, temperature=0.4, timeout=180, trigger=None
         req = urllib.request.Request("http://%s:%d/v1/chat/completions" % (LEG_HOST, LEG_PORT),
                                      data=body, headers={"Content-Type": "application/json"})
         try:
-            with _no_redirect.open(req, timeout=timeout) as r:     # no redirects off loopback
-                raw = r.read(MAX_HTTP_BYTES + 1)                   # CXR-3: bound the response BEFORE parsing
+            deadline = time.monotonic() + float(timeout)
+            with _no_redirect.open(req, timeout=timeout) as r:     # no redirects off loopback, no proxy (A472)
+                served_manifest = str(r.headers.get("X-Leg-Manifest") or "")[:200]
+                # A472 (Codex's audit): EXACT equality, not "the pin appears somewhere in the header" -- a header
+                # carrying another hash and the pin together passed the old substring test. Checked on the headers,
+                # before any body is read.
+                if remote and manifest_hex(served_manifest) != pin:
+                    return None
+                # A472: one overall deadline for the whole body, not only a per-read socket timeout -- a server that
+                # drips a byte just inside each timeout could hold a leg slot indefinitely.
+                raw = read_bounded(r, deadline)                    # CXR-3 + A472: bounded in bytes AND in time
+                if raw is None:
+                    return None
             if len(raw) > MAX_HTTP_BYTES:
                 return None
             d = json.loads(raw.decode("utf-8", "replace"))
             ans = (d.get("choices") or [{}])[0].get("message", {}).get("content") or ""
-            return ans.strip(), attribution(text, body, params, served=d.get("model"), trigger=trigger)
+            att = attribution(text, body, params, served=d.get("model"), trigger=trigger)
+            if remote:
+                att["manifest"] = served_manifest                  # the pinned file's hash, as the gateway sent it
+            return ans.strip(), att
         except Exception:                                  # noqa: BLE001
             return None
     finally:

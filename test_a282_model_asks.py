@@ -110,11 +110,22 @@ def main():
         urllib.request.urlopen = lambda req, timeout=None: _Resp(json.dumps(no_n).encode("utf-8"))
         M.ask([{"role": "user", "content": "hello"}])
         r5 = rows(M.ASKS)
-        extra = [{k: v for k, v in x.items() if k not in ("at", "ok", "ms", "error")} for x in r5]
+        # A480 (2026-11-23) added fields to every row on purpose: cold (this ask loaded the model -- measured by the
+        # keeper, never guessed), and from the server's timings gen_ms / prompt_ms / cache_n when it gives them. Q5
+        # as written pinned the whole row, so it failed in CI on A480's first push (found there; the local run had
+        # missed this suite). Q5 still asserts what it was written about, over the A351 fields only, unchanged;
+        # Q5b pins A480's fields on the same rows, so neither contract can drift silently.
+        A480_KEYS = ("cold", "gen_ms", "prompt_ms", "cache_n")
+        extra = [{k: v for k, v in x.items() if k not in ("at", "ok", "ms", "error") + A480_KEYS} for x in r5]
         check("Q5 an answer without timings is the line it always was; a rate left out beside its count and time is "
               "worked from them, a part left out stays out, and without predicted_n the tokens written are usage's count",
-              len(r5) == 4 and list(r5[1]) == ["at", "ok", "ms", "error"]
+              len(r5) == 4 and [k for k in r5[1] if k not in A480_KEYS] == ["at", "ok", "ms", "error"]
               and extra[2:] == [{"gen_n": 500, "gen_tps": 5.0}, {"gen_n": 120, "gen_tps": 6.0}], r5)
+        a480 = [{k: x[k] for k in A480_KEYS if k in x} for x in r5]
+        check("Q5b (A480) the no-timings row adds only cold; a row adds gen_ms only from predicted_ms the server gave, "
+              "and nothing it did not give (no prompt_ms, no cache_n)",
+              set(a480[1]) == {"cold"} and a480[2].get("gen_ms") == 100000 and "prompt_ms" not in a480[2]
+              and "cache_n" not in a480[2] and "gen_ms" not in a480[3], a480)
         led = os.path.join(tmp, "ledger_a351.jsonl")
         with open(led, "w", encoding="utf-8") as fh:
             for tps in (9.0, 6.0, 7.0, 5.0):

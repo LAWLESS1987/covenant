@@ -771,21 +771,113 @@ def agent_history_budget(addr, can_fit):
 # teacher, and the teacher is a panel on the PUBLIC repository's runner whose job summary is public
 # -- the A128 route, reached with no path for A128's notice to read. A caller that sends
 # {"private": true} (exactly true; tools/tetsu_work.py --private) is answered by the model on this
-# machine and nothing of the exchange leaves it: not queued (recorded as withheld, with the reason,
-# by covenant_daily_plan.teacher_queue_append), not replayed into an ordinary ask (agent_history),
-# and no act that reaches outside -- FETCH, WEB, MOLTBOOK, the council's page read -- is made for it.
-# HANDS and HEAL stay: both act on this machine only. Nothing changes for an ask without the marker,
-# which is every ask his phone and his PC page send.
+# machine. What the marker does: the exchange is not queued for the teacher (recorded as withheld,
+# with the reason, by covenant_daily_plan.teacher_queue_append), it is not replayed into an ordinary
+# ask (agent_history), and no FETCH, WEB or MOLTBOOK act, nor the council's page read, is made for
+# it. HANDS and HEAL stay: both act on this machine only. Nothing changes for an ask without the
+# marker, which is every ask his phone and his PC page send.
+# [A263-NOTHING-LEAVES, restated by A463 (2026-11-20). As written on 2026-10-05 this note and the
+# notice below said the exchange never left this one machine. That stopped being true with A402
+# (2026-11-01), which gave Tetsu limbs on the second PC: a LIMB line on a private ask sent his
+# question wherever private/limbs.json pointed, and this rule did not look. What holds now, checked
+# by private_consult_leaves(): a LEG or LIMB consult on a private ask is made only when the host
+# urllib will connect to is this machine or a tailnet address written as an IP, with no system
+# proxy in the way; otherwise it is held and he is told so as data. What the marker still does not
+# close, as A263's own entry says under "Residual": the gate sees a private question and answer
+# (sentinel.evaluate_transaction), so with a judge that is not on this machine they go to that judge.]
 PRIVATE_TEACHER_NOTE = ("withheld: private (A263) -- answered on this machine; not queued for the "
                         "teacher panel, which runs on the public repository's runner")
-PRIVATE_ACT_HELD = ("NOT done: this ask is marked private (A263), so nothing from it leaves this machine -- "
-                    "no fetch, no web search, no forum. Nothing was read or sent. Answer the person from what "
-                    "you already have, in your own words, and say plainly if that is not enough.")
+PRIVATE_ACT_HELD = ("NOT done: this ask is marked private (A263), so no fetch, no web search and no forum act "
+                    "is made for it. Nothing was read or sent. Answer the person from what you already have, in "
+                    "your own words, and say plainly if that is not enough.")
+PRIVATE_CONSULT_HELD = ("NOT done: this ask is marked private (A263) and that consult would have left the "
+                        "operator's own machines, so it was not made. Nothing was sent. Answer the person in "
+                        "your own words, and say plainly if that is not enough.")
 
 
 def private_ask(body):
     """True only for an explicit JSON true under "private"; any other value is an ordinary ask."""
     return isinstance(body, dict) and body.get("private") is True
+
+
+def _consult_host_as_sent(url):
+    """(scheme, host) that urllib.request will open a connection to for this URL, read the way urllib reads it: the
+    host part percent-decoded, the port cut off as http.client cuts it, IPv6 brackets removed. Raises on a string
+    that is no URL. [A463's review, 2026-11-20: the first form of the private rule read urlsplit().hostname, which
+    is NOT percent-decoded, and tailnet_ok cuts a host at its first '%'. So http://100.64.0.1%2Eevil.example/ read
+    as a tailnet address and was then sent to a host NAME. The check now reads the host the sender reads.]"""
+    req = importlib.import_module("urllib.request").Request(url)
+    hp = req.host or ""
+    i, j = hp.rfind(":"), hp.rfind("]")
+    host = hp[:i] if i > j else hp
+    if host[:1] == "[" and host[-1:] == "]":
+        host = host[1:-1]
+    return req.type, host
+
+
+def _own_machine_host(host):
+    """True only for "localhost" or an IP literal that is loopback or in the tailnet range. Stricter than tailnet_ok
+    in the two places tailnet_ok forgives a caller's address: a '%' (a zone id, or what is left of an encoding) and
+    space around the host both refuse here. Anything else that is not an IP literal (a name, a user part, a slash)
+    is refused by the address parser itself; a mutation that dropped an explicit '@' test changed nothing, so there
+    is none."""
+    h = host or ""
+    if not h or h != h.strip() or "%" in h:
+        return False
+    return h.lower() == "localhost" or tailnet_ok(h)
+
+
+def _proxy_in_the_way(scheme, host):
+    """True when urllib would hand this request to a system or environment proxy instead of the host itself. The leg
+    and the limbs are opened with urllib's default proxy handling, so a configured proxy carries the question
+    whatever the address says. Unreadable proxy settings count as a proxy."""
+    try:
+        ur = importlib.import_module("urllib.request")
+        return bool(ur.getproxies().get(scheme)) and not ur.proxy_bypass(host)
+    except Exception:                                            # noqa: BLE001
+        return True
+
+
+def private_consult_leaves(first, limbs=None, leg_host=None):
+    """A463. For an ask marked PRIVATE: why the LEG or LIMB consult on the model's first line would leave the
+    operator's own machines, else None. "Own" is the host urllib will connect to being "localhost" or an IP that is
+    loopback or in the tailnet range, with no proxy in the way. A host NAME is refused: a name proves nothing about
+    where the question goes. An endpoint that cannot be read is refused, closed rather than open. A limb nobody
+    configured returns None: that consult VOIDs by itself and sends nothing, so there is nothing to hold. The reason
+    names the limb, never the question.
+
+    The door reads the limb list ONCE for a private ask and hands that same list to the consult (`limbs`), so the
+    address checked here is the address the question goes to. A list that cannot be read is an empty list
+    (covenant_limbs.load_config never raises), and the consult then VOIDs on it.
+
+    What it cannot see: where a tailnet address actually routes, or what the machine at that address keeps. It reads
+    the configured address; it does not trace the packet. The leg: covenant_leg already refuses a host that is not
+    loopback unless COVENANT_LEG_ALLOW_REMOTE is set, so for the leg this is a second layer that matters only with
+    that switch on. `leg_host` is for the tests."""
+    line = (first or "").strip()
+    up = line.upper()
+    if not up.startswith(("LIMB ", "LEG ")):
+        return None
+    try:
+        if up.startswith("LIMB "):
+            lm = importlib.import_module("covenant_limbs")
+            name = (lm.parse_directive(line) or ("", ""))[0]
+            cfg = (limbs if limbs is not None else lm.load_config()).get(name)
+            if not cfg:
+                return None
+            url, what = str(cfg.get("url") or ""), "limb %s" % name[:20]
+        else:
+            leg = importlib.import_module("covenant_leg")           # the URL exactly as covenant_leg.consult_leg builds it
+            url = "http://%s:%d/v1/chat/completions" % (leg_host if leg_host is not None else leg.LEG_HOST, leg.LEG_PORT)
+            what = "the leg"
+        scheme, host = _consult_host_as_sent(url)
+        if not _own_machine_host(host):
+            return "%s is not served on this machine or at a tailnet address" % what
+        if _proxy_in_the_way(scheme, host):
+            return "a proxy stands between this machine and %s" % what
+        return None
+    except Exception as e:                                       # noqa: BLE001 -- unreadable means held, never sent
+        return "where the consult would go could not be read (%s)" % type(e).__name__
 
 # A FRESH ASK (A284, 2026-10-06). History is replayed per caller ADDRESS, and every caller that is not his
 # conversation shares one: tools/tetsu_work.py's 127.0.0.2. So Tetsu's reviews of free's held drafts
@@ -840,7 +932,11 @@ def _clean_outside(data):
 # precise enough to leave ordinary "fetch" / "search the web" phrasing alone (0 false positives measured over 134
 # acts), so the full act list is covered. HANDS RUN is additionally gated by A423's signature; this adds a second
 # layer on MOLTBOOK (posting as the operator), HANDS WRITE/PROPOSE, HEAL and LEG, which A423 does not cover.
-ACT_WORDS = ("HANDS", "FETCH", "WEB", "MOLTBOOK", "HEAL", "SELF-HEAL", "LEG")
+# [A427-FULL-ACT-LIST, restated by A463 (2026-11-20). The list as written on 2026-11-14 stopped at LEG, while the
+# door had carried out a line beginning LIMB since A402 (2026-11-01): a message that spelled the limb line out made
+# Tetsu consult a limb on the second PC. Found on TETSU while designing a trial that would have relied on it. LIMB
+# is on the list now. The words above are kept as written; the list they describe was one act short.]
+ACT_WORDS = ("HANDS", "FETCH", "WEB", "MOLTBOOK", "HEAL", "SELF-HEAL", "LEG", "LIMB")
 
 
 def _planted_act_word(text, first):
@@ -9474,12 +9570,30 @@ class CovenantAPI:
                                        "guard_would": "reachable" if _wld else "unreachable", "guard_reason": _wwhy}
                     except Exception:                         # noqa: BLE001 -- shadow observation never breaks a turn
                         _eg_obs = None
+                # A463: on a private ask the limb list is read ONCE, here, and this same list is handed to the consult
+                # below, so the address the private rule checks is the address the question goes to. (The first form
+                # read it twice; a list rewritten between the two reads could pass the check and send elsewhere.)
+                _limbs_once = None
+                if private and first.upper().startswith("LIMB "):
+                    try:
+                        _limbs_once = importlib.import_module("covenant_limbs").load_config()
+                    except Exception:                         # noqa: BLE001 -- unreadable is an empty list: the consult VOIDs
+                        _limbs_once = {}
                 if private and (url or first.upper().startswith(("MOLTBOOK", "WEB "))):
                     # A263: an act that reaches outside this machine is not made for a private ask.
                     # Handed back as data, the same way a refused act is, so what he says is what happened.
                     forum.append({"act": first[:40], "held": "private (A263)"})
                     msgs.append({"role": "assistant", "content": answer})
                     msgs.append({"role": "user", "content": PRIVATE_ACT_HELD + " Do not write FETCH, WEB or MOLTBOOK."})
+                    answer, meta = _ask_fitted()
+                elif private and (_pc_why := private_consult_leaves(first, limbs=_limbs_once)):
+                    # A463: a LEG or LIMB consult on a private ask is made only to this machine or a tailnet address.
+                    # Anywhere else it is held, the same way a private web act is. The record names the act and the
+                    # limb, never his question.
+                    forum.append({"act": " ".join(first.split()[:2])[:40] if first.upper().startswith("LIMB ") else "LEG",
+                                  "held": "private (A263, A463): " + _pc_why[:120]})
+                    msgs.append({"role": "assistant", "content": answer})
+                    msgs.append({"role": "user", "content": PRIVATE_CONSULT_HELD + " Do not write LEG or LIMB again."})
                     answer, meta = _ask_fitted()
                 elif (_planted := _planted_act_word(text, first)):
                     # A427 (TETSU's act-word check, measured): the caller's own message spelled this act word out
@@ -9556,6 +9670,18 @@ class CovenantAPI:
                         msgs.append({"role": "assistant", "content": answer})
                         msgs.append({"role": "user", "content": _data + "\n\nNow tell the person, in your own words, what was repaired and what still needs a person. Do not write HEAL again."})
                         answer, meta = _ask_fitted()
+                elif first.upper() == "COLLECTIVE":
+                    # Tetsu reads the collective through the central brain (2026-11-24, A485). Lawrence's intent:
+                    # "the purpose of the SNN is for one neural network. It collective consciousness ... Tetsu is
+                    # Tetsu"; asked how Tetsu should join it, "Through the brain" -- the way Tetsu himself preferred
+                    # when he declined the ring for his arms (2026-11-07). A READ, not an act: every arm's rate, the
+                    # witness detectors and his own counts come back as data; nothing changes, nothing schedules it.
+                    _handled, _data, _rec = importlib.import_module("covenant_tetsu_collective").act(answer)
+                    if _handled:
+                        forum.append(_rec)
+                        msgs.append({"role": "assistant", "content": answer})
+                        msgs.append({"role": "user", "content": _data + "\n\nNow tell the person, in your own words, what the collective looks like right now. Do not write COLLECTIVE again."})
+                        answer, meta = _ask_fitted()
                 elif first.upper().startswith("WEB "):
                     # Tetsu's crawler (2026-09-27, A237, his words: "create a fire crawl like
                     # system for tetsu also"): a search, or a same-host crawl a few pages deep,
@@ -9615,7 +9741,7 @@ class CovenantAPI:
                     try:
                         _lm = importlib.import_module("covenant_limbs")
                         _pd = _lm.parse_directive(answer) or ("", "")
-                        _lr = _lm.consult(_pd[0], _pd[1])
+                        _lr = _lm.consult(_pd[0], _pd[1], config=_limbs_once)   # None unless private: then the list checked above
                         leg.append({"limb": _lr.get("limb"), "status": _lr.get("status"),
                                     "why": str(_lr.get("why", ""))[:200], "model": _lr.get("model"),
                                     "confidence": (_lr.get("fields") or {}).get("confidence"),
