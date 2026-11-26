@@ -19745,6 +19745,22 @@ Each needs its own pull request on today's main if it is still wanted.
 - GS2's boundary checks pass here, 4/4.
 - Its numpy apparatus checks run on CI's Linux lanes, which install numpy (A484).
 
+### A490. [the console / a refusal that did not arrive] covenant_app answered a cross-site POST with 403 before reading its body, so Windows reset the connection -- RECORDED 2026-11-26
+
+**Found by** the audit of 2026-11-26 (the operator: "run an audit on everything we've done"). The full sweep of main f0228b8 on TETSU had one red: CX1.2, a `Sec-Fetch-Site: cross-site` POST that got `ConnectionAbortedError` where a 403 was wanted. Run alone afterwards, the suite passed 9 of 9 times. No earlier record entry or tombstone has this shape. The lookback index had no hit for `ConnectionAbortedError`.
+
+**Cause.** `Handler._not_cross_site` sent the 403 and returned with the request body still unread. When a server closes a socket that still has unread data, Windows sends a reset, and the client can see the reset before the answer. The request was refused either way: nothing reached `run_action`. But the refusal did not always arrive, and a real browser can be shown the same broken connection.
+
+**Change.**
+- A new `_refuse_cross_site` reads the body, up to 64 KiB (`DRAIN_MAX`), and discards it before answering 403.
+- Nothing in the body is parsed or used, and a larger body is not read.
+- The same-origin and no-Origin paths are unchanged.
+
+**Check.** New CX1.5: 120 cross-site POSTs with a 32 KiB body, alternating `Origin` and `Sec-Fetch-Site`, must all get the 403.
+- On the old console: 116 got the 403 and 4 got `ConnectionAbortedError`.
+- With the change: 120 of 120. CX1 5/5.
+
+**Additive.** It adds a read before a refusal. No route, guard or allowed origin changed.
 ### A492. [linux / the Debian towers] covenant_prod.bat gets a Linux port, and three Windows-only paths are found by running them under Linux -- RECORDED 2026-11-25
 
 **Why.** On 2026-11-25 the operator chose Debian 13 for the three office towers (Dell OptiPlex 7050, HP ProDesk 9th gen, HP EliteDesk mini 8th gen) because no single company controls it. His words: "This is all about running Covenant and the corresponding repos." Asked to start the Linux launchers, with "Use your discernment" on the branch.
