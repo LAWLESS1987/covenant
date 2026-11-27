@@ -42,4 +42,7 @@ class ReplayEvidence(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(ReplayEvidence))
+    passed = result.testsRun - len(result.failures) - len(result.errors) - len(result.skipped)
+    print("A480 replay: %d/%d passed" % (passed, result.testsRun))
+    raise SystemExit(0 if result.wasSuccessful() and passed == result.testsRun else 1)
