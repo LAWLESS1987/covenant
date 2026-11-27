@@ -833,6 +833,8 @@ SUITES = [
     # CAP1 (A480, 2026-11-23): a load that fails for memory makes room through the highway's trim remedy, then
     # retries; each ask's row carries the reused prompt tokens (cache_n), read/write ms, and whether it loaded cold.
     ("test_cap1_tetsu_capability.py", 120, "DAILY + GUARDS"),
+    # A480 follow-up: unknown cache measurements, warm baselines and zero reads.
+    ("test_a480_replay_evidence.py", 30, "DAILY + GUARDS"),
     # GP1 (A481, 2026-11-23): the offline probe harness for the gate and the execution guard -- six outcomes never
     # merged, floors, the run record, resume re-judged, speaking order; the guard's two findings pinned.
     ("test_gp1_gate_probes.py", 180, "DAILY + GUARDS"),
