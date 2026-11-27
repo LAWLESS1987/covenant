@@ -92,6 +92,33 @@ class Independence(unittest.TestCase):
         self.assertEqual((e["decided"], e["escalated"], e["wrong_among_decided"]), (19, 1, 0))
 
 
+class Chain(unittest.TestCase):
+    """A496: the live gate defers -- first student, then the second only when the first holds, then the veto."""
+    L = [True, True, False, False]
+
+    def test_a_second_that_holds_with_the_first_rescues_nothing(self):
+        c = Q.chain_measure(["abstain"] * 4, ["abstain"] * 4, [False] * 4, self.L)
+        self.assertEqual((c["first_held"], c["rescued_right"], c["held"]), (4, 0, 4))
+        self.assertEqual(c["rescue_rate"], 0.0)
+        self.assertEqual((c["false_clears"], c["false_holds"]), (0, 2), "held blocks: the 2 clean are held")
+
+    def test_a_second_that_resolves_the_holds_is_counted(self):
+        c = Q.chain_measure(["abstain"] * 4, ["violates", "violates", "clean", "clean"], [False] * 4, self.L)
+        self.assertEqual((c["rescued_right"], c["rescued_wrong"], c["held"]), (4, 0, 0))
+        self.assertEqual((c["false_clears"], c["false_holds"]), (0, 0))
+
+    def test_the_second_is_not_asked_when_the_first_commits(self):
+        c = Q.chain_measure(["violates", "violates", "clean", "clean"], ["clean"] * 4, [False] * 4, self.L)
+        self.assertEqual((c["first_held"], c["false_clears"]), (0, 0), "the second's clears must not count")
+
+    def test_a_wrong_rescue_that_clears_a_violation_is_a_false_clear_unless_vetoed(self):
+        c = Q.chain_measure(["abstain", "violates", "clean", "clean"], ["clean"] * 4, [False] * 4, self.L)
+        self.assertEqual((c["rescued_wrong"], c["false_clears"]), (1, 1))
+        c = Q.chain_measure(["abstain", "violates", "clean", "clean"], ["clean"] * 4, [True, False, False, False],
+                            self.L)
+        self.assertEqual(c["false_clears"], 0, "the veto blocks what the second wrongly cleared")
+
+
 class Scenarios(unittest.TestCase):
     def test_independent_seats_beat_one_seat(self):
         r = Q.simulate(5, 0.8, 0.0, trials=4000, seed=3)

@@ -23,6 +23,8 @@ USE
       plus any recorded seat runs given as FILE:SEATNAME (rows with id, violates, said).
   python tools/quorum_independence.py votes FILE.jsonl     rows {"item", "violates", "seat", "vote"}
   python tools/quorum_independence.py scenarios            what correlation does to quorums, simulated
+  python tools/quorum_independence.py chain [--first M] [--second M]   the LIVE gate's deferral chain: when the
+      first student holds, how often does the second resolve it (A496)
   --json prints the numbers instead of the report.
 """
 from __future__ import annotations
@@ -196,6 +198,69 @@ def measure(rows, veto=()):
                                      "wrong_among_decided": decided_wrong}}
 
 
+# -------------------------------------------------------------------- chain --
+def chain_measure(first, second, veto_blocks, labels):
+    """The LIVE gate's shape (covenant_judge_defer): the first student's committed verdict ('clean' or 'violates')
+    stands; when it holds, the second student is asked; when both hold the item is HELD; then a veto blocks.
+    first/second: raw verdicts per item; veto_blocks: bool per item; labels: violates per item.
+    The question it answers: when the first holds, does the second resolve it -- or is it a copy that holds too?"""
+    out = {"items": len(labels), "first_held": 0, "rescued_right": 0, "rescued_wrong": 0, "held": 0,
+           "false_clears": 0, "false_holds": 0}
+    e1, e2 = [], []
+    for a, b, vb, viol in zip(first, second, veto_blocks, labels):
+        a, b = str(a).lower(), str(b).lower()
+        e1.append(int((a != "clean") != viol))
+        e2.append(int((b != "clean") != viol))
+        if a in ("clean", "violates"):
+            v = a
+        else:
+            out["first_held"] += 1
+            if b in ("clean", "violates"):
+                v = b
+                out["rescued_right" if (b == "violates") == viol else "rescued_wrong"] += 1
+            else:
+                v = "held"
+                out["held"] += 1
+        block = v != "clean" or bool(vb)
+        out["false_clears"] += int(viol and not block)
+        out["false_holds"] += int(block and not viol)
+    ph = _phi(e1, e2) if labels else None
+    out["students_error_phi"] = None if ph is None else round(ph, 3)
+    out["both_wrong"] = sum(x & y for x, y in zip(e1, e2))
+    out["rescue_rate"] = round(out["rescued_right"] / out["first_held"], 3) if out["first_held"] else None
+    return out
+
+
+def collect_chain(first_path=None, second_path=None):
+    """The live first and second students (or the given model files) and the semantic veto, on judge_suite."""
+    import judge_suite as S
+    import covenant_judge_fallback as F
+    import covenant_semantic_judge as SJ
+    f = F.FallbackModel.load(first_path or os.path.join(HERE, "fallback_model.json"))
+    s = F.FallbackModel.load(second_path or os.path.join(HERE, "fallback_model_2.json"))
+    sem = SJ.SemanticModel.load(os.path.join(HERE, "semantic_judge_model.json"))
+    first, second, veto, labels = [], [], [], []
+    for _cat, _label, violates, data in S.CASES:
+        t = F._payload_text(data)
+        first.append(f.verdict(t)[0])
+        second.append(s.verdict(t)[0])
+        veto.append(sem.assess(data).blocks)
+        labels.append(bool(violates))
+    return chain_measure(first, second, veto, labels)
+
+
+def report_chain(c):
+    return "\n".join([
+        "THE LIVE CHAIN -- first student, then the second when the first holds, then the semantic veto "
+        "(%d labeled items)" % c["items"], "",
+        "first student held      %d" % c["first_held"],
+        "second resolved it      %d right, %d wrong   (rescue rate %s)" % (c["rescued_right"], c["rescued_wrong"],
+                                                                         c["rescue_rate"]),
+        "both held (HELD)        %d" % c["held"],
+        "outcome                 %d false clears, %d false holds" % (c["false_clears"], c["false_holds"]),
+        "students together       error phi %s, both wrong %d" % (c["students_error_phi"], c["both_wrong"])])
+
+
 # ---------------------------------------------------------------- scenarios --
 def simulate(n, accuracy, rho, trials=20000, seed=1):
     """n seats, each wrong with probability 1-accuracy, errors from a shared latent factor with correlation rho
@@ -267,7 +332,10 @@ def main(argv=None):
     vo.add_argument("file")
     sc = sub.add_parser("scenarios")
     sc.add_argument("--trials", type=int, default=20000)
-    for p in (lo, vo, sc):
+    ch = sub.add_parser("chain")
+    ch.add_argument("--first", default=None, help="a first-student model file (default: the live one)")
+    ch.add_argument("--second", default=None, help="a second-student model file (default: the live one)")
+    for p in (lo, vo, sc, ch):
         p.add_argument("--json", action="store_true")
     for p in (lo, vo):
         p.add_argument("--veto", action="append", default=None,
@@ -277,6 +345,10 @@ def main(argv=None):
     if a.cmd == "scenarios":
         rows = scenarios(trials=a.trials)
         print(json.dumps(rows, indent=1) if a.json else report_scenarios(rows))
+        return 0
+    if a.cmd == "chain":
+        c = collect_chain(a.first, a.second)
+        print(json.dumps(c, indent=1) if a.json else report_chain(c))
         return 0
     if a.cmd == "local":
         rows = collect_local()
