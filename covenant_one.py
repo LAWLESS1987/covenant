@@ -228,6 +228,9 @@ SUITES = [
     # A495 (2026-11-27, quorum Z1 lead A): how many INDEPENDENT votes a quorum carries -- copies of a seat are one
     # vote, a veto-only seat's silence is not a clear, a tie blocks; and the correlated-quorum simulator.
     ("test_a495_quorum_independence.py", 120, "JUDGE"),
+    # A497 (2026-11-27, quorum Z1 lead E): the hyperdimensional witness's MECHANISM, on constructed data only -- the
+    # exam is measured once against the bar sealed in ops/HDC_WITNESS_PREREG_2026-11-27.md, never here.
+    ("test_a497_hdc_witness.py", 120, "JUDGE"),
     # A125 (2026-09-15): the trunk judges history, the branch judges new
     # work. Pins that the trunk is a REAL judge (never a back door), that
     # admission is untouched, and that a missing or untrained trunk

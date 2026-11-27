@@ -19949,3 +19949,22 @@ Disjoint halves give the second student something to do -- it resolves 13 of the
 **Not done here, and why.** The 3 semantic false convictions and the discourse holds are not "fixed" by tuning the judges on these cases: judge_suite is the exam, and training on it is A118's "tuning the gate to suit the thing being judged".
 
 **Checks.** `chain_measure` and its collector added to `tools/quorum_independence.py`; `test_a495_quorum_independence.py` 16/16, its four new chain cases driven the other way by three breaks (the second asked even when the first commits, a hold that passes, the veto ignored), each CAUGHT, with the earlier two breaks still CAUGHT.
+
+### A497. [the gate / quorum Z1's lead E] A hyperdimensional witness, built to a pre-registration sealed before it existed, is SAFE and INDEPENDENT but does not reduce what the gate holds: NO-GO, as the stated prior said -- MEASURED 2026-11-27
+
+**His words, 2026-11-27:** "Use discernment towards mutual benefit." (on building lead E, after A496 showed the students' shared errors follow their shared mechanism).
+
+**Sealed first.** `ops/HDC_WITNESS_PREREG_2026-11-27.md`, committed at cb911aab (sha256 b5e234ce...) while `covenant_hdc_witness.py` and any prototypes did not exist. Role: the second opinion in the deferral chain. Model, data split, baseline and four bars fixed there; stated prior NO-GO.
+
+**Built to it.** `covenant_hdc_witness.py`, standard library only: 10,000-dimension bipolar vectors seeded by sha256(token), unigram plus bound, permuted trigram encoding, class prototypes with 3 perceptron epochs, split-conformal thresholds (clean below the 1st percentile of calibration violations' margins, violates above the 99th of clean). Trained on half 1 of `ops/verdicts.jsonl` (ledger sha256 44b94a53d8f02df9..., 5629 lines), decontaminated against judge_suite (0 rows matched): 1711 train, 445 calibration, 370 held-out. Model sha256 a99ca24f76ea..., t_clear -0.016457, t_violate 0.009500; measured from the file reloaded from disk.
+
+**Measured once, against the sealed bar:**
+- B1 safety (exam) -- PASS: 0 false clears among the 27 violations, alone and in the chain.
+- B2 safety (held-out) -- PASS: 0 of 158 held-out violations cleared, against 1 for token log-odds trained on the same rows.
+- B3 benefit (exam) -- **FAIL**: live-first -> witness -> veto still holds 12 of the 26 clean items, the same as the live chain; the bar was 9 or fewer. The witness resolved 1 of the first student's 11 holds correctly and 1 wrongly (a false conviction).
+- B4 independence (exam) -- PASS: error phi with the first student 0.477, against 0.793 for the live second student.
+- **Result: NO-GO.** The witness is the more independent and the safer second opinion, and it is too cautious to help: it holds 40 of the 53 exam cases, and on held-out clean rows it clears 57 of 212 to the baseline's 90.
+
+**What follows.** Nothing is seated; the gate is unchanged. No weights ship: the model file and the measure output are kept privately (`private/evals/a497_hdc_witness/`), reproducible with `python covenant_hdc_witness.py build` on a ledger with the hash above. A different design (a wider calibration band, more data, another encoding) is a NEW pre-registration, never a retune of this one. Together with A496: a second opinion can be made independent, and safe, without making the gate hold less; the holds on discourse text need a reader of meaning, which is what the operator seated Tetsu for, on forum replies only (A322).
+
+**Checks.** `test_a497_hdc_witness.py`, registered JUDGE, runs on constructed data only (the exam is measured once, never in the suite): 8/8. Driven the other way, three breaks each CAUGHT: binding without the permutation, the clear threshold moved to the median, an empty text encoded as all +1.
