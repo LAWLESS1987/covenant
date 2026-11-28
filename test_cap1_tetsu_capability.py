@@ -189,9 +189,12 @@ rows_evict = TR.run(fake_server(False), "u", SYS, between=32, say=lambda *a: Non
 s_evict = TR.summary(rows_evict, None)
 check("CAP1.9 the replay runs A, A, then A after 1 and after 32 short asks", [r["step"] for r in rows_keep]
       == ["A1", "A2 (again)", "A after 1", "A after 32"], [r["step"] for r in rows_keep])
-check("CAP1.10 a server that keeps the prefix reads as reused throughout; one that loses it to short asks reads as "
-      "evicted", s_keep["reading"].startswith("reused throughout") and s_evict["reading"].startswith("reused back to back"),
-      (s_keep["reading"], s_evict["reading"]))
+# The A480 follow-up reports observed reuse, not a causal claim about eviction.
+check("CAP1.10 a server that keeps the prefix measures reuse at every step; one that loses it measures no reuse "
+      "after short asks", s_keep["back_to_back_reused"] is True and s_evict["back_to_back_reused"] is True
+      and all(s_keep[k] is True and s_evict[k] is False for k in ("reused_A_after_1", "reused_A_after_32"))
+      and "cause not established" in s_evict["reading"],
+      (s_keep, s_evict))
 check("CAP1.11 the rows keep numbers and an output hash, never the text", all("fine" not in json.dumps(r)
                                                                               for r in rows_keep + rows_evict))
 _saved_alive = M.alive
