@@ -19922,3 +19922,24 @@ It came from DeepSeek's answer in the 2026-11-10 consult (`ops/QUORUM_REASONING_
 **Why now.** The operator, 2026-11-26: "All work done in other chats ai and pcs towards mutual benefit should be worked in."
 
 **Checks.** AU1 15/15. It is additive: nothing calls it from the gate or from promotion.
+
+### A498. [linux / interoperability and the spiking network] A fresh Linux node joins the Windows-built chain (174 blocks, same tip hash), the gate scores the chain identically on both platforms, and the spiking network needs no cross-machine link -- MEASURED 2026-11-26
+
+**Renumbered 2026-11-27 (the hub, on the operator's "Let the hub do it").** This entry was written as A494 on `claude/linux-interop` (4c6f7e3). Main's A494 is the judge auditor (#123), which landed first, so this one is A498. A495-A497 are #125's, and A499 is the laptop's challenge solver. Its heading as first written:
+
+> A494. [linux / interoperability and the spiking network] A fresh Linux node joins the Windows-built chain (174 blocks, same tip hash), the gate scores the chain identically on both platforms, and the spiking network needs no cross-machine link -- MEASURED 2026-11-26
+
+The text below it is unchanged; only the number moved.
+
+**His words, 2026-11-26:** "Ensure interoperability communication and snn connections."
+
+**Counted first.** Tracked .py files that name the spiking network: 46 (unit: files). Its modules are `covenant_octopus.py`, `covenant_snn_backend.py`, `covenant_grid_snn.py`, `covenant_tetsu_collective.py`, `covenant_neural_bridge.py`, `covenant_grid_guard.py`: no Windows-only call and no network call in any of them. What crosses machines is the node network (`run_node.py` / `covenant_unified_v8.py`, listening on 0.0.0.0 with a per-platform exclusive bind, A19), the remote limb (`covenant_leg.py`, HTTP; its one Windows call is the memory probe, guarded) and the spore roads (`covenant_spore.py`: tailnet, LAN, relay).
+
+**Measured.**
+- The full Linux sweep of the merged code (b7b5c329, 685 s, RESULT PASS) ran every spiking and node-to-node suite green: octopus 34/34, SNN backends 10/10, GPU lease 13/13, grid guard 86/86, spore 32/32, gossip scale 23/23, peer version 14/14, anomaly eviction 71/71, listener bind 20/20, peer caller gate 20/20, mesh split 49/49, topology 26/26, chain serialisation 15/15, remote leg pin 21/21, leg policy 15/15. A124 is not in a sweep (it needs a node database).
+- A124 on a SQLite-backup copy of the operator's node A (175 judged payloads), with main's committed model (44d550e2): 3/3 on Windows (Python 3.12) and 3/3 on Linux (WSL Ubuntu, Python 3.14.4), margin 0.2680 on both. Every payload's score and verdict written out on each: identical once Windows' CRLF line endings are removed.
+- Chain sync, inside WSL: A serves that copy (its 2 stored peer registrations emptied, so it can reach nobody), B starts empty with the operator's Windows-made genesis.json and lists only A. B reached 174 blocks with A's tip hash 0000741582bd... in about 12 s. Blocks 166-173 were accepted under the catch-up waiver (held, nothing alleged), as designed. Kept as `linux/test_chain_join.sh`; driven the other way, a genesis with its timestamp changed is refused ("canonical genesis hash does not match its contents") and the script exits 1.
+- Two findings on the way, neither about Linux: a bare `covenant_unified_v8.py` with no judge settings defaults to the Claude judge, which fails closed without an API key, so it refused to sync at block 2; and it does not know the `deferring` provider (`run_node.py` registers it). Production starts through `run_node.py` with the right settings in both launchers, and `linux/README.md` now says to.
+- numpy: WSL's python3 has none, and `requirements.txt` does not list it (CI installs `numpy>=2,<3`, A484). The backend imports it lazily and falls back to pure Python, so nothing breaks; it is slower above 256 neurons (3.3 us vs 21.7 us measured, A483). `linux/README.md`'s first run now installs it with CI's pin.
+
+**Not measured.** A Windows node and a Linux node over a real network: this session's safety check refused a listener on all of the Windows PC's interfaces, and the core has no loopback-only option, so that waits for the first tower on the LAN or tailnet. Nothing has run on Debian 13 or Python 3.13.
