@@ -42,12 +42,100 @@ import json
 import os
 import re
 import sys
+import socket as _fsock
 import tempfile
 import time
 
-import covenant_highway as H
+# ---- A501: the network fence (installed before anything under test is imported) ----
+# A493 measured that this suite reached whatever services the machine it runs on
+# happens to serve: on the operator's PC the LIVE nodes A/B/C (5000/5020/5060), the
+# headscale and git-host ports, the model on 8081, the failover pair 8771/8772, the
+# test-mesh ports, and two HTTPS reads (threefold, the public CI). On a CI runner the
+# same calls were refused, at ~2 s each on Windows, so H1's duration and inputs
+# depended on the machine. The fence makes every run look like CI, at once: a connect
+# goes through only to a socket THIS process bound (H1's own throwaway servers);
+# anything else is refused immediately and counted, and a non-local name is not
+# looked up. No check's assertion changes: CI already ran all of them with every
+# outward call refused (Ubuntu lanes green), and the fence only makes that the rule.
+_FENCE = {"on": True, "own": set(), "refused": [], "real_out": []}
+_LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1", "0.0.0.0", "", "::"}
+_f_orig_bind = _fsock.socket.bind
+_f_orig_connect = _fsock.socket.connect
+_f_orig_connect_ex = _fsock.socket.connect_ex
+_f_orig_getaddrinfo = _fsock.getaddrinfo
+
+
+def _f_bind(self, addr):
+    out = _f_orig_bind(self, addr)
+    try:
+        _FENCE["own"].add(self.getsockname()[1])
+    except OSError:
+        pass
+    return out
+
+
+def _f_allowed(addr):
+    if not isinstance(addr, tuple) or len(addr) < 2:
+        return True                                   # AF_UNIX and the like: not the network
+    return str(addr[0]) in _LOCAL_HOSTS and addr[1] in _FENCE["own"]
+
+
+def _f_connect(self, addr):
+    if _f_allowed(addr):
+        return _f_orig_connect(self, addr)
+    if _FENCE["on"]:
+        _FENCE["refused"].append(addr[:2])
+        raise ConnectionRefusedError(111, "refused by H1's network fence (A501): %r" % (addr[:2],))
+    _FENCE["real_out"].append(addr[:2])
+    return _f_orig_connect(self, addr)
+
+
+def _f_connect_ex(self, addr):
+    if _f_allowed(addr):
+        return _f_orig_connect_ex(self, addr)
+    if _FENCE["on"]:
+        _FENCE["refused"].append(addr[:2])
+        return 111                                    # nonzero: "not listening", as on a CI runner
+    _FENCE["real_out"].append(addr[:2])
+    return _f_orig_connect_ex(self, addr)
+
+
+def _f_getaddrinfo(host, *a, **k):
+    h = host.decode() if isinstance(host, bytes) else host
+    if _FENCE["on"] and h is not None and str(h) not in _LOCAL_HOSTS:
+        _FENCE["refused"].append((str(h), a[0] if a else None))
+        raise _fsock.gaierror(_fsock.EAI_NONAME, "not looked up: H1's network fence (A501)")
+    return _f_orig_getaddrinfo(host, *a, **k)
+
+
+_fsock.socket.bind = _f_bind
+_fsock.socket.connect = _f_connect
+_fsock.socket.connect_ex = _f_connect_ex
+_fsock.getaddrinfo = _f_getaddrinfo
+
+import covenant_highway as H  # noqa: E402  (after the fence, on purpose)
+import covenant_gateway_attest as _GA  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__)) or "."
+
+# A501: the real detectors that this suite sweeps write two gitignored files in ops/. One is the gateway's
+# holds and its 15-minute stamp (A475): a test run that wrote it stopped the LIVE gateway check from
+# measuring for 15 minutes. The other is the threefold witness's cache. Point the gateway's at a temp
+# file (H1 already does this for the threefold cache where it drives it), and check at the end that
+# neither live file changed.
+_GA.STATE = tempfile.mktemp(suffix="_gateway_attest_state.json")
+_LIVE_OPS_FILES = [os.path.join(HERE, "ops", "gateway_attest_state.json"), H.THREEFOLD_CACHE]
+
+
+def _f_stat(p):
+    try:
+        st = os.stat(p)
+        return (st.st_size, st.st_mtime_ns)
+    except OSError:
+        return None
+
+
+_LIVE_OPS_BEFORE = {p: _f_stat(p) for p in _LIVE_OPS_FILES}
 
 results = []
 
@@ -2900,6 +2988,45 @@ def main():
     _tracked = os.path.exists(os.path.join(HERE, ".git")) and __import__("subprocess").run(
         ["git", "ls-files", "--error-unmatch", "ops/machine.json"], cwd=HERE, capture_output=True).returncode == 0
     check("H1mp ops/machine.json itself is not tracked: it is a fact about one machine", not _tracked)
+
+    # ---- H1net (A501): the suite reached nothing outside itself, and the counter can see it if it did ----
+    _out_during_suite = list(_FENCE["real_out"])
+    _refused_during_suite = len(_FENCE["refused"])
+    _changed = [os.path.relpath(p, HERE) for p in _LIVE_OPS_FILES if _f_stat(p) != _LIVE_OPS_BEFORE[p]]
+    check("H1net the live gateway holds file and the threefold cache are as the suite found them "
+          "(a test run no longer silences the gateway check for 15 minutes)", not _changed, str(_changed))
+    check("H1net every connect the suite made went to a socket this process bound; nothing reached the machine "
+          "or the internet", not _out_during_suite and _FENCE["on"],
+          "refused by the fence: %d; reached out: %r" % (_refused_during_suite, _out_during_suite))
+    _probe = _fsock.socket()
+    _probe.bind(("127.0.0.1", 0))
+    _free = _probe.getsockname()[1]
+    _probe.close()
+    _FENCE["own"].discard(_free)                     # a port nobody in this process is serving
+    _t0 = time.time()
+    _c = _fsock.socket()
+    try:
+        _c.settimeout(5)
+        _c.connect(("127.0.0.1", _free))
+        _refused = False
+    except ConnectionRefusedError:
+        _refused = True
+    finally:
+        _c.close()
+    check("H1net the fence refuses a connect outside the suite at once, and counts it",
+          _refused and time.time() - _t0 < 0.5 and _FENCE["refused"][-1] == ("127.0.0.1", _free),
+          "%.3fs" % (time.time() - _t0))
+    _FENCE["on"] = False                             # mutation: the fence off
+    _c = _fsock.socket()
+    try:
+        _c.settimeout(2)
+        _c.connect_ex(("127.0.0.1", _free))
+    finally:
+        _c.close()
+        _FENCE["on"] = True
+    check("H1net mutation: with the fence off, the same connect is SEEN going out (the guard can go red)",
+          _FENCE["real_out"] == [("127.0.0.1", _free)], str(_FENCE["real_out"]))
+    _FENCE["real_out"].clear()
 
     failed = [n for n, ok in results if not ok]
     print(f"\nH1: {len(results) - len(failed)}/{len(results)} passed")

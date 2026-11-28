@@ -19922,3 +19922,48 @@ It came from DeepSeek's answer in the 2026-11-10 consult (`ops/QUORUM_REASONING_
 **Why now.** The operator, 2026-11-26: "All work done in other chats ai and pcs towards mutual benefit should be worked in."
 
 **Checks.** AU1 15/15. It is additive: nothing calls it from the gate or from promotion.
+
+### A501. [ci / tests touching the live machine, A493's open item] test_h1_highway.py reached the live nodes, four other local services and two internet hosts, and wrote the live gateway state; a network fence and a temp state path make it hermetic -- RECORDED 2026-11-27
+
+**His words, 2026-11-27:** "figure it out and get it fixed. I thought Codex had fixed that. Consult with him and the others if need be." Then, asked whether to close A493's open item: "Use your discernment towards mutual benefit of all intelligence."
+
+**What the red was.** The Windows lane failed on PRs #107 and #112 because `test_h1_highway.py` hit its 180 s limit. A493 (main, 2026-11-26) had already raised the limit to 360 s. Both PRs were last updated before that, and both landed on main on 2026-11-24 anyway. Main's Windows lane is green: H1 ran 314/314 in 181.3 s. So no CI fix was needed. The cause A493 left open was the work.
+
+**Measured before the change** (main 394d507, the operator's PC, a socket trace loaded with `sitecustomize`, one run): 128 connects.
+- Besides H1's own throwaway servers, H1 reached:
+  - the LIVE nodes on 5000/5020/5060 (45 health reads);
+  - the headscale (8080) and git-host (8088) ports;
+  - the model on 8081 (8 refused connects, 16.2 s);
+  - the failover pair 8771/8772;
+  - the test-mesh ports 6000/6020/6060;
+  - two HTTPS hosts: the threefold read (8 connects) and the public CI read.
+- The calls came from `report()`, `run_once()` and `sense()` without an explicit `health`, from the check that every real detector returns a real state, and from `heal()`.
+- It also wrote two gitignored files in `ops/`:
+  - `threefold_witness.json`;
+  - `gateway_attest_state.json`. This one holds A475's gateway holds and its 15-minute stamp, so a test run silenced the LIVE gateway check for 15 minutes. Holds were kept, never cleared: `check()` pops a hold only on an "ok" measurement.
+- The suite's own comments said it was hermetic and did not reach the network (`covenant_one.py`'s H1 entry, and H1's gateway_impostor block). That was not true until this change.
+
+**Changed** (`test_h1_highway.py`, `covenant_one.py` comment, `.gitignore`):
+- A network fence, installed before anything under test is imported. A connect goes through only to a port that this process bound. Anything else is refused at once and counted: `ConnectionRefusedError` from `connect`, nonzero from `connect_ex`. A non-local name is not looked up.
+- This is the condition every CI lane already ran all of H1's checks under, so no assertion moved.
+- `covenant_gateway_attest.STATE` is pointed at a temp file for the run.
+- `ops/gateway_attest_state.json` is gitignored beside the threefold cache. It is one machine's runtime state, and it showed as untracked in the live checkout.
+
+**New checks, H1net, each driven both ways:**
+- Nothing reached out.
+  - Green: 86 refused, 0 out.
+  - Red: a probe copy with the fence off from the start goes red and names the live connects (8081, 8080, 8088, 6000/6020/6060, 443 x2, 8771/8772, 5000/5020/5060).
+- The fence refuses at once and counts the refusal (0.000 s).
+- Mutation: with the fence off, the counter sees a connect go out.
+- The two live `ops/` files are as the suite found them.
+  - Red: a probe copy without the temp state path, run with no state file present, creates it and the check goes red.
+  - Green: with the temp path, no state file appears.
+- The probe copies and the files they wrote are in `.trash/a501_probes/` (gitignored) with WHY.txt.
+
+**After.** Counted two ways that can disagree:
+- the fence's own count: 0 out, 86 refused;
+- an independent socket trace: 78 connects got through, all to loopback ephemeral ports, H1's own servers.
+
+H1 is 318/318: 314 old checks unchanged and 4 new. Through `covenant_one.py --ci --only test_h1_highway.py` on the PC it took 69.9 s, RESULT PASS; before the change it took 93.8 s (A493). The CI budget stays 360 s.
+
+**Not measured here:** the Windows and Linux CI lanes on this branch. They run when it is pushed.

@@ -478,6 +478,8 @@ ops/model_asks.jsonl
 ops/model_asks.jsonl.prev
 # A294 (2026-10-07): the threefold witness's readings and its first-seen gaps
 ops/threefold_witness.json
+# A501 (2026-11-27): the gateway attestation's holds and 15-minute stamp (A475) -- runtime state of one machine
+ops/gateway_attest_state.json
 # A405 (2026-11-02): the highway's per-copy mirror-lag cycle counts (first-seen lag, cycles behind the unison target)
 ops/unison_lag_witness.json
 # A375 (2026-10-27): the spiking witness's negatives-accrual pipeline -- runtime state, accrues over months
