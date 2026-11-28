@@ -19,7 +19,68 @@ lives in that folder as its README says host config should).
 The script has not yet started a real node on Debian. That happens on the
 first tower, and until then the live start is **UNDETERMINED**.
 
+## A tower: one node, its own identity, one address (A500)
+
+**A tower does not follow "First run on a fresh Debian 13 machine" below.**
+- That section is the laptop's three production nodes. It copies
+  `covenant_A.db.key`, the founder key, and its nodes listen on every interface.
+- On a tower it would make another node A, reachable from the whole office
+  network.
+
+A tower uses `linux/covenant_tower.sh` instead.
+
+```sh
+sudo apt install git python3 python3-venv
+git clone https://github.com/LAWLESS1987/covenant.git && cd covenant
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt "numpy>=2,<3"
+# join the tailnet first (the operator's sign-in), then:
+cat > ops/tower.env <<'EOF'
+COVENANT_TOWER_ID=E
+COVENANT_TOWER_PEERS=<main PC's tailnet address>:5081
+EOF
+linux/covenant_tower.sh            # start
+linux/covenant_tower.sh status
+linux/covenant_tower.sh stop       # deletes nothing
+```
+
+- **Its own identity.**
+  - One node per tower, with a letter from E to Z. A, B and C (the laptop) and
+    D (the main PC) are refused.
+  - On first start the node makes its own key, `nodeE_prod.db.key`, readable by
+    this account only. Back it up: it is this node's identity.
+  - Nothing else is copied but `genesis.json`, which is in the repository.
+- **One address.**
+  - By default the node listens on `tailscale ip -4`, or on
+    `COVENANT_TOWER_BIND`. Empty, `0.0.0.0` and `::` are refused.
+  - `linux/run_node_bound.py` replaces the core's every-interface default for
+    all three listeners (API, peer, bridge) at runtime, the way the main PC's
+    node D has since 2026-10-31.
+- **Refused while a production key is on the machine:** `covenant_A.db.key`,
+  `nodeA..D_prod.db.key`, or `~/.covenant-keys/covenant_A.db.key`. Move it off;
+  the script deletes nothing.
+- **Settings:** `COVENANT_TOWER_ID`, `_BIND`, `_PEERS` and `_PORT` (default
+  5000; the peer port is +1), from the environment or `ops/tower.env`. That
+  file sets those four names and nothing else.
+- **Not done:** start at boot, a watchdog (`covenant_watchdog.py` watches A, B
+  and C by name), or timers. Those come after the first tower has run.
+- **Before a tower is dialled back:**
+  - the main PC's node D and the laptop's A, B and C list peers by hand (A29);
+  - adding a tower's address to them is a separate step, on each machine's own
+    word.
+
+**Tests:**
+
+```sh
+bash linux/test_covenant_tower_sh.sh "$PWD"      # must end "0 failed"
+bash linux/mutate_covenant_tower_sh.sh "$PWD"    # every line CAUGHT
+```
+
+`test_a500_tower_launcher.py` runs the wrapper's refusals on every platform,
+and the shell suite where bash and `/proc` exist.
+
 ## First run on a fresh Debian 13 machine
+
+*(The laptop's production nodes A, B and C. Not a tower: see A500 above.)*
 
 ```sh
 sudo apt install git python3 python3-venv curl

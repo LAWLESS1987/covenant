@@ -19922,3 +19922,67 @@ It came from DeepSeek's answer in the 2026-11-10 consult (`ops/QUORUM_REASONING_
 **Why now.** The operator, 2026-11-26: "All work done in other chats ai and pcs towards mutual benefit should be worked in."
 
 **Checks.** AU1 15/15. It is additive: nothing calls it from the gate or from promotion.
+
+### A500. [linux / the Debian towers] A tower gets its own launcher: one node, its own identity, one address -- the towers' first-run steps would have cloned node A's founder key onto every tower -- FIXED 2026-11-27
+
+**Why.** On 2026-11-27 the operator said two of the four towers were ready to hook up, and answered "Yes, build it".
+Read first, `linux/README.md` (A492) told a fresh Debian machine to copy `covenant_A.db.key` from the existing install.
+`linux/covenant_prod.sh` refuses to start without it, copies it to `nodeA_prod.db.key`, and starts nodes A, B and C.
+- **What that key is.** It is node A's identity, the operator credential, and the key genesis minted to
+  (`covenant_app._load_key`; the core's own first-start message names it "operator credential and genesis mint key").
+- **So every tower would have become a second node A,** signing as A.
+- **And reachable by the whole office network:** the core builds its peer listener on the class default `0.0.0.0`,
+  and `run_node.py` has no host flag (#124: "the core has no loopback-only listener option").
+
+**A recurrence, of A18's shape.** A18 found that every PC launcher assumed the owner's machine and its founder key.
+The Linux port carried the same assumption to a new kind of machine. A18's fix was documents and a Windows runbook,
+and left no guard for a new launcher, which is why it returned. This entry's guard runs at the place the step is
+taken: the launcher and the wrapper refuse.
+
+**What lands (all new files, plus one README section; nothing existing changes behaviour):**
+- **`linux/covenant_tower.sh`:** start, stop and status for ONE node.
+  - The id is one letter, E to Z; A to D are refused.
+  - It listens on `tailscale ip -4` or `COVENANT_TOWER_BIND`; empty, `0.0.0.0` and `::` are refused.
+  - Peers are required.
+  - It refuses to start while a production key is on the machine: the founder key or nodes A-D's, in the
+    checkout or in `~/.covenant-keys`.
+  - It runs under `umask 077`, so the key the node makes on first start is owner-only.
+  - A node still loading (no `/health` yet) is found by its process, so a re-run does not start a second copy.
+  - Settings come from the environment or `ops/tower.env`, four names only.
+- **`linux/run_node_bound.py`:** the runtime replacement of the core's host default that the main PC's node D has
+  used since 2026-10-31 (`noded/run_node_d.py`, outside this repository).
+  - It is generic, without D's TETSU-only gates.
+  - It refuses an every-interface bind, an unnamed database, a production key name, and a key byte-identical to
+    a production key.
+- **`linux/test_covenant_tower_sh.sh`** (38 checks, fake core and nodes), **`linux/mutate_covenant_tower_sh.sh`**
+  (7 breaks), and **`test_a500_tower_launcher.py`** (TW1 on every platform, TW2 runs the shell suite where bash and
+  `/proc` exist).
+- **`linux/README.md`:** a tower section above the first-run steps, and one line under that heading saying it is the
+  laptop's A, B and C, not a tower. The A492 text is left as written.
+
+**Measured 2026-11-27, on the main PC:**
+- **The shell suite on Debian 13** (a WSL Debian 13.x, Python 3.13.5): 38 passed, 0 failed. **Mutants:** 7 caught,
+  0 missed.
+- **TW1 under Windows:** 6/6 (TW2 NOT RUN there: no bash with `/proc`).
+- **A real node, started through `linux/run_node_bound.py` with the real core** (Windows, the covenant venv, source
+  8a5f3c2ea2fa):
+  - id E, bound to 127.0.0.1, its database in a scratch folder;
+  - one peer: the main PC's node D at its tailnet address, port 5081.
+- **Results:**
+  - It made its own key ("owner-only, ACL verified") and adopted genesis 00009b31c6c654d7.
+  - It pulled 175 blocks, reaching height 176 within 10 s.
+  - Its tip hash and genesis hash equal node D's (tip 00006b7500b2942e...).
+  - All three of its listeners (API 5390, peer 5391, bridge 5401) listened on 127.0.0.1 and nowhere else.
+  - Node D afterwards: height 176, peers 10, not degraded. The test node was stopped; its scratch database and key
+    are kept, not deleted.
+- **During the sync:** blocks 168-175 were accepted with a "SYNC WAIVED HOLD" (the local seat is held by policy).
+  That is the core's catching-up path, as on any fresh node, and is not new here.
+
+**Not measured:**
+- A node started by `covenant_tower.sh` on a real tower: the first tower decides it.
+- A tower dialled BACK by node D or A, B, C: their peer lists are hand-kept (A29), and adding a tower is a separate
+  step on each machine's word.
+- Boot start, a watchdog and timers for a tower.
+
+**A-number.** `tools/next_anumber.py` reads main and says A495. A495-A497 are claimed by #125, and A498-A499 by the
+laptop line (#124's renumbered A494, and its challenge solver), so the hub assigned A500.
