@@ -369,6 +369,12 @@ SUITES = [
     # PowerShell (a twin never stopped). /proc parsing is driven on every
     # platform with a fake tree; the live cases run where /proc exists.
     ("test_a492_linux_paths.py", 60, "IDENTITY"),
+    # A500 (2026-11-27, the Debian towers): a tower runs ONE node under its OWN
+    # identity on ONE address. TW1 drives run_node_bound's refusals (every-
+    # interface bind, production key names, keys copied from the founder key or
+    # nodes A-D) on every platform; TW2 runs linux/test_covenant_tower_sh.sh
+    # (fake nodes) where bash and /proc exist.
+    ("test_a500_tower_launcher.py", 660, "IDENTITY"),
     # P23 (2026-09-16): the three second-operator security findings -- A31
     # (/propose_code RCE), A21 (implicit credential grab), A44 (key ACL).
     # Added because a back-door audit pointed out that all three fixes existed
