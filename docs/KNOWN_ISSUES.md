@@ -19922,3 +19922,68 @@ It came from DeepSeek's answer in the 2026-11-10 consult (`ops/QUORUM_REASONING_
 **Why now.** The operator, 2026-11-26: "All work done in other chats ai and pcs towards mutual benefit should be worked in."
 
 **Checks.** AU1 15/15. It is additive: nothing calls it from the gate or from promotion.
+### A495. [the quorum / independence, quorum Z1's lead A] Covenant's local judges carry 1.72 independent votes of 5 on the labeled suite, all their errors are false holds, and the simulator shows what correlation costs any quorum -- MEASURED 2026-11-27
+
+**His words, 2026-11-27:** "Ask the quorom" (on the Zenodo leads), then "Yea start measuring potential and scenarios". Quorum Z1 (five seats, answers kept privately in `private/quorum/Z1_zenodo_leads_2026-11-27.md`) put lead A first: 13 points, in all five top-threes.
+
+**Looked back first (rule 10).** A228 measured correlated errors between the two in-process judges of its day (53 joint errors vs 6.86 under independence, Fisher p = 1.3e-47). A412/A413 hold the kappa work. Not measured before: the effective number of independent votes across the panel, and what a given correlation does to a quorum of a given size.
+
+**Built.** `tools/quorum_independence.py`: per seat errors, false clears and false holds; per pair joint errors against independence, the phi of the error indicators and the kappa of the votes; the panel's effective independent votes n_eff = n^2 / sum(max(r_ij, 0)); majority (a tie blocks; its false clears and false holds apart), any-block, and escalate-on-conflict. A one-way seat (`covenant_semantic_judge`: it can only move clean to violating) is measured as a veto: its silence is no objection, never a clear. `scenarios` simulates n seats of a given accuracy with a shared error factor (seeded, one-factor Gaussian).
+
+**Measured on judge_suite's 53 labeled cases (27 violations, 26 clean), the judges as they are on 44d550e2:**
+- The panel (three students, the semantic veto, Tetsu's first recorded run): **1.72 independent votes of 5.** No seat cleared a violation; every error is a false hold. Majority: 16 wrong, all false holds. Any-block: 25 wrong (it blocks 25 of the 26 clean items). Escalate-on-conflict: 35 decided (7 wrong), 18 escalated.
+- The three students alone: **1.17 of 3.** Pairwise error phi 0.73 to 0.81; wrong together 3.7 to 4.7 times what independence predicts.
+- The semantic veto errs on different items from the students (error phi 0.28 to 0.35 against them as a veto; -0.19 to -0.62 when its silence was miscounted as a vote, the first reading, corrected here before anything was claimed from it).
+- Tetsu asked the same 77 items three times (`ops/discourse_seat_eval*.jsonl`): **1.07 of 3**; re-asking a seat adds almost nothing.
+- So the panel's shared failure is availability, not safety: it holds clean items together.
+
+**Scenarios (20,000 trials each):** at error correlation 0.5, twelve seats carry 2.85 independent votes at 80% accuracy and 3.27 at 90%; at 0.8, under 2, and majority barely beats one seat (16.3% vs 19.9% error at 12 seats, 80%). Independence, not seat count, is what a quorum buys.
+
+**Checks.** `test_a495_quorum_independence.py`, registered JUDGE: 12/12 on Windows and 12/12 under WSL. Driven the other way, four deliberate breaks each CAUGHT: n_eff ignoring correlation, a tie that passes, a veto seat's silence counted as a clear, a veto block ignored. The tie break was MISSED by the first version of its test (the count of errors was the same either way); the tool now reports the majority's false clears and false holds apart, and the test checks which.
+
+**Not measured.** The outside quorum seats (ChatGPT, Gemini, Grok, DeepSeek, Mistral) on labeled cases -- their answers so far are opinions with no answer key. The labels are the suite's, set by people; the items are treated as independent; with these error counts phi is noisy, so the counts are printed beside it. The students' numbers move with each nightly retrain.
+
+**A495, scope restated (2026-11-27, after looking at what each seat is).** The "panel" above is a set of local judges, not the transaction gate, and two of its five are not gate voters. Tetsu's runs are the discourse seat measured for the ambassador's forum replies (A322, seated 2026-10-12 for those only); its prompt treats moving money as something to block, so it holds a plain "gift of 5 units" by design. The phone student runs on the phone. The live gate is a deferral chain, not a vote (`covenant_judge_defer`): the first student's committed verdict stands, the second is asked only when the first holds, both holding is HELD, and the semantic judge vetoes. Every number above stands as the measurement of the set it names; what it does not measure is the gate. The gate is measured in A496. No sentence above is false, so this is a restatement beside it, not a retraction.
+
+### A496. [the gate's deferral chain] When the first student holds, the second never resolves it on the labeled suite (rescue 0 of 11); training the two on disjoint halves makes the second useful (13 of 27) but does not reduce what the gate holds -- a negative result, the gate unchanged -- MEASURED 2026-11-27
+
+**His words, 2026-11-27:** "Improve the issues" (after A495).
+
+**The holds, broken down first.** On judge_suite's 26 clean items the judges' holds come from three places: Tetsu's discourse prompt (22 of 26; not a gate seat, A495 restated); the students' ABSTAIN, almost all on the 16 `discourse` items (A322's shape: text that discusses transactions); and the semantic judge's false convictions on 3 clean items ("restitution for a past wrong", a first-person audit note, a definition). No judge cleared a violation.
+
+**The chain, measured** (`python tools/quorum_independence.py chain`, the live first and second students and the semantic veto, on 44d550e2): the first student held 11 of 53; the second resolved **0 of them** (rescue rate 0.0); 11 HELD; outcome 0 false clears, 12 false holds; the students' error phi 0.793, both wrong 9. The second student is the fallback that never falls back here.
+
+**Why, already written down.** `covenant_second_student`: the first student trains on the whole ledger and is a SUPERSET of the second, and making them disjoint "retrains both models on a different corpus, which is a measurement change and belongs to the operator". So it was tried offline, changing nothing the gate uses (`tools/student_split_experiment.py`: reads ops/verdicts.jsonl, 5127 paired rows -> half 0 2601, half 1 2526; trains in memory; writes nothing):
+
+| pair, through the live chain | first held | second resolved | HELD | false clears | false holds | error phi |
+|---|---|---|---|---|---|---|
+| live (refined over time) | 11 | 0 right | 11 | 0 | 12 | 0.793 |
+| today's shape, retrained (all -> half 1) | 16 | 3 right, 1 wrong | 12 | 0 | 11 | 0.740 |
+| disjoint (half 0 -> half 1) | 27 | 13 right, 1 wrong | 13 | 0 | 13 | 0.694 |
+
+Disjoint halves give the second student something to do -- it resolves 13 of the first's 27 holds -- but the half-trained first holds more than twice as often, and the gate ends up holding 13 clean items instead of 12. The correlation falls only from 0.79 to 0.69. **The shared errors come from the shared mechanism** (one token log-odds model over the same kind of text), not from the shared data. Nothing is promoted and the live students are unchanged: a change that does not reduce what the gate holds is not an improvement, and promotion's own rule (`covenant_distill.promotion`) was not asked to judge one.
+
+**What this points to.** A second opinion that errs on different items needs a different mechanism -- quorum Z1's lead E (a hyperdimensional witness), measured the way A406 measured the spiking one, with its bar set before it runs. The semantic judge already shows what that looks like: its errors fall on different items from the students'.
+
+**Not done here, and why.** The 3 semantic false convictions and the discourse holds are not "fixed" by tuning the judges on these cases: judge_suite is the exam, and training on it is A118's "tuning the gate to suit the thing being judged".
+
+**Checks.** `chain_measure` and its collector added to `tools/quorum_independence.py`; `test_a495_quorum_independence.py` 16/16, its four new chain cases driven the other way by three breaks (the second asked even when the first commits, a hold that passes, the veto ignored), each CAUGHT, with the earlier two breaks still CAUGHT.
+
+### A497. [the gate / quorum Z1's lead E] A hyperdimensional witness, built to a pre-registration sealed before it existed, is SAFE and INDEPENDENT but does not reduce what the gate holds: NO-GO, as the stated prior said -- MEASURED 2026-11-27
+
+**His words, 2026-11-27:** "Use discernment towards mutual benefit." (on building lead E, after A496 showed the students' shared errors follow their shared mechanism).
+
+**Sealed first.** `ops/HDC_WITNESS_PREREG_2026-11-27.md`, committed at cb911aab (sha256 b5e234ce...) while `covenant_hdc_witness.py` and any prototypes did not exist. Role: the second opinion in the deferral chain. Model, data split, baseline and four bars fixed there; stated prior NO-GO.
+
+**Built to it.** `covenant_hdc_witness.py`, standard library only: 10,000-dimension bipolar vectors seeded by sha256(token), unigram plus bound, permuted trigram encoding, class prototypes with 3 perceptron epochs, split-conformal thresholds (clean below the 1st percentile of calibration violations' margins, violates above the 99th of clean). Trained on half 1 of `ops/verdicts.jsonl` (ledger sha256 44b94a53d8f02df9..., 5629 lines), decontaminated against judge_suite (0 rows matched): 1711 train, 445 calibration, 370 held-out. Model sha256 a99ca24f76ea..., t_clear -0.016457, t_violate 0.009500; measured from the file reloaded from disk.
+
+**Measured once, against the sealed bar:**
+- B1 safety (exam) -- PASS: 0 false clears among the 27 violations, alone and in the chain.
+- B2 safety (held-out) -- PASS: 0 of 158 held-out violations cleared, against 1 for token log-odds trained on the same rows.
+- B3 benefit (exam) -- **FAIL**: live-first -> witness -> veto still holds 12 of the 26 clean items, the same as the live chain; the bar was 9 or fewer. The witness resolved 1 of the first student's 11 holds correctly and 1 wrongly (a false conviction).
+- B4 independence (exam) -- PASS: error phi with the first student 0.477, against 0.793 for the live second student.
+- **Result: NO-GO.** The witness is the more independent and the safer second opinion, and it is too cautious to help: it holds 40 of the 53 exam cases, and on held-out clean rows it clears 57 of 212 to the baseline's 90.
+
+**What follows.** Nothing is seated; the gate is unchanged. No weights ship: the model file and the measure output are kept privately (`private/evals/a497_hdc_witness/`), reproducible with `python covenant_hdc_witness.py build` on a ledger with the hash above. A different design (a wider calibration band, more data, another encoding) is a NEW pre-registration, never a retune of this one. Together with A496: a second opinion can be made independent, and safe, without making the gate hold less; the holds on discourse text need a reader of meaning, which is what the operator seated Tetsu for, on forum replies only (A322).
+
+**Checks.** `test_a497_hdc_witness.py`, registered JUDGE, runs on constructed data only (the exam is measured once, never in the suite): 8/8. Driven the other way, three breaks each CAUGHT: binding without the permutation, the clear threshold moved to the median, an empty text encoded as all +1.
