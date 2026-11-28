@@ -35,9 +35,9 @@ linux/covenant_prod.sh status
 **Start nodes only through `linux/covenant_prod.sh`** (or `run_node.py` with
 its judge settings). A bare `python3 covenant_unified_v8.py` falls back to the
 Claude judge, which fails closed without an API key, so it refuses to sync from
-block 2 on; and it does not know the `deferring` judge production uses (A494).
+block 2 on; and it does not know the `deferring` judge production uses (A498).
 
-## Interoperability, measured (A494)
+## Interoperability, measured (A498)
 
 - **The Windows-built chain joins on Linux.** A fresh Linux node, started with the
   Windows `genesis.json`, synced all 174 blocks of a copy of node A's chain from

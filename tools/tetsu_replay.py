@@ -85,24 +85,52 @@ def run(post, url, system, between=32, max_tokens=48, temperature=0.0, say=print
 
 
 def summary(rows, prompt_tokens):
-    """What the rows say, in words: reused or not, and where."""
+    """Describe measured majority-prefix reuse; missing telemetry is unknown, not no."""
     by = {r["step"]: r for r in rows}
-    full = max(1, int(prompt_tokens or (by.get("A1") or {}).get("prompt_n") or 1))
+
+    def count(v):
+        return v if type(v) is int and v >= 0 else None
+
+    a1 = by.get("A1", {})
+    full = count(prompt_tokens)
+    if not full and count(a1.get("cache_n")) == 0:
+        full = count(a1.get("prompt_n"))
 
     def reused(r):
-        return r is not None and (r.get("prompt_n") or full) < 0.5 * full
+        if r is None:
+            return None
+        read, cache = count(r.get("prompt_n")), count(r.get("cache_n"))
+        if read is None:
+            return None
+        if cache is not None:
+            return cache > read if cache + read > 0 else None
+        if full and read <= full:
+            return 2 * read < full
+        return None
 
+    def digest(r):
+        h = r.get("out_sha")
+        # Old rows hash empty/missing content to this value. It proves no parity.
+        return h if isinstance(h, str) and h and h != "e3b0c44298fc1c14" else None
+
+    x, y = digest(a1), digest(by.get("A2 (again)", {}))
     out = {"back_to_back_reused": reused(by.get("A2 (again)")),
-           "parity_A1_A2": (by.get("A1") or {}).get("out_sha") == (by.get("A2 (again)") or {}).get("out_sha")}
+           "parity_A1_A2": x == y if x and y else None}
     for label, r in by.items():
         if label.startswith("A after"):
             out["reused_" + label.replace(" ", "_")] = reused(r)
-    if not out["back_to_back_reused"]:
-        out["reading"] = "not reused even back to back: the prefix or the request changes, or caching is off"
-    elif not all(v for k, v in out.items() if k.startswith("reused_A_after")):
-        out["reading"] = "reused back to back but lost after short asks: they evict it (host cache not restoring)"
+    first = out["back_to_back_reused"]
+    after = [v for k, v in out.items() if k.startswith("reused_A_after")]
+    if first is None:
+        out["reading"] = "insufficient telemetry to classify back-to-back reuse"
+    elif first is False:
+        out["reading"] = "majority reuse not observed back to back; cause not established"
+    elif any(v is False for v in after):
+        out["reading"] = "majority reuse observed back to back but not after some short asks; cause not established"
+    elif not after or any(v is None for v in after):
+        out["reading"] = "majority reuse observed back to back; short-ask evidence incomplete"
     else:
-        out["reading"] = "reused throughout: on this server the cause is elsewhere (unloads, timing, other requests)"
+        out["reading"] = "majority reuse observed at all measured steps; cause of other latency not established"
     return out
 
 

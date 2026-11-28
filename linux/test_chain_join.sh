@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  linux/test_chain_join.sh -- can a fresh Linux node join an existing chain? (A494)
+#  linux/test_chain_join.sh -- can a fresh Linux node join an existing chain? (A498)
 #
 #  Two throwaway nodes on this machine, on spare ports, in a temp folder:
 #    A serves a COPY of a chain database (its stored peer list emptied, so it
