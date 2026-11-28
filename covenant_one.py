@@ -762,6 +762,9 @@ SUITES = [
     # ~2.04 s on Windows (measured), ~61 of them: H1 took 205 s with those ports refused here, and CI killed it at
     # 180 s on main (f0228b8f) and on PR #121 alike, 0 checks failed. Not the check moved: the kill time, with the
     # cause named. That H1 reads the machine's live services at all is the open part (A493).
+    # A501 (2026-11-27): closed. A network fence in H1 refuses, at once and counted, every connect but its own
+    # throwaway servers' (H1net, driven both ways), so the "no node and no network" above holds from A501 on; it
+    # did not before. Through this runner on the operator's PC: 69.9 s, 318/318. The budget stays 360 s.
     ("test_h1_highway.py", 360, "DAILY + GUARDS"),
     # SF1 (2026-11-02, A405): the highway's sync-fabric detectors and remedies, each driven both ways. The
     # unison feed's staleness, a sync task that fails or stops firing (re-run, AUTO_REVERSIBLE), a task gone
